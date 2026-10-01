@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Танкові Баталії 2.5D: Ідеальна Синхронізація</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="relative text-white">
+
+    <!-- Глобальні налаштування -->
+    <div id="settings-modal" class="modal hidden absolute inset-0 z-[100] flex items-center justify-center p-4">
+        <div class="bg-slate-800 p-8 rounded-2xl max-w-sm w-full text-center shadow-2xl border-t border-slate-700">
+            <h2 class="text-2xl font-russo mb-6 text-white">НАЛАШТУВАННЯ</h2>
+            <div class="mb-6 text-left"><label class="text-sm font-bold uppercase text-slate-400 block mb-2">Музика</label><input type="range" id="vol-music" min="0" max="1" step="0.05" value="0.3" class="w-full"></div>
+            <div class="mb-8 text-left"><label class="text-sm font-bold uppercase text-slate-400 block mb-2">Звуки</label><input type="range" id="vol-sfx" min="0" max="1" step="0.05" value="0.6" class="w-full"></div>
+            <button id="close-settings-btn" class="w-full bg-slate-700 py-3 rounded-xl font-bold text-white shadow hover:bg-slate-600 transition">ЗАКРИТИ</button>
+        </div>
+    </div>
+
+    <!-- Авторизація -->
+    <div id="login-screen" class="flex flex-col items-center justify-center h-screen w-screen absolute z-30 bg-slate-900">
+        <div class="bg-slate-800 p-8 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] max-w-md w-full text-center border-t border-slate-700 relative">
+            <button id="login-settings-btn" class="absolute top-4 right-4 text-slate-400 hover:text-white transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            </button>
+            <h1 class="text-6xl mb-2 text-orange-500 drop-shadow-[0_0_15px_rgba(249,115,22,0.8)] font-russo mt-4">ТАНКИ</h1>
+            <p class="text-slate-400 mb-6 font-bold tracking-widest uppercase text-sm text-green-400">Військовий Облік</p>
+            
+            <div class="flex w-full mb-4 bg-slate-900 rounded-xl overflow-hidden border border-slate-700 shadow-inner">
+                <button id="tab-login" class="flex-1 py-3 text-sm font-bold uppercase transition bg-orange-600 text-white">Вхід</button>
+                <button id="tab-register" class="flex-1 py-3 text-sm font-bold uppercase transition text-slate-400 hover:bg-slate-800">Реєстрація</button>
+            </div>
+
+            <input type="text" id="nickname-input" placeholder="Логін" maxlength="12" class="w-full p-4 rounded-xl bg-slate-900 text-white mb-4 border border-slate-700 focus:outline-none focus:border-orange-500 text-xl font-russo text-center uppercase shadow-inner">
+            <input type="password" id="password-input" placeholder="Пароль" class="w-full p-4 rounded-xl bg-slate-900 text-white mb-6 border border-slate-700 focus:outline-none focus:border-orange-500 text-xl font-russo text-center shadow-inner">
+            
+            <button id="auth-btn" class="w-full bg-gradient-to-b from-orange-500 to-orange-700 hover:from-orange-400 hover:to-orange-600 text-white font-bold py-4 px-4 rounded-xl text-xl transition shadow-[0_5px_15px_rgba(249,115,22,0.4)] font-russo uppercase">УВІЙТИ В ГРУ</button>
+        </div>
+    </div>
+
+    <!-- Крамниця -->
+    <div id="shop-panel" class="fixed top-0 left-0 w-80 h-full bg-slate-800 z-40 transform -translate-x-full transition-transform duration-300 shadow-[20px_0_50px_rgba(0,0,0,0.8)] border-r border-slate-700 flex flex-col">
+        <div class="p-6 bg-slate-900 flex justify-between items-center border-b border-slate-700">
+            <h2 class="text-2xl font-russo text-emerald-400">АРСЕНАЛ</h2>
+            <button id="close-shop-btn" class="text-slate-400 hover:text-white font-bold text-xl">✕</button>
+        </div>
+        <div class="p-4 bg-emerald-900/30 text-center border-b border-emerald-500/30">
+            <p class="text-sm font-bold text-slate-400 uppercase">Ваш баланс</p>
+            <p class="text-3xl font-russo text-emerald-400">💵 <span id="shop-bucks">0</span></p>
+        </div>
+        <div class="p-4 overflow-y-auto flex-1 flex flex-col gap-4" id="shop-items-container"></div>
+        <div class="p-4 bg-slate-900 border-t border-slate-700">
+            <button id="buy-case-btn" class="w-full py-4 rounded-xl font-russo text-lg uppercase font-bold bg-gradient-to-b from-purple-500 to-purple-700 hover:from-purple-400 hover:to-purple-600 shadow-[0_0_15px_rgba(168,85,247,0.5)] transition">🎁 КЕЙС (50$)</button>
+        </div>
+    </div>
+
+    <!-- Модалки Крамниці -->
+    <div id="case-confirm-modal" class="modal hidden absolute inset-0 z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 p-8 rounded-2xl max-w-sm w-full text-center shadow-2xl border border-purple-500">
+            <h2 class="text-2xl font-russo mb-4 text-purple-400">УВАГА!</h2>
+            <p class="text-slate-300 mb-6 font-bold">Відкриття кейсу дає випадковий апгрейд БУДЬ-ЯКОГО рівня. Це може <span class="text-red-400">знизити</span> ваш поточний рівень, якщо випаде гірший! Ви впевнені?</p>
+            <div class="flex gap-4">
+                <button id="cancel-case-btn" class="flex-1 bg-slate-700 py-3 rounded-xl font-bold hover:bg-slate-600 transition">ВІДМІНА</button>
+                <button id="confirm-case-btn" class="flex-1 bg-purple-600 py-3 rounded-xl font-bold hover:bg-purple-500 transition text-white">ВІДКРИТИ</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="roulette-modal" class="modal hidden absolute inset-0 z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 p-8 rounded-2xl max-w-2xl w-full text-center shadow-[0_0_50px_rgba(168,85,247,0.5)] border border-purple-500 overflow-hidden relative">
+            <div class="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-full bg-red-500 z-10 shadow-[0_0_10px_red]"></div>
+            <div class="w-full h-20 bg-slate-800 border-y border-slate-600 overflow-hidden relative rounded">
+                <div id="roulette-tape" class="roulette-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Лобі -->
+    <div id="lobby-screen" class="hidden flex-col items-center justify-center h-screen w-screen absolute z-20 bg-slate-900 p-4 overflow-y-auto">
+        <div class="absolute top-4 w-full px-8 flex justify-between items-start z-30 pointer-events-none">
+            <div class="pointer-events-auto">
+                <button id="open-shop-btn" class="bg-emerald-700/80 hover:bg-emerald-600 border border-emerald-500 text-white px-6 py-3 rounded-xl font-russo text-lg shadow-[0_0_15px_rgba(16,185,129,0.5)] transition flex items-center gap-2">
+                    🛒 КРАМНИЦЯ <span class="text-sm bg-emerald-900 px-2 py-1 rounded">💵 <span id="lobby-bucks-display">0</span></span>
+                </button>
+            </div>
+            <div class="pointer-events-auto">
+                <button id="lobby-settings-btn" class="bg-slate-800/80 p-3 rounded-xl border border-slate-600 text-slate-300 hover:text-white hover:bg-slate-700 backdrop-blur shadow-lg">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-slate-800 p-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] max-w-4xl w-full text-center border-t border-slate-700 mt-16 relative z-10">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-4xl text-blue-400 font-russo drop-shadow-[0_0_10px_rgba(59,130,246,0.6)] flex items-center gap-4">
+                    ВІЙСЬКОВА БАЗА 
+                    <button id="logout-btn" class="text-sm font-sans text-red-500 hover:text-red-400 underline cursor-pointer">Вийти</button>
+                </h2>
+                <div class="bg-slate-900 px-4 py-2 rounded-lg border border-slate-700 text-sm font-bold shadow-inner flex items-center gap-2">
+                    <span class="text-slate-400">АДМІН:</span>
+                    <input type="password" id="admin-code" placeholder="Код" class="bg-transparent w-20 outline-none text-orange-400 text-center font-mono placeholder-slate-600">
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="col-span-1 bg-slate-900 p-4 rounded-xl border border-slate-700 text-left min-h-[300px] flex flex-col shadow-inner">
+                    <h3 class="text-xs uppercase text-slate-400 mb-3 font-bold border-b border-slate-700 pb-2 flex justify-between">
+                        <span>Гравці</span><span id="lobby-count" class="text-blue-400">0 / 6</span>
+                    </h3>
+                    <div id="players-list" class="space-y-3 overflow-y-auto flex-1"></div>
+                </div>
+                <div class="col-span-2 flex flex-col gap-4">
+                    <div class="bg-slate-900 p-4 rounded-xl border border-slate-700 text-left shadow-inner">
+                        <h3 class="text-xs uppercase text-slate-400 mb-3 font-bold">Ваш камуфляж</h3>
+                        <div class="grid grid-cols-6 gap-2" id="color-selectors">
+                            <button class="color-btn bg-white h-12 rounded-lg shadow-md" data-color="white"></button>
+                            <button class="color-btn bg-slate-900 border border-slate-700 h-12 rounded-lg shadow-md" data-color="black"></button>
+                            <button class="color-btn bg-red-600 h-12 rounded-lg shadow-md" data-color="red"></button>
+                            <button class="color-btn bg-blue-600 h-12 rounded-lg shadow-md" data-color="blue"></button>
+                            <button class="color-btn bg-amber-800 h-12 rounded-lg shadow-md" data-color="brown"></button>
+                            <button class="color-btn bg-purple-600 h-12 rounded-lg shadow-md" data-color="purple"></button>
+                        </div>
+                    </div>
+                    <div id="admin-panel" class="hidden flex-col gap-4">
+                        <div class="bg-slate-900 p-4 rounded-xl border border-orange-700/50 text-left shadow-inner">
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 class="text-xs uppercase text-orange-400 font-bold">Адмін Налаштування</h3>
+                                <button id="admin-save-btn" class="bg-orange-600 hover:bg-orange-500 text-white text-xs px-3 py-1 rounded font-bold transition">ЗБЕРЕГТИ</button>
+                            </div>
+                            <div class="flex flex-col gap-3">
+                                <div><label class="text-xs text-slate-500 mb-1 block">Режим Гри</label>
+                                    <div class="flex gap-2">
+                                        <div class="select-btn mode-select p-2 rounded-lg flex-1 text-center bg-slate-800 text-xs font-bold" data-mode="deathmatch">⚔️️ ДЕТМАТЧ</div>
+                                        <div class="select-btn mode-select p-2 rounded-lg flex-1 text-center bg-slate-800 text-xs font-bold" data-mode="survival">🧟 ВИЖИВАННЯ</div>
+                                    </div>
+                                </div>
+                                <div class="flex gap-4">
+                                    <div class="flex-[2]"><label class="text-xs text-slate-500 mb-1 block">Локація</label>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <div class="select-btn map-select p-2 rounded-lg text-center bg-slate-800 text-xs font-bold" data-map="city">🏙️ МІСТО</div>
+                                            <div class="select-btn map-select p-2 rounded-lg text-center bg-slate-800 text-xs font-bold" data-map="hangars">🏭 АНГАРИ</div>
+                                            <div class="select-btn map-select p-2 rounded-lg text-center bg-slate-800 text-xs font-bold" data-map="ship">🚢 КОРАБЕЛЬ</div>
+                                            <div class="select-btn map-select p-2 rounded-lg text-center bg-slate-800 text-xs font-bold" data-map="castle">🏰 ЗАМОК</div>
+                                        </div>
+                                    </div>
+                                    <div class="w-24" id="score-limit-container"><label class="text-xs text-slate-500 mb-1 block">Жетони</label>
+                                        <input type="number" id="win-score-input" min="1" max="1000" value="50" class="w-full p-2 rounded-lg bg-slate-800 text-white border border-slate-700 text-center font-bold outline-none h-10">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="view-panel" class="bg-slate-900 p-4 rounded-xl border border-slate-700 text-left flex justify-between items-center shadow-inner mt-auto">
+                        <div><p class="text-xs text-slate-500 uppercase">Режим / Карта</p><p id="view-map-name" class="font-bold text-lg text-blue-300">⚔️ 🏙️ МІСТО</p></div>
+                        <div class="text-right" id="view-score-container"><p class="text-xs text-slate-500 uppercase">Ціль</p><p id="view-win-score" class="font-bold text-lg text-orange-400">50</p></div>
+                    </div>
+                </div>
+            </div>
+            <button id="btn-ready" class="w-full py-5 rounded-xl font-bold bg-slate-700 text-slate-400 cursor-not-allowed mb-2 transition text-2xl font-russo uppercase shadow-lg">ОБЕРІТЬ КАМУФЛЯЖ</button>
+        </div>
+    </div>
+
+    <!-- Екран Гри -->
+    <div id="game-screen" class="hidden relative h-screen w-screen bg-black overflow-hidden">
+        <div id="damage-vignette" class="absolute inset-0 pointer-events-none z-10 transition-opacity duration-200" style="opacity:0; box-shadow: inset 0 0 150px 30px rgba(220, 38, 38, 1);"></div>
+        <div id="hitmarker" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20">
+            <svg width="40" height="40" viewBox="0 0 40 40"><path d="M12,12 L28,28 M28,12 L12,28" stroke="white" stroke-width="3" stroke-linecap="round"/></svg>
+        </div>
+
+        <div class="absolute inset-0 p-4 flex flex-col justify-between z-30 pointer-events-none">
+            <div class="flex justify-between items-start">
+                <button id="game-settings-btn" class="pointer-events-auto bg-slate-800/80 p-3 rounded-xl border border-slate-600 text-slate-300 hover:text-white hover:bg-slate-700 backdrop-blur shadow-lg">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                </button>
+                
+                <div id="buff-timer-container" class="hidden absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/90 px-4 py-2 rounded-2xl border border-slate-600 shadow-[0_0_20px_rgba(0,0,0,0.8)] flex items-center gap-3 pointer-events-none z-40 transition-opacity">
+                    <div id="buff-timer-icon" class="text-3xl drop-shadow-md">🔥</div>
+                    <div class="flex flex-col">
+                        <span id="buff-timer-name" class="text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">Ефект</span>
+                        <div class="w-40 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700 shadow-inner">
+                            <div id="buff-timer-bar" class="h-full bg-gradient-to-r from-orange-500 to-yellow-400 w-full transition-none"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="homing-target-ui" class="hidden absolute left-1/2 top-20 -translate-x-1/2 bg-emerald-900/80 border border-emerald-500 px-4 py-1 rounded-full text-emerald-400 font-bold text-xs tracking-widest uppercase shadow-[0_0_15px_rgba(16,185,129,0.5)]">
+                    🎯 Ціль захоплена (TAB)
+                </div>
+
+                <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-700 backdrop-blur shadow-lg w-56 text-right pointer-events-auto flex flex-col items-end">
+                    <h3 id="score-header" class="text-xs text-slate-400 mb-2 font-bold uppercase border-b border-slate-700 pb-1 w-full flex justify-between">
+                        <span>ЖЕТОНИ</span><span id="target-score-display" class="text-orange-400 font-russo">50</span>
+                    </h3>
+                    <div id="score-list" class="space-y-1 text-lg font-russo mt-2 w-full"></div>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-end w-full pb-2">
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-700 backdrop-blur-md shadow-lg w-72 flex flex-col pointer-events-auto">
+                    <div class="flex justify-between w-full items-center mb-2">
+                        <div class="text-xs font-bold text-slate-400 uppercase">Броня <span id="hp-text" class="text-white ml-1">500/500</span></div>
+                    </div>
+                    <div class="w-full h-4 bg-slate-800 rounded-full overflow-hidden border border-slate-600 shadow-inner">
+                        <div id="hp-bar" class="h-full bg-gradient-to-r from-green-500 to-green-400 w-full transition-all duration-300"></div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/90 p-4 rounded-2xl border border-slate-700 backdrop-blur-md shadow-lg w-64 flex flex-col pointer-events-auto">
+                    <div class="flex justify-between w-full items-center mb-2">
+                        <div class="text-xs font-bold text-slate-400 uppercase">Перезарядка</div>
+                        <div class="text-xs font-bold text-orange-400">ПРОБІЛ</div>
+                    </div>
+                    <div class="w-full h-4 bg-slate-800 rounded-full overflow-hidden border border-slate-600 shadow-inner relative">
+                        <div id="cooldown-bar" class="h-full bg-orange-500 w-full transition-none"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="countdown-overlay" class="hidden absolute inset-0 z-40 flex items-center justify-center bg-black/80 pointer-events-none backdrop-blur-sm">
+            <div id="countdown-text" class="text-[12rem] font-russo text-white drop-shadow-[0_0_40px_rgba(249,115,22,1)] scale-150 transition-transform">3</div>
+        </div>
+        <div id="wave-overlay" class="hidden absolute inset-0 z-40 flex items-center justify-center pointer-events-none">
+            <div id="wave-text" class="text-7xl font-russo text-red-500 drop-shadow-[0_0_30px_rgba(220,38,38,1)] animate-bounce">ХВИЛЯ 1</div>
+        </div>
+        
+        <div id="winner-modal" class="modal hidden absolute inset-0 z-50 flex items-center justify-center p-4">
+            <div class="bg-slate-900 p-10 rounded-3xl max-w-lg w-full text-center shadow-[0_0_100px_rgba(250,204,21,0.4)] border border-yellow-500/50">
+                <div id="winner-emoji" class="text-8xl mb-6">🏆</div>
+                <h2 id="winner-title" class="text-5xl font-russo mb-4 text-yellow-400">ПЕРЕМОГА!</h2>
+                <p id="winner-message" class="mb-4 text-2xl font-bold text-white"></p>
+                <div class="bg-slate-800 rounded-xl py-3 px-6 mb-8 inline-block border border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                    <p class="text-sm font-bold text-emerald-400 uppercase">Нагорода</p>
+                    <p class="text-3xl font-russo text-white">💵 +<span id="winner-reward">0</span></p>
+                </div>
+                <button id="back-to-lobby-btn" class="w-full bg-gradient-to-b from-blue-600 to-blue-800 text-white font-bold py-4 rounded-xl text-xl font-russo uppercase shadow-lg hover:from-blue-500 hover:to-blue-700 transition">НА БАЗУ</button>
+            </div>
+        </div>
+        <div id="game-container"><canvas id="game-canvas"></canvas></div>
+    </div>
+
+    <!-- ТУТ БУДУТЬ ПІДКЛЮЧАТИСЯ НАШІ НОВІ ФАЙЛИ JS -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>const socket = io();</script>
+    <script src="js/config.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/network.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/ui.js"></script>
+
+</body>
+</html>

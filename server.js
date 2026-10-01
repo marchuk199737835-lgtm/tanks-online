@@ -7,9 +7,10 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { MongoClient } = require('mongodb');
 
-app.use(express.static(path.join(__dirname)));
+// ВКАЗУЄМО СЕРВЕРУ ПАПКУ PUBLIC
+app.use(express.static(path.join(__dirname, 'public')));
 
-// --- НОВА МУЗИЧНА СИСТЕМА ---
+// Папка з музикою залишається в корені
 const musicDir = path.join(__dirname, 'music');
 if (!fs.existsSync(musicDir)) fs.mkdirSync(musicDir); 
 
@@ -31,7 +32,8 @@ scanMusic();
 
 app.use('/music', express.static(musicDir));
 
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+// ВІДДАЄМО INDEX.HTML З ПАПКИ PUBLIC
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 const MAX_HP = 500;
 const BUFF_DURATION = 15000;
@@ -150,7 +152,6 @@ function sendEconomy(socketId, name) {
 
 io.on('connection', (socket) => {
     
-    // Надсилаємо список музики відразу при підключенні
     socket.emit('initMusic', musicData);
     
     function setupPlayer(socket, name, token) {
@@ -416,7 +417,6 @@ setInterval(() => {
     if (now - lastPowerupSpawn > 30000) {
         lastPowerupSpawn = now;
         const types = ['fast', 'explosive', 'piercing', 'incendiary', 'minigun', 'boss', 'invisible', 'shotgun', 'homing'];
-        
         if (Object.keys(powerups).length > 10) delete powerups[Object.keys(powerups)[0]];
         for(let i=0; i<2; i++) {
             const pid = 'pu_' + now + '_' + i;
