@@ -5,13 +5,13 @@ socket.on('authSuccess', (data) => {
     localStorage.setItem('tankToken', data.token); myName = data.name; myId = socket.id; 
     initAudio(); if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); 
     switchMusicState('loby');
-    showScreen('main-menu-screen'); // Відразу в головне меню після входу
+    showScreen('main-menu-screen');
 });
 
 socket.on('authError', (msg) => { 
     alert(msg); 
-    localStorage.removeItem('tankToken'); // Видаляємо зламаний/старий пароль
-    showScreen('login-screen'); // Залишаємо на екрані входу
+    localStorage.removeItem('tankToken');
+    showScreen('login-screen');
 });
 
 socket.on('economyUpdate', (data) => { 
@@ -106,8 +106,3 @@ socket.on('caseResult', (result) => {
 });
 
 function emitDamage(amt, attacker) { playSound('hurt'); shakeTime = 0.3; socket.emit('takeDamage', { roomId: currentRoomId, amt: amt, attacker: attacker }); }
-
-// Перевірка старого токену
-const savedToken = localStorage.getItem('tankToken');
-if(savedToken) socket.emit('authToken', savedToken);
-else showScreen('login-screen');

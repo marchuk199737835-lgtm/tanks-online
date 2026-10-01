@@ -7,6 +7,14 @@ function showScreen(screenId) {
 }
 function updateGlobalBucks() { document.querySelectorAll('.global-bucks-display').forEach(el => el.innerText = myBucks); }
 
+// ОБРОБНИКИ ЗВУКУ З ІНТЕРФЕЙСУ
+document.getElementById('vol-music').addEventListener('input', e => { 
+    if (typeof setMusicVolume === 'function') setMusicVolume(parseFloat(e.target.value)); 
+});
+document.getElementById('vol-sfx').addEventListener('input', e => { 
+    if (typeof setSfxVolume === 'function') setSfxVolume(parseFloat(e.target.value)); 
+});
+
 document.getElementById('tab-login').onclick = () => { authMode='login'; playSound('ui_click'); document.getElementById('tab-login').className='flex-1 py-3 text-xs font-bold uppercase transition bg-blue-600 text-white tracking-wider'; document.getElementById('tab-register').className='flex-1 py-3 text-xs font-bold uppercase transition text-slate-400 hover:bg-slate-800 tracking-wider'; document.getElementById('auth-btn').innerText='АВТОРИЗАЦІЯ'; };
 document.getElementById('tab-register').onclick = () => { authMode='register'; playSound('ui_click'); document.getElementById('tab-register').className='flex-1 py-3 text-xs font-bold uppercase transition bg-blue-600 text-white tracking-wider'; document.getElementById('tab-login').className='flex-1 py-3 text-xs font-bold uppercase transition text-slate-400 hover:bg-slate-800 tracking-wider'; document.getElementById('auth-btn').innerText='СТВОРИТИ АКАУНТ'; };
 document.getElementById('auth-btn').onclick = () => { playSound('ui_click'); const name = document.getElementById('nickname-input').value.trim().toUpperCase(); const pwd = document.getElementById('password-input').value.trim(); if(!name || !pwd) return alert('Введіть логін та пароль!'); socket.emit(authMode, { name, password: pwd }); };
@@ -67,7 +75,6 @@ function updateLobbyUI() {
     document.getElementById('view-map-name').innerText = (currentRoomData.mode === 'survival' ? '🧟 ' : '⚔️ ') + MAP_NAMES[currentRoomData.map];
     document.getElementById('view-win-score').innerText = currentRoomData.mode === 'survival' ? 'БЕЗКІНЕЧНО' : currentRoomData.winScore;
 
-    // ПАНЕЛЬ ЛІДЕРА
     const isHost = (myId === currentRoomData.hostSocket);
     document.getElementById('host-settings-panel').classList.toggle('hidden', !isHost);
     document.getElementById('host-settings-panel').classList.toggle('flex', isHost);
@@ -101,7 +108,6 @@ function updateLobbyUI() {
     }
 }
 
-// ІВЕНТИ ЛІДЕРА
 document.querySelectorAll('.host-mode-select').forEach(btn => { btn.onclick = () => { playSound('ui_click'); socket.emit('updateRoomSettings', { roomId: currentRoomId, mode: btn.dataset.mode }); }; });
 document.querySelectorAll('.host-map-select').forEach(btn => { btn.onclick = () => { playSound('ui_click'); socket.emit('updateRoomSettings', { roomId: currentRoomId, map: btn.dataset.map }); }; });
 document.getElementById('host-max-players').onchange = (e) => { playSound('ui_click'); socket.emit('updateRoomSettings', { roomId: currentRoomId, maxPlayers: parseInt(e.target.value) }); };
@@ -116,3 +122,8 @@ function doCountdown() {
     const iv = setInterval(() => { count--; if (count > 0) { text.innerText = count; playSound('ui_click'); } else if (count === 0) { text.innerText = "БІЙ!"; text.classList.add('text-emerald-400', 'drop-shadow-[0_0_50px_rgba(16,185,129,0.8)]'); playSound('shoot'); startGameLoop(); } else { clearInterval(iv); overlay.classList.add('hidden'); } }, 1000);
 }
 document.getElementById('back-to-room-lobby-btn').onclick = () => { playSound('ui_click'); document.getElementById('winner-modal').classList.add('hidden'); socket.emit('backToRoomLobby', currentRoomId); switchMusicState('loby'); };
+
+// ПЕРЕВІРКА ТОКЕНА (Тепер безпечно в самому кінці, коли всі функції завантажені)
+const savedToken = localStorage.getItem('tankToken');
+if(savedToken) socket.emit('authToken', savedToken);
+else showScreen('login-screen');
