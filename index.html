@@ -368,9 +368,8 @@
         document.getElementById('win-score-input').onchange = e => { if(isAdmin) { let v=parseInt(e.target.value); socket.emit('adminUpdate', { code: '123321', winScore: Math.max(1, Math.min(1000, v)) }); }};
         document.getElementById('back-to-lobby-btn').onclick = () => { document.getElementById('winner-modal').classList.add('hidden'); socket.emit('backToLobby'); };
 
-        // ВИПРАВЛЕННЯ ПОМИЛКИ КЛАВІАТУРИ (Запобіжник для e.key)
         window.addEventListener('keydown', e => { 
-            if (!e || !e.key) return; // Уникнення помилки 'toLowerCase' of undefined
+            if (!e || !e.key) return; 
             const k = e.key.toLowerCase(); 
             if(keys.hasOwnProperty(k) || k===' ') { if(k===' ') keys.space = true; else keys[k] = true; }
             if(e.key === 'Tab') { e.preventDefault(); if(myLocalTank.buff === 'homing') { let visibleOps = Object.keys(opponents).filter(id => opponents[id].hp > 0 && Math.hypot(opponents[id].x - myLocalTank.x, opponents[id].y - myLocalTank.y) < 1500); if(visibleOps.length > 0) { playSound('hitmarker'); if(!homingTargetId || !visibleOps.includes(homingTargetId)) homingTargetId = visibleOps[0]; else { let idx = visibleOps.indexOf(homingTargetId); homingTargetId = visibleOps[(idx + 1) % visibleOps.length]; } } else homingTargetId = null; } }
@@ -448,7 +447,6 @@
 
         let lastTime = 0, gameLoopId = null;
         
-        // ВИПРАВЛЕННЯ ПОМИЛКИ ЗАПУСКУ ІГРОВОГО ЦИКЛУ
         function startGameLoop() {
             if(gameLoopId) cancelAnimationFrame(gameLoopId);
             lastTime = performance.now();
@@ -573,6 +571,14 @@
             ctx.shadowColor = 'transparent'; ctx.fillStyle = isMe ? '#60a5fa' : '#cbd5e1'; ctx.font = '14px Russo One'; ctx.textAlign = 'center'; if(buff !== 'invisible' || isMe) ctx.fillText(name, 0, -45);
             ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 10; ctx.save(); ctx.rotate(bodyAngle); ctx.fillStyle = '#0f172a'; ctx.fillRect(-32, -28, 64, 12); ctx.fillRect(-32, 16, 64, 12); ctx.fillStyle = colorHex; ctx.fillRect(-28, -22, 56, 44); ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 2; ctx.strokeRect(-28, -22, 56, 44); ctx.restore();
             ctx.save(); ctx.rotate(turretAngle); ctx.fillStyle = '#334155'; ctx.fillRect(0, -5, 45, 10); ctx.strokeStyle = '#0f172a'; ctx.lineWidth=1; ctx.strokeRect(0, -5, 45, 10); ctx.fillStyle = colorHex; ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.beginPath(); ctx.arc(-4, -4, 8, 0, Math.PI*2); ctx.fill(); ctx.restore(); ctx.restore();
+        }
+
+        // ПОВЕРНЕНА ФУНКЦІЯ ВИБУХІВ
+        function createExplosion(x, y, count, color) {
+            for(let i=0; i<count; i++){
+                const ang = Math.random() * Math.PI * 2; const spd = Math.random() * 200 + 50;
+                particles.push({ x, y, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd, life: Math.random() * 0.4 + 0.1, color });
+            }
         }
 
         function gameLoop(now) { const dt = Math.min((now - lastTime) / 1000, 0.1); lastTime = now; if (serverGameState.status === 'playing') { updatePhysics(now, dt); draw(now); } gameLoopId = requestAnimationFrame(gameLoop); }
