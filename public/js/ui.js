@@ -1,88 +1,139 @@
-function updateLobbyUI() {
-    if(serverGameState.status === 'playing' || serverGameState.status === 'starting') return;
-    document.getElementById('login-screen').classList.add('hidden'); document.getElementById('lobby-screen').classList.remove('hidden'); document.getElementById('lobby-screen').classList.add('flex'); document.getElementById('game-screen').classList.add('hidden');
-    const list = document.getElementById('players-list'); list.innerHTML = ''; const takenColors = new Set(); const pKeys = Object.keys(serverPlayers); let pCount = pKeys.length;
-    for(let id in serverPlayers) {
-        const p = serverPlayers[id]; if (p.color) takenColors.add(p.color); if (id === myId) { myColor = p.color; isReady = p.ready; }
-        const colorHex = p.color ? (p.color==='white'?'#e2e8f0':p.color==='black'?'#1e293b':p.color==='red'?'#ef4444':p.color==='blue'?'#3b82f6':p.color==='brown'?'#78350f':'#9333ea') : '#475569';
-        const isLeader = (id === serverGameState.leaderId) ? '👑' : '';
-        list.innerHTML += `<div class="flex items-center justify-between p-3 bg-slate-800 rounded-lg shadow-inner"><div class="flex items-center gap-3"><div class="w-5 h-5 rounded-md border-2 border-slate-600" style="background-color: ${colorHex}"></div><span class="font-bold text-white tracking-wide">${p.name} ${isLeader}</span></div><span class="text-xs font-bold px-2 py-1 rounded ${p.ready ? 'bg-green-900/50 text-green-400' : 'bg-slate-700/50 text-slate-400'}">${p.ready ? 'ГОТОВИЙ' : 'ЧЕКАЄ'}</span></div>`;
-    }
-    document.getElementById('lobby-count').innerText = `${pCount} / 6`;
-    document.querySelectorAll('.color-btn').forEach(btn => { const c = btn.dataset.color; btn.classList.toggle('selected', c === myColor); btn.disabled = takenColors.has(c) && c !== myColor; });
-
-    const MAP_NAMES = { 'city': '🏙️ МІСТО', 'hangars': '🏭 АНГАРИ', 'ship': '🚢 КОРАБЕЛЬ', 'castle': '🏰 ЗАМОК' };
-    let activeMap = MAP_DATA[serverGameState.map] ? serverGameState.map : 'city';
-    document.getElementById('view-map-name').innerText = (serverGameState.mode === 'survival' ? '🧟 ' : '⚔️ ') + MAP_NAMES[activeMap];
-    document.getElementById('view-win-score').innerText = serverGameState.mode === 'survival' ? 'БЕЗКІНЕЧНО' : serverGameState.winScore;
-    
-    if(isAdmin) {
-        document.querySelectorAll('.map-select').forEach(el => el.classList.toggle('selected', el.dataset.map === serverGameState.map));
-        document.querySelectorAll('.mode-select').forEach(el => el.classList.toggle('selected', el.dataset.mode === serverGameState.mode));
-        if(document.activeElement !== document.getElementById('win-score-input')) document.getElementById('win-score-input').value = serverGameState.winScore;
-    }
-
-    const btn = document.getElementById('btn-ready'); const allReady = pKeys.every(id => serverPlayers[id].ready);
-    if (!myColor) { btn.innerText = "ОБЕРІТЬ КАМУФЛЯЖ"; btn.disabled = true; btn.className = "w-full py-5 rounded-xl font-bold bg-slate-700 text-slate-500 mb-2 font-russo uppercase shadow-inner"; } else {
-        btn.disabled = false;
-        if (myId === serverGameState.leaderId) {
-            if (isReady) { if (pKeys.length >= 2 && allReady) { btn.innerText = "🚀 ПОЧАТИ ГРУ"; btn.className = "w-full py-5 rounded-xl font-bold bg-gradient-to-b from-orange-500 to-red-600 text-white shadow-[0_5px_15px_rgba(249,115,22,0.6)] mb-2 font-russo uppercase"; } else { btn.innerText = "ГОТОВИЙ (ЧЕКАЄМО ІНШИХ...)"; btn.className = "w-full py-5 rounded-xl font-bold bg-gradient-to-b from-green-500 to-green-700 text-white shadow-[0_5px_15px_rgba(34,197,94,0.5)] mb-2 font-russo uppercase"; } } else { btn.innerText = "ПІДТВЕРДИТИ ГОТОВНІСТЬ"; btn.className = "w-full py-5 rounded-xl font-bold bg-gradient-to-b from-blue-500 to-blue-700 text-white shadow-[0_5px_15px_rgba(59,130,246,0.5)] mb-2 font-russo uppercase"; }
-        } else {
-            if (isReady) { btn.innerText = "ГОТОВИЙ (СКАСУВАТИ)"; btn.className = "w-full py-5 rounded-xl font-bold bg-gradient-to-b from-green-500 to-green-700 text-white shadow-[0_5px_15px_rgba(34,197,94,0.5)] mb-2 font-russo uppercase"; } else { btn.innerText = "ПІДТВЕРДИТИ ГОТОВНІСТЬ"; btn.className = "w-full py-5 rounded-xl font-bold bg-gradient-to-b from-blue-500 to-blue-700 text-white shadow-[0_5px_15px_rgba(59,130,246,0.5)] mb-2 font-russo uppercase"; }
-        }
-    }
+// --- ФУНКЦІЯ НАВІГАЦІЇ ПО ЕКРАНАХ ---
+function showScreen(screenId) {
+    const screens = ['login-screen', 'main-menu-screen', 'room-browser-screen', 'shop-screen', 'lobby-screen', 'game-screen'];
+    screens.forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+        document.getElementById(id).classList.remove('flex');
+    });
+    const s = document.getElementById(screenId);
+    s.classList.remove('hidden');
+    if (screenId !== 'game-screen') s.classList.add('flex');
+    playSound('ui_click');
 }
 
+// Глобальний баланс для верхнього кута
+function updateGlobalBucks() {
+    document.querySelectorAll('.global-bucks-display').forEach(el => el.innerText = myBucks);
+}
+
+// --- ЕКРАН АВТОРИЗАЦІЇ ---
+document.getElementById('tab-login').onclick = () => { authMode='login'; playSound('ui_click'); document.getElementById('tab-login').className='flex-1 py-3 text-xs font-bold uppercase transition bg-blue-600 text-white tracking-wider'; document.getElementById('tab-register').className='flex-1 py-3 text-xs font-bold uppercase transition text-slate-400 hover:bg-slate-800 tracking-wider'; document.getElementById('auth-btn').innerText='АВТОРИЗАЦІЯ'; };
+document.getElementById('tab-register').onclick = () => { authMode='register'; playSound('ui_click'); document.getElementById('tab-register').className='flex-1 py-3 text-xs font-bold uppercase transition bg-blue-600 text-white tracking-wider'; document.getElementById('tab-login').className='flex-1 py-3 text-xs font-bold uppercase transition text-slate-400 hover:bg-slate-800 tracking-wider'; document.getElementById('auth-btn').innerText='СТВОРИТИ АКАУНТ'; };
+document.getElementById('auth-btn').onclick = () => { playSound('ui_click'); const name = document.getElementById('nickname-input').value.trim().toUpperCase(); const pwd = document.getElementById('password-input').value.trim(); if(!name || !pwd) return alert('Введіть логін та пароль!'); socket.emit(authMode, { name, password: pwd }); };
+document.getElementById('menu-logout-btn').onclick = () => { playSound('ui_click'); localStorage.removeItem('tankToken'); location.reload(); };
+
+// --- НАЛАШТУВАННЯ ---
+document.querySelectorAll('.settings-btn').forEach(btn => btn.onclick = () => { playSound('ui_click'); document.getElementById('settings-modal').classList.remove('hidden'); });
+document.getElementById('close-settings-btn').onclick = () => { playSound('ui_click'); document.getElementById('settings-modal').classList.add('hidden'); };
+
+// --- ГОЛОВНЕ МЕНЮ ---
+document.getElementById('nav-sessions-btn').onclick = () => { socket.emit('requestRooms'); showScreen('room-browser-screen'); };
+document.getElementById('nav-shop-btn').onclick = () => { renderShop(); showScreen('shop-screen'); };
+document.getElementById('shop-back-btn').onclick = () => { showScreen('main-menu-screen'); };
+document.getElementById('back-to-menu-btn').onclick = () => { showScreen('main-menu-screen'); };
+
+// --- БРАУЗЕР КІМНАТ ---
+function renderRoomsList(rooms) {
+    const list = document.getElementById('rooms-list'); list.innerHTML = '';
+    if (rooms.length === 0) { list.innerHTML = '<div class="text-center text-slate-500 py-10 font-bold tracking-widest uppercase">Немає активних сесій</div>'; return; }
+    
+    rooms.forEach(r => {
+        let isFull = r.playersCount >= r.maxPlayers; let inProgress = r.status === 'playing';
+        let btnHtml = '';
+        if (inProgress) btnHtml = '<button disabled class="bg-slate-700 text-slate-500 px-4 py-2 rounded font-bold uppercase text-xs">В ГРІ</button>';
+        else if (isFull) btnHtml = '<button disabled class="bg-red-900/50 text-red-500 px-4 py-2 rounded font-bold uppercase text-xs border border-red-500/30">ПОВНА</button>';
+        else btnHtml = `<button onclick="joinRoomBtn('${r.id}')" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-bold uppercase text-xs transition shadow-[0_0_10px_rgba(37,99,235,0.4)]">ПІД'ЄДНАТИСЬ</button>`;
+        
+        const modeEmoji = r.mode === 'survival' ? '🧟' : '⚔️';
+        list.innerHTML += `<div class="grid grid-cols-5 gap-4 items-center p-4 bg-slate-800/50 hover:bg-slate-800 rounded-xl border border-slate-700 transition">
+            <div class="col-span-2 flex flex-col"><span class="font-bold text-white text-sm">${r.hostName}</span><span class="text-[10px] text-slate-500 font-mono">${r.id}</span></div>
+            <div class="text-sm font-bold text-slate-300 uppercase">${modeEmoji} ${r.mode === 'survival'?'ВИЖИВАННЯ':'ДЕТМАТЧ'}</div>
+            <div class="text-sm text-slate-300 uppercase">${r.map}</div>
+            <div class="flex justify-between items-center"><span class="font-russo ${isFull?'text-red-400':'text-blue-400'}">${r.playersCount}/${r.maxPlayers}</span>${btnHtml}</div>
+        </div>`;
+    });
+}
+
+window.joinRoomBtn = function(roomId) { playSound('ui_click'); socket.emit('joinRoom', roomId); };
+
+// --- СТВОРЕННЯ КІМНАТИ ---
+let createConfig = { mode: 'deathmatch', map: 'city', maxPlayers: 6, winScore: 50 };
+document.getElementById('open-create-room-btn').onclick = () => { playSound('ui_click'); document.getElementById('create-room-modal').classList.remove('hidden'); };
+document.getElementById('cancel-create-btn').onclick = () => { playSound('ui_click'); document.getElementById('create-room-modal').classList.add('hidden'); };
+
+document.querySelectorAll('.create-mode-select').forEach(btn => { btn.onclick = () => { playSound('ui_click'); document.querySelectorAll('.create-mode-select').forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); createConfig.mode = btn.dataset.mode; document.getElementById('create-score-wrap').style.display = createConfig.mode === 'survival' ? 'none' : 'block'; }; });
+document.querySelectorAll('.create-map-select').forEach(btn => { btn.onclick = () => { playSound('ui_click'); document.querySelectorAll('.create-map-select').forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); createConfig.map = btn.dataset.map; }; });
+document.getElementById('create-max-players').oninput = (e) => { createConfig.maxPlayers = e.target.value; document.getElementById('max-players-val').innerText = e.target.value; };
+document.getElementById('confirm-create-btn').onclick = () => { playSound('ui_click'); createConfig.winScore = document.getElementById('create-win-score').value; document.getElementById('create-room-modal').classList.add('hidden'); socket.emit('createRoom', createConfig); };
+
+// --- КРАМНИЦЯ (НОВИЙ ДИЗАЙН) ---
 function renderShop() {
-    document.getElementById('shop-bucks').innerText = myBucks; document.getElementById('lobby-bucks-display').innerText = myBucks;
+    updateGlobalBucks();
     const container = document.getElementById('shop-items-container'); container.innerHTML = '';
     for(let key in SHOP_DATA) {
         let data = SHOP_DATA[key]; let currentLvl = myUpgrades[key] || 0; let maxLvl = data.levels.length - 1;
         let nextPrice = currentLvl < maxLvl ? data.prices[currentLvl] : 'MAX'; let nextBonus = currentLvl < maxLvl ? data.levels[currentLvl+1] : data.levels[maxLvl];
-        let btnHtml = currentLvl < maxLvl ? `<button onclick="buyUpgrade('${key}')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-4 rounded transition text-sm">💵 ${nextPrice}</button>` : `<button disabled class="bg-slate-700 text-slate-500 font-bold py-2 px-4 rounded text-sm">MAX</button>`;
-        container.innerHTML += `<div class="bg-slate-800 p-4 rounded-xl border border-slate-600 shadow flex justify-between items-center gap-2"><div><p class="font-bold text-white text-lg">${data.icon} ${data.title}</p><p class="text-xs text-slate-400">Рівень: <span class="text-emerald-400">${currentLvl}</span> (${data.levels[currentLvl]}%)</p>${currentLvl < maxLvl ? `<p class="text-[10px] text-slate-500">Далі: ${nextBonus}%</p>` : ''}</div>${btnHtml}</div>`;
+        let btnHtml = currentLvl < maxLvl ? `<button onclick="buyUpgrade('${key}')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-6 rounded-xl transition text-sm shadow-[0_0_15px_rgba(16,185,129,0.3)]">💵 ${nextPrice}</button>` : `<button disabled class="bg-slate-700/50 text-slate-500 font-bold py-3 px-6 rounded-xl text-sm border border-slate-600">MAX</button>`;
+        container.innerHTML += `<div class="glass-panel p-5 rounded-2xl border border-slate-700 shadow-lg flex justify-between items-center gap-4 transition hover:border-slate-500">
+            <div class="text-4xl drop-shadow-md">${data.icon}</div>
+            <div class="flex-1">
+                <p class="font-russo text-white text-xl tracking-wider">${data.title}</p>
+                <div class="flex items-center gap-2 mt-1">
+                    <div class="flex gap-1">${Array.from({length: maxLvl}).map((_,i) => `<div class="w-3 h-1.5 rounded-full ${i < currentLvl ? 'bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.8)]' : 'bg-slate-700'}"></div>`).join('')}</div>
+                    <span class="text-xs text-slate-400 font-bold">(${data.levels[currentLvl]}%)</span>
+                </div>
+            </div>
+            ${btnHtml}
+        </div>`;
+    }
+}
+window.buyUpgrade = function(type) { let price = SHOP_DATA[type].prices[myUpgrades[type] || 0]; if (myBucks >= price) { playSound('ui_buy'); socket.emit('buyUpgrade', type); } else { alert('Недостатньо коштів!'); } };
+document.getElementById('buy-case-btn').onclick = () => { playSound('ui_click'); if (myBucks >= 50) { document.getElementById('case-confirm-modal').classList.remove('hidden'); } else { alert('Недостатньо баксів!'); } };
+document.getElementById('cancel-case-btn').onclick = () => { playSound('ui_click'); document.getElementById('case-confirm-modal').classList.add('hidden'); };
+document.getElementById('confirm-case-btn').onclick = () => { playSound('ui_buy'); document.getElementById('case-confirm-modal').classList.add('hidden'); socket.emit('buyCase'); };
+
+// --- ЛОБІ КІМНАТИ ---
+document.getElementById('leave-room-btn').onclick = () => { playSound('ui_click'); if(currentRoomId) socket.emit('leaveRoom', currentRoomId); currentRoomId = null; currentRoomData = null; showScreen('room-browser-screen'); };
+
+function updateLobbyUI() {
+    if(!currentRoomData || currentRoomData.status === 'playing') return;
+    
+    document.getElementById('lobby-room-name').innerText = currentRoomData.hostName + " СЕСІЯ";
+    const MAP_NAMES = { 'city': '🏙️ МІСТО', 'hangars': '🏭 АНГАРИ', 'ship': '🚢 КОРАБЕЛЬ', 'castle': '🏰 ЗАМОК' };
+    document.getElementById('view-map-name').innerText = (currentRoomData.mode === 'survival' ? '🧟 ' : '⚔️ ') + MAP_NAMES[currentRoomData.map];
+    document.getElementById('view-win-score').innerText = currentRoomData.mode === 'survival' ? 'БЕЗКІНЕЧНО' : currentRoomData.winScore;
+
+    const list = document.getElementById('players-list'); list.innerHTML = ''; const takenColors = new Set(); const pKeys = Object.keys(currentRoomData.players);
+    document.getElementById('lobby-count').innerText = `${pKeys.length} / ${currentRoomData.maxPlayers}`;
+    
+    for(let id in currentRoomData.players) {
+        const p = currentRoomData.players[id]; if (p.color) takenColors.add(p.color); if (id === myId) { myColor = p.color; isReady = p.ready; }
+        const colorHex = p.color ? (p.color==='white'?'#f8fafc':p.color==='black'?'#1e293b':p.color==='red'?'#ef4444':p.color==='blue'?'#3b82f6':p.color==='brown'?'#78350f':'#9333ea') : '#475569';
+        const isLeader = (id === currentRoomData.hostSocket) ? '👑' : '';
+        list.innerHTML += `<div class="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 mb-2"><div class="flex items-center gap-3"><div class="w-6 h-6 rounded-lg border border-slate-500 shadow-inner" style="background-color: ${colorHex}"></div><span class="font-bold text-white tracking-widest uppercase">${p.name} ${isLeader}</span></div><span class="text-xs font-bold px-3 py-1.5 rounded border ${p.ready ? 'bg-emerald-900/30 text-emerald-400 border-emerald-500/30' : 'bg-slate-800 text-slate-500 border-slate-700'}">${p.ready ? 'ГОТОВИЙ' : 'ЧЕКАЄ'}</span></div>`;
+    }
+    
+    document.querySelectorAll('.color-btn').forEach(btn => { const c = btn.dataset.color; btn.classList.toggle('selected', c === myColor); btn.disabled = takenColors.has(c) && c !== myColor; });
+
+    const btn = document.getElementById('btn-ready'); const allReady = pKeys.every(id => currentRoomData.players[id].ready);
+    if (!myColor) { btn.innerText = "ОБЕРІТЬ КАМУФЛЯЖ"; btn.disabled = true; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-slate-800 text-slate-500 transition shadow-inner border border-slate-700"; } else {
+        btn.disabled = false;
+        if (myId === currentRoomData.hostSocket) {
+            if (isReady) { if (pKeys.length >= 2 && allReady) { btn.innerText = "🚀 ЗАПУСК СЕСІЇ"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white transition shadow-[0_0_30px_rgba(37,99,235,0.6)]"; } else { btn.innerText = "ГОТОВИЙ (ЧЕКАЄМО...)"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-emerald-600 text-white transition shadow-[0_0_20px_rgba(16,185,129,0.4)]"; } } else { btn.innerText = "ПІДТВЕРДИТИ"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-slate-700 hover:bg-slate-600 text-white transition border border-slate-500"; }
+        } else {
+            if (isReady) { btn.innerText = "ВІДМІНИТИ"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-[0_0_20px_rgba(16,185,129,0.4)]"; } else { btn.innerText = "ПІДТВЕРДИТИ"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white transition shadow-[0_0_20px_rgba(37,99,235,0.4)]"; }
+        }
     }
 }
 
-window.buyUpgrade = function(type) { let price = SHOP_DATA[type].prices[myUpgrades[type] || 0]; if (myBucks >= price) { playSound('token'); socket.emit('buyUpgrade', type); } else { alert('Недостатньо баксів!'); } };
+document.querySelectorAll('.color-btn').forEach(btn => { btn.onclick = () => { if(!btn.disabled) { playSound('ui_click'); socket.emit('setColor', { roomId: currentRoomId, color: btn.dataset.color }); } } });
+document.getElementById('btn-ready').onclick = () => { playSound('ui_click'); const pKeys = Object.keys(currentRoomData.players); const allReady = pKeys.every(id => currentRoomData.players[id].ready); if (myId === currentRoomData.hostSocket && isReady && pKeys.length >= 2 && allReady) { socket.emit('startGame', currentRoomId); } else { socket.emit('toggleReady', currentRoomId); } };
 
 function doCountdown() {
-    document.getElementById('lobby-screen').classList.add('hidden'); document.getElementById('lobby-screen').classList.remove('flex'); document.getElementById('game-screen').classList.remove('hidden');
+    showScreen('game-screen');
     const overlay = document.getElementById('countdown-overlay'), text = document.getElementById('countdown-text'); overlay.classList.remove('hidden');
-    bullets = []; particles = [];
-    let count = 3; text.innerText = count; text.className = "text-[12rem] font-russo text-white drop-shadow-[0_0_40px_rgba(249,115,22,1)] scale-150 transition-transform";
-    const iv = setInterval(() => { count--; if (count > 0) { text.innerText = count; playSound('token'); } else if (count === 0) { text.innerText = "БІЙ!"; text.classList.add('text-green-500', 'drop-shadow-[0_0_40px_rgba(34,197,94,1)]'); playSound('shoot'); startGameLoop(); } else { clearInterval(iv); overlay.classList.add('hidden'); } }, 1000);
+    bullets = []; particles = []; let count = 3; text.innerText = count; text.className = "text-[15rem] font-russo text-white drop-shadow-[0_0_50px_rgba(37,99,235,0.8)] scale-150 transition-transform";
+    const iv = setInterval(() => { count--; if (count > 0) { text.innerText = count; playSound('ui_click'); } else if (count === 0) { text.innerText = "БІЙ!"; text.classList.add('text-emerald-400', 'drop-shadow-[0_0_50px_rgba(16,185,129,0.8)]'); playSound('shoot'); startGameLoop(); } else { clearInterval(iv); overlay.classList.add('hidden'); } }, 1000);
 }
 
-document.getElementById('vol-music').addEventListener('input', e => { volMusic = parseFloat(e.target.value); bgMusic.volume = volMusic; });
-document.getElementById('vol-sfx').addEventListener('input', e => { volSfx = parseFloat(e.target.value); });
-
-document.getElementById('login-settings-btn').onclick = () => document.getElementById('settings-modal').classList.remove('hidden');
-document.getElementById('lobby-settings-btn').onclick = () => document.getElementById('settings-modal').classList.remove('hidden');
-document.getElementById('game-settings-btn').onclick = () => document.getElementById('settings-modal').classList.remove('hidden');
-document.getElementById('close-settings-btn').onclick = () => document.getElementById('settings-modal').classList.add('hidden');
-
-document.getElementById('tab-login').onclick = () => { authMode='login'; document.getElementById('tab-login').className='flex-1 py-3 text-sm font-bold uppercase transition bg-orange-600 text-white'; document.getElementById('tab-register').className='flex-1 py-3 text-sm font-bold uppercase transition text-slate-400 hover:bg-slate-800'; document.getElementById('auth-btn').innerText='УВІЙТИ В ГРУ'; };
-document.getElementById('tab-register').onclick = () => { authMode='register'; document.getElementById('tab-register').className='flex-1 py-3 text-sm font-bold uppercase transition bg-orange-600 text-white'; document.getElementById('tab-login').className='flex-1 py-3 text-sm font-bold uppercase transition text-slate-400 hover:bg-slate-800'; document.getElementById('auth-btn').innerText='ЗАРЕЄСТРУВАТИСЯ'; };
-document.getElementById('auth-btn').onclick = () => { const name = document.getElementById('nickname-input').value.trim().toUpperCase(); const pwd = document.getElementById('password-input').value.trim(); if(!name || !pwd) return alert('Введіть логін та пароль!'); socket.emit(authMode, { name, password: pwd }); };
-document.getElementById('logout-btn').onclick = () => { localStorage.removeItem('tankToken'); location.reload(); };
-
-document.getElementById('open-shop-btn').onclick = () => { document.getElementById('shop-panel').classList.replace('-translate-x-full', 'translate-x-0'); playSound('token'); };
-document.getElementById('close-shop-btn').onclick = () => { document.getElementById('shop-panel').classList.replace('translate-x-0', '-translate-x-full'); playSound('token'); };
-document.getElementById('buy-case-btn').onclick = () => { if (myBucks >= 50) { playSound('token'); document.getElementById('case-confirm-modal').classList.remove('hidden'); } else { alert('Недостатньо баксів для кейсу (потрібно 50$)!'); } };
-document.getElementById('cancel-case-btn').onclick = () => { playSound('token'); document.getElementById('case-confirm-modal').classList.add('hidden'); };
-document.getElementById('confirm-case-btn').onclick = () => { playSound('token'); document.getElementById('case-confirm-modal').classList.add('hidden'); socket.emit('buyCase'); };
-
-document.querySelectorAll('.color-btn').forEach(btn => { btn.onclick = () => { if(!btn.disabled) { playSound('token'); socket.emit('setColor', btn.dataset.color); } } });
-document.getElementById('btn-ready').onclick = () => { playSound('token'); const pKeys = Object.keys(serverPlayers); const allReady = pKeys.every(id => serverPlayers[id].ready); if (myId === serverGameState.leaderId && isReady && pKeys.length >= 2 && allReady) { socket.emit('startGame'); } else { socket.emit('toggleReady'); } };
-
-document.getElementById('admin-code').addEventListener('input', e => { isAdmin = (e.target.value === '123321'); document.getElementById('admin-panel').classList.toggle('hidden', !isAdmin); document.getElementById('admin-panel').classList.toggle('flex', isAdmin); });
-document.getElementById('admin-save-btn').onclick = () => { if(isAdmin) { playSound('token'); socket.emit('adminSave'); const btn = document.getElementById('admin-save-btn'); btn.innerText = "ЗБЕРЕЖЕНО!"; btn.classList.replace('bg-orange-600', 'bg-green-600'); setTimeout(() => { btn.innerText = "ЗБЕРЕГТИ"; btn.classList.replace('bg-green-600', 'bg-orange-600'); }, 2000); } };
-document.querySelectorAll('.map-select').forEach(el => el.onclick = () => { if(isAdmin) { playSound('token'); socket.emit('adminUpdate', { code: '123321', map: el.dataset.map }); }});
-document.querySelectorAll('.mode-select').forEach(el => el.onclick = () => { if(isAdmin) { playSound('token'); socket.emit('adminUpdate', { code: '123321', mode: el.dataset.mode }); }});
-document.getElementById('win-score-input').onchange = e => { if(isAdmin) { let v=parseInt(e.target.value); socket.emit('adminUpdate', { code: '123321', winScore: Math.max(1, Math.min(1000, v)) }); }};
-document.getElementById('back-to-lobby-btn').onclick = () => { 
-    document.getElementById('winner-modal').classList.add('hidden'); 
-    socket.emit('backToLobby'); 
-    if (typeof switchMusicState === 'function') switchMusicState('loby'); 
-};
+document.getElementById('back-to-room-lobby-btn').onclick = () => { playSound('ui_click'); document.getElementById('winner-modal').classList.add('hidden'); socket.emit('backToRoomLobby', currentRoomId); switchMusicState('loby'); };

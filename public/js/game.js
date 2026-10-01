@@ -8,12 +8,14 @@ function createExplosion(x, y, count, color) {
 }
 
 function checkCollision(x, y, r, checkSolids = true) {
-    let cMap = MAP_DATA[serverGameState.map] ? serverGameState.map : 'city';
+    if (!currentRoomData) return true;
+    let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'city';
     let mSize = MAP_DATA[cMap].size; if (x - r < 0 || x + r > mSize || y - r < 0 || y + r > mSize) return true; 
     if (checkSolids) { const solids = MAP_DATA[cMap].solids; for (let s of solids) { if (s.type === 'wall') { let testX = Math.max(s.x, Math.min(x, s.x + s.w)), testY = Math.max(s.y, Math.min(y, s.y + s.h)); if (Math.hypot(x - testX, y - testY) <= r) return true; } else if (s.type === 'tree') { if (Math.hypot(x - s.x, y - s.y) < r + s.r) return true; } } } return false;
 }
 
 function updatePhysics(now, dt) {
+    if (!currentRoomData || !currentRoomId) return;
     let myRadius = myLocalTank.buff === 'boss' ? 75 : 30;
     if (myLocalTank.hp > 0) {
         let moveX = 0, moveY = 0;
@@ -24,17 +26,17 @@ function updatePhysics(now, dt) {
         if (moveX !== 0 || moveY !== 0) { let len = Math.hypot(moveX, moveY); moveX /= len; moveY /= len; myLocalTank.bodyAngle = Math.atan2(moveY, moveX); let nextX = myLocalTank.x + moveX * speed * dt, nextY = myLocalTank.y + moveY * speed * dt; if (!checkCollision(nextX, myLocalTank.y, myRadius)) myLocalTank.x = nextX; if (!checkCollision(myLocalTank.x, nextY, myRadius)) myLocalTank.y = nextY; }
 
         let wMx = mouseX + camera.x - canvas.width/2, wMy = mouseY + camera.y - canvas.height/2; myLocalTank.turretAngle = Math.atan2(wMy - myLocalTank.y, wMx - myLocalTank.x);
-        socket.emit('move', { x: myLocalTank.x, y: myLocalTank.y, bodyAngle: myLocalTank.bodyAngle, turretAngle: myLocalTank.turretAngle });
+        socket.emit('move', { roomId: currentRoomId, x: myLocalTank.x, y: myLocalTank.y, bodyAngle: myLocalTank.bodyAngle, turretAngle: myLocalTank.turretAngle });
 
         let fCfg = BUFFS[myLocalTank.buff || 'none'];
         if (keys.space && (now - lastShootTime >= fCfg.cd)) {
             lastShootTime = now; let bId = Date.now() + Math.random(); let bSpd = (myLocalTank.buff === 'fast' || myLocalTank.buff === 'minigun') ? BASE_BULLET_SPEED * 1.8 : BASE_BULLET_SPEED;
-            let shot = { id: bId, x: myLocalTank.x + Math.cos(myLocalTank.turretAngle)*(myRadius+10), y: myLocalTank.y + Math.sin(myLocalTank.turretAngle)*(myRadius+10), vx: Math.cos(myLocalTank.turretAngle)*bSpd, vy: Math.sin(myLocalTank.turretAngle)*bSpd, type: myLocalTank.buff || 'none' };
+            let shot = { roomId: currentRoomId, id: bId, x: myLocalTank.x + Math.cos(myLocalTank.turretAngle)*(myRadius+10), y: myLocalTank.y + Math.sin(myLocalTank.turretAngle)*(myRadius+10), vx: Math.cos(myLocalTank.turretAngle)*bSpd, vy: Math.sin(myLocalTank.turretAngle)*bSpd, type: myLocalTank.buff || 'none' };
             if (myLocalTank.buff === 'homing' && homingTargetId) shot.targetId = homingTargetId; socket.emit('shoot', shot);
         }
 
-        for(let pid in powerups) { if (Math.hypot(powerups[pid].x - myLocalTank.x, powerups[pid].y - myLocalTank.y) < myRadius + 30) socket.emit('collectPowerup', pid); }
-        for(let tid in tokens) { if (Math.hypot(tokens[tid].x - myLocalTank.x, tokens[tid].y - myLocalTank.y) < myRadius + 25) socket.emit('collectToken', tid); }
+        for(let pid in powerups) { if (Math.hypot(powerups[pid].x - myLocalTank.x, powerups[pid].y - myLocalTank.y) < myRadius + 30) socket.emit('collectPowerup', {roomId: currentRoomId, pid: pid}); }
+        for(let tid in tokens) { if (Math.hypot(tokens[tid].x - myLocalTank.x, tokens[tid].y - myLocalTank.y) < myRadius + 25) socket.emit('collectToken', {roomId: currentRoomId, tid: tid}); }
     }
 
     camera.x += (myLocalTank.x - camera.x) * 5 * dt; camera.y += (myLocalTank.y - camera.y) * 5 * dt;
@@ -55,7 +57,7 @@ function updatePhysics(now, dt) {
         let hit = false; let bCfg = BUFFS[b.type] || BUFFS['none'];
         if (b.type === 'homing' || b.type.includes('piercing') || b.type === 'ghost_melee') { hit = checkCollision(b.x, b.y, 4, false); } else { hit = checkCollision(b.x, b.y, 4, true); } 
         if (!hit && b.owner !== myId && myLocalTank.hp > 0) { if (Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < myRadius + 4) { hit = true; emitDamage(bCfg.dmg, b.owner); if(b.type==='incendiary') { let end = now + 5000; let int = setInterval(()=>{ if(Date.now() > end || myLocalTank.hp <= 0) clearInterval(int); else { emitDamage(10, b.owner); createExplosion(myLocalTank.x, myLocalTank.y, 5, '#f97316'); } }, 1000); } } }
-        if (!hit && serverGameState.mode === 'survival' && b.owner === myId) { for(let zid in zombies) { let z = zombies[zid]; if (Math.hypot(b.x - z.x, b.y - z.y) < Z_TYPES[z.type].radius + 10) { hit = true; socket.emit('zombieHit', { zid, dmg: bCfg.dmg }); createExplosion(b.x, b.y, 5, Z_TYPES[z.type].color); break; } } }
+        if (!hit && currentRoomData.mode === 'survival' && b.owner === myId) { for(let zid in zombies) { let z = zombies[zid]; if (Math.hypot(b.x - z.x, b.y - z.y) < Z_TYPES[z.type].radius + 10) { hit = true; socket.emit('zombieHit', { roomId: currentRoomId, zid: zid, dmg: bCfg.dmg }); createExplosion(b.x, b.y, 5, Z_TYPES[z.type].color); break; } } }
         if (hit || b.life <= 0) { if (b.type !== 'shotgun' && b.type !== 'minigun' && b.type !== 'acid') createExplosion(b.x, b.y, bCfg.type === 'explosive' ? 30 : 10, bCfg.type === 'explosive' ? '#ea580c' : '#fcd34d'); if (hit && bCfg.type === 'explosive' && myLocalTank.hp > 0 && Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < (b.type==='boss'?250:120)) { emitDamage(bCfg.dmg, b.owner); } bullets.splice(i, 1); }
     }
     for(let i=particles.length-1; i>=0; i--){ particles[i].life -= dt; particles[i].x += particles[i].vx * dt; particles[i].y += particles[i].vy * dt; if(particles[i].life <= 0) particles.splice(i, 1); }
@@ -69,23 +71,24 @@ function drawTank(x, y, bodyAngle, turretAngle, colorHex, name, isMe, hp, buff) 
 }
 
 function draw(now) {
+    if(!currentRoomData) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.save();
     let shX = 0, shY = 0; if (shakeTime > 0) { shX = (Math.random() - 0.5) * 20; shY = (Math.random() - 0.5) * 20; shakeTime -= 0.03; } ctx.translate(canvas.width/2 - camera.x + shX, canvas.height/2 - camera.y + shY);
     
-    let cMap = MAP_DATA[serverGameState.map] ? serverGameState.map : 'city';
+    let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'city';
     let mSize = MAP_DATA[cMap].size; ctx.fillStyle = MAP_DATA[cMap].bg; ctx.fillRect(0, 0, mSize, mSize); ctx.strokeStyle = MAP_DATA[cMap].grid; ctx.lineWidth = 1;
     for(let i=0; i<=mSize; i+=100) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, mSize); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(mSize, i); ctx.stroke(); }
     
     for (let tid in tokens) { const tkn = tokens[tid]; ctx.save(); ctx.translate(tkn.x, tkn.y + Math.sin(now/200)*10); const colorHex = tkn.color==='white'?'#f8fafc':tkn.color==='black'?'#1e293b':tkn.color==='red'?'#ef4444':tkn.color==='blue'?'#3b82f6':tkn.color==='brown'?'#78350f':'#9333ea'; ctx.shadowColor = colorHex; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI*2); ctx.fillStyle = '#0f172a'; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = colorHex; ctx.stroke(); ctx.fillStyle = colorHex; ctx.font = '16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('★', 0, 1); ctx.restore(); }
     
     ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 15; ctx.shadowOffsetX = 8; ctx.shadowOffsetY = 12;
-    MAP_DATA[cMap].solids.forEach(o => { ctx.fillStyle = o.color; if (o.type === 'wall') { ctx.fillRect(o.x, o.y, o.w, o.h); if (o.neon) { ctx.strokeStyle = o.neon; ctx.lineWidth = 2; ctx.strokeRect(o.x, o.y, o.w, o.h); ctx.fillStyle = o.neon; ctx.globalAlpha = 0.2; ctx.fillRect(o.x, o.y, o.w, o.h); ctx.globalAlpha = 1.0; } if (o.stripe) { ctx.fillStyle = o.stripe; ctx.fillRect(o.x, o.y + o.h/2 - 10, o.w, 20); } if (!o.neon && !o.stripe) { ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(o.x, o.y, o.w, 5); } } else if (o.type === 'tree') { ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(o.x+5, o.y+5, o.r-10, 0, Math.PI*2); ctx.fill(); } });
+    MAP_DATA[cMap].solids.forEach(o => { ctx.fillStyle = o.color; if (o.type === 'wall') { ctx.fillRect(o.x, o.y, o.w, o.h); if (o.neon) { ctx.strokeStyle = o.neon; ctx.lineWidth = 2; ctx.strokeRect(o.x, o.y, o.w, o.h); ctx.fillStyle = o.neon; ctx.globalAlpha = 0.2; ctx.fillRect(o.x, o.y, o.w, o.h); ctx.globalAlpha = 1.0; } if (o.stripe) { ctx.fillStyle = o.stripe; ctx.fillRect(o.x, o.y + o.h/2 - 10, o.w, 20); } if (!o.neon && !o.stripe) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(o.x, o.y, o.w, 5); } } else if (o.type === 'tree') { ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.arc(o.x+5, o.y+5, o.r-10, 0, Math.PI*2); ctx.fill(); } });
     
     for(let pid in powerups) { const pu = powerups[pid]; const boxColor = PU_COLORS[pu.type] || '#38bdf8'; ctx.save(); ctx.translate(pu.x, pu.y); ctx.rotate(now / 500); ctx.fillStyle = '#334155'; ctx.fillRect(-20, -20, 40, 40); ctx.strokeStyle = boxColor; ctx.lineWidth = 3; ctx.strokeRect(-20, -20, 40, 40); ctx.fillStyle = boxColor; ctx.shadowBlur = 10; ctx.shadowColor = boxColor; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '24px Russo One'; ctx.fillText(PU_ICONS[pu.type], 0, 2); ctx.restore(); }
     
-    for (let id in opponents) { const p = opponents[id]; const sn = serverPlayers[id]; if (!sn) continue; const cHex = sn.color==='white'?'#f8fafc':sn.color==='black'?'#1e293b':sn.color==='red'?'#ef4444':sn.color==='blue'?'#3b82f6':sn.color==='brown'?'#78350f':'#9333ea'; drawTank(p.x, p.y, p.bodyAngle, p.turretAngle, cHex, sn.name, false, p.hp, p.buff); if (myLocalTank.buff === 'homing' && id === homingTargetId && p.hp > 0) { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(now/300); ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3; ctx.setLineDash([15, 10]); ctx.strokeRect(-45, -45, 90, 90); ctx.restore(); } }
+    for (let id in opponents) { const p = opponents[id]; const sn = currentRoomData.players[id]; if (!sn) continue; const cHex = sn.color==='white'?'#f8fafc':sn.color==='black'?'#1e293b':sn.color==='red'?'#ef4444':sn.color==='blue'?'#3b82f6':sn.color==='brown'?'#78350f':'#9333ea'; drawTank(p.x, p.y, p.bodyAngle, p.turretAngle, cHex, sn.name, false, p.hp, p.buff); if (myLocalTank.buff === 'homing' && id === homingTargetId && p.hp > 0) { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(now/300); ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3; ctx.setLineDash([15, 10]); ctx.strokeRect(-45, -45, 90, 90); ctx.restore(); } }
     if (myLocalTank.hp > 0) { const myCHex = myColor==='white'?'#f8fafc':myColor==='black'?'#1e293b':myColor==='red'?'#ef4444':myColor==='blue'?'#3b82f6':myColor==='brown'?'#78350f':'#9333ea'; drawTank(myLocalTank.x, myLocalTank.y, myLocalTank.bodyAngle, myLocalTank.turretAngle, myCHex, myName, true, myLocalTank.hp, myLocalTank.buff); }
-    if (serverGameState.mode === 'survival') { for (let zid in zombies) { let z = zombies[zid]; let zCfg = Z_TYPES[z.type]; ctx.save(); ctx.translate(z.x, z.y); if (zCfg.ghost) ctx.globalAlpha = 0.5; ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 5; ctx.fillStyle = zCfg.color; ctx.beginPath(); ctx.arc(0, 0, zCfg.radius, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(-zCfg.radius*0.3, -zCfg.radius*0.2, zCfg.radius*0.2, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(zCfg.radius*0.3, -zCfg.radius*0.2, zCfg.radius*0.2, 0, Math.PI*2); ctx.fill(); ctx.fillRect(-zCfg.radius*0.4, zCfg.radius*0.3, zCfg.radius*0.8, zCfg.radius*0.2); ctx.fillStyle = '#ef4444'; ctx.fillRect(-15, -zCfg.radius-10, 30, 4); ctx.fillStyle = '#22c55e'; ctx.fillRect(-15, -zCfg.radius-10, 30 * (z.hp/zCfg.hp), 4); ctx.restore(); } }
+    if (currentRoomData.mode === 'survival') { for (let zid in zombies) { let z = zombies[zid]; let zCfg = Z_TYPES[z.type]; ctx.save(); ctx.translate(z.x, z.y); if (zCfg.ghost) ctx.globalAlpha = 0.5; ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 5; ctx.fillStyle = zCfg.color; ctx.beginPath(); ctx.arc(0, 0, zCfg.radius, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(-zCfg.radius*0.3, -zCfg.radius*0.2, zCfg.radius*0.2, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(zCfg.radius*0.3, -zCfg.radius*0.2, zCfg.radius*0.2, 0, Math.PI*2); ctx.fill(); ctx.fillRect(-zCfg.radius*0.4, zCfg.radius*0.3, zCfg.radius*0.8, zCfg.radius*0.2); ctx.fillStyle = '#ef4444'; ctx.fillRect(-15, -zCfg.radius-10, 30, 4); ctx.fillStyle = '#22c55e'; ctx.fillRect(-15, -zCfg.radius-10, 30 * (z.hp/zCfg.hp), 4); ctx.restore(); } }
     
     ctx.shadowColor = 'transparent';
     bullets.forEach(b => { ctx.beginPath(); if(b.type === 'piercing' || b.type === 'fast' || b.type === 'minigun' || b.type === 'homing') { ctx.moveTo(b.x, b.y-4); ctx.lineTo(b.x+20, b.y); ctx.lineTo(b.x, b.y+4); } else if (b.type === 'acid') { ctx.arc(b.x, b.y, 8, 0, Math.PI*2); } else if (b.type === 'boss') { ctx.arc(b.x, b.y, 15, 0, Math.PI*2); } else ctx.arc(b.x, b.y, 6, 0, Math.PI*2); let bCol = b.type === 'fast' || b.type === 'minigun' ? '#38bdf8' : b.type === 'explosive' || b.type === 'boss' ? '#fb923c' : b.type === 'incendiary' ? '#ef4444' : b.type === 'piercing' ? '#d946ef' : b.type === 'acid' ? '#a3e635' : b.type === 'shotgun' ? '#f8fafc' : b.type === 'homing' ? '#10b981' : '#fef08a'; ctx.fillStyle = bCol; ctx.shadowColor = bCol; ctx.shadowBlur = 10; ctx.fill(); ctx.shadowBlur = 0; });
@@ -97,12 +100,13 @@ function draw(now) {
 }
 
 function updateHUD() {
+    if(!currentRoomData) return;
     document.getElementById('hp-bar').style.width = Math.max(0, (myLocalTank.hp/MAX_HP)*100) + '%'; document.getElementById('hp-text').innerText = `${Math.ceil(myLocalTank.hp)}/${MAX_HP}`;
     let vignetteOpacity = 0; if (myLocalTank.hp < MAX_HP) vignetteOpacity = (1 - (myLocalTank.hp / MAX_HP)) * 0.85; document.getElementById('damage-vignette').style.opacity = vignetteOpacity;
-    if(myLocalTank.hp < MAX_HP * 0.3) document.getElementById('hp-bar').className = 'h-full bg-gradient-to-r from-red-600 to-red-400 w-full transition-all duration-300 shadow-[0_0_15px_rgba(239,68,68,0.8)]'; else document.getElementById('hp-bar').className = 'h-full bg-gradient-to-r from-green-500 to-green-400 w-full transition-all duration-300 shadow-[0_0_10px_rgba(34,197,94,0.5)]';
+    if(myLocalTank.hp < MAX_HP * 0.3) document.getElementById('hp-bar').className = 'h-full bg-gradient-to-r from-red-600 to-red-400 w-full transition-all duration-300 shadow-[0_0_15px_rgba(239,68,68,0.8)]'; else document.getElementById('hp-bar').className = 'h-full bg-gradient-to-r from-green-500 to-emerald-400 w-full transition-all duration-300 shadow-[0_0_10px_rgba(34,197,94,0.5)]';
     const targetUI = document.getElementById('homing-target-ui'); if (myLocalTank.buff === 'homing') targetUI.classList.remove('hidden'); else targetUI.classList.add('hidden');
-    const slist = document.getElementById('score-list'); slist.innerHTML = ''; if (serverGameState.mode === 'survival') { document.getElementById('target-score-display').innerText = serverGameState.wave; }
-    Object.values(serverPlayers).sort((a,b) => b.score - a.score).forEach(p => { slist.innerHTML += `<div class="flex justify-between w-full ${p.id===myId?'text-blue-400':'text-slate-300'} border-b border-slate-800 pb-1 ${p.hp<=0?'opacity-30 line-through':''}"><span>${p.name}</span><span class="font-bold">${serverGameState.mode === 'survival' ? Math.ceil(p.hp) : p.score}</span></div>`; });
+    const slist = document.getElementById('score-list'); slist.innerHTML = ''; if (currentRoomData.mode === 'survival') { document.getElementById('target-score-display').innerText = currentRoomData.wave; }
+    Object.values(currentRoomData.players).sort((a,b) => b.score - a.score).forEach(p => { slist.innerHTML += `<div class="flex justify-between w-full ${p.id===myId?'text-blue-400':'text-slate-300'} border-b border-slate-700/50 pb-1 ${p.hp<=0?'opacity-30 line-through':''}"><span>${p.name}</span><span class="font-bold">${currentRoomData.mode === 'survival' ? Math.ceil(p.hp) : p.score}</span></div>`; });
 }
 
 function startGameLoop() {
@@ -111,17 +115,11 @@ function startGameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-function gameLoop(now) { const dt = Math.min((now - lastTime) / 1000, 0.1); lastTime = now; if (serverGameState.status === 'playing') { updatePhysics(now, dt); draw(now); } gameLoopId = requestAnimationFrame(gameLoop); }
+function gameLoop(now) { const dt = Math.min((now - lastTime) / 1000, 0.1); lastTime = now; if (currentRoomData && currentRoomData.status === 'playing') { updatePhysics(now, dt); draw(now); } gameLoopId = requestAnimationFrame(gameLoop); }
 
 window.addEventListener('keydown', e => { 
-    if (!e || !e.key) return; 
-    const k = e.key.toLowerCase(); 
-    if(keys.hasOwnProperty(k) || k===' ') { if(k===' ') keys.space = true; else keys[k] = true; }
+    if (!e || !e.key) return; const k = e.key.toLowerCase(); if(keys.hasOwnProperty(k) || k===' ') { if(k===' ') keys.space = true; else keys[k] = true; }
     if(e.key === 'Tab') { e.preventDefault(); if(myLocalTank.buff === 'homing') { let visibleOps = Object.keys(opponents).filter(id => opponents[id].hp > 0 && Math.hypot(opponents[id].x - myLocalTank.x, opponents[id].y - myLocalTank.y) < 1500); if(visibleOps.length > 0) { playSound('hitmarker'); if(!homingTargetId || !visibleOps.includes(homingTargetId)) homingTargetId = visibleOps[0]; else { let idx = visibleOps.indexOf(homingTargetId); homingTargetId = visibleOps[(idx + 1) % visibleOps.length]; } } else homingTargetId = null; } }
 });
-window.addEventListener('keyup', e => { 
-    if (!e || !e.key) return;
-    const k = e.key.toLowerCase(); 
-    if(keys.hasOwnProperty(k) || k===' ') { if(k===' ') keys.space = false; else keys[k] = false; }
-});
+window.addEventListener('keyup', e => { if (!e || !e.key) return; const k = e.key.toLowerCase(); if(keys.hasOwnProperty(k) || k===' ') { if(k===' ') keys.space = false; else keys[k] = false; } });
 window.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
