@@ -13,7 +13,6 @@ socket.on('authError', (msg) => {
 
 socket.on('economyUpdate', (data) => { 
     myBucks = data.bucks; myUpgrades = data.upgrades; 
-    if(data.reward) { document.getElementById('winner-reward').innerText = data.reward; } 
     if (typeof updateGlobalBucks === 'function') updateGlobalBucks();
     if (typeof renderShop === 'function') renderShop(); 
 });
@@ -43,7 +42,6 @@ socket.on('gameStarting', (roomData) => {
 socket.on('sync', (data) => {
     if (!currentRoomData || currentRoomData.status !== 'playing') return;
     
-    // Синхронізуємо загальний список гравців, щоб уникнути помилок, коли хтось виходить під час гри
     currentRoomData.players = data.players;
     
     let activeOpponents = {};
@@ -61,7 +59,7 @@ socket.on('sync', (data) => {
 });
 
 socket.on('spawnBullet', (data) => {
-    playSound(data.type === 'minigun' ? 'minigun' : data.type === 'boss' ? 'boss_shoot' : 'shoot');
+    playSound(data.type === 'minigun' ? 'minigun' : data.type.includes('boss') ? 'boss_shoot' : 'shoot');
     if (data.type === 'shotgun') { for(let i=0; i<20; i++) { let angle = Math.atan2(data.vy, data.vx) + (Math.random()-0.5)*0.6; let spd = BASE_BULLET_SPEED * (0.8 + Math.random()*0.4); bullets.push({ ...data, vx: Math.cos(angle)*spd, vy: Math.sin(angle)*spd, life: 0.8 }); } } 
     else bullets.push({ ...data, life: 2.5 });
 });
@@ -75,11 +73,33 @@ socket.on('bomberExplode', (data) => { if (typeof createExplosion === 'function'
 socket.on('zombieMeleeHit', (data) => { if (data.targetId === myId && myLocalTank.hp > 0) emitDamage(data.dmg, 'zombie'); });
 socket.on('newWave', (data) => { document.getElementById('wave-overlay').classList.remove('hidden'); document.getElementById('wave-text').innerText = `ХВИЛЯ ${data.wave}`; setTimeout(()=> document.getElementById('wave-overlay').classList.add('hidden'), 3000); });
 
+// НОВИЙ ЕКРАН ПЕРЕМОГИ
 socket.on('gameOver', (data) => {
     if(currentRoomData) currentRoomData.status = 'finished'; 
     document.getElementById('winner-modal').classList.remove('hidden'); document.getElementById('damage-vignette').style.opacity = 0;
-    if (data.winner === 'ZOMBIES') { document.getElementById('winner-title').innerText = "ВИ НЕ ВИЖИЛИ"; document.getElementById('winner-title').className = "text-6xl font-russo mb-4 text-red-500 tracking-widest drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]"; document.getElementById('winner-emoji').innerText = "💀"; document.getElementById('winner-message').innerText = `Ви протримались до ${data.wave} хвилі.`; } 
-    else { document.getElementById('winner-title').innerText = "ПЕРЕМОГА!"; document.getElementById('winner-title').className = "text-6xl font-russo mb-4 text-white tracking-widest drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]"; document.getElementById('winner-emoji').innerText = "🏆"; document.getElementById('winner-message').innerText = `${data.name} здобуває перемогу!`; }
+    
+    if (data.winner === 'ZOMBIES') { 
+        document.getElementById('winner-title').innerText = "ВИ НЕ ВИЖИЛИ"; 
+        document.getElementById('winner-title').className = "text-6xl font-russo mb-4 text-red-500 tracking-widest drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]"; 
+        document.getElementById('winner-emoji').innerText = "💀"; 
+        document.getElementById('winner-message').innerText = `Ви протримались до ${data.wave} хвилі.`; 
+        document.getElementById('winner-reward').innerText = data.wave; // Нагорода у виживанні = хвилям
+    } else { 
+        let myReward = data.rewards ? (data.rewards[myId] || 0) : 0;
+        document.getElementById('winner-reward').innerText = myReward;
+
+        if (data.winner === myId) {
+            document.getElementById('winner-title').innerText = "ПЕРЕМОГА!"; 
+            document.getElementById('winner-title').className = "text-6xl font-russo mb-4 text-white tracking-widest drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]"; 
+            document.getElementById('winner-emoji').innerText = "🏆"; 
+            document.getElementById('winner-message').innerText = "Ви розбили ворогів!"; 
+        } else {
+            document.getElementById('winner-title').innerText = "ЕХХ..."; 
+            document.getElementById('winner-title').className = "text-6xl font-russo mb-4 text-slate-400 tracking-widest"; 
+            document.getElementById('winner-emoji').innerText = "💔"; 
+            document.getElementById('winner-message').innerText = `${data.name} здобуває перемогу.`; 
+        }
+    }
 });
 
 socket.on('caseResult', (result) => {

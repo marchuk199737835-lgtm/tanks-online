@@ -55,10 +55,23 @@ function updatePhysics(now, dt) {
         }
         b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
         let hit = false; let bCfg = BUFFS[b.type] || BUFFS['none'];
-        if (b.type === 'homing' || b.type.includes('piercing') || b.type === 'ghost_melee') { hit = checkCollision(b.x, b.y, 4, false); } else { hit = checkCollision(b.x, b.y, 4, true); } 
-        if (!hit && b.owner !== myId && myLocalTank.hp > 0) { if (Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < myRadius + 4) { hit = true; emitDamage(bCfg.dmg, b.owner); if(b.type==='incendiary') { let end = now + 5000; let int = setInterval(()=>{ if(Date.now() > end || myLocalTank.hp <= 0) clearInterval(int); else { emitDamage(10, b.owner); createExplosion(myLocalTank.x, myLocalTank.y, 5, '#f97316'); } }, 1000); } } }
+        if (b.type === 'homing' || b.type.includes('piercing') || b.type === 'ghost_melee' || b.type === 'boss_proj') { hit = checkCollision(b.x, b.y, 4, false); } else { hit = checkCollision(b.x, b.y, 4, true); } 
+        
+        if (!hit && b.owner !== myId && myLocalTank.hp > 0) { 
+            if (Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < myRadius + 4) { 
+                hit = true; 
+                let dmgToDeal = b.dmgOverride || bCfg.dmg; // Якщо це бос, беремо його урон
+                emitDamage(dmgToDeal, b.owner); 
+                if(b.type==='incendiary') { let end = now + 5000; let int = setInterval(()=>{ if(Date.now() > end || myLocalTank.hp <= 0) clearInterval(int); else { emitDamage(10, b.owner); createExplosion(myLocalTank.x, myLocalTank.y, 5, '#f97316'); } }, 1000); } 
+            } 
+        }
         if (!hit && currentRoomData.mode === 'survival' && b.owner === myId) { for(let zid in zombies) { let z = zombies[zid]; if (Math.hypot(b.x - z.x, b.y - z.y) < Z_TYPES[z.type].radius + 10) { hit = true; socket.emit('zombieHit', { roomId: currentRoomId, zid: zid, dmg: bCfg.dmg }); createExplosion(b.x, b.y, 5, Z_TYPES[z.type].color); break; } } }
-        if (hit || b.life <= 0) { if (b.type !== 'shotgun' && b.type !== 'minigun' && b.type !== 'acid') createExplosion(b.x, b.y, bCfg.type === 'explosive' ? 30 : 10, bCfg.type === 'explosive' ? '#ea580c' : '#fcd34d'); if (hit && bCfg.type === 'explosive' && myLocalTank.hp > 0 && Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < (b.type==='boss'?250:120)) { emitDamage(bCfg.dmg, b.owner); } bullets.splice(i, 1); }
+        
+        if (hit || b.life <= 0) { 
+            if (b.type !== 'shotgun' && b.type !== 'minigun' && b.type !== 'acid') createExplosion(b.x, b.y, bCfg.type === 'explosive' ? 30 : 10, bCfg.type === 'explosive' ? '#ea580c' : '#fcd34d'); 
+            if (hit && bCfg.type === 'explosive' && myLocalTank.hp > 0 && Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < (b.type==='boss'?250:120)) { emitDamage(bCfg.dmg, b.owner); } 
+            bullets.splice(i, 1); 
+        }
     }
     for(let i=particles.length-1; i>=0; i--){ particles[i].life -= dt; particles[i].x += particles[i].vx * dt; particles[i].y += particles[i].vy * dt; if(particles[i].life <= 0) particles.splice(i, 1); }
 }
@@ -92,10 +105,29 @@ function draw(now) {
         const cHex = sn.color==='white'?'#f8fafc':sn.color==='black'?'#1e293b':sn.color==='red'?'#ef4444':sn.color==='blue'?'#3b82f6':sn.color==='brown'?'#78350f':'#9333ea'; drawTank(p.x, p.y, p.bodyAngle, p.turretAngle, cHex, sn.name, false, p.hp, p.buff); if (myLocalTank.buff === 'homing' && id === homingTargetId && p.hp > 0) { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(now/300); ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3; ctx.setLineDash([15, 10]); ctx.strokeRect(-45, -45, 90, 90); ctx.restore(); } 
     }
     if (myLocalTank.hp > 0) { const myCHex = myColor==='white'?'#f8fafc':myColor==='black'?'#1e293b':myColor==='red'?'#ef4444':myColor==='blue'?'#3b82f6':myColor==='brown'?'#78350f':'#9333ea'; drawTank(myLocalTank.x, myLocalTank.y, myLocalTank.bodyAngle, myLocalTank.turretAngle, myCHex, myName, true, myLocalTank.hp, myLocalTank.buff); }
-    if (currentRoomData.mode === 'survival') { for (let zid in zombies) { let z = zombies[zid]; let zCfg = Z_TYPES[z.type]; ctx.save(); ctx.translate(z.x, z.y); if (zCfg.ghost) ctx.globalAlpha = 0.5; ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 5; ctx.fillStyle = zCfg.color; ctx.beginPath(); ctx.arc(0, 0, zCfg.radius, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(-zCfg.radius*0.3, -zCfg.radius*0.2, zCfg.radius*0.2, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(zCfg.radius*0.3, -zCfg.radius*0.2, zCfg.radius*0.2, 0, Math.PI*2); ctx.fill(); ctx.fillRect(-zCfg.radius*0.4, zCfg.radius*0.3, zCfg.radius*0.8, zCfg.radius*0.2); ctx.fillStyle = '#ef4444'; ctx.fillRect(-15, -zCfg.radius-10, 30, 4); ctx.fillStyle = '#22c55e'; ctx.fillRect(-15, -zCfg.radius-10, 30 * (z.hp/zCfg.hp), 4); ctx.restore(); } }
+    
+    if (currentRoomData.mode === 'survival') { 
+        for (let zid in zombies) { 
+            let z = zombies[zid]; let zCfg = Z_TYPES[z.type]; ctx.save(); ctx.translate(z.x, z.y); 
+            if (zCfg.ghost) ctx.globalAlpha = 0.5; ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 5; 
+            ctx.fillStyle = zCfg.color; ctx.beginPath(); ctx.arc(0, 0, zCfg.radius, 0, Math.PI*2); ctx.fill(); 
+            ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(-zCfg.radius*0.3, -zCfg.radius*0.2, zCfg.radius*0.2, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(zCfg.radius*0.3, -zCfg.radius*0.2, zCfg.radius*0.2, 0, Math.PI*2); ctx.fill(); ctx.fillRect(-zCfg.radius*0.4, zCfg.radius*0.3, zCfg.radius*0.8, zCfg.radius*0.2); 
+            
+            // ВІЗУАЛІЗАЦІЯ БОСІВ (Ім'я та велика смуга здоров'я)
+            if (zCfg.isBoss) {
+                ctx.fillStyle = '#fff'; ctx.font = '24px Russo One'; ctx.textAlign = 'center'; ctx.fillText(zCfg.name, 0, -zCfg.radius - 20);
+                ctx.fillStyle = '#ef4444'; ctx.fillRect(-40, -zCfg.radius-10, 80, 8); 
+                ctx.fillStyle = '#22c55e'; ctx.fillRect(-40, -zCfg.radius-10, 80 * (z.hp/zCfg.hp), 8);
+            } else {
+                ctx.fillStyle = '#ef4444'; ctx.fillRect(-15, -zCfg.radius-10, 30, 4); 
+                ctx.fillStyle = '#22c55e'; ctx.fillRect(-15, -zCfg.radius-10, 30 * (z.hp/zCfg.hp), 4); 
+            }
+            ctx.restore(); 
+        } 
+    }
     
     ctx.shadowColor = 'transparent';
-    bullets.forEach(b => { ctx.beginPath(); if(b.type === 'piercing' || b.type === 'fast' || b.type === 'minigun' || b.type === 'homing') { ctx.moveTo(b.x, b.y-4); ctx.lineTo(b.x+20, b.y); ctx.lineTo(b.x, b.y+4); } else if (b.type === 'acid') { ctx.arc(b.x, b.y, 8, 0, Math.PI*2); } else if (b.type === 'boss') { ctx.arc(b.x, b.y, 15, 0, Math.PI*2); } else ctx.arc(b.x, b.y, 6, 0, Math.PI*2); let bCol = b.type === 'fast' || b.type === 'minigun' ? '#38bdf8' : b.type === 'explosive' || b.type === 'boss' ? '#fb923c' : b.type === 'incendiary' ? '#ef4444' : b.type === 'piercing' ? '#d946ef' : b.type === 'acid' ? '#a3e635' : b.type === 'shotgun' ? '#f8fafc' : b.type === 'homing' ? '#10b981' : '#fef08a'; ctx.fillStyle = bCol; ctx.shadowColor = bCol; ctx.shadowBlur = 10; ctx.fill(); ctx.shadowBlur = 0; });
+    bullets.forEach(b => { ctx.beginPath(); if(b.type === 'piercing' || b.type === 'fast' || b.type === 'minigun' || b.type === 'homing') { ctx.moveTo(b.x, b.y-4); ctx.lineTo(b.x+20, b.y); ctx.lineTo(b.x, b.y+4); } else if (b.type === 'acid') { ctx.arc(b.x, b.y, 8, 0, Math.PI*2); } else if (b.type === 'boss_proj') { ctx.arc(b.x, b.y, 10, 0, Math.PI*2); } else ctx.arc(b.x, b.y, 6, 0, Math.PI*2); let bCol = b.type === 'fast' || b.type === 'minigun' ? '#38bdf8' : b.type === 'explosive' || b.type === 'boss_proj' ? '#fb923c' : b.type === 'incendiary' ? '#ef4444' : b.type === 'piercing' ? '#d946ef' : b.type === 'acid' ? '#a3e635' : b.type === 'shotgun' ? '#f8fafc' : b.type === 'homing' ? '#10b981' : '#fef08a'; ctx.fillStyle = bCol; ctx.shadowColor = bCol; ctx.shadowBlur = 10; ctx.fill(); ctx.shadowBlur = 0; });
     
     particles.forEach(p => { ctx.fillStyle = p.color; ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2.5)); ctx.beginPath(); ctx.arc(p.x, p.y, Math.random()*4+2, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1.0; }); ctx.restore();
     
