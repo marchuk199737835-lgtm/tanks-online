@@ -51,10 +51,22 @@ function checkCollisionServer(mapName, x, y, r) {
         else if (s.type === 'tree') { if(Math.hypot(x-s.x, y-s.y) < r+s.r) return true; }
     } return false;
 }
+
 function getValidSpawn(mapName, r) {
     let cMap = MAP_DATA[mapName] ? mapName : 'city'; let mSize = MAP_DATA[cMap].size;
     for(let i=0; i<100; i++) { let x = Math.random()*(mSize-200)+100; let y = Math.random()*(mSize-200)+100; if(!checkCollisionServer(cMap, x, y, r + 20)) return {x, y}; }
     return {x: mSize/2, y: mSize/2}; 
+}
+
+// НОВА ФУНКЦІЯ: Безпечний спавн зомбі по краях карти
+function getValidEdgeSpawn(mapName, r) {
+    let cMap = MAP_DATA[mapName] ? mapName : 'city'; let mSize = MAP_DATA[cMap].size;
+    for(let i=0; i<100; i++) { 
+        let x = Math.random() < 0.5 ? 50 : mSize-50; 
+        let y = Math.random() * (mSize - 100) + 50; 
+        if(!checkCollisionServer(cMap, x, y, r + 20)) return {x, y}; 
+    }
+    return getValidSpawn(mapName, r); // Якщо край забитий, спавним де завгодно безпечно
 }
 
 let rooms = {}; let globalPlayers = {}; 
@@ -155,8 +167,6 @@ io.on('connection', (socket) => {
         
         if (room.players[socket.id].score >= room.winScore && room.mode === 'deathmatch') {
             room.status = 'finished'; 
-            
-            // НОВА СИСТЕМА ЕКОНОМІКИ ДЛЯ ДЕЗМАТЧУ
             let multiplier = 1 + Math.max(0, room.winScore - 5) * 0.10;
             let baseWin = Math.round(10 * multiplier);
             let baseLose = Math.round(2 * multiplier);
@@ -249,8 +259,9 @@ setInterval(() => {
                             else type = typesList[Math.floor(Math.random() * (maxIdx + 1))];
                             if (type === 'boss') type = 'tanker';
                             
-                            let zid = `z_${now}_${i}`; let zSpawn = getValidSpawn(room.map, 20); 
-                            let mSize = MAP_DATA[room.map].size; zSpawn.x = Math.random() < 0.5 ? 50 : mSize-50; 
+                            // ВИПРАВЛЕНО БАГ ЗІ СПАВНОМ ЗОМБІ В СТІНАХ
+                            let zSpawn = getValidEdgeSpawn(room.map, 20); 
+                            let zid = `z_${now}_${i}`; 
                             room.zombies[zid] = { id: zid, x: zSpawn.x, y: zSpawn.y, type: type, hp: Z_TYPES[type].hp, nextAttack: 0 }; 
                         }
                     }
@@ -263,13 +274,11 @@ setInterval(() => {
                     if (target) {
                         let dx = target.x - z.x; let dy = target.y - z.y; let len = Math.hypot(dx, dy); let speed = Z_TYPES[z.type].speed;
                         
-                        // НОВА ФІЗИКА ЗОМБІ (Оминають перешкоди)
                         let nextX = z.x + (dx/len) * speed * (1/30);
                         let nextY = z.y + (dy/len) * speed * (1/30);
                         if (!checkCollisionServer(room.map, nextX, z.y, Z_TYPES[z.type].radius)) z.x = nextX;
                         if (!checkCollisionServer(room.map, z.x, nextY, Z_TYPES[z.type].radius)) z.y = nextY;
                         
-                        // ЛОГІКА СТРІЛЬБИ БОСІВ
                         if (Z_TYPES[z.type].isBoss && now > z.nextAttack) {
                             z.nextAttack = now + Z_TYPES[z.type].cd;
                             let bCount = Z_TYPES[z.type].bullets;
@@ -279,11 +288,7 @@ setInterval(() => {
                             if (bCount === 25) { spread = Math.PI * 2; step = spread / 25; startAngle = 0; } 
                             for(let b=0; b<bCount; b++) {
                                 let a = startAngle + (b * step);
-                                io.to(roomId).emit('spawnBullet', {
-                                    id: 'b_'+now+b+zid, x: z.x, y: z.y,
-                                    vx: Math.cos(a)*500, vy: Math.sin(a)*500,
-                                    type: 'boss_proj', owner: 'zombie', dmgOverride: Z_TYPES[z.type].dmg
-                                });
+                                io.to(roomId).emit('spawnBullet', { id: 'b_'+now+b+zid, x: z.x, y: z.y, vx: Math.cos(a)*500, vy: Math.sin(a)*500, type: 'boss_proj', owner: 'zombie', dmgOverride: Z_TYPES[z.type].dmg });
                             }
                         }
                         else if (Z_TYPES[z.type].ranged && !Z_TYPES[z.type].isBoss && minDist < 400 && now > z.nextAttack) { 
