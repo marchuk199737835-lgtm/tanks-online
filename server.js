@@ -87,7 +87,12 @@ io.on('connection', (socket) => {
     socket.on('shoot', (data) => { let room = rooms[data.roomId]; if(room && room.status === 'playing') io.to(data.roomId).emit('spawnBullet', { ...data, owner: socket.id }); });
 
     socket.on('takeDamage', (data) => {
-        let room = rooms[data.roomId]; if(!room || room.status !== 'playing' || !room.players[socket.id] || room.players[socket.id].hp <= 0) return; let finalDmg = data.amt;
+        let room = rooms[data.roomId]; if(!room || room.status !== 'playing' || !room.players[socket.id] || room.players[socket.id].hp <= 0) return; 
+        
+        // ФІКС: ЗАБОРОНА ДРУЖНЬОГО ВОГНЮ НА СЕРВЕРІ
+        if (room.mode === 'survival' && data.attacker !== 'zombie') return;
+        
+        let finalDmg = data.amt;
         if (data.attacker && room.players[data.attacker]) { let atkName = room.players[data.attacker].name; if (dbUsers[atkName]) { let dLvl = dbUsers[atkName].upgrades.damage || 0; let dMult = 1.0; if(dLvl===1) dMult=1.02; else if(dLvl===2) dMult=1.04; else if(dLvl===3) dMult=1.08; else if(dLvl===4) dMult=1.12; finalDmg *= dMult; } io.to(data.attacker).emit('hitConfirmed'); }
         room.players[socket.id].hp = Math.max(0, room.players[socket.id].hp - finalDmg);
         if (room.players[socket.id].hp === 0) { room.players[socket.id].buff = null; io.to(data.roomId).emit('playerDied', { id: socket.id, killer: data.attacker }); if (room.mode === 'deathmatch') { const tid = 'tkn_' + Date.now() + Math.random(); room.tokens[tid] = { id: tid, x: room.players[socket.id].x, y: room.players[socket.id].y, color: room.players[socket.id].color, active: true }; } setTimeout(() => { if(room && room.players[socket.id] && room.status === 'playing' && room.mode !== 'survival') { room.players[socket.id].hp = MAX_HP; let spawn = getValidSpawn(room.map, 30); room.players[socket.id].x = spawn.x; room.players[socket.id].y = spawn.y; io.to(data.roomId).emit('playerRespawn', room.players[socket.id]); } }, 3000); }
@@ -164,7 +169,6 @@ setInterval(() => {
 
         if (now - room.lastPowerupSpawn > 30000) {
             room.lastPowerupSpawn = now; 
-            // ПОВЕРНУТІ ЕФЕКТИ В ПУЛ
             const types = ['explosive', 'minigun', 'boss', 'shotgun', 'healing', 'samurai', 'piercing', 'invisible', 'homing'];
             if (Object.keys(room.powerups).length > 10) delete room.powerups[Object.keys(room.powerups)[0]];
             for(let i=0; i<2; i++) { const pid = 'pu_' + now + '_' + i; let pSpawn = getValidSpawn(room.map, 30); room.powerups[pid] = { id: pid, type: types[Math.floor(Math.random() * types.length)], active: true, x: pSpawn.x, y: pSpawn.y }; }
