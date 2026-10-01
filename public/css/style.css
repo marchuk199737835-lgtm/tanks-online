@@ -5,7 +5,8 @@ h1, h2, h3, .font-russo { font-family: 'Russo One', sans-serif; }
 
 #game-container { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; background-color: #000; position: absolute; top:0; left:0; z-index: 10;}
 canvas { display: block; cursor: crosshair; }
-.screen-container { width: 100vw; height: 100vh; background-color: #020617; background-image: radial-gradient(circle at top right, #1e3a8a 0%, transparent 40%), radial-gradient(circle at bottom left, #064e3b 0%, transparent 40%); }
+
+.screen-container { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: #020617; background-image: radial-gradient(circle at top right, #1e3a8a 0%, transparent 40%), radial-gradient(circle at bottom left, #064e3b 0%, transparent 40%); }
 
 /* Glassmorphism */
 .glass-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
@@ -19,20 +20,16 @@ canvas { display: block; cursor: crosshair; }
 .select-btn { cursor: pointer; border: 2px solid transparent; transition: all 0.2s; }
 .select-btn.selected { border-color: #3b82f6; background-color: rgba(59, 130, 246, 0.3); box-shadow: 0 0 15px rgba(59, 130, 246, 0.5); }
 
-/* Animations */
 @keyframes hitmarker-anim { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; } 50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; } }
 .hitmarker-active { animation: hitmarker-anim 0.2s ease-out forwards; }
-
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 .fade-in { animation: fade-in 0.4s ease-out forwards; }
-
 @keyframes slide-up { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
 .slide-up { animation: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
 .roulette-container { display: flex; transition: transform 3.5s cubic-bezier(0.1, 1, 0.3, 1); }
 .roulette-item { width: 90px; height: 90px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-family: 'Russo One'; border-right: 1px solid rgba(255,255,255,0.05); }
 
-/* Custom Scrollbar for room list */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 10px; }
 ::-webkit-scrollbar-thumb { background: rgba(59, 130, 246, 0.5); border-radius: 10px; }

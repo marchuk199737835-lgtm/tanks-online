@@ -9,8 +9,8 @@
 </head>
 <body class="relative text-white antialiased">
 
-    <!-- Глобальні налаштування -->
-    <div id="settings-modal" class="modal hidden absolute inset-0 z-[100] flex items-center justify-center p-4">
+    <!-- Глобальні налаштування (ПО ФІКСУ: fixed замість absolute) -->
+    <div id="settings-modal" class="modal hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
         <div class="glass-panel p-8 rounded-2xl max-w-sm w-full text-center neon-border">
             <h2 class="text-2xl font-russo mb-6 text-white tracking-widest">НАЛАШТУВАННЯ</h2>
             <div class="mb-6 text-left"><label class="text-xs font-bold uppercase text-slate-400 block mb-2 tracking-wider">Музика</label><input type="range" id="vol-music" min="0" max="1" step="0.05" value="0.3" class="w-full accent-blue-500"></div>
@@ -20,12 +20,11 @@
     </div>
 
     <!-- Екран 1: Авторизація -->
-    <div id="login-screen" class="screen-container flex flex-col items-center justify-center absolute z-50">
+    <div id="login-screen" class="screen-container fixed inset-0 z-50 flex flex-col items-center justify-center">
         <div class="glass-panel p-8 rounded-2xl max-w-md w-full text-center neon-border relative slide-up">
             <button class="settings-btn absolute top-4 right-4 text-slate-400 hover:text-white transition">⚙️</button>
             <h1 class="text-6xl mb-2 text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.8)] font-russo mt-4 tracking-wider">ТАНКИ</h1>
             <p class="text-slate-400 mb-8 font-bold tracking-widest uppercase text-xs text-blue-400">Військовий Облік</p>
-            
             <div class="flex w-full mb-6 bg-slate-900/50 rounded-xl overflow-hidden border border-slate-700/50">
                 <button id="tab-login" class="flex-1 py-3 text-xs font-bold uppercase transition bg-blue-600 text-white tracking-wider">Вхід</button>
                 <button id="tab-register" class="flex-1 py-3 text-xs font-bold uppercase transition text-slate-400 hover:bg-slate-800 tracking-wider">Реєстрація</button>
@@ -36,8 +35,8 @@
         </div>
     </div>
 
-    <!-- Екран 2: Головне меню (Вибір) -->
-    <div id="main-menu-screen" class="screen-container hidden flex-col items-center justify-center absolute z-40">
+    <!-- Екран 2: Головне меню -->
+    <div id="main-menu-screen" class="screen-container hidden fixed inset-0 z-40 flex-col items-center justify-center">
         <div class="absolute top-6 right-8 flex gap-4 z-50">
             <div class="glass-panel px-6 py-2 rounded-full border border-emerald-500/30 flex items-center gap-3">
                 <span class="text-emerald-400 font-russo text-xl">💵 <span class="global-bucks-display">0</span></span>
@@ -45,16 +44,13 @@
             <button class="settings-btn glass-panel p-3 rounded-full text-slate-300 hover:text-white transition">⚙️</button>
             <button id="menu-logout-btn" class="glass-panel p-3 rounded-full text-red-400 hover:text-red-300 transition">🚪</button>
         </div>
-        
         <h1 class="text-7xl text-white font-russo mb-16 drop-shadow-[0_0_20px_rgba(255,255,255,0.3)] tracking-widest fade-in">ОБЕРІТЬ ДІЮ</h1>
-        
         <div class="flex gap-8 slide-up">
             <button id="nav-sessions-btn" class="w-80 h-96 glass-panel rounded-3xl border border-blue-500/30 hover:border-blue-500 hover:shadow-[0_0_30px_rgba(37,99,235,0.4)] transition-all group flex flex-col items-center justify-center gap-6">
                 <div class="text-8xl group-hover:scale-110 transition-transform duration-300">🌍</div>
                 <h2 class="text-3xl font-russo text-white tracking-widest">СЕСІЇ</h2>
                 <p class="text-slate-400 text-sm font-bold uppercase tracking-wider">Знайти або створити гру</p>
             </button>
-            
             <button id="nav-shop-btn" class="w-80 h-96 glass-panel rounded-3xl border border-emerald-500/30 hover:border-emerald-500 hover:shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all group flex flex-col items-center justify-center gap-6">
                 <div class="text-8xl group-hover:scale-110 transition-transform duration-300">🛠️</div>
                 <h2 class="text-3xl font-russo text-white tracking-widest">АРСЕНАЛ</h2>
@@ -64,28 +60,24 @@
     </div>
 
     <!-- Екран 3: Браузер Сесій -->
-    <div id="room-browser-screen" class="screen-container hidden flex-col absolute z-40 p-8">
+    <div id="room-browser-screen" class="screen-container hidden fixed inset-0 z-40 flex-col p-8">
         <div class="flex justify-between items-center mb-8 fade-in">
             <button id="back-to-menu-btn" class="glass-panel px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-slate-300 hover:text-white transition">← Назад</button>
             <h2 class="text-4xl font-russo text-white tracking-widest">АКТИВНІ СЕСІЇ</h2>
             <button id="open-create-room-btn" class="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-xl font-russo text-lg uppercase tracking-widest transition shadow-[0_0_15px_rgba(37,99,235,0.5)]">+ СТВОРИТИ</button>
         </div>
-        
         <div class="glass-panel flex-1 rounded-2xl border border-slate-700 overflow-hidden flex flex-col slide-up">
             <div class="grid grid-cols-5 gap-4 p-4 bg-slate-900/80 border-b border-slate-700 text-xs font-bold uppercase tracking-widest text-slate-400">
                 <div class="col-span-2">Хост / ID</div><div>Режим</div><div>Мапа</div><div>Гравці</div>
             </div>
-            <div id="rooms-list" class="flex-1 overflow-y-auto p-2 space-y-2">
-                <!-- Кімнати -->
-            </div>
+            <div id="rooms-list" class="flex-1 overflow-y-auto p-2 space-y-2"></div>
         </div>
     </div>
 
     <!-- Модалка: Створення кімнати -->
-    <div id="create-room-modal" class="modal hidden absolute inset-0 z-[60] flex items-center justify-center p-4">
+    <div id="create-room-modal" class="modal hidden fixed inset-0 z-[60] flex items-center justify-center p-4">
         <div class="glass-panel p-8 rounded-3xl max-w-md w-full border border-blue-500/50 shadow-[0_0_30px_rgba(37,99,235,0.2)] slide-up">
             <h2 class="text-2xl font-russo mb-6 text-white tracking-widest text-center">НАЛАШТУВАННЯ СЕСІЇ</h2>
-            
             <div class="space-y-6 text-left">
                 <div><label class="text-xs font-bold uppercase text-slate-400 mb-2 block tracking-wider">Режим Гри</label>
                     <div class="flex gap-2"><div class="select-btn create-mode-select p-3 rounded-xl flex-1 text-center bg-slate-800 text-xs font-bold tracking-widest selected" data-mode="deathmatch">ДЕТМАТЧ</div><div class="select-btn create-mode-select p-3 rounded-xl flex-1 text-center bg-slate-800 text-xs font-bold tracking-widest" data-mode="survival">ВИЖИВАННЯ</div></div>
@@ -98,7 +90,6 @@
                     <div class="w-24" id="create-score-wrap"><label class="text-xs font-bold uppercase text-slate-400 mb-2 block tracking-wider">Жетони</label><input type="number" id="create-win-score" min="5" max="1000" value="50" class="w-full p-2 rounded-xl bg-slate-900 border border-slate-700 text-center font-bold text-white outline-none"></div>
                 </div>
             </div>
-            
             <div class="flex gap-4 mt-8">
                 <button id="cancel-create-btn" class="flex-1 bg-slate-700/80 hover:bg-slate-600 py-4 rounded-xl font-bold transition tracking-widest uppercase">ВІДМІНА</button>
                 <button id="confirm-create-btn" class="flex-[2] bg-blue-600 hover:bg-blue-500 py-4 rounded-xl font-russo transition tracking-widest uppercase shadow-[0_0_15px_rgba(37,99,235,0.4)]">СТВОРИТИ</button>
@@ -107,8 +98,7 @@
     </div>
 
     <!-- Екран 4: Арсенал (Крамниця) -->
-    <div id="shop-screen" class="screen-container hidden absolute z-40 flex">
-        <!-- Ліва частина: Товари -->
+    <div id="shop-screen" class="screen-container hidden fixed inset-0 z-40 flex">
         <div class="w-1/2 h-full bg-slate-900/90 border-r border-slate-700 flex flex-col p-8 backdrop-blur-md slide-up">
             <div class="flex justify-between items-center mb-8">
                 <button id="shop-back-btn" class="glass-panel px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-slate-300 hover:text-white transition">← Назад</button>
@@ -117,32 +107,24 @@
                 </div>
             </div>
             <h2 class="text-4xl font-russo text-white mb-8 tracking-widest">АРСЕНАЛ</h2>
-            
             <div class="flex gap-2 mb-6 border-b border-slate-700 pb-2">
                 <button class="shop-tab-btn selected px-4 py-2 text-sm font-bold uppercase tracking-widest text-white border-b-2 border-emerald-500">Покращення</button>
             </div>
-
             <div id="shop-items-container" class="flex-1 overflow-y-auto space-y-4 pr-2"></div>
-            
             <div class="mt-6 pt-6 border-t border-slate-700">
                 <button id="buy-case-btn" class="w-full py-5 rounded-2xl font-russo text-xl uppercase tracking-widest bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-[0_0_20px_rgba(147,51,234,0.4)] transition">🎁 КЕЙС (50$)</button>
             </div>
         </div>
-        
-        <!-- Права частина: Танк на підставці -->
         <div class="w-1/2 h-full relative flex items-center justify-center fade-in">
-            <!-- Підставка -->
             <div class="absolute bottom-1/4 w-96 h-32 bg-slate-800 rounded-full border-t border-slate-600 shadow-[0_50px_100px_rgba(0,0,0,0.9)] transform rotate-x-60"></div>
-            <!-- Світіння -->
             <div class="absolute bottom-1/4 w-80 h-20 bg-emerald-500/20 blur-3xl rounded-full"></div>
-            <!-- Танк (Емодзі/CSS макет) -->
             <div class="absolute z-10 text-[15rem] drop-shadow-[0_20px_30px_rgba(0,0,0,0.8)] transform -translate-y-10">🛡️</div>
             <p class="absolute bottom-10 text-slate-500 font-russo tracking-widest text-2xl opacity-30">T-SERIES MK.II</p>
         </div>
     </div>
 
     <!-- Модалки Крамниці -->
-    <div id="case-confirm-modal" class="modal hidden absolute inset-0 z-[60] flex items-center justify-center p-4">
+    <div id="case-confirm-modal" class="modal hidden fixed inset-0 z-[60] flex items-center justify-center p-4">
         <div class="glass-panel p-8 rounded-3xl max-w-sm w-full text-center border border-purple-500/50 shadow-[0_0_40px_rgba(147,51,234,0.3)] slide-up">
             <h2 class="text-2xl font-russo mb-4 text-purple-400 tracking-widest">УВАГА!</h2>
             <p class="text-slate-300 mb-8 font-bold text-sm leading-relaxed">Відкриття кейсу дає випадковий апгрейд БУДЬ-ЯКОГО рівня. Це може <span class="text-red-400">знизити</span> ваш поточний рівень, якщо випаде гірший! Ви впевнені?</p>
@@ -152,8 +134,7 @@
             </div>
         </div>
     </div>
-
-    <div id="roulette-modal" class="modal hidden absolute inset-0 z-[60] flex items-center justify-center p-4">
+    <div id="roulette-modal" class="modal hidden fixed inset-0 z-[60] flex items-center justify-center p-4">
         <div class="glass-panel p-8 rounded-3xl max-w-2xl w-full text-center border border-purple-500 shadow-[0_0_60px_rgba(147,51,234,0.4)] overflow-hidden relative slide-up">
             <div class="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-full bg-red-500 z-10 shadow-[0_0_15px_red]"></div>
             <div class="w-full h-24 bg-slate-900 border-y border-slate-700 overflow-hidden relative rounded-lg">
@@ -162,30 +143,47 @@
         </div>
     </div>
 
-    <!-- Екран 5: Лобі Кімнати (В очікуванні матчу) -->
-    <div id="lobby-screen" class="screen-container hidden flex-col absolute z-30 p-8">
+    <!-- Екран 5: Лобі Кімнати -->
+    <div id="lobby-screen" class="screen-container hidden fixed inset-0 z-30 flex-col p-8 overflow-y-auto">
         <div class="flex justify-between items-center mb-8 fade-in">
             <button id="leave-room-btn" class="glass-panel px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-red-400 hover:text-white hover:bg-red-500/20 transition border border-red-500/30">🚪 Покинути</button>
-            <div class="flex items-center gap-4">
-                <h2 class="text-3xl font-russo text-white tracking-widest" id="lobby-room-name">СЕСІЯ</h2>
-                <div class="glass-panel px-4 py-1.5 rounded-lg border border-slate-600 flex items-center gap-2">
-                    <span class="text-xs text-slate-400 font-bold tracking-wider">АДМІН:</span>
-                    <input type="password" id="admin-code" placeholder="КОД" class="bg-transparent w-16 outline-none text-blue-400 text-center font-mono placeholder-slate-600 text-sm">
-                </div>
-            </div>
+            <h2 class="text-3xl font-russo text-white tracking-widest" id="lobby-room-name">СЕСІЯ</h2>
         </div>
         
-        <div class="grid grid-cols-3 gap-8 flex-1 h-full slide-up">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 flex-1">
             <!-- Список гравців -->
-            <div class="col-span-1 glass-panel p-6 rounded-3xl border border-slate-700 flex flex-col">
+            <div class="col-span-1 glass-panel p-6 rounded-3xl border border-slate-700 flex flex-col min-h-[400px]">
                 <h3 class="text-xs uppercase text-slate-400 mb-4 font-bold border-b border-slate-700 pb-3 flex justify-between tracking-wider">
                     <span>Загін</span><span id="lobby-count" class="text-blue-400">0 / 0</span>
                 </h3>
                 <div id="players-list" class="space-y-3 overflow-y-auto flex-1 pr-2"></div>
             </div>
             
-            <!-- Налаштування танка -->
+            <!-- Налаштування танка і Сесії -->
             <div class="col-span-2 flex flex-col gap-6">
+                <!-- ПАНЕЛЬ ХОСТА (Показується тільки лідеру) -->
+                <div id="host-settings-panel" class="hidden flex-col">
+                    <div class="glass-panel p-6 rounded-3xl border border-blue-500/50 shadow-[0_0_20px_rgba(37,99,235,0.2)]">
+                        <h3 class="text-sm uppercase text-blue-400 mb-4 font-russo tracking-widest">👑 ПАРАМЕТРИ СЕСІЇ (ЛІДЕР)</h3>
+                        <div class="grid grid-cols-2 gap-6">
+                            <div>
+                                <label class="text-[10px] font-bold uppercase text-slate-400 mb-2 block tracking-wider">Режим</label>
+                                <div class="flex gap-2 mb-4"><div class="select-btn host-mode-select p-2 rounded-xl flex-1 text-center bg-slate-800 text-xs font-bold" data-mode="deathmatch">ДЕТМАТЧ</div><div class="select-btn host-mode-select p-2 rounded-xl flex-1 text-center bg-slate-800 text-xs font-bold" data-mode="survival">ВИЖИВАННЯ</div></div>
+                                <label class="text-[10px] font-bold uppercase text-slate-400 mb-2 block tracking-wider">Мапа</label>
+                                <div class="grid grid-cols-2 gap-2"><div class="select-btn host-map-select p-2 rounded-xl text-center bg-slate-800 text-xs font-bold" data-map="city">МІСТО</div><div class="select-btn host-map-select p-2 rounded-xl text-center bg-slate-800 text-xs font-bold" data-map="hangars">АНГАРИ</div><div class="select-btn host-map-select p-2 rounded-xl text-center bg-slate-800 text-xs font-bold" data-map="ship">КОРАБЕЛЬ</div><div class="select-btn host-map-select p-2 rounded-xl text-center bg-slate-800 text-xs font-bold" data-map="castle">ЗАМОК</div></div>
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold uppercase text-slate-400 mb-2 block tracking-wider">Макс. Гравців: <span id="host-max-players-val" class="text-white">6</span></label>
+                                <input type="range" id="host-max-players" min="2" max="10" class="w-full accent-blue-500 mb-4">
+                                <div id="host-score-wrap">
+                                    <label class="text-[10px] font-bold uppercase text-slate-400 mb-2 block tracking-wider">Жетони</label>
+                                    <input type="number" id="host-win-score" min="5" max="1000" class="w-full p-2 rounded-xl bg-slate-900 border border-slate-700 text-center font-bold text-white outline-none">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="glass-panel p-8 rounded-3xl border border-slate-700">
                     <h3 class="text-sm uppercase text-white mb-6 font-russo tracking-widest">КАМУФЛЯЖ</h3>
                     <div class="grid grid-cols-6 gap-4" id="color-selectors">
@@ -218,7 +216,6 @@
         <div class="absolute inset-0 p-6 flex flex-col justify-between z-30 pointer-events-none">
             <div class="flex justify-between items-start">
                 <button class="settings-btn pointer-events-auto glass-panel p-4 rounded-2xl text-slate-300 hover:text-white transition">⚙️</button>
-                
                 <div id="buff-timer-container" class="hidden absolute top-6 left-1/2 -translate-x-1/2 glass-panel px-6 py-3 rounded-2xl border border-slate-600 flex items-center gap-4 pointer-events-none z-40">
                     <div id="buff-timer-icon" class="text-3xl drop-shadow-md">🔥</div>
                     <div class="flex flex-col">
@@ -228,11 +225,9 @@
                         </div>
                     </div>
                 </div>
-
                 <div id="homing-target-ui" class="hidden absolute left-1/2 top-24 -translate-x-1/2 bg-emerald-900/80 border border-emerald-500 px-6 py-2 rounded-full text-emerald-400 font-bold text-xs tracking-widest uppercase shadow-[0_0_20px_rgba(16,185,129,0.4)]">
                     🎯 Захоплено (TAB)
                 </div>
-
                 <div class="glass-panel p-5 rounded-2xl border border-slate-700 w-64 text-right pointer-events-auto flex flex-col items-end">
                     <h3 id="score-header" class="text-xs text-slate-400 mb-3 font-bold uppercase border-b border-slate-700 pb-2 w-full flex justify-between tracking-wider">
                         <span>ЖЕТОНИ</span><span id="target-score-display" class="text-blue-400 font-russo">50</span>
@@ -240,7 +235,6 @@
                     <div id="score-list" class="space-y-2 text-lg font-russo w-full pr-1"></div>
                 </div>
             </div>
-
             <div class="flex justify-between items-end w-full pb-4 px-2">
                 <div class="glass-panel p-5 rounded-2xl border border-slate-700 w-80 flex flex-col pointer-events-auto">
                     <div class="flex justify-between w-full items-center mb-3">
@@ -250,7 +244,6 @@
                         <div id="hp-bar" class="h-full bg-gradient-to-r from-green-500 to-emerald-400 w-full transition-all duration-300"></div>
                     </div>
                 </div>
-
                 <div class="glass-panel p-5 rounded-2xl border border-slate-700 w-72 flex flex-col pointer-events-auto">
                     <div class="flex justify-between w-full items-center mb-3">
                         <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Перезарядка</div>
@@ -263,14 +256,13 @@
             </div>
         </div>
         
-        <div id="countdown-overlay" class="hidden absolute inset-0 z-40 flex items-center justify-center bg-black/90 pointer-events-none backdrop-blur-md">
+        <div id="countdown-overlay" class="hidden fixed inset-0 z-40 flex items-center justify-center bg-black/90 pointer-events-none backdrop-blur-md">
             <div id="countdown-text" class="text-[15rem] font-russo text-white drop-shadow-[0_0_50px_rgba(37,99,235,0.8)] scale-150 transition-transform">3</div>
         </div>
-        <div id="wave-overlay" class="hidden absolute inset-0 z-40 flex items-center justify-center pointer-events-none">
+        <div id="wave-overlay" class="hidden fixed inset-0 z-40 flex items-center justify-center pointer-events-none">
             <div id="wave-text" class="text-8xl font-russo text-red-500 drop-shadow-[0_0_40px_rgba(220,38,38,1)] tracking-widest">ХВИЛЯ 1</div>
         </div>
-        
-        <div id="winner-modal" class="modal hidden absolute inset-0 z-50 flex items-center justify-center p-4">
+        <div id="winner-modal" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="glass-panel p-12 rounded-[3rem] max-w-xl w-full text-center border border-blue-500/50 shadow-[0_0_60px_rgba(37,99,235,0.3)] slide-up">
                 <div id="winner-emoji" class="text-9xl mb-8 drop-shadow-2xl">🏆</div>
                 <h2 id="winner-title" class="text-6xl font-russo mb-4 text-white tracking-widest drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">ПЕРЕМОГА!</h2>
