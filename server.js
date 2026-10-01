@@ -5,12 +5,30 @@ const io = require('socket.io')(http);
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { MongoClient } = require('mongodb'); // Підключаємо MongoDB
+const { MongoClient } = require('mongodb');
 
 app.use(express.static(path.join(__dirname)));
 
+// --- НОВА МУЗИЧНА СИСТЕМА ---
 const musicDir = path.join(__dirname, 'music');
 if (!fs.existsSync(musicDir)) fs.mkdirSync(musicDir); 
+
+const musicCategories = ['loby', 'dezmatch', 'survive', 'main'];
+let musicData = {};
+
+musicCategories.forEach(cat => {
+    const catDir = path.join(musicDir, cat);
+    if (!fs.existsSync(catDir)) fs.mkdirSync(catDir, { recursive: true });
+});
+
+function scanMusic() {
+    musicCategories.forEach(cat => {
+        const catDir = path.join(musicDir, cat);
+        musicData[cat] = fs.readdirSync(catDir).filter(f => f.endsWith('.mp3')).map(f => `${cat}/${f}`);
+    });
+}
+scanMusic();
+
 app.use('/music', express.static(musicDir));
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
@@ -19,7 +37,6 @@ const MAX_HP = 500;
 const BUFF_DURATION = 15000;
 const MAX_PLAYERS = 6;
 
-// --- БАЗА ДАНИХ MONGODB ---
 const mongoUri = process.env.MONGO_URI;
 let dbUsersCol = null;
 let dbConfigCol = null;
@@ -35,7 +52,6 @@ if (mongoUri) {
         dbUsersCol = db.collection("users");
         dbConfigCol = db.collection("config");
 
-        // Завантажуємо налаштування Адміна
         dbConfigCol.findOne({ _id: "admin" }).then(conf => {
             if (conf) {
                 savedConfig.map = conf.map || 'city';
@@ -47,19 +63,15 @@ if (mongoUri) {
             }
         });
 
-        // Завантажуємо всіх гравців у пам'ять для швидкої гри
         dbUsersCol.find({}).toArray().then(users => {
             users.forEach(u => dbUsers[u.name] = u);
             console.log(`Завантажено акаунтів: ${users.length}`);
         });
     }).catch(err => console.error("❌ Помилка підключення до MongoDB:", err));
-} else {
-    console.log("⚠️ MONGO_URI не знайдено! Прогрес зберігатиметься лише тимчасово.");
 }
 
 function saveUser(name) {
     if (dbUsersCol && dbUsers[name]) {
-        // Оновлюємо дані гравця в базі
         dbUsersCol.updateOne({ name: name }, { $set: dbUsers[name] }, { upsert: true });
     }
 }
@@ -112,28 +124,12 @@ function getValidSpawn(mapName, r) {
     return {x: mSize/2, y: mSize/2}; 
 }
 
-function getMusicPlaylist() {
-    if (!fs.existsSync(musicDir)) return [];
-    let files = fs.readdirSync(musicDir).filter(f => f.endsWith('.mp3'));
-    return files.sort(() => Math.random() - 0.5); 
-}
-
 let gameState = {
-    status: 'lobby', 
-    mode: savedConfig.mode, 
-    map: savedConfig.map,
-    winScore: savedConfig.winScore,
-    wave: 1,
-    survivalState: 'waiting',
-    nextWaveTime: 0,
-    leaderId: null,
-    playlist: getMusicPlaylist()
+    status: 'lobby', mode: savedConfig.mode, map: savedConfig.map, winScore: savedConfig.winScore,
+    wave: 1, survivalState: 'waiting', nextWaveTime: 0, leaderId: null
 };
 
-let players = {};
-let powerups = {};
-let tokens = {};
-let zombies = {};
+let players = {}; let powerups = {}; let tokens = {}; let zombies = {};
 
 const Z_TYPES = {
     'normal': { hp: 25, speed: 120, dmg: 10, radius: 15, color: '#22c55e' },
@@ -154,6 +150,9 @@ function sendEconomy(socketId, name) {
 
 io.on('connection', (socket) => {
     
+    // Надсилаємо список музики відразу при підключенні
+    socket.emit('initMusic', musicData);
+    
     function setupPlayer(socket, name, token) {
         let alreadyOnline = Object.values(players).find(p => p.name === name);
         if(alreadyOnline) return socket.emit('authError', 'Гравець з таким ніком вже в грі!');
@@ -162,7 +161,6 @@ io.on('connection', (socket) => {
         players[socket.id] = { id: socket.id, name: name, color: null, ready: false, hp: MAX_HP, score: 0, x: 0, y: 0, bodyAngle: 0, turretAngle: 0, buff: null, buffEndTime: 0, buffProgress: 0 };
         if (Object.keys(players).length === 1 && !gameState.leaderId) {
             gameState.leaderId = socket.id;
-            gameState.playlist = getMusicPlaylist(); 
         }
 
         socket.emit('authSuccess', { name, token });
