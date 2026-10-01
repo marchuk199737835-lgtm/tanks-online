@@ -8,7 +8,7 @@ let currentTrackIndex = 0;
 
 function initAudio() { if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } }
 
-// Глобальні функції для зміни гучності
+// Гарантоване оновлення гучності з усіх менюшок
 window.setMusicVolume = function(val) { volMusic = val; bgMusic.volume = val; };
 window.setSfxVolume = function(val) { volSfx = val; };
 

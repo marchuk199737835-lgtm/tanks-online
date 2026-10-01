@@ -1,6 +1,5 @@
 socket.on('initMusic', (data) => { myMusicPlaylists = data; });
 
-// АВТОРИЗАЦІЯ
 socket.on('authSuccess', (data) => { 
     localStorage.setItem('tankToken', data.token); myName = data.name; myId = socket.id; 
     initAudio(); if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); 
@@ -9,9 +8,7 @@ socket.on('authSuccess', (data) => {
 });
 
 socket.on('authError', (msg) => { 
-    alert(msg); 
-    localStorage.removeItem('tankToken');
-    showScreen('login-screen');
+    alert(msg); localStorage.removeItem('tankToken'); showScreen('login-screen');
 });
 
 socket.on('economyUpdate', (data) => { 
@@ -21,21 +18,9 @@ socket.on('economyUpdate', (data) => {
     if (typeof renderShop === 'function') renderShop(); 
 });
 
-// КІМНАТИ
-socket.on('roomsList', (rooms) => {
-    if (typeof renderRoomsList === 'function') renderRoomsList(rooms);
-});
-
-socket.on('roomCreated', (roomId) => {
-    socket.emit('joinRoom', roomId);
-});
-
-socket.on('joinedRoom', (data) => {
-    currentRoomId = data.roomId;
-    currentRoomData = data.roomData;
-    showScreen('lobby-screen');
-});
-
+socket.on('roomsList', (rooms) => { if (typeof renderRoomsList === 'function') renderRoomsList(rooms); });
+socket.on('roomCreated', (roomId) => { socket.emit('joinRoom', roomId); });
+socket.on('joinedRoom', (data) => { currentRoomId = data.roomId; currentRoomData = data.roomData; showScreen('lobby-screen'); });
 socket.on('joinError', (msg) => { alert(msg); });
 
 socket.on('updateLobby', (roomData) => {
@@ -43,7 +28,6 @@ socket.on('updateLobby', (roomData) => {
     if (typeof updateLobbyUI === 'function') updateLobbyUI();
 });
 
-// ГРА
 socket.on('gameStarting', (roomData) => {
     currentRoomData = roomData;
     const pData = currentRoomData.players[myId];
@@ -58,6 +42,10 @@ socket.on('gameStarting', (roomData) => {
 
 socket.on('sync', (data) => {
     if (!currentRoomData || currentRoomData.status !== 'playing') return;
+    
+    // Синхронізуємо загальний список гравців, щоб уникнути помилок, коли хтось виходить під час гри
+    currentRoomData.players = data.players;
+    
     let activeOpponents = {};
     for (let id in data.players) {
         if (id !== myId) {

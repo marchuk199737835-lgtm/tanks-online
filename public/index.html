@@ -9,7 +9,7 @@
 </head>
 <body class="relative text-white antialiased">
 
-    <!-- Глобальні налаштування (ПО ФІКСУ: fixed замість absolute) -->
+    <!-- Глобальні налаштування -->
     <div id="settings-modal" class="modal hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
         <div class="glass-panel p-8 rounded-2xl max-w-sm w-full text-center neon-border">
             <h2 class="text-2xl font-russo mb-6 text-white tracking-widest">НАЛАШТУВАННЯ</h2>
@@ -123,7 +123,6 @@
         </div>
     </div>
 
-    <!-- Модалки Крамниці -->
     <div id="case-confirm-modal" class="modal hidden fixed inset-0 z-[60] flex items-center justify-center p-4">
         <div class="glass-panel p-8 rounded-3xl max-w-sm w-full text-center border border-purple-500/50 shadow-[0_0_40px_rgba(147,51,234,0.3)] slide-up">
             <h2 class="text-2xl font-russo mb-4 text-purple-400 tracking-widest">УВАГА!</h2>
@@ -151,7 +150,6 @@
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8 flex-1">
-            <!-- Список гравців -->
             <div class="col-span-1 glass-panel p-6 rounded-3xl border border-slate-700 flex flex-col min-h-[400px]">
                 <h3 class="text-xs uppercase text-slate-400 mb-4 font-bold border-b border-slate-700 pb-3 flex justify-between tracking-wider">
                     <span>Загін</span><span id="lobby-count" class="text-blue-400">0 / 0</span>
@@ -159,9 +157,8 @@
                 <div id="players-list" class="space-y-3 overflow-y-auto flex-1 pr-2"></div>
             </div>
             
-            <!-- Налаштування танка і Сесії -->
             <div class="col-span-2 flex flex-col gap-6">
-                <!-- ПАНЕЛЬ ХОСТА (Показується тільки лідеру) -->
+                <!-- ПАНЕЛЬ ХОСТА -->
                 <div id="host-settings-panel" class="hidden flex-col">
                     <div class="glass-panel p-6 rounded-3xl border border-blue-500/50 shadow-[0_0_20px_rgba(37,99,235,0.2)]">
                         <h3 class="text-sm uppercase text-blue-400 mb-4 font-russo tracking-widest">👑 ПАРАМЕТРИ СЕСІЇ (ЛІДЕР)</h3>
@@ -206,8 +203,8 @@
         </div>
     </div>
 
-    <!-- Екран Гри -->
-    <div id="game-screen" class="screen-container hidden relative bg-black overflow-hidden z-20">
+    <!-- Екран Гри (ТУТ БУЛА ПОМИЛКА: додано fixed inset-0) -->
+    <div id="game-screen" class="screen-container hidden fixed inset-0 bg-black overflow-hidden z-20">
         <div id="damage-vignette" class="absolute inset-0 pointer-events-none z-10 transition-opacity duration-200" style="opacity:0; box-shadow: inset 0 0 150px 30px rgba(220, 38, 38, 1);"></div>
         <div id="hitmarker" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20">
             <svg width="40" height="40" viewBox="0 0 40 40"><path d="M12,12 L28,28 M28,12 L12,28" stroke="white" stroke-width="3" stroke-linecap="round"/></svg>

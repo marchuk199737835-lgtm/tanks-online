@@ -7,13 +7,11 @@ function showScreen(screenId) {
 }
 function updateGlobalBucks() { document.querySelectorAll('.global-bucks-display').forEach(el => el.innerText = myBucks); }
 
-// ОБРОБНИКИ ЗВУКУ З ІНТЕРФЕЙСУ
-document.getElementById('vol-music').addEventListener('input', e => { 
-    if (typeof setMusicVolume === 'function') setMusicVolume(parseFloat(e.target.value)); 
-});
-document.getElementById('vol-sfx').addEventListener('input', e => { 
-    if (typeof setSfxVolume === 'function') setSfxVolume(parseFloat(e.target.value)); 
-});
+// Прив'язка гучності
+const musicSlider = document.getElementById('vol-music');
+if(musicSlider) musicSlider.addEventListener('input', e => { if (typeof setMusicVolume === 'function') setMusicVolume(parseFloat(e.target.value)); });
+const sfxSlider = document.getElementById('vol-sfx');
+if(sfxSlider) sfxSlider.addEventListener('input', e => { if (typeof setSfxVolume === 'function') setSfxVolume(parseFloat(e.target.value)); });
 
 document.getElementById('tab-login').onclick = () => { authMode='login'; playSound('ui_click'); document.getElementById('tab-login').className='flex-1 py-3 text-xs font-bold uppercase transition bg-blue-600 text-white tracking-wider'; document.getElementById('tab-register').className='flex-1 py-3 text-xs font-bold uppercase transition text-slate-400 hover:bg-slate-800 tracking-wider'; document.getElementById('auth-btn').innerText='АВТОРИЗАЦІЯ'; };
 document.getElementById('tab-register').onclick = () => { authMode='register'; playSound('ui_click'); document.getElementById('tab-register').className='flex-1 py-3 text-xs font-bold uppercase transition bg-blue-600 text-white tracking-wider'; document.getElementById('tab-login').className='flex-1 py-3 text-xs font-bold uppercase transition text-slate-400 hover:bg-slate-800 tracking-wider'; document.getElementById('auth-btn').innerText='СТВОРИТИ АКАУНТ'; };
@@ -123,7 +121,7 @@ function doCountdown() {
 }
 document.getElementById('back-to-room-lobby-btn').onclick = () => { playSound('ui_click'); document.getElementById('winner-modal').classList.add('hidden'); socket.emit('backToRoomLobby', currentRoomId); switchMusicState('loby'); };
 
-// ПЕРЕВІРКА ТОКЕНА (Тепер безпечно в самому кінці, коли всі функції завантажені)
+// Перевірка токена - ЗАВЖДИ В САМОМУ КІНЦІ, коли всі функції вже створені!
 const savedToken = localStorage.getItem('tankToken');
 if(savedToken) socket.emit('authToken', savedToken);
 else showScreen('login-screen');
