@@ -143,9 +143,9 @@ setInterval(() => {
         Object.values(room.players).forEach(p => { 
             if (p.buff) { 
                 p.buffProgress = Math.max(0, (p.buffEndTime - now) / BUFF_DURATION); 
-                if (p.buff === 'healing' && p.hp > 0) p.hp = Math.min(MAX_HP, p.hp + 10 * (1/30)); // Відновлення 10 ХП в секунду
+                if (p.buff === 'healing' && p.hp > 0) p.hp = Math.min(MAX_HP, p.hp + 10 * (1/30)); 
                 if (now > p.buffEndTime) { 
-                    if (p.buff === 'boss') { // Телепортація, якщо застряг у стіні
+                    if (p.buff === 'boss') { 
                         if (checkCollisionServer(room.map, p.x, p.y, 30)) {
                             let found = false;
                             for(let rad = 50; rad < 800; rad += 50) {
@@ -163,7 +163,9 @@ setInterval(() => {
         });
 
         if (now - room.lastPowerupSpawn > 30000) {
-            room.lastPowerupSpawn = now; const types = ['explosive', 'minigun', 'boss', 'shotgun', 'healing', 'samurai'];
+            room.lastPowerupSpawn = now; 
+            // ПОВЕРНУТІ ЕФЕКТИ В ПУЛ
+            const types = ['explosive', 'minigun', 'boss', 'shotgun', 'healing', 'samurai', 'piercing', 'invisible', 'homing'];
             if (Object.keys(room.powerups).length > 10) delete room.powerups[Object.keys(room.powerups)[0]];
             for(let i=0; i<2; i++) { const pid = 'pu_' + now + '_' + i; let pSpawn = getValidSpawn(room.map, 30); room.powerups[pid] = { id: pid, type: types[Math.floor(Math.random() * types.length)], active: true, x: pSpawn.x, y: pSpawn.y }; }
         }
@@ -181,7 +183,6 @@ setInterval(() => {
                 else if (room.survivalState === 'waiting' && now > room.nextWaveTime) {
                     room.wave++; 
                     let isBossWave = (room.wave === 25 || room.wave === 50 || room.wave === 75 || room.wave === 100);
-                    
                     if (isBossWave) {
                         let bType = room.wave === 25 ? 'pikus' : room.wave === 50 ? 'shurik' : room.wave === 75 ? 'oneshot' : 'padlo';
                         let zid = `boss_${now}`; let zSpawn = getValidSpawn(room.map, 50);

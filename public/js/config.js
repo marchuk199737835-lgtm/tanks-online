@@ -30,16 +30,15 @@ const BUFFS = {
     'boss': { cd: 1000, dmg: 500, type: 'explosive' }, 
     'shotgun': { cd: 1500, dmg: 25, type: 'normal' }, 
     'healing': { cd: 1500, dmg: 75, type: 'normal' }, 
-    'samurai': { cd: 750, dmg: 75, type: 'melee' }
-    // 'fast': { cd: 1500, dmg: 50, type: 'piercing_fast' }, 
-    // 'piercing': { cd: 1500, dmg: 50, type: 'piercing' }, 
-    // 'incendiary': { cd: 1500, dmg: 10, type: 'incendiary' }, 
-    // 'invisible': { cd: 500, dmg: 75, type: 'normal' }, 
-    // 'homing': { cd: 3000, dmg: 125, type: 'homing' }
+    'samurai': { cd: 750, dmg: 75, type: 'melee' },
+    // ПОВЕРНУТІ ЕФЕКТИ
+    'piercing': { cd: 1500, dmg: 50, type: 'piercing' }, 
+    'invisible': { cd: 500, dmg: 75, type: 'normal' }, 
+    'homing': { cd: 3000, dmg: 125, type: 'homing' }
 };
 
-const PU_COLORS = { 'explosive': '#fb923c', 'minigun': '#fde047', 'boss': '#dc2626', 'shotgun': '#9ca3af', 'healing': '#22c55e', 'samurai': '#ef4444' };
-const PU_ICONS = { 'explosive': '💥', 'minigun': '🔫', 'boss': '👹', 'shotgun': '💨', 'healing': '➕', 'samurai': '⚔️' };
-const BUFF_NAMES = { 'explosive': 'Розривний', 'minigun': 'Мініган', 'boss': 'БОС', 'shotgun': 'Дробовик', 'healing': 'Лікування', 'samurai': 'Самурай' };
+const PU_COLORS = { 'explosive': '#fb923c', 'minigun': '#fde047', 'boss': '#dc2626', 'shotgun': '#9ca3af', 'healing': '#22c55e', 'samurai': '#ef4444', 'piercing': '#d946ef', 'invisible': '#cbd5e1', 'homing': '#10b981' };
+const PU_ICONS = { 'explosive': '💥', 'minigun': '🔫', 'boss': '👹', 'shotgun': '💨', 'healing': '➕', 'samurai': '⚔️', 'piercing': '🏹', 'invisible': '👻', 'homing': '🎯' };
+const BUFF_NAMES = { 'explosive': 'Розривний', 'minigun': 'Мініган', 'boss': 'БОС', 'shotgun': 'Дробовик', 'healing': 'Лікування', 'samurai': 'Самурай', 'piercing': 'Бронебійний', 'invisible': 'Привид', 'homing': 'Наведення' };
 const Z_TYPES = { 'normal': { radius: 15, color: '#22c55e' }, 'runner': { radius: 12, color: '#84cc16' }, 'tanker': { radius: 25, color: '#15803d' }, 'spitter': { radius: 15, color: '#a3e635' }, 'bomber': { radius: 18, color: '#dc2626' }, 'ghost': { radius: 15, color: '#cbd5e1', ghost: true } };
 const SHOP_DATA = { damage: { title: "Урон", icon: "⚔️", levels: [0, 2, 4, 8, 12], prices: [50, 100, 200, 500] }, speed: { title: "Швидкість", icon: "💨", levels: [0, 2, 5, 10], prices: [50, 100, 150] }, earnings: { title: "Заробіток", icon: "💰", levels: [0, 5, 10], prices: [50, 100] } };
