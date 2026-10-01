@@ -5,7 +5,6 @@ socket.on('authSuccess', (data) => {
     initAudio(); if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); 
     switchMusicState('loby'); showScreen('main-menu-screen');
 });
-
 socket.on('authError', (msg) => { alert(msg); localStorage.removeItem('tankToken'); showScreen('login-screen'); });
 socket.on('economyUpdate', (data) => { myBucks = data.bucks; myUpgrades = data.upgrades; if(data.reward) { document.getElementById('winner-reward').innerText = data.reward; } if (typeof updateGlobalBucks === 'function') updateGlobalBucks(); if (typeof renderShop === 'function') renderShop(); });
 
@@ -14,11 +13,8 @@ socket.on('roomCreated', (roomId) => { socket.emit('joinRoom', roomId); });
 socket.on('joinedRoom', (data) => { currentRoomId = data.roomId; currentRoomData = data.roomData; showScreen('lobby-screen'); });
 socket.on('joinError', (msg) => { alert(msg); });
 
-// СИНХРОНІЗАЦІЯ ПОВЕРНЕННЯ
 socket.on('updateLobby', (roomData) => {
-    currentRoomData = roomData;
-    if (typeof updateLobbyUI === 'function') updateLobbyUI();
-
+    currentRoomData = roomData; if (typeof updateLobbyUI === 'function') updateLobbyUI();
     const gameScreen = document.getElementById('game-screen');
     if (roomData.status === 'lobby' && gameScreen && !gameScreen.classList.contains('hidden')) {
         document.getElementById('winner-modal').classList.add('hidden');
@@ -37,8 +33,7 @@ socket.on('gameStarting', (roomData) => {
 
 socket.on('sync', (data) => {
     if (!currentRoomData || currentRoomData.status !== 'playing') return;
-    currentRoomData.players = data.players;
-    let activeOpponents = {};
+    currentRoomData.players = data.players; let activeOpponents = {};
     for (let id in data.players) {
         if (id !== myId) {
             if (!opponents[id]) activeOpponents[id] = { ...data.players[id] };
@@ -53,8 +48,9 @@ socket.on('sync', (data) => {
 });
 
 socket.on('spawnBullet', (data) => {
-    playSound(data.type === 'minigun' ? 'minigun' : data.type.includes('boss') ? 'boss_shoot' : 'shoot');
-    if (data.type === 'shotgun') { for(let i=0; i<20; i++) { let angle = Math.atan2(data.vy, data.vx) + (Math.random()-0.5)*0.6; let spd = BASE_BULLET_SPEED * (0.8 + Math.random()*0.4); bullets.push({ ...data, vx: Math.cos(angle)*spd, vy: Math.sin(angle)*spd, life: 0.8 }); } } 
+    playSound(data.type === 'minigun' ? 'minigun' : data.type.includes('boss') ? 'boss_shoot' : data.type === 'samurai' ? 'samurai' : 'shoot');
+    if (data.type === 'shotgun') { for(let i=0; i<20; i++) { let angle = Math.atan2(data.vy, data.vx) + (Math.random()-0.5)*0.6; let spd = BASE_BULLET_SPEED * (0.8 + Math.random()*0.4); bullets.push({ ...data, vx: Math.cos(angle)*spd, vy: Math.sin(angle)*spd, life: 1.2 }); } } 
+    else if (data.type === 'samurai') { bullets.push({ ...data, life: 0.15 }); }
     else bullets.push({ ...data, life: 2.5 });
 });
 
@@ -70,13 +66,11 @@ socket.on('newWave', (data) => { document.getElementById('wave-overlay').classLi
 socket.on('gameOver', (data) => {
     if(currentRoomData) currentRoomData.status = 'finished'; 
     document.getElementById('winner-modal').classList.remove('hidden'); document.getElementById('damage-vignette').style.opacity = 0;
-    
     if (data.winner === 'ZOMBIES') { 
         document.getElementById('winner-title').innerText = "ВИ НЕ ВИЖИЛИ"; document.getElementById('winner-title').className = "text-6xl font-russo mb-4 text-red-500 tracking-widest drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]"; 
         document.getElementById('winner-emoji').innerText = "💀"; document.getElementById('winner-message').innerText = `Ви протримались до ${data.wave} хвилі.`; document.getElementById('winner-reward').innerText = data.wave;
     } else { 
-        let myReward = data.rewards ? (data.rewards[myId] || 0) : 0;
-        document.getElementById('winner-reward').innerText = myReward;
+        let myReward = data.rewards ? (data.rewards[myId] || 0) : 0; document.getElementById('winner-reward').innerText = myReward;
         if (data.winner === myId) {
             document.getElementById('winner-title').innerText = "ПЕРЕМОГА!"; document.getElementById('winner-title').className = "text-6xl font-russo mb-4 text-white tracking-widest drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]"; 
             document.getElementById('winner-emoji').innerText = "🏆"; document.getElementById('winner-message').innerText = "Ви розбили ворогів!"; 
@@ -87,41 +81,15 @@ socket.on('gameOver', (data) => {
     }
 });
 
-// НОВА РУЛЕТКА
 socket.on('caseResult', (result) => {
-    myBucks = result.bucks; myUpgrades = result.upgrades; 
-    if (typeof updateGlobalBucks === 'function') updateGlobalBucks(); 
-    if (typeof renderShop === 'function') renderShop();
-    
+    myBucks = result.bucks; myUpgrades = result.upgrades; if (typeof updateGlobalBucks === 'function') updateGlobalBucks(); if (typeof renderShop === 'function') renderShop();
     document.getElementById('roulette-modal').classList.remove('hidden');
     const tape = document.getElementById('roulette-tape'); tape.style.transition = 'none'; tape.style.transform = 'translateX(0)'; tape.innerHTML = '';
-    
     let items = []; let types = ['damage', 'speed', 'earnings'];
-    for(let i=0; i<65; i++) { 
-        if (i === 44) { items.push({ type: result.type, level: result.level }); } 
-        else { let rT = types[Math.floor(Math.random()*types.length)]; let rL = Math.floor(Math.random() * (SHOP_DATA[rT].levels.length - 1)) + 1; items.push({ type: rT, level: rL }); } 
-    }
+    for(let i=0; i<65; i++) { if (i === 44) { items.push({ type: result.type, level: result.level }); } else { let rT = types[Math.floor(Math.random()*types.length)]; let rL = Math.floor(Math.random() * (SHOP_DATA[rT].levels.length - 1)) + 1; items.push({ type: rT, level: rL }); } }
     items.forEach(item => { let d = SHOP_DATA[item.type]; tape.innerHTML += `<div class="roulette-item text-center min-w-[90px] w-[90px]"><div class="text-3xl">${d.icon}</div><div class="text-[10px] text-slate-300">Lvl ${item.level}</div></div>`; });
-    
-    setTimeout(() => { 
-        playSound('shoot'); 
-        tape.style.transition = 'transform 3.5s cubic-bezier(0.1, 1, 0.3, 1)'; 
-        let containerWidth = tape.parentElement.offsetWidth || 600;
-        let targetX = (44 * 90 + 45) - (containerWidth / 2);
-        tape.style.transform = `translateX(-${targetX}px)`; 
-    }, 100);
-    
-    setTimeout(() => { 
-        playSound('powerup'); 
-        document.getElementById('roulette-modal').classList.add('hidden'); 
-        
-        const rw = document.getElementById('reward-modal');
-        if(rw) {
-            document.getElementById('reward-item-name').innerText = SHOP_DATA[result.type].title + " (Рівень " + result.level + ")";
-            document.getElementById('reward-item-icon').innerText = SHOP_DATA[result.type].icon;
-            rw.classList.remove('hidden');
-        }
-    }, 3600);
+    setTimeout(() => { playSound('shoot'); tape.style.transition = 'transform 3.5s cubic-bezier(0.1, 1, 0.3, 1)'; let containerWidth = tape.parentElement.offsetWidth || 600; let targetX = (44 * 90 + 45) - (containerWidth / 2); tape.style.transform = `translateX(-${targetX}px)`; }, 100);
+    setTimeout(() => { playSound('powerup'); document.getElementById('roulette-modal').classList.add('hidden'); const rw = document.getElementById('reward-modal'); if(rw) { document.getElementById('reward-item-name').innerText = SHOP_DATA[result.type].title + " (Рівень " + result.level + ")"; document.getElementById('reward-item-icon').innerText = SHOP_DATA[result.type].icon; rw.classList.remove('hidden'); } }, 3600);
 });
 
 function emitDamage(amt, attacker) { playSound('hurt'); shakeTime = 0.3; socket.emit('takeDamage', { roomId: currentRoomId, amt: amt, attacker: attacker }); }

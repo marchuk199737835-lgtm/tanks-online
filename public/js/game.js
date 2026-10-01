@@ -1,29 +1,34 @@
 const canvas = document.getElementById('game-canvas'); const ctx = canvas.getContext('2d'); window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }); canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
 function createExplosion(x, y, count, color) {
-    for(let i=0; i<count; i++){
-        const ang = Math.random() * Math.PI * 2; const spd = Math.random() * 200 + 50;
-        particles.push({ x, y, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd, life: Math.random() * 0.4 + 0.1, color });
-    }
+    for(let i=0; i<count; i++){ const ang = Math.random() * Math.PI * 2; const spd = Math.random() * 200 + 50; particles.push({ x, y, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd, life: Math.random() * 0.4 + 0.1, color }); }
 }
 
 function checkCollision(x, y, r, checkSolids = true) {
-    if (!currentRoomData) return true;
-    let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'city';
-    let mSize = MAP_DATA[cMap].size; if (x - r < 0 || x + r > mSize || y - r < 0 || y + r > mSize) return true; 
+    if (!currentRoomData) return true; let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'city'; let mSize = MAP_DATA[cMap].size; if (x - r < 0 || x + r > mSize || y - r < 0 || y + r > mSize) return true; 
     if (checkSolids) { const solids = MAP_DATA[cMap].solids; for (let s of solids) { if (s.type === 'wall') { let testX = Math.max(s.x, Math.min(x, s.x + s.w)), testY = Math.max(s.y, Math.min(y, s.y + s.h)); if (Math.hypot(x - testX, y - testY) <= r) return true; } else if (s.type === 'tree') { if (Math.hypot(x - s.x, y - s.y) < r + s.r) return true; } } } return false;
 }
 
 function updatePhysics(now, dt) {
     if (!currentRoomData || !currentRoomId) return;
     let myRadius = myLocalTank.buff === 'boss' ? 75 : 30;
+    
     if (myLocalTank.hp > 0) {
-        let moveX = 0, moveY = 0;
-        let speedMult = 1.0; if(myUpgrades.speed === 1) speedMult = 1.02; if(myUpgrades.speed === 2) speedMult = 1.05; if(myUpgrades.speed === 3) speedMult = 1.10;
+        let moveX = 0, moveY = 0; let speedMult = 1.0; 
+        if(myUpgrades.speed === 1) speedMult = 1.02; if(myUpgrades.speed === 2) speedMult = 1.05; if(myUpgrades.speed === 3) speedMult = 1.10;
+        if(myLocalTank.buff === 'samurai') speedMult *= 1.5; // +50% швидкості самураю
         let speed = (myLocalTank.buff === 'boss' ? TANK_SPEED * 0.6 : TANK_SPEED) * speedMult;
         
         if (keys.w) moveY -= 1; if (keys.s) moveY += 1; if (keys.a) moveX -= 1; if (keys.d) moveX += 1;
-        if (moveX !== 0 || moveY !== 0) { let len = Math.hypot(moveX, moveY); moveX /= len; moveY /= len; myLocalTank.bodyAngle = Math.atan2(moveY, moveX); let nextX = myLocalTank.x + moveX * speed * dt, nextY = myLocalTank.y + moveY * speed * dt; if (!checkCollision(nextX, myLocalTank.y, myRadius)) myLocalTank.x = nextX; if (!checkCollision(myLocalTank.x, nextY, myRadius)) myLocalTank.y = nextY; }
+        if (moveX !== 0 || moveY !== 0) { 
+            let len = Math.hypot(moveX, moveY); moveX /= len; moveY /= len; myLocalTank.bodyAngle = Math.atan2(moveY, moveX); 
+            let nextX = myLocalTank.x + moveX * speed * dt, nextY = myLocalTank.y + moveY * speed * dt; 
+            
+            // Бос ігнорує стіни локально
+            let isBoss = (myLocalTank.buff === 'boss');
+            if (!checkCollision(nextX, myLocalTank.y, myRadius) || isBoss) myLocalTank.x = nextX; 
+            if (!checkCollision(myLocalTank.x, nextY, myRadius) || isBoss) myLocalTank.y = nextY; 
+        }
 
         let wMx = mouseX + camera.x - canvas.width/2, wMy = mouseY + camera.y - canvas.height/2; myLocalTank.turretAngle = Math.atan2(wMy - myLocalTank.y, wMx - myLocalTank.x);
         socket.emit('move', { roomId: currentRoomId, x: myLocalTank.x, y: myLocalTank.y, bodyAngle: myLocalTank.bodyAngle, turretAngle: myLocalTank.turretAngle });
@@ -32,7 +37,15 @@ function updatePhysics(now, dt) {
         if (keys.space && (now - lastShootTime >= fCfg.cd)) {
             lastShootTime = now; let bId = Date.now() + Math.random(); let bSpd = (myLocalTank.buff === 'fast' || myLocalTank.buff === 'minigun') ? BASE_BULLET_SPEED * 1.8 : BASE_BULLET_SPEED;
             let shot = { roomId: currentRoomId, id: bId, x: myLocalTank.x + Math.cos(myLocalTank.turretAngle)*(myRadius+10), y: myLocalTank.y + Math.sin(myLocalTank.turretAngle)*(myRadius+10), vx: Math.cos(myLocalTank.turretAngle)*bSpd, vy: Math.sin(myLocalTank.turretAngle)*bSpd, type: myLocalTank.buff || 'none' };
-            if (myLocalTank.buff === 'homing' && homingTargetId) shot.targetId = homingTargetId; socket.emit('shoot', shot);
+            
+            if (myLocalTank.buff === 'samurai') { // Снаряд самурая (Змах катаною)
+                shot.x = myLocalTank.x + Math.cos(myLocalTank.turretAngle)*(myRadius+15);
+                shot.y = myLocalTank.y + Math.sin(myLocalTank.turretAngle)*(myRadius+15);
+                shot.vx = Math.cos(myLocalTank.turretAngle) * 100;
+                shot.vy = Math.sin(myLocalTank.turretAngle) * 100;
+            }
+            if (myLocalTank.buff === 'homing' && homingTargetId) shot.targetId = homingTargetId; 
+            socket.emit('shoot', shot);
         }
 
         for(let pid in powerups) { if (Math.hypot(powerups[pid].x - myLocalTank.x, powerups[pid].y - myLocalTank.y) < myRadius + 30) socket.emit('collectPowerup', {roomId: currentRoomId, pid: pid}); }
@@ -47,28 +60,30 @@ function updatePhysics(now, dt) {
         let b = bullets[i]; 
         if (b.type === 'homing' && b.targetId) { 
             let tgt = (b.targetId === myId) ? myLocalTank : opponents[b.targetId]; 
-            if (tgt && tgt.hp > 0) { 
-                let ang = Math.atan2(tgt.y - b.y, tgt.x - b.x); 
-                let currentSpd = Math.hypot(b.vx, b.vy);
-                b.vx = Math.cos(ang) * currentSpd; b.vy = Math.sin(ang) * currentSpd; 
-            } 
+            if (tgt && tgt.hp > 0) { let ang = Math.atan2(tgt.y - b.y, tgt.x - b.x); let currentSpd = Math.hypot(b.vx, b.vy); b.vx = Math.cos(ang) * currentSpd; b.vy = Math.sin(ang) * currentSpd; } 
         }
         b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
         let hit = false; let bCfg = BUFFS[b.type] || BUFFS['none'];
-        if (b.type === 'homing' || b.type.includes('piercing') || b.type === 'ghost_melee' || b.type === 'boss_proj') { hit = checkCollision(b.x, b.y, 4, false); } else { hit = checkCollision(b.x, b.y, 4, true); } 
+        
+        if (b.type === 'samurai' || b.type === 'homing' || b.type.includes('piercing') || b.type === 'ghost_melee' || b.type === 'boss_proj') { hit = checkCollision(b.x, b.y, 4, false); } else { hit = checkCollision(b.x, b.y, 4, true); } 
         
         if (!hit && b.owner !== myId && myLocalTank.hp > 0) { 
-            if (Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < myRadius + 4) { 
-                hit = true; 
-                let dmgToDeal = b.dmgOverride || bCfg.dmg; // Якщо це бос, беремо його урон
-                emitDamage(dmgToDeal, b.owner); 
+            let hitDist = b.type === 'samurai' ? myRadius + 30 : myRadius + 4;
+            if (Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < hitDist) { 
+                hit = true; let dmgToDeal = b.dmgOverride || bCfg.dmg; emitDamage(dmgToDeal, b.owner); 
                 if(b.type==='incendiary') { let end = now + 5000; let int = setInterval(()=>{ if(Date.now() > end || myLocalTank.hp <= 0) clearInterval(int); else { emitDamage(10, b.owner); createExplosion(myLocalTank.x, myLocalTank.y, 5, '#f97316'); } }, 1000); } 
             } 
         }
-        if (!hit && currentRoomData.mode === 'survival' && b.owner === myId) { for(let zid in zombies) { let z = zombies[zid]; if (Math.hypot(b.x - z.x, b.y - z.y) < Z_TYPES[z.type].radius + 10) { hit = true; socket.emit('zombieHit', { roomId: currentRoomId, zid: zid, dmg: bCfg.dmg }); createExplosion(b.x, b.y, 5, Z_TYPES[z.type].color); break; } } }
+        if (!hit && currentRoomData.mode === 'survival' && b.owner === myId) { 
+            for(let zid in zombies) { 
+                let z = zombies[zid]; 
+                let zDist = b.type === 'samurai' ? Z_TYPES[z.type].radius + 35 : Z_TYPES[z.type].radius + 10;
+                if (Math.hypot(b.x - z.x, b.y - z.y) < zDist) { hit = true; socket.emit('zombieHit', { roomId: currentRoomId, zid: zid, dmg: bCfg.dmg }); createExplosion(b.x, b.y, 5, Z_TYPES[z.type].color); break; } 
+            } 
+        }
         
         if (hit || b.life <= 0) { 
-            if (b.type !== 'shotgun' && b.type !== 'minigun' && b.type !== 'acid') createExplosion(b.x, b.y, bCfg.type === 'explosive' ? 30 : 10, bCfg.type === 'explosive' ? '#ea580c' : '#fcd34d'); 
+            if (b.type !== 'shotgun' && b.type !== 'minigun' && b.type !== 'acid' && b.type !== 'samurai') createExplosion(b.x, b.y, bCfg.type === 'explosive' ? 30 : 10, bCfg.type === 'explosive' ? '#ea580c' : '#fcd34d'); 
             if (hit && bCfg.type === 'explosive' && myLocalTank.hp > 0 && Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < (b.type==='boss'?250:120)) { emitDamage(bCfg.dmg, b.owner); } 
             bullets.splice(i, 1); 
         }
@@ -88,8 +103,7 @@ function draw(now) {
     ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.save();
     let shX = 0, shY = 0; if (shakeTime > 0) { shX = (Math.random() - 0.5) * 20; shY = (Math.random() - 0.5) * 20; shakeTime -= 0.03; } ctx.translate(canvas.width/2 - camera.x + shX, canvas.height/2 - camera.y + shY);
     
-    let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'city';
-    let mSize = MAP_DATA[cMap].size; ctx.fillStyle = MAP_DATA[cMap].bg; ctx.fillRect(0, 0, mSize, mSize); ctx.strokeStyle = MAP_DATA[cMap].grid; ctx.lineWidth = 1;
+    let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'city'; let mSize = MAP_DATA[cMap].size; ctx.fillStyle = MAP_DATA[cMap].bg; ctx.fillRect(0, 0, mSize, mSize); ctx.strokeStyle = MAP_DATA[cMap].grid; ctx.lineWidth = 1;
     for(let i=0; i<=mSize; i+=100) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, mSize); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(mSize, i); ctx.stroke(); }
     
     for (let tid in tokens) { const tkn = tokens[tid]; ctx.save(); ctx.translate(tkn.x, tkn.y + Math.sin(now/200)*10); const colorHex = tkn.color==='white'?'#f8fafc':tkn.color==='black'?'#1e293b':tkn.color==='red'?'#ef4444':tkn.color==='blue'?'#3b82f6':tkn.color==='brown'?'#78350f':'#9333ea'; ctx.shadowColor = colorHex; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI*2); ctx.fillStyle = '#0f172a'; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = colorHex; ctx.stroke(); ctx.fillStyle = colorHex; ctx.font = '16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('★', 0, 1); ctx.restore(); }
@@ -99,35 +113,28 @@ function draw(now) {
     
     for(let pid in powerups) { const pu = powerups[pid]; const boxColor = PU_COLORS[pu.type] || '#38bdf8'; ctx.save(); ctx.translate(pu.x, pu.y); ctx.rotate(now / 500); ctx.fillStyle = '#334155'; ctx.fillRect(-20, -20, 40, 40); ctx.strokeStyle = boxColor; ctx.lineWidth = 3; ctx.strokeRect(-20, -20, 40, 40); ctx.fillStyle = boxColor; ctx.shadowBlur = 10; ctx.shadowColor = boxColor; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '24px Russo One'; ctx.fillText(PU_ICONS[pu.type], 0, 2); ctx.restore(); }
     
-    for (let id in opponents) { 
-        const p = opponents[id]; 
-        const sn = currentRoomData.players[id] || { name: 'Гравець', color: 'white' }; // Страховка
-        const cHex = sn.color==='white'?'#f8fafc':sn.color==='black'?'#1e293b':sn.color==='red'?'#ef4444':sn.color==='blue'?'#3b82f6':sn.color==='brown'?'#78350f':'#9333ea'; drawTank(p.x, p.y, p.bodyAngle, p.turretAngle, cHex, sn.name, false, p.hp, p.buff); if (myLocalTank.buff === 'homing' && id === homingTargetId && p.hp > 0) { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(now/300); ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3; ctx.setLineDash([15, 10]); ctx.strokeRect(-45, -45, 90, 90); ctx.restore(); } 
-    }
+    for (let id in opponents) { const p = opponents[id]; const sn = currentRoomData.players[id] || { name: 'Гравець', color: 'white' }; const cHex = sn.color==='white'?'#f8fafc':sn.color==='black'?'#1e293b':sn.color==='red'?'#ef4444':sn.color==='blue'?'#3b82f6':sn.color==='brown'?'#78350f':'#9333ea'; drawTank(p.x, p.y, p.bodyAngle, p.turretAngle, cHex, sn.name, false, p.hp, p.buff); if (myLocalTank.buff === 'homing' && id === homingTargetId && p.hp > 0) { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(now/300); ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3; ctx.setLineDash([15, 10]); ctx.strokeRect(-45, -45, 90, 90); ctx.restore(); } }
     if (myLocalTank.hp > 0) { const myCHex = myColor==='white'?'#f8fafc':myColor==='black'?'#1e293b':myColor==='red'?'#ef4444':myColor==='blue'?'#3b82f6':myColor==='brown'?'#78350f':'#9333ea'; drawTank(myLocalTank.x, myLocalTank.y, myLocalTank.bodyAngle, myLocalTank.turretAngle, myCHex, myName, true, myLocalTank.hp, myLocalTank.buff); }
     
     if (currentRoomData.mode === 'survival') { 
         for (let zid in zombies) { 
             let z = zombies[zid]; let zCfg = Z_TYPES[z.type]; ctx.save(); ctx.translate(z.x, z.y); 
             if (zCfg.ghost) ctx.globalAlpha = 0.5; ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 5; 
-            ctx.fillStyle = zCfg.color; ctx.beginPath(); ctx.arc(0, 0, zCfg.radius, 0, Math.PI*2); ctx.fill(); 
-            ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(-zCfg.radius*0.3, -zCfg.radius*0.2, zCfg.radius*0.2, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(zCfg.radius*0.3, -zCfg.radius*0.2, zCfg.radius*0.2, 0, Math.PI*2); ctx.fill(); ctx.fillRect(-zCfg.radius*0.4, zCfg.radius*0.3, zCfg.radius*0.8, zCfg.radius*0.2); 
-            
-            // ВІЗУАЛІЗАЦІЯ БОСІВ (Ім'я та велика смуга здоров'я)
-            if (zCfg.isBoss) {
-                ctx.fillStyle = '#fff'; ctx.font = '24px Russo One'; ctx.textAlign = 'center'; ctx.fillText(zCfg.name, 0, -zCfg.radius - 20);
-                ctx.fillStyle = '#ef4444'; ctx.fillRect(-40, -zCfg.radius-10, 80, 8); 
-                ctx.fillStyle = '#22c55e'; ctx.fillRect(-40, -zCfg.radius-10, 80 * (z.hp/zCfg.hp), 8);
-            } else {
-                ctx.fillStyle = '#ef4444'; ctx.fillRect(-15, -zCfg.radius-10, 30, 4); 
-                ctx.fillStyle = '#22c55e'; ctx.fillRect(-15, -zCfg.radius-10, 30 * (z.hp/zCfg.hp), 4); 
-            }
+            ctx.fillStyle = zCfg.color; ctx.beginPath(); ctx.arc(0, 0, zCfg.radius, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(-zCfg.radius*0.3, -zCfg.radius*0.2, zCfg.radius*0.2, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(zCfg.radius*0.3, -zCfg.radius*0.2, zCfg.radius*0.2, 0, Math.PI*2); ctx.fill(); ctx.fillRect(-zCfg.radius*0.4, zCfg.radius*0.3, zCfg.radius*0.8, zCfg.radius*0.2); 
+            if (zCfg.isBoss) { ctx.fillStyle = '#fff'; ctx.font = '24px Russo One'; ctx.textAlign = 'center'; ctx.fillText(zCfg.name, 0, -zCfg.radius - 20); ctx.fillStyle = '#ef4444'; ctx.fillRect(-40, -zCfg.radius-10, 80, 8); ctx.fillStyle = '#22c55e'; ctx.fillRect(-40, -zCfg.radius-10, 80 * (z.hp/zCfg.hp), 8); } else { ctx.fillStyle = '#ef4444'; ctx.fillRect(-15, -zCfg.radius-10, 30, 4); ctx.fillStyle = '#22c55e'; ctx.fillRect(-15, -zCfg.radius-10, 30 * (z.hp/zCfg.hp), 4); }
             ctx.restore(); 
         } 
     }
     
     ctx.shadowColor = 'transparent';
-    bullets.forEach(b => { ctx.beginPath(); if(b.type === 'piercing' || b.type === 'fast' || b.type === 'minigun' || b.type === 'homing') { ctx.moveTo(b.x, b.y-4); ctx.lineTo(b.x+20, b.y); ctx.lineTo(b.x, b.y+4); } else if (b.type === 'acid') { ctx.arc(b.x, b.y, 8, 0, Math.PI*2); } else if (b.type === 'boss_proj') { ctx.arc(b.x, b.y, 10, 0, Math.PI*2); } else ctx.arc(b.x, b.y, 6, 0, Math.PI*2); let bCol = b.type === 'fast' || b.type === 'minigun' ? '#38bdf8' : b.type === 'explosive' || b.type === 'boss_proj' ? '#fb923c' : b.type === 'incendiary' ? '#ef4444' : b.type === 'piercing' ? '#d946ef' : b.type === 'acid' ? '#a3e635' : b.type === 'shotgun' ? '#f8fafc' : b.type === 'homing' ? '#10b981' : '#fef08a'; ctx.fillStyle = bCol; ctx.shadowColor = bCol; ctx.shadowBlur = 10; ctx.fill(); ctx.shadowBlur = 0; });
+    bullets.forEach(b => { 
+        if (b.type === 'samurai') { // АНІМАЦІЯ ЗМАХУ КАТАНИ
+            ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(Math.atan2(b.vy, b.vx));
+            ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 10; ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 15;
+            ctx.beginPath(); ctx.arc(0, 0, 25, -Math.PI/1.5, Math.PI/1.5); ctx.stroke(); ctx.restore(); return;
+        }
+        ctx.beginPath(); if(b.type === 'piercing' || b.type === 'fast' || b.type === 'minigun' || b.type === 'homing') { ctx.moveTo(b.x, b.y-4); ctx.lineTo(b.x+20, b.y); ctx.lineTo(b.x, b.y+4); } else if (b.type === 'acid') { ctx.arc(b.x, b.y, 8, 0, Math.PI*2); } else if (b.type === 'boss_proj') { ctx.arc(b.x, b.y, 10, 0, Math.PI*2); } else ctx.arc(b.x, b.y, 6, 0, Math.PI*2); let bCol = b.type === 'fast' || b.type === 'minigun' ? '#38bdf8' : b.type === 'explosive' || b.type === 'boss_proj' ? '#fb923c' : b.type === 'incendiary' ? '#ef4444' : b.type === 'piercing' ? '#d946ef' : b.type === 'acid' ? '#a3e635' : b.type === 'shotgun' ? '#f8fafc' : b.type === 'homing' ? '#10b981' : '#fef08a'; ctx.fillStyle = bCol; ctx.shadowColor = bCol; ctx.shadowBlur = 10; ctx.fill(); ctx.shadowBlur = 0; 
+    });
     
     particles.forEach(p => { ctx.fillStyle = p.color; ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2.5)); ctx.beginPath(); ctx.arc(p.x, p.y, Math.random()*4+2, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1.0; }); ctx.restore();
     
@@ -145,12 +152,7 @@ function updateHUD() {
     Object.values(currentRoomData.players).sort((a,b) => b.score - a.score).forEach(p => { slist.innerHTML += `<div class="flex justify-between w-full ${p.id===myId?'text-blue-400':'text-slate-300'} border-b border-slate-700/50 pb-1 ${p.hp<=0?'opacity-30 line-through':''}"><span>${p.name}</span><span class="font-bold">${currentRoomData.mode === 'survival' ? Math.ceil(p.hp) : p.score}</span></div>`; });
 }
 
-function startGameLoop() {
-    if(gameLoopId) cancelAnimationFrame(gameLoopId);
-    lastTime = performance.now();
-    requestAnimationFrame(gameLoop);
-}
-
+function startGameLoop() { if(gameLoopId) cancelAnimationFrame(gameLoopId); lastTime = performance.now(); requestAnimationFrame(gameLoop); }
 function gameLoop(now) { const dt = Math.min((now - lastTime) / 1000, 0.1); lastTime = now; if (currentRoomData && currentRoomData.status === 'playing') { updatePhysics(now, dt); draw(now); } gameLoopId = requestAnimationFrame(gameLoop); }
 
 window.addEventListener('keydown', e => { 
