@@ -5,6 +5,7 @@ const io = require('socket.io')(http);
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { MongoClient } = require('mongodb'); // Підключаємо MongoDB
 
 app.use(express.static(path.join(__dirname)));
 
@@ -18,12 +19,51 @@ const MAX_HP = 500;
 const BUFF_DURATION = 15000;
 const MAX_PLAYERS = 6;
 
-const usersFile = path.join(__dirname, 'users.json');
-let dbUsers = {};
-if (fs.existsSync(usersFile)) {
-    try { dbUsers = JSON.parse(fs.readFileSync(usersFile, 'utf8')); } catch(e) {}
+// --- БАЗА ДАНИХ MONGODB ---
+const mongoUri = process.env.MONGO_URI;
+let dbUsersCol = null;
+let dbConfigCol = null;
+let dbUsers = {}; 
+
+let savedConfig = { map: 'city', mode: 'deathmatch', winScore: 50 };
+
+if (mongoUri) {
+    const client = new MongoClient(mongoUri);
+    client.connect().then(() => {
+        console.log("✅ Підключено до MongoDB!");
+        const db = client.db("tanks_db");
+        dbUsersCol = db.collection("users");
+        dbConfigCol = db.collection("config");
+
+        // Завантажуємо налаштування Адміна
+        dbConfigCol.findOne({ _id: "admin" }).then(conf => {
+            if (conf) {
+                savedConfig.map = conf.map || 'city';
+                savedConfig.mode = conf.mode || 'deathmatch';
+                savedConfig.winScore = conf.winScore || 50;
+                gameState.map = savedConfig.map;
+                gameState.mode = savedConfig.mode;
+                gameState.winScore = savedConfig.winScore;
+            }
+        });
+
+        // Завантажуємо всіх гравців у пам'ять для швидкої гри
+        dbUsersCol.find({}).toArray().then(users => {
+            users.forEach(u => dbUsers[u.name] = u);
+            console.log(`Завантажено акаунтів: ${users.length}`);
+        });
+    }).catch(err => console.error("❌ Помилка підключення до MongoDB:", err));
+} else {
+    console.log("⚠️ MONGO_URI не знайдено! Прогрес зберігатиметься лише тимчасово.");
 }
-function saveUsers() { fs.writeFileSync(usersFile, JSON.stringify(dbUsers, null, 2)); }
+
+function saveUser(name) {
+    if (dbUsersCol && dbUsers[name]) {
+        // Оновлюємо дані гравця в базі
+        dbUsersCol.updateOne({ name: name }, { $set: dbUsers[name] }, { upsert: true });
+    }
+}
+
 function hashPwd(pwd) { return crypto.createHash('sha256').update(pwd).digest('hex'); }
 
 const SHOP_DATA = {
@@ -38,6 +78,7 @@ const MAP_DATA = {
     'ship': { size: 2000, solids: [] },
     'castle': { size: 2500, solids: [] }
 };
+
 const neonColors = ['#0ea5e9', '#ec4899', '#8b5cf6', '#10b981'];
 for(let x=200; x<3400; x+=450) { for(let y=200; y<3400; y+=450) { let n = (x*13 + y*17) % 100; if(n < 75) MAP_DATA['city'].solids.push({ type: 'wall', x, y, w: 300, h: 300 }); } }
 for(let x=150; x<2800; x+=350) { for(let y=150; y<2800; y+=300) { let n = (x*23 + y*29) % 100; if(n < 60) MAP_DATA['hangars'].solids.push({ type: 'wall', x, y, w: 250, h: 150 }); } }
@@ -69,17 +110,6 @@ function getValidSpawn(mapName, r) {
         if(!checkCollisionServer(cMap, x, y, r + 20)) return {x, y};
     }
     return {x: mSize/2, y: mSize/2}; 
-}
-
-const configPath = path.join(__dirname, 'admin_config.json');
-let savedConfig = { map: 'city', mode: 'deathmatch', winScore: 50 };
-if (fs.existsSync(configPath)) {
-    try { 
-        let parsed = JSON.parse(fs.readFileSync(configPath, 'utf8')); 
-        if (MAP_DATA[parsed.map]) savedConfig.map = parsed.map;
-        if (parsed.mode) savedConfig.mode = parsed.mode;
-        if (parsed.winScore) savedConfig.winScore = parsed.winScore;
-    } catch(e) {}
 }
 
 function getMusicPlaylist() {
@@ -146,8 +176,9 @@ io.on('connection', (socket) => {
         if(dbUsers[name]) return socket.emit('authError', 'Цей логін вже зайнятий!');
 
         const token = crypto.randomUUID();
-        dbUsers[name] = { password: hashPwd(password), token: token, bucks: 0, upgrades: { damage: 0, speed: 0, earnings: 0 } };
-        saveUsers(); setupPlayer(socket, name, token);
+        dbUsers[name] = { name: name, password: hashPwd(password), token: token, bucks: 0, upgrades: { damage: 0, speed: 0, earnings: 0 } };
+        saveUser(name);
+        setupPlayer(socket, name, token);
     });
 
     socket.on('login', (data) => {
@@ -156,7 +187,8 @@ io.on('connection', (socket) => {
         if(!u || u.password !== hashPwd(password)) return socket.emit('authError', 'Невірний логін або пароль!');
         const token = crypto.randomUUID(); u.token = token;
         if(u.bucks === undefined) { u.bucks = 0; u.upgrades = { damage: 0, speed: 0, earnings: 0 }; }
-        saveUsers(); setupPlayer(socket, name, token);
+        saveUser(name);
+        setupPlayer(socket, name, token);
     });
 
     socket.on('authToken', (token) => {
@@ -176,7 +208,8 @@ io.on('connection', (socket) => {
             if(u.bucks >= price) {
                 u.bucks -= price;
                 u.upgrades[type] = currentLvl + 1;
-                saveUsers(); sendEconomy(socket.id, p.name);
+                saveUser(p.name);
+                sendEconomy(socket.id, p.name);
             }
         }
     });
@@ -192,7 +225,7 @@ io.on('connection', (socket) => {
             let rLvl = Math.floor(Math.random() * maxLvl) + 1; 
             
             u.upgrades[rType] = rLvl; 
-            saveUsers();
+            saveUser(p.name);
             socket.emit('caseResult', { type: rType, level: rLvl, bucks: u.bucks, upgrades: u.upgrades });
         }
     });
@@ -239,7 +272,9 @@ io.on('connection', (socket) => {
 
     socket.on('adminSave', () => {
         savedConfig = { map: gameState.map, mode: gameState.mode, winScore: gameState.winScore };
-        fs.writeFileSync(configPath, JSON.stringify(savedConfig));
+        if (dbConfigCol) {
+            dbConfigCol.updateOne({ _id: "admin" }, { $set: savedConfig }, { upsert: true });
+        }
     });
 
     socket.on('move', (data) => {
@@ -306,7 +341,8 @@ io.on('connection', (socket) => {
                     let bonus = eLvl === 1 ? 1.05 : (eLvl === 2 ? 1.10 : 1.0);
                     reward = Math.round(20 * bonus);
                     dbUsers[name].bucks += reward;
-                    saveUsers(); sendEconomy(socket.id, name);
+                    saveUser(name);
+                    sendEconomy(socket.id, name);
                 }
                 
                 io.emit('tokenCollected', { tid, playerId: socket.id, score: players[socket.id].score });
@@ -382,10 +418,12 @@ setInterval(() => {
     if (now - lastPowerupSpawn > 30000) {
         lastPowerupSpawn = now;
         const types = ['fast', 'explosive', 'piercing', 'incendiary', 'minigun', 'boss', 'invisible', 'shotgun', 'homing'];
+        
         if (Object.keys(powerups).length > 10) delete powerups[Object.keys(powerups)[0]];
         for(let i=0; i<2; i++) {
             const pid = 'pu_' + now + '_' + i;
-            let pSpawn = getValidSpawn(gameState.map, 30);
+            let cMap = MAP_DATA[gameState.map] ? gameState.map : 'city';
+            let pSpawn = getValidSpawn(cMap, 30);
             powerups[pid] = { id: pid, type: types[Math.floor(Math.random() * types.length)], active: true, x: pSpawn.x, y: pSpawn.y };
         }
     }
@@ -404,10 +442,10 @@ setInterval(() => {
                     let bonus = eLvl === 1 ? 1.05 : (eLvl === 2 ? 1.10 : 1.0);
                     let reward = Math.round(gameState.wave * bonus);
                     dbUsers[name].bucks += reward;
+                    saveUser(name);
                     io.to(p.id).emit('economyUpdate', { bucks: dbUsers[name].bucks, upgrades: dbUsers[name].upgrades, reward: reward });
                 }
             });
-            saveUsers();
             io.emit('gameOver', { winner: 'ZOMBIES', wave: gameState.wave });
             return;
         }
