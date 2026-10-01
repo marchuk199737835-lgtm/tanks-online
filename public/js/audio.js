@@ -8,7 +8,6 @@ let currentTrackIndex = 0;
 
 function initAudio() { if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } }
 
-// Гарантоване оновлення гучності з усіх менюшок
 window.setMusicVolume = function(val) { volMusic = val; bgMusic.volume = val; };
 window.setSfxVolume = function(val) { volSfx = val; };
 

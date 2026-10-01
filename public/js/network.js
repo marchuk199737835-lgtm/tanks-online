@@ -13,6 +13,7 @@ socket.on('authError', (msg) => {
 
 socket.on('economyUpdate', (data) => { 
     myBucks = data.bucks; myUpgrades = data.upgrades; 
+    if(data.reward) { document.getElementById('winner-reward').innerText = data.reward; } 
     if (typeof updateGlobalBucks === 'function') updateGlobalBucks();
     if (typeof renderShop === 'function') renderShop(); 
 });
@@ -22,9 +23,18 @@ socket.on('roomCreated', (roomId) => { socket.emit('joinRoom', roomId); });
 socket.on('joinedRoom', (data) => { currentRoomId = data.roomId; currentRoomData = data.roomData; showScreen('lobby-screen'); });
 socket.on('joinError', (msg) => { alert(msg); });
 
+// ФИКС ВЫХОДА ИЗ КОМНАТЫ: Обработка статуса 'lobby' для всей группы
 socket.on('updateLobby', (roomData) => {
     currentRoomData = roomData;
     if (typeof updateLobbyUI === 'function') updateLobbyUI();
+
+    // Если игра окончена и лидер нажал "Возврат", принудительно забираем всех с экрана игры
+    const gameScreen = document.getElementById('game-screen');
+    if (roomData.status === 'lobby' && gameScreen && !gameScreen.classList.contains('hidden')) {
+        document.getElementById('winner-modal').classList.add('hidden');
+        if (typeof showScreen === 'function') showScreen('lobby-screen');
+        if (typeof switchMusicState === 'function') switchMusicState('loby');
+    }
 });
 
 socket.on('gameStarting', (roomData) => {
@@ -73,7 +83,6 @@ socket.on('bomberExplode', (data) => { if (typeof createExplosion === 'function'
 socket.on('zombieMeleeHit', (data) => { if (data.targetId === myId && myLocalTank.hp > 0) emitDamage(data.dmg, 'zombie'); });
 socket.on('newWave', (data) => { document.getElementById('wave-overlay').classList.remove('hidden'); document.getElementById('wave-text').innerText = `ХВИЛЯ ${data.wave}`; setTimeout(()=> document.getElementById('wave-overlay').classList.add('hidden'), 3000); });
 
-// НОВИЙ ЕКРАН ПЕРЕМОГИ
 socket.on('gameOver', (data) => {
     if(currentRoomData) currentRoomData.status = 'finished'; 
     document.getElementById('winner-modal').classList.remove('hidden'); document.getElementById('damage-vignette').style.opacity = 0;
@@ -83,7 +92,7 @@ socket.on('gameOver', (data) => {
         document.getElementById('winner-title').className = "text-6xl font-russo mb-4 text-red-500 tracking-widest drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]"; 
         document.getElementById('winner-emoji').innerText = "💀"; 
         document.getElementById('winner-message').innerText = `Ви протримались до ${data.wave} хвилі.`; 
-        document.getElementById('winner-reward').innerText = data.wave; // Нагорода у виживанні = хвилям
+        document.getElementById('winner-reward').innerText = data.wave;
     } else { 
         let myReward = data.rewards ? (data.rewards[myId] || 0) : 0;
         document.getElementById('winner-reward').innerText = myReward;

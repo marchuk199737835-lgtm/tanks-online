@@ -18,12 +18,20 @@ function showScreen(screenId) {
 
 function updateGlobalBucks() { document.querySelectorAll('.global-bucks-display').forEach(el => el.innerText = myBucks); }
 
-// --- ОБРОБНИКИ ЗВУКУ З ІНТЕРФЕЙСУ ---
+// --- ОБРОБНИКИ ЗВУКУ З ІНТЕРФЕЙСУ (ФІКС ГУЧНОСТІ) ---
 const musicSlider = document.getElementById('vol-music');
-if(musicSlider) musicSlider.addEventListener('input', e => { if (typeof setMusicVolume === 'function') setMusicVolume(parseFloat(e.target.value)); });
+if(musicSlider) {
+    musicSlider.addEventListener('input', e => { 
+        if (typeof setMusicVolume === 'function') setMusicVolume(parseFloat(e.target.value)); 
+    });
+}
 
 const sfxSlider = document.getElementById('vol-sfx');
-if(sfxSlider) sfxSlider.addEventListener('input', e => { if (typeof setSfxVolume === 'function') setSfxVolume(parseFloat(e.target.value)); });
+if(sfxSlider) {
+    sfxSlider.addEventListener('input', e => { 
+        if (typeof setSfxVolume === 'function') setSfxVolume(parseFloat(e.target.value)); 
+    });
+}
 
 // --- ЕКРАН АВТОРИЗАЦІЇ ---
 document.getElementById('tab-login').onclick = () => { authMode='login'; if (typeof playSound === 'function') playSound('ui_click'); document.getElementById('tab-login').className='flex-1 py-3 text-xs font-bold uppercase transition bg-blue-600 text-white tracking-wider'; document.getElementById('tab-register').className='flex-1 py-3 text-xs font-bold uppercase transition text-slate-400 hover:bg-slate-800 tracking-wider'; document.getElementById('auth-btn').innerText='АВТОРИЗАЦІЯ'; };
@@ -112,7 +120,6 @@ function updateLobbyUI() {
     document.getElementById('view-map-name').innerText = (currentRoomData.mode === 'survival' ? '🧟 ' : '⚔️ ') + MAP_NAMES[currentRoomData.map];
     document.getElementById('view-win-score').innerText = currentRoomData.mode === 'survival' ? 'БЕЗКІНЕЧНО' : currentRoomData.winScore;
 
-    // ПАНЕЛЬ ЛІДЕРА
     const isHost = (myId === currentRoomData.hostSocket);
     const hostPanel = document.getElementById('host-settings-panel');
     if(hostPanel) {
@@ -154,7 +161,6 @@ function updateLobbyUI() {
     }
 }
 
-// ІВЕНТИ ЛІДЕРА
 document.querySelectorAll('.host-mode-select').forEach(btn => { btn.onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); socket.emit('updateRoomSettings', { roomId: currentRoomId, mode: btn.dataset.mode }); }; });
 document.querySelectorAll('.host-map-select').forEach(btn => { btn.onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); socket.emit('updateRoomSettings', { roomId: currentRoomId, map: btn.dataset.map }); }; });
 const hostMaxPlayers = document.getElementById('host-max-players');
@@ -172,9 +178,16 @@ function doCountdown() {
     const iv = setInterval(() => { count--; if (count > 0) { text.innerText = count; if (typeof playSound === 'function') playSound('ui_click'); } else if (count === 0) { text.innerText = "БІЙ!"; text.classList.add('text-emerald-400', 'drop-shadow-[0_0_50px_rgba(16,185,129,0.8)]'); if (typeof playSound === 'function') playSound('shoot'); startGameLoop(); } else { clearInterval(iv); overlay.classList.add('hidden'); } }, 1000);
 }
 
-document.getElementById('back-to-room-lobby-btn').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); document.getElementById('winner-modal').classList.add('hidden'); socket.emit('backToRoomLobby', currentRoomId); if(typeof switchMusicState === 'function') switchMusicState('loby'); };
+// ФИКС КНОПКИ: Явное переключение экрана
+document.getElementById('back-to-room-lobby-btn').onclick = () => { 
+    if (typeof playSound === 'function') playSound('ui_click'); 
+    document.getElementById('winner-modal').classList.add('hidden'); 
+    socket.emit('backToRoomLobby', currentRoomId); 
+    if(typeof switchMusicState === 'function') switchMusicState('loby'); 
+    showScreen('lobby-screen'); // Мгновенный выход с черного экрана
+};
 
-// ПЕРЕВІРКА ТОКЕНА (Тепер безпечно в самому кінці, коли всі функції завантажені)
+// ПЕРЕВІРКА ТОКЕНА
 const savedToken = localStorage.getItem('tankToken');
 if(savedToken) socket.emit('authToken', savedToken);
 else showScreen('login-screen');
