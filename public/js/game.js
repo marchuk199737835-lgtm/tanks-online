@@ -71,46 +71,67 @@ function updatePhysics(now, dt) {
         
         let isSurvival = currentRoomData.mode === 'survival';
 
-        // 1. Попадання чужого снаряду в МЕНЕ
-        if (!hit && b.owner !== myId && myLocalTank.hp > 0) { 
-            let friendlyFire = (isSurvival && b.owner !== 'zombie');
-            if (!friendlyFire) {
-                let hitDist = b.type === 'samurai' ? myRadius + 30 : myRadius + 4;
-                if (Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < hitDist) { 
-                    hit = true; let dmgToDeal = b.dmgOverride || bCfg.dmg; emitDamage(dmgToDeal, b.owner); 
-                    if(b.type==='incendiary') { let end = now + 5000; let int = setInterval(()=>{ if(Date.now() > end || myLocalTank.hp <= 0) clearInterval(int); else { emitDamage(10, b.owner); createExplosion(myLocalTank.x, myLocalTank.y, 5, '#f97316'); } }, 1000); } 
-                }
-            } 
-        }
-
-        // 2. ФІКС ВІЗУАЛУ: Попадання МОГО снаряду в ІНШОГО ГРАВЦЯ
+        // АВТОРИТЕТ СТРІЛЬЦЯ: Якщо Я випустив кулю, Я перевіряю, чи влучила вона у ВОРОГА
         if (!hit && b.owner === myId && !isSurvival) {
             for (let oid in opponents) {
                 let op = opponents[oid];
                 if (op.hp > 0) {
                     let opRadius = op.buff === 'boss' ? 75 : 30;
                     let hitDist = b.type === 'samurai' ? opRadius + 30 : opRadius + 4;
-                    if (Math.hypot(b.x - op.x, b.y - op.y) < hitDist) { hit = true; break; }
+                    
+                    if (Math.hypot(b.x - op.x, b.y - op.y) < hitDist) { 
+                        hit = true; 
+                        let dmgToDeal = b.dmgOverride || bCfg.dmg; 
+                        socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: dmgToDeal });
+                        
+                        if(b.type === 'incendiary') { 
+                            let end = now + 5000; 
+                            let int = setInterval(() => { 
+                                if(Date.now() > end || !opponents[oid] || opponents[oid].hp <= 0) clearInterval(int); 
+                                else { 
+                                    socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: 10 });
+                                    createExplosion(opponents[oid].x, opponents[oid].y, 5, '#f97316'); 
+                                } 
+                            }, 1000); 
+                        } 
+                        break;
+                    }
                 }
             }
         }
 
-        // 3. Попадання МОГО снаряду по ЗОМБІ (Виживання)
+        // Попадання МОГО снаряду по ЗОМБІ (Виживання)
         if (!hit && isSurvival && b.owner === myId) { 
             for(let zid in zombies) { 
                 let z = zombies[zid]; let zDist = b.type === 'samurai' ? Z_TYPES[z.type].radius + 35 : Z_TYPES[z.type].radius + 10;
                 if (Math.hypot(b.x - z.x, b.y - z.y) < zDist) { hit = true; socket.emit('zombieHit', { roomId: currentRoomId, zid: zid, dmg: bCfg.dmg }); createExplosion(b.x, b.y, 5, Z_TYPES[z.type].color); break; } 
             } 
         }
+
+        // ВЛУЧАННЯ СНАРЯДІВ ЗОМБІ В МЕНЕ
+        if (!hit && b.owner === 'zombie' && myLocalTank.hp > 0) {
+            let hitDist = myRadius + 4;
+            if (Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < hitDist) { 
+                hit = true; 
+                let dmgToDeal = b.dmgOverride || bCfg.dmg; 
+                playSound('hurt'); shakeTime = 0.3; 
+                socket.emit('takeDamage', { roomId: currentRoomId, amt: dmgToDeal, attacker: 'zombie' }); 
+            }
+        }
         
+        // Візуалізація вибуху та знищення кулі
         if (hit || b.life <= 0) { 
-            if (b.type !== 'shotgun' && b.type !== 'minigun' && b.type !== 'acid' && b.type !== 'samurai') createExplosion(b.x, b.y, bCfg.type === 'explosive' ? 30 : 10, bCfg.type === 'explosive' ? '#ea580c' : '#fcd34d'); 
+            if (b.type !== 'shotgun' && b.type !== 'minigun' && b.type !== 'acid' && b.type !== 'samurai') {
+                createExplosion(b.x, b.y, bCfg.type === 'explosive' ? 30 : 10, bCfg.type === 'explosive' ? '#ea580c' : '#fcd34d'); 
+            }
             
-            // ФІКС САМОВРОНУ ДЛЯ БОСА: Вибуховий урон по площі ігнорує власника
-            if (hit && bCfg.type === 'explosive' && myLocalTank.hp > 0) { 
-                let splashFriendlyFire = (isSurvival && b.owner !== 'zombie');
-                if (b.owner !== myId && !splashFriendlyFire) {
-                    if (Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < (b.type==='boss'?250:120)) { emitDamage(bCfg.dmg, b.owner); }
+            // Сплеш-урон від вибухівки
+            if (hit && bCfg.type === 'explosive' && b.owner === myId) { 
+                let splashRad = b.type === 'boss' ? 250 : 120;
+                for (let oid in opponents) {
+                    if (opponents[oid].hp > 0 && Math.hypot(b.x - opponents[oid].x, b.y - opponents[oid].y) < splashRad) {
+                         socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: bCfg.dmg });
+                    }
                 }
             } 
             bullets.splice(i, 1); 
