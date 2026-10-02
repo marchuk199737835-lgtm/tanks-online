@@ -168,6 +168,7 @@ window.buyShopCase = function(caseId, price) {
 };
 
 document.getElementById('cancel-case-btn').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); document.getElementById('case-confirm-modal').classList.add('hidden'); };
+
 document.getElementById('close-reward-btn').onclick = () => { 
     if (typeof playSound === 'function') playSound('ui_click'); 
     document.getElementById('reward-modal').classList.add('hidden'); 
@@ -217,7 +218,7 @@ document.getElementById('leave-room-btn').onclick = () => { if (typeof playSound
 function updateLobbyUI() {
     if(!currentRoomData || currentRoomData.status === 'playing') return;
     document.getElementById('lobby-room-name').innerText = currentRoomData.hostName + " СЕСІЯ";
-    const MAP_NAMES = { 'площя': '🔲 ПЛОЩА' };
+    const MAP_NAMES = { 'площя': '🔲 ПЛОЩА', 'epic_map': '🌐 EPIC MAP' };
     document.getElementById('view-map-name').innerText = (currentRoomData.mode === 'survival' ? '🧟 ' : '⚔️ ') + MAP_NAMES[currentRoomData.map];
     document.getElementById('view-win-score').innerText = currentRoomData.mode === 'survival' ? 'БЕЗКІНЕЧНО' : currentRoomData.winScore;
 
