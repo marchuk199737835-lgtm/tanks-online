@@ -32,15 +32,82 @@ if (mongoUri) {
 function saveUser(name) { if (dbUsersCol && dbUsers[name]) { dbUsersCol.updateOne({ name: name }, { $set: dbUsers[name] }, { upsert: true }); } }
 function hashPwd(pwd) { return crypto.createHash('sha256').update(pwd).digest('hex'); }
 
-const MAP_DATA = { 'city': { size: 3600, solids: [] }, 'hangars': { size: 3000, solids: [] }, 'ship': { size: 2000, solids: [] }, 'castle': { size: 2500, solids: [] } };
-for(let x=200; x<3400; x+=450) { for(let y=200; y<3400; y+=450) { let n = (x*13 + y*17) % 100; if(n < 75) MAP_DATA['city'].solids.push({ type: 'wall', x, y, w: 300, h: 300 }); } }
-for(let x=150; x<2800; x+=350) { for(let y=150; y<2800; y+=300) { let n = (x*23 + y*29) % 100; if(n < 60) MAP_DATA['hangars'].solids.push({ type: 'wall', x, y, w: 250, h: 150 }); } }
-for(let x=200; x<1800; x+=250) { for(let y=200; y<1800; y+=250) { let n = (x*31 + y*37) % 100; if(n < 30) MAP_DATA['ship'].solids.push({ type: 'wall', x, y, w: 180, h: 80 }); } }
-for(let x=200; x<2300; x+=300) { for(let y=200; y<2300; y+=300) { let n = (x*41 + y*43) % 100; if(n < 50) { if(n < 15) MAP_DATA['castle'].solids.push({ type: 'tree', x: x+100, y: y+100, r: 60 }); else MAP_DATA['castle'].solids.push({ type: 'wall', x, y, w: 250, h: 80 }); } } }
+const MAP_DATA = { 
+    'площя': {
+        size: 750,
+        bg: '#4b5062',
+        grid: '#393c47',
+        solids: [
+            {"type":"shape_rhombus","x":100,"y":100,"w":100,"h":100,"color":"#878787"},
+            {"type":"shape_rhombus","x":550,"y":100,"w":100,"h":100,"color":"#878787"},
+            {"type":"shape_rhombus","x":100,"y":550,"w":100,"h":100,"color":"#878787"},
+            {"type":"shape_rhombus","x":550,"y":550,"w":100,"h":100,"color":"#878787"},
+            {"type":"neon_cross","x":350,"y":350,"w":50,"h":50,"color":"#878787"},
+            {"type":"spawn_player","x":150,"y":700},
+            {"type":"spawn_player","x":600,"y":700},
+            {"type":"spawn_player","x":150,"y":50},
+            {"type":"spawn_player","x":600,"y":50},
+            {"type":"spawn_player","x":250,"y":300},
+            {"type":"spawn_player","x":500,"y":450},
+            {"type":"spawn_zombie","x":50,"y":550},
+            {"type":"spawn_zombie","x":50,"y":450},
+            {"type":"spawn_zombie","x":50,"y":350},
+            {"type":"spawn_zombie","x":50,"y":250},
+            {"type":"spawn_zombie","x":50,"y":150},
+            {"type":"spawn_zombie","x":50,"y":650},
+            {"type":"spawn_zombie","x":700,"y":650},
+            {"type":"spawn_zombie","x":700,"y":550},
+            {"type":"spawn_zombie","x":700,"y":450},
+            {"type":"spawn_zombie","x":700,"y":350},
+            {"type":"spawn_zombie","x":700,"y":250},
+            {"type":"spawn_zombie","x":700,"y":150},
+            {"type":"spawn_zombie","x":250,"y":500},
+            {"type":"spawn_zombie","x":500,"y":500},
+            {"type":"spawn_zombie","x":500,"y":200},
+            {"type":"spawn_zombie","x":250,"y":200},
+            {"type":"spawn_powerup","x":250,"y":400},
+            {"type":"spawn_powerup","x":500,"y":350},
+            {"type":"spawn_powerup","x":50,"y":50},
+            {"type":"spawn_powerup","x":700,"y":50},
+            {"type":"spawn_powerup","x":700,"y":700},
+            {"type":"spawn_powerup","x":50,"y":700}
+        ]
+    }
+};
 
-function checkCollisionServer(mapName, x, y, r) { let cMap = MAP_DATA[mapName] ? mapName : 'city'; let mSize = MAP_DATA[cMap].size; if (x - r < 0 || x + r > mSize || y - r < 0 || y + r > mSize) return true; for(let s of MAP_DATA[cMap].solids) { if(s.type === 'wall') { let testX = Math.max(s.x, Math.min(x, s.x+s.w)), testY = Math.max(s.y, Math.min(y, s.y+s.h)); if(Math.hypot(x-testX, y-testY) <= r) return true; } else if (s.type === 'tree') { if(Math.hypot(x-s.x, y-s.y) < r+s.r) return true; } } return false; }
-function getValidSpawn(mapName, r) { let cMap = MAP_DATA[mapName] ? mapName : 'city'; let mSize = MAP_DATA[cMap].size; for(let i=0; i<100; i++) { let x = Math.random()*(mSize-200)+100; let y = Math.random()*(mSize-200)+100; if(!checkCollisionServer(cMap, x, y, r + 20)) return {x, y}; } return {x: mSize/2, y: mSize/2}; }
-function getValidEdgeSpawn(mapName, r) { let cMap = MAP_DATA[mapName] ? mapName : 'city'; let mSize = MAP_DATA[cMap].size; for(let i=0; i<100; i++) { let x = Math.random() < 0.5 ? 50 : mSize-50; let y = Math.random() * (mSize - 100) + 50; if(!checkCollisionServer(cMap, x, y, r + 20)) return {x, y}; } return getValidSpawn(mapName, r); }
+function checkCollisionServer(mapName, x, y, r) { 
+    let cMap = MAP_DATA[mapName] ? mapName : 'площя'; let mSize = MAP_DATA[cMap].size; 
+    if (x - r < 0 || x + r > mSize || y - r < 0 || y + r > mSize) return true; 
+    for(let s of MAP_DATA[cMap].solids) { 
+        if(s.type.includes('spawn')) continue;
+        if(s.type === 'tree' || s.type === 'neon_circle' || s.type === 'neon_pillar') { if(Math.hypot(x-(s.x+(s.w||0)/2), y-(s.y+(s.h||0)/2)) <= r+(s.r||s.w/2||30)) return true; } 
+        else if(s.type === 'line') { for(let p of s.points) { if(Math.hypot(x-p.x, y-p.y) <= r+(s.width||10)/2) return true; } }
+        else { let testX = Math.max(s.x, Math.min(x, s.x+(s.w||30))), testY = Math.max(s.y, Math.min(y, s.y+(s.h||30))); if(Math.hypot(x-testX, y-testY) <= r) return true; } 
+    } return false; 
+}
+
+function getValidSpawn(mapName, r, typeStr = 'spawn_player') { 
+    let cMap = MAP_DATA[mapName] ? mapName : 'площя'; let mSize = MAP_DATA[cMap].size;
+    let spawnPoints = MAP_DATA[cMap].solids.filter(s => s.type === typeStr);
+    if (spawnPoints.length > 0) {
+        let attempts = 0;
+        while(attempts < 50) {
+            let sp = spawnPoints[Math.floor(Math.random() * spawnPoints.length)];
+            let sx = sp.x + (Math.random() * 20 - 10); let sy = sp.y + (Math.random() * 20 - 10);
+            if (!checkCollisionServer(cMap, sx, sy, r)) return {x: sx, y: sy};
+            attempts++;
+        }
+    }
+    for(let i=0; i<100; i++) { let x = Math.random()*(mSize-200)+100; let y = Math.random()*(mSize-200)+100; if(!checkCollisionServer(cMap, x, y, r + 20)) return {x, y}; } return {x: mSize/2, y: mSize/2}; 
+}
+
+function getValidEdgeSpawn(mapName, r, typeStr = 'spawn_zombie') { 
+    let cMap = MAP_DATA[mapName] ? mapName : 'площя'; let mSize = MAP_DATA[cMap].size;
+    let spawnPoints = MAP_DATA[cMap].solids.filter(s => s.type === typeStr);
+    if (spawnPoints.length > 0) return getValidSpawn(mapName, r, typeStr);
+    for(let i=0; i<100; i++) { let x = Math.random() < 0.5 ? 50 : mSize-50; let y = Math.random() * (mSize - 100) + 50; if(!checkCollisionServer(cMap, x, y, r + 20)) return {x, y}; }
+    return getValidSpawn(mapName, r); 
+}
 
 let rooms = {}; let globalPlayers = {}; 
 const Z_TYPES = { 'normal': { hp: 25, speed: 120, dmg: 10, radius: 15, color: '#22c55e' }, 'runner': { hp: 15, speed: 250, dmg: 5, radius: 12, color: '#84cc16' }, 'tanker': { hp: 100, speed: 60, dmg: 25, radius: 25, color: '#15803d' }, 'spitter': { hp: 40, speed: 90, dmg: 15, radius: 15, color: '#a3e635', ranged: true }, 'bomber': { hp: 30, speed: 140, dmg: 50, radius: 18, color: '#dc2626', explode: true }, 'ghost': { hp: 20, speed: 100, dmg: 10, radius: 15, color: '#cbd5e1', ghost: true }, 'pikus': { isBoss: true, name: 'ПІКУС', hp: 1000, speed: 294, dmg: 100, radius: 30, color: '#9333ea', bullets: 3, cd: 3000 }, 'shurik': { isBoss: true, name: 'ШУРІК', hp: 2000, speed: 280, dmg: 100, radius: 22.5, color: '#f43f5e', bullets: 10, cd: 3000 }, 'oneshot': { isBoss: true, name: 'ВАНШОТУС', hp: 3000, speed: 294, dmg: 1000, radius: 30, color: '#fbbf24', bullets: 2, cd: 2000 }, 'padlo': { isBoss: true, name: 'ПАДЛО', hp: 5000, speed: 280, dmg: 75, radius: 15, color: '#10b981', bullets: 25, cd: 1500 } };
@@ -61,7 +128,6 @@ function getMaxHp(equipped) {
     return Math.round(MAX_HP * hpMult);
 }
 
-// ДОДАНО МАСИВ usedPromos ДЛЯ ЗБЕРЕЖЕННЯ В БАЗІ ДАНИХ
 function validateUser(u) { 
     if(!u.inventory) u.inventory = []; 
     if(!u.equipped) u.equipped = { cannon: null, turret: null, hull: null, tracks: null }; 
@@ -79,23 +145,9 @@ io.on('connection', (socket) => {
     socket.on('login', (data) => { const { name, password } = data; let u = dbUsers[name]; if(!u || u.password !== hashPwd(password)) return socket.emit('authError', 'Невірний логін або пароль!'); const token = crypto.randomUUID(); u.token = token; u = validateUser(u); saveUser(name); globalPlayers[socket.id] = name; socket.emit('authSuccess', { name, token }); sendEconomy(socket.id, name); });
     socket.on('authToken', (token) => { let foundName = null; for(let n in dbUsers) { if(dbUsers[n].token === token) foundName = n; } if(foundName) { globalPlayers[socket.id] = foundName; dbUsers[foundName] = validateUser(dbUsers[foundName]); socket.emit('authSuccess', { name: foundName, token }); sendEconomy(socket.id, foundName); } else socket.emit('authError', 'Сесія закінчилась, увійдіть знову'); });
 
-    // СИСТЕМА ПРОМОКОДІВ
     socket.on('usePromo', (code) => {
-        let name = globalPlayers[socket.id]; if(!name || !dbUsers[name]) return;
-        let u = dbUsers[name];
-        let normalizedCode = code.trim().toLowerCase();
-        
-        if (normalizedCode === 'alex-top1') {
-            if (u.usedPromos.includes(normalizedCode)) return socket.emit('promoError', 'Промокод вже використано на цьому акаунті!');
-            u.bucks += 200;
-            u.stats.earned += 200;
-            u.usedPromos.push(normalizedCode);
-            saveUser(name);
-            sendEconomy(socket.id, name);
-            socket.emit('promoSuccess', 'Успішно! +200 баксів нараховано.');
-        } else {
-            socket.emit('promoError', 'Невірний або неіснуючий промокод!');
-        }
+        let name = globalPlayers[socket.id]; if(!name || !dbUsers[name]) return; let u = dbUsers[name]; let normalizedCode = code.trim().toLowerCase();
+        if (normalizedCode === 'alex-top1') { if (u.usedPromos.includes(normalizedCode)) return socket.emit('promoError', 'Промокод вже використано на цьому акаунті!'); u.bucks += 200; u.stats.earned += 200; u.usedPromos.push(normalizedCode); saveUser(name); sendEconomy(socket.id, name); socket.emit('promoSuccess', 'Успішно! +200 баксів нараховано.'); } else { socket.emit('promoError', 'Невірний або неіснуючий промокод!'); }
     });
 
     socket.on('buyCase', (caseId) => { 
@@ -138,7 +190,7 @@ io.on('connection', (socket) => {
             const pKeys = Object.keys(room.players); 
             if (pKeys.length >= 2 && pKeys.every(id => room.players[id].ready)) { 
                 room.status = 'playing'; if (room.mode === 'survival') { room.wave = 1; room.survivalState = 'spawning'; room.zombies = {}; } 
-                pKeys.forEach((id) => { room.players[id].hp = getMaxHp(room.players[id].equipped); room.players[id].score = 0; room.players[id].buff = null; let spawn = getValidSpawn(room.map, 30); room.players[id].x = spawn.x; room.players[id].y = spawn.y; }); 
+                pKeys.forEach((id) => { room.players[id].hp = getMaxHp(room.players[id].equipped); room.players[id].score = 0; room.players[id].buff = null; let spawn = getValidSpawn(room.map, 30, 'spawn_player'); room.players[id].x = spawn.x; room.players[id].y = spawn.y; }); 
                 io.to(roomId).emit('gameStarting', room); io.emit('roomsList', getActiveRooms()); 
             } 
         } 
@@ -164,7 +216,7 @@ io.on('connection', (socket) => {
             victim.buff = null; io.to(data.roomId).emit('playerDied', { id: data.targetId, killer: attackerSocketId }); 
             if(atkName && dbUsers[atkName]) { dbUsers[atkName].stats.kills++; saveUser(atkName); }
             if (room.mode === 'deathmatch') { const tid = 'tkn_' + Date.now() + Math.random(); room.tokens[tid] = { id: tid, x: victim.x, y: victim.y, color: victim.color, active: true }; } 
-            setTimeout(() => { if(room && room.players[data.targetId] && room.status === 'playing' && room.mode !== 'survival') { room.players[data.targetId].hp = getMaxHp(room.players[data.targetId].equipped); let spawn = getValidSpawn(room.map, 30); room.players[data.targetId].x = spawn.x; room.players[data.targetId].y = spawn.y; io.to(data.roomId).emit('playerRespawn', room.players[data.targetId]); } }, 3000); 
+            setTimeout(() => { if(room && room.players[data.targetId] && room.status === 'playing' && room.mode !== 'survival') { room.players[data.targetId].hp = getMaxHp(room.players[data.targetId].equipped); let spawn = getValidSpawn(room.map, 30, 'spawn_player'); room.players[data.targetId].x = spawn.x; room.players[data.targetId].y = spawn.y; io.to(data.roomId).emit('playerRespawn', room.players[data.targetId]); } }, 3000); 
         }
     });
 
@@ -174,7 +226,7 @@ io.on('connection', (socket) => {
         let victim = room.players[socket.id]; victim.hp = Math.max(0, victim.hp - data.amt);
         if (victim.hp === 0) { 
             victim.buff = null; io.to(data.roomId).emit('playerDied', { id: socket.id, killer: 'zombie' }); 
-            setTimeout(() => { if(room && room.players[socket.id] && room.status === 'playing' && room.mode !== 'survival') { room.players[socket.id].hp = getMaxHp(room.players[socket.id].equipped); let spawn = getValidSpawn(room.map, 30); room.players[socket.id].x = spawn.x; room.players[socket.id].y = spawn.y; io.to(data.roomId).emit('playerRespawn', room.players[socket.id]); } }, 3000); 
+            setTimeout(() => { if(room && room.players[socket.id] && room.status === 'playing' && room.mode !== 'survival') { room.players[socket.id].hp = getMaxHp(room.players[socket.id].equipped); let spawn = getValidSpawn(room.map, 30, 'spawn_player'); room.players[socket.id].x = spawn.x; room.players[socket.id].y = spawn.y; io.to(data.roomId).emit('playerRespawn', room.players[socket.id]); } }, 3000); 
         }
     });
 
@@ -247,7 +299,7 @@ setInterval(() => {
             room.lastPowerupSpawn = now; 
             const types = ['explosive', 'minigun', 'boss', 'shotgun', 'healing', 'samurai', 'piercing', 'invisible', 'homing'];
             if (Object.keys(room.powerups).length > 10) delete room.powerups[Object.keys(room.powerups)[0]];
-            for(let i=0; i<2; i++) { const pid = 'pu_' + now + '_' + i; let pSpawn = getValidSpawn(room.map, 30); room.powerups[pid] = { id: pid, type: types[Math.floor(Math.random() * types.length)], active: true, x: pSpawn.x, y: pSpawn.y }; }
+            for(let i=0; i<2; i++) { const pid = 'pu_' + now + '_' + i; let pSpawn = getValidSpawn(room.map, 30, 'spawn_powerup'); room.powerups[pid] = { id: pid, type: types[Math.floor(Math.random() * types.length)], active: true, x: pSpawn.x, y: pSpawn.y }; }
         }
         if (Object.keys(room.tokens).length > 40) delete room.tokens[Object.keys(room.tokens)[0]];
 
@@ -262,8 +314,8 @@ setInterval(() => {
                 if (room.survivalState === 'playing') { room.survivalState = 'waiting'; room.nextWaveTime = now + 5000; } 
                 else if (room.survivalState === 'waiting' && now > room.nextWaveTime) {
                     room.wave++; let isBossWave = (room.wave === 25 || room.wave === 50 || room.wave === 75 || room.wave === 100);
-                    if (isBossWave) { let bType = room.wave === 25 ? 'pikus' : room.wave === 50 ? 'shurik' : room.wave === 75 ? 'oneshot' : 'padlo'; let zid = `boss_${now}`; let zSpawn = getValidSpawn(room.map, 50); room.zombies[zid] = { id: zid, x: zSpawn.x, y: zSpawn.y, type: bType, hp: Z_TYPES[bType].hp, nextAttack: 0 }; } 
-                    else { let spawnCount = Math.min(125, 10 + (room.wave - 1) * 5); let isTenth = (room.wave % 10 === 0); let typesList = ['normal', 'runner', 'spitter', 'tanker', 'bomber', 'ghost']; let maxIdx = Math.min(typesList.length - 1, Math.floor(room.wave / 3)); for(let i=0; i<spawnCount; i++) { let type = 'normal'; if (isTenth && i >= spawnCount/2) type = typesList[Math.floor(Math.random()*maxIdx) + 1]; else if (i === 0 && room.wave > 1) type = typesList[Math.min(typesList.length-1, Math.floor(room.wave/4))]; else type = typesList[Math.floor(Math.random() * (maxIdx + 1))]; if (type === 'boss') type = 'tanker'; let zSpawn = getValidEdgeSpawn(room.map, 20); let zid = `z_${now}_${i}`; room.zombies[zid] = { id: zid, x: zSpawn.x, y: zSpawn.y, type: type, hp: Z_TYPES[type].hp, nextAttack: 0 }; } }
+                    if (isBossWave) { let bType = room.wave === 25 ? 'pikus' : room.wave === 50 ? 'shurik' : room.wave === 75 ? 'oneshot' : 'padlo'; let zid = `boss_${now}`; let zSpawn = getValidSpawn(room.map, 50, 'spawn_zombie'); room.zombies[zid] = { id: zid, x: zSpawn.x, y: zSpawn.y, type: bType, hp: Z_TYPES[bType].hp, nextAttack: 0 }; } 
+                    else { let spawnCount = Math.min(125, 10 + (room.wave - 1) * 5); let isTenth = (room.wave % 10 === 0); let typesList = ['normal', 'runner', 'spitter', 'tanker', 'bomber', 'ghost']; let maxIdx = Math.min(typesList.length - 1, Math.floor(room.wave / 3)); for(let i=0; i<spawnCount; i++) { let type = 'normal'; if (isTenth && i >= spawnCount/2) type = typesList[Math.floor(Math.random()*maxIdx) + 1]; else if (i === 0 && room.wave > 1) type = typesList[Math.min(typesList.length-1, Math.floor(room.wave/4))]; else type = typesList[Math.floor(Math.random() * (maxIdx + 1))]; if (type === 'boss') type = 'tanker'; let zSpawn = getValidEdgeSpawn(room.map, 20, 'spawn_zombie'); let zid = `z_${now}_${i}`; room.zombies[zid] = { id: zid, x: zSpawn.x, y: zSpawn.y, type: type, hp: Z_TYPES[type].hp, nextAttack: 0 }; } }
                     room.survivalState = 'playing'; io.to(roomId).emit('newWave', { wave: room.wave });
                 } else if (room.survivalState === 'spawning') { room.survivalState = 'waiting'; room.nextWaveTime = now + 1000; }
             } else if (room.survivalState === 'playing') {

@@ -32,16 +32,8 @@ document.getElementById('shop-back-btn').onclick = () => { showScreen('main-menu
 document.getElementById('hangar-back-btn').onclick = () => { showScreen('main-menu-screen'); };
 document.getElementById('back-to-menu-btn').onclick = () => { showScreen('main-menu-screen'); };
 
-// ОБРОБНИК ПРОМОКОДІВ
 const submitPromoBtn = document.getElementById('submit-promo-btn');
-if(submitPromoBtn) {
-    submitPromoBtn.onclick = () => {
-        if (typeof playSound === 'function') playSound('ui_click');
-        const code = document.getElementById('promo-input').value;
-        if(!code) return alert('Введіть промокод!');
-        socket.emit('usePromo', code);
-    };
-}
+if(submitPromoBtn) { submitPromoBtn.onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); const code = document.getElementById('promo-input').value; if(!code) return alert('Введіть промокод!'); socket.emit('usePromo', code); }; }
 
 function renderRoomsList(rooms) {
     const list = document.getElementById('rooms-list'); list.innerHTML = '';
@@ -57,7 +49,7 @@ function renderRoomsList(rooms) {
 }
 window.joinRoomBtn = function(roomId) { if (typeof playSound === 'function') playSound('ui_click'); socket.emit('joinRoom', roomId); };
 
-let createConfig = { mode: 'deathmatch', map: 'city', maxPlayers: 6, winScore: 50 };
+let createConfig = { mode: 'deathmatch', map: 'площя', maxPlayers: 6, winScore: 50 };
 document.getElementById('open-create-room-btn').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); document.getElementById('create-room-modal').classList.remove('hidden'); };
 document.getElementById('cancel-create-btn').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); document.getElementById('create-room-modal').classList.add('hidden'); };
 document.querySelectorAll('.create-mode-select').forEach(btn => { btn.onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); document.querySelectorAll('.create-mode-select').forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); createConfig.mode = btn.dataset.mode; document.getElementById('create-score-wrap').style.display = createConfig.mode === 'survival' ? 'none' : 'block'; }; });
@@ -176,7 +168,6 @@ window.buyShopCase = function(caseId, price) {
 };
 
 document.getElementById('cancel-case-btn').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); document.getElementById('case-confirm-modal').classList.add('hidden'); };
-
 document.getElementById('close-reward-btn').onclick = () => { 
     if (typeof playSound === 'function') playSound('ui_click'); 
     document.getElementById('reward-modal').classList.add('hidden'); 
@@ -226,7 +217,7 @@ document.getElementById('leave-room-btn').onclick = () => { if (typeof playSound
 function updateLobbyUI() {
     if(!currentRoomData || currentRoomData.status === 'playing') return;
     document.getElementById('lobby-room-name').innerText = currentRoomData.hostName + " СЕСІЯ";
-    const MAP_NAMES = { 'city': '🏙️ МІСТО', 'hangars': '🏭 АНГАРИ', 'ship': '🚢 КОРАБЕЛЬ', 'castle': '🏰 ЗАМОК' };
+    const MAP_NAMES = { 'площя': '🔲 ПЛОЩА' };
     document.getElementById('view-map-name').innerText = (currentRoomData.mode === 'survival' ? '🧟 ' : '⚔️ ') + MAP_NAMES[currentRoomData.map];
     document.getElementById('view-win-score').innerText = currentRoomData.mode === 'survival' ? 'БЕЗКІНЕЧНО' : currentRoomData.winScore;
 

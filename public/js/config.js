@@ -15,14 +15,49 @@ const keys = { w: false, a: false, s: false, d: false, space: false };
 let mouseX = 0, mouseY = 0; let lastShootTime = 0; let camera = { x: 0, y: 0 }; let shakeTime = 0; let homingTargetId = null;
 let gameLoopId = null; let lastTime = 0;
 
-const MAP_DATA = { 'city': { size: 3600, bg: '#020617', grid: '#1e293b', solids: [] }, 'hangars': { size: 3000, bg: '#0f172a', grid: '#334155', solids: [] }, 'ship': { size: 2000, bg: '#1e293b', grid: '#475569', solids: [] }, 'castle': { size: 2500, bg: '#1c1917', grid: '#292524', solids: [] } };
-const neonColors = ['#3b82f6', '#ec4899', '#8b5cf6', '#10b981'];
-for(let x=200; x<3400; x+=450) { for(let y=200; y<3400; y+=450) { let n = (x*13 + y*17) % 100; if(n < 75) MAP_DATA['city'].solids.push({ type: 'wall', x, y, w: 300, h: 300, color: '#09090b', neon: neonColors[n % neonColors.length] }); } }
-const hangarColors = ['#0f172a', '#020617', '#1e293b'];
-for(let x=150; x<2800; x+=350) { for(let y=150; y<2800; y+=300) { let n = (x*23 + y*29) % 100; if(n < 60) MAP_DATA['hangars'].solids.push({ type: 'wall', x, y, w: 250, h: 150, color: hangarColors[n % hangarColors.length], stripe: (n%2===0)?'#eab308':'#ef4444' }); } }
-const containerColors = ['#0284c7', '#dc2626', '#16a34a', '#ca8a04'];
-for(let x=200; x<1800; x+=250) { for(let y=200; y<1800; y+=250) { let n = (x*31 + y*37) % 100; if(n < 30) MAP_DATA['ship'].solids.push({ type: 'wall', x, y, w: 180, h: 80, color: containerColors[n % containerColors.length] }); } }
-for(let x=200; x<2300; x+=300) { for(let y=200; y<2300; y+=300) { let n = (x*41 + y*43) % 100; if(n < 50) { if(n < 15) MAP_DATA['castle'].solids.push({ type: 'tree', x: x+100, y: y+100, r: 60, color: '#0c0a09' }); else MAP_DATA['castle'].solids.push({ type: 'wall', x, y, w: 250, h: 80, color: '#171717' }); } } }
+// ТВОЯ КРУТА МАПА
+const MAP_DATA = { 
+    'площя': {
+        size: 750,
+        bg: '#4b5062',
+        grid: '#393c47',
+        solids: [
+            {"type":"shape_rhombus","x":100,"y":100,"w":100,"h":100,"color":"#878787"},
+            {"type":"shape_rhombus","x":550,"y":100,"w":100,"h":100,"color":"#878787"},
+            {"type":"shape_rhombus","x":100,"y":550,"w":100,"h":100,"color":"#878787"},
+            {"type":"shape_rhombus","x":550,"y":550,"w":100,"h":100,"color":"#878787"},
+            {"type":"neon_cross","x":350,"y":350,"w":50,"h":50,"color":"#878787"},
+            {"type":"spawn_player","x":150,"y":700},
+            {"type":"spawn_player","x":600,"y":700},
+            {"type":"spawn_player","x":150,"y":50},
+            {"type":"spawn_player","x":600,"y":50},
+            {"type":"spawn_player","x":250,"y":300},
+            {"type":"spawn_player","x":500,"y":450},
+            {"type":"spawn_zombie","x":50,"y":550},
+            {"type":"spawn_zombie","x":50,"y":450},
+            {"type":"spawn_zombie","x":50,"y":350},
+            {"type":"spawn_zombie","x":50,"y":250},
+            {"type":"spawn_zombie","x":50,"y":150},
+            {"type":"spawn_zombie","x":50,"y":650},
+            {"type":"spawn_zombie","x":700,"y":650},
+            {"type":"spawn_zombie","x":700,"y":550},
+            {"type":"spawn_zombie","x":700,"y":450},
+            {"type":"spawn_zombie","x":700,"y":350},
+            {"type":"spawn_zombie","x":700,"y":250},
+            {"type":"spawn_zombie","x":700,"y":150},
+            {"type":"spawn_zombie","x":250,"y":500},
+            {"type":"spawn_zombie","x":500,"y":500},
+            {"type":"spawn_zombie","x":500,"y":200},
+            {"type":"spawn_zombie","x":250,"y":200},
+            {"type":"spawn_powerup","x":250,"y":400},
+            {"type":"spawn_powerup","x":500,"y":350},
+            {"type":"spawn_powerup","x":50,"y":50},
+            {"type":"spawn_powerup","x":700,"y":50},
+            {"type":"spawn_powerup","x":700,"y":700},
+            {"type":"spawn_powerup","x":50,"y":700}
+        ]
+    }
+};
 
 const BUFFS = { 'none': { cd: 1500, dmg: 75, type: 'normal' }, 'explosive': { cd: 1500, dmg: 250, type: 'explosive' }, 'minigun': { cd: 100, dmg: 25, type: 'fast' }, 'boss': { cd: 1000, dmg: 500, type: 'explosive' }, 'shotgun': { cd: 1500, dmg: 25, type: 'normal' }, 'healing': { cd: 1500, dmg: 75, type: 'normal' }, 'samurai': { cd: 750, dmg: 75, type: 'melee' }, 'piercing': { cd: 1500, dmg: 50, type: 'piercing' }, 'invisible': { cd: 500, dmg: 75, type: 'normal' }, 'homing': { cd: 3000, dmg: 125, type: 'homing' } };
 const PU_COLORS = { 'explosive': '#fb923c', 'minigun': '#fde047', 'boss': '#dc2626', 'shotgun': '#9ca3af', 'healing': '#22c55e', 'samurai': '#ef4444', 'piercing': '#d946ef', 'invisible': '#cbd5e1', 'homing': '#10b981' };
@@ -33,7 +68,6 @@ const Z_TYPES = { 'normal': { radius: 15, color: '#22c55e' }, 'runner': { radius
 const RARITY = { 'common': { name: 'Звичайний', color: '#94a3b8', price: 5 }, 'rare': { name: 'Рідкісний', color: '#3b82f6', price: 10 }, 'epic': { name: 'Епічний', color: '#a855f7', price: 50 }, 'legendary': { name: 'Легендарний', color: '#eab308', price: 250 } };
 const CAT_NAMES = { 'cannon': 'ДУЛО', 'turret': 'БАШТА', 'hull': 'КОРПУС', 'tracks': 'ГУСЕНИЦІ' };
 
-// КАСТОМНІ ІКОНКИ ДЛЯ ІНВЕНТАРЯ ТА РУЛЕТКИ
 const SVG_ICONS = {
     'cannon': (color) => `<svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:100%; height:100%;"><rect x="9" y="2" width="6" height="12" rx="1"></rect><path d="M12 14v8"></path><path d="M8 22h8"></path></svg>`,
     'turret': (color) => `<svg viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:100%; height:100%;"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle></svg>`,

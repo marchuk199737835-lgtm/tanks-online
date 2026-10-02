@@ -2,7 +2,19 @@ const canvas = document.getElementById('game-canvas'); const ctx = canvas.getCon
 
 function createExplosion(x, y, count, color) { for(let i=0; i<count; i++){ const ang = Math.random() * Math.PI * 2; const spd = Math.random() * 200 + 50; particles.push({ x, y, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd, life: Math.random() * 0.4 + 0.1, color }); } }
 
-function checkCollision(x, y, r, checkSolids = true) { if (!currentRoomData) return true; let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'city'; let mSize = MAP_DATA[cMap].size; if (x - r < 0 || x + r > mSize || y - r < 0 || y + r > mSize) return true; if (checkSolids) { const solids = MAP_DATA[cMap].solids; for (let s of solids) { if (s.type === 'wall') { let testX = Math.max(s.x, Math.min(x, s.x + s.w)), testY = Math.max(s.y, Math.min(y, s.y + s.h)); if (Math.hypot(x - testX, y - testY) <= r) return true; } else if (s.type === 'tree') { if (Math.hypot(x - s.x, y - s.y) < r + s.r) return true; } } } return false; }
+function checkCollision(x, y, r, checkSolids = true) { 
+    if (!currentRoomData) return true; let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'площя'; let mSize = MAP_DATA[cMap].size; 
+    if (x - r < 0 || x + r > mSize || y - r < 0 || y + r > mSize) return true; 
+    if (checkSolids) { 
+        const solids = MAP_DATA[cMap].solids; 
+        for (let s of solids) { 
+            if(s.type.includes('spawn')) continue; // Точки спавну не є перешкодами
+            if(s.type === 'tree' || s.type === 'neon_circle' || s.type === 'neon_pillar') { if(Math.hypot(x-(s.x+(s.w||0)/2), y-(s.y+(s.h||0)/2)) <= r+(s.r||s.w/2||30)) return true; } 
+            else if(s.type === 'line') { for(let p of s.points) { if(Math.hypot(x-p.x, y-p.y) <= r+(s.width||10)/2) return true; } }
+            else { let testX = Math.max(s.x, Math.min(x, s.x+(s.w||30))), testY = Math.max(s.y, Math.min(y, s.y+(s.h||30))); if(Math.hypot(x-testX, y-testY) <= r) return true; } 
+        } 
+    } return false; 
+}
 
 function updatePhysics(now, dt) {
     if (!currentRoomData || !currentRoomId) return;
@@ -73,7 +85,6 @@ function updatePhysics(now, dt) {
 function drawTank(x, y, bodyAngle, turretAngle, colorHex, name, isMe, hp, buff, equipped) {
     if (hp <= 0) return; ctx.save(); ctx.translate(x, y); let scale = buff === 'boss' ? 2.5 : 1.0; ctx.scale(scale, scale); if (buff === 'invisible') ctx.globalAlpha = isMe ? 0.2 : 0.03; else ctx.globalAlpha = 1.0;
     
-    // ІМ'Я ГРАВЦЯ має колір команди
     ctx.shadowColor = 'transparent'; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; 
     ctx.fillStyle = colorHex; ctx.font = '14px Russo One'; ctx.textAlign = 'center'; if(buff !== 'invisible' || isMe) ctx.fillText(name, 0, -45);
     
@@ -83,7 +94,6 @@ function drawTank(x, y, bodyAngle, turretAngle, colorHex, name, isMe, hp, buff, 
     let cCol = equipped && equipped.cannon && MODULES[equipped.cannon] ? RARITY[MODULES[equipped.cannon].rarity].color : '#0f172a';
     let tuCol = equipped && equipped.turret && MODULES[equipped.turret] ? RARITY[MODULES[equipped.turret].rarity].color : '#334155';
 
-    // ФІКС ВІЗУАЛУ ТАНКА: Забороняємо тіням від барикад з'їжджати на танк
     ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
 
     ctx.save(); ctx.rotate(bodyAngle); 
@@ -109,21 +119,96 @@ function drawTank(x, y, bodyAngle, turretAngle, colorHex, name, isMe, hp, buff, 
     ctx.restore(); ctx.restore();
 }
 
+function drawProp(ctx, o, time) {
+    let x = o.x, y = o.y, w = o.w||30, h = o.h||30; ctx.save();
+    switch(o.type) {
+        case 'prop_crate': ctx.fillStyle = '#b45309'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = '#78350f'; ctx.lineWidth = 3; ctx.strokeRect(x, y, w, h); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x+w, y+h); ctx.moveTo(x+w, y); ctx.lineTo(x, y+h); ctx.stroke(); break;
+        case 'prop_barrel': ctx.fillStyle = '#dc2626'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, Math.min(w,h)/2, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#991b1b'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, Math.min(w,h)/2 - 4, 0, Math.PI*2); ctx.fill(); break;
+        case 'prop_sandbag': ctx.fillStyle = '#d4a373'; ctx.strokeStyle = '#a68a64'; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(x, y, w, h/2, 10); ctx.fill(); ctx.stroke(); ctx.beginPath(); ctx.roundRect(x+5, y+h/2, w-10, h/2, 10); ctx.fill(); ctx.stroke(); break;
+        case 'prop_rock': ctx.fillStyle = '#52525b'; ctx.beginPath(); ctx.moveTo(x+w/2, y); ctx.lineTo(x+w, y+h/3); ctx.lineTo(x+w*0.8, y+h); ctx.lineTo(x+w*0.2, y+h); ctx.lineTo(x, y+h/2); ctx.fill(); break;
+        case 'prop_bush': ctx.fillStyle = '#15803d'; ctx.beginPath(); ctx.arc(x+w/3, y+h/3, w/2, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(x+w*0.7, y+h/3, w/2, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(x+w/2, y+h*0.7, w/2.5, 0, Math.PI*2); ctx.fill(); break;
+        case 'prop_cone': ctx.fillStyle = '#ea580c'; ctx.beginPath(); ctx.moveTo(x+w/2, y); ctx.lineTo(x+w, y+h); ctx.lineTo(x, y+h); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(x+w*0.3, y+h*0.5, w*0.4, h*0.2); break;
+        case 'prop_concrete': ctx.fillStyle = '#a1a1aa'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = '#71717a'; ctx.lineWidth = 2; ctx.strokeRect(x+2, y+2, w-4, h-4); break;
+        case 'prop_hedgehog': ctx.strokeStyle = '#71717a'; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x+w, y+h); ctx.moveTo(x+w, y); ctx.lineTo(x, y+h); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x+w/2, y); ctx.lineTo(x+w/2, y+h); ctx.moveTo(x, y+h/2); ctx.lineTo(x+w, y+h/2); ctx.stroke(); break;
+        case 'prop_radar': ctx.fillStyle = '#334155'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, w/2, 0, Math.PI*2); ctx.fill(); ctx.translate(x+w/2, y+h/2); ctx.rotate(time * 2); ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(w/2, 0); ctx.stroke(); break;
+        case 'prop_tent': ctx.fillStyle = '#4d7c0f'; ctx.fillRect(x, y, w, h); ctx.fillStyle = '#1a2e05'; ctx.beginPath(); ctx.moveTo(x+w/2, y+h); ctx.lineTo(x+w/2 - 15, y+h - 20); ctx.lineTo(x+w/2 + 15, y+h - 20); ctx.fill(); break;
+        case 'prop_cont_red': case 'prop_cont_blue': ctx.fillStyle = o.type === 'prop_cont_red' ? '#dc2626' : '#2563eb'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 2; for(let l=x+10; l<x+w; l+=15) { ctx.beginPath(); ctx.moveTo(l, y); ctx.lineTo(l, y+h); ctx.stroke(); } break;
+        case 'prop_fence_wood': ctx.fillStyle = '#78350f'; ctx.fillRect(x, y+h/2-2, w, 4); for(let fx=x; fx<=x+w; fx+=20) { ctx.beginPath(); ctx.arc(fx, y+h/2, 4, 0, Math.PI*2); ctx.fill(); } break;
+        case 'prop_fence_metal': ctx.fillStyle = '#94a3b8'; ctx.fillRect(x, y+h/2-1, w, 2); ctx.setLineDash([5, 5]); ctx.strokeStyle='#94a3b8'; ctx.beginPath(); ctx.moveTo(x, y+h/2-5); ctx.lineTo(x+w, y+h/2-5); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x, y+h/2+5); ctx.lineTo(x+w, y+h/2+5); ctx.stroke(); break;
+        case 'prop_wreck': ctx.fillStyle = '#1c1917'; ctx.fillRect(x+5, y+10, w-10, h-20); ctx.fillStyle = '#09090b'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, 15, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle = '#09090b'; ctx.lineWidth=6; ctx.beginPath(); ctx.moveTo(x+w/2, y+h/2); ctx.lineTo(x+w, y+h); ctx.stroke(); break;
+        case 'prop_tires': ctx.fillStyle = '#171717'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, w/2, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#27272a'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, w/3, 0, Math.PI*2); ctx.fill(); break;
+        case 'prop_generator': ctx.fillStyle = '#eab308'; ctx.fillRect(x, y, w, h); ctx.fillStyle = '#171717'; ctx.fillRect(x+5, y+5, w-10, h/2); break;
+        case 'prop_spotlight': ctx.fillStyle = '#d4d4d8'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, 10, 0, Math.PI*2); ctx.fill(); ctx.translate(x+w/2, y+h/2); ctx.rotate(Math.sin(time)*0.5); ctx.fillStyle = 'rgba(253, 224, 71, 0.2)'; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(150, -40); ctx.lineTo(150, 40); ctx.fill(); break;
+        case 'prop_puddle': ctx.fillStyle = '#451a03'; ctx.beginPath(); ctx.ellipse(x+w/2, y+h/2, w/2, h/3, Math.PI/4, 0, Math.PI*2); ctx.fill(); break;
+        case 'prop_crater': ctx.fillStyle = '#27272a'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, w/2, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#09090b'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, w/3, 0, Math.PI*2); ctx.fill(); break;
+    }
+    ctx.restore();
+}
+
 function draw(now) {
     if(!currentRoomData) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.save();
     let shX = 0, shY = 0; if (shakeTime > 0) { shX = (Math.random() - 0.5) * 20; shY = (Math.random() - 0.5) * 20; shakeTime -= 0.03; } ctx.translate(canvas.width/2 - camera.x + shX, canvas.height/2 - camera.y + shY);
     
-    let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'city'; let mSize = MAP_DATA[cMap].size; ctx.fillStyle = MAP_DATA[cMap].bg; ctx.fillRect(0, 0, mSize, mSize); ctx.strokeStyle = MAP_DATA[cMap].grid; ctx.lineWidth = 1;
-    for(let i=0; i<=mSize; i+=100) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, mSize); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(mSize, i); ctx.stroke(); }
+    let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'площя'; let mSize = MAP_DATA[cMap].size; ctx.fillStyle = MAP_DATA[cMap].bg || '#020617'; ctx.fillRect(0, 0, mSize, mSize); ctx.strokeStyle = MAP_DATA[cMap].grid || '#1e293b'; ctx.lineWidth = 1;
+    for(let i=0; i<=mSize; i+=50) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, mSize); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(mSize, i); ctx.stroke(); }
     
+    let time = Date.now() / 1000;
+
+    // --- ПІДЛОГА (ВОДА, ЛІНІЇ, БАЗОВІ ФІГУРИ) ---
+    MAP_DATA[cMap].solids.forEach(o => {
+        if(o.type.includes('spawn')) return;
+        ctx.save();
+        if (o.type === 'line') { ctx.strokeStyle = o.color; ctx.lineWidth = o.width; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(o.points[0].x, o.points[0].y); for(let i=1; i<o.points.length; i++) ctx.lineTo(o.points[i].x, o.points[i].y); ctx.stroke(); } 
+        else if (o.type.includes('water')) {
+            ctx.fillStyle = '#0369a1'; ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 2;
+            if(o.type === 'water_curve') { ctx.beginPath(); ctx.roundRect(o.x, o.y, o.w, o.h, Math.min(o.w,o.h)/2); ctx.fill(); ctx.clip(); } 
+            else { ctx.fillRect(o.x, o.y, o.w, o.h); ctx.beginPath(); ctx.rect(o.x, o.y, o.w, o.h); ctx.clip(); }
+            ctx.setLineDash([20, 20]); ctx.lineDashOffset = -time * 20;
+            for(let wy=o.y+10; wy<o.y+o.h; wy+=30) { ctx.beginPath(); ctx.moveTo(o.x, wy); ctx.lineTo(o.x+o.w, wy); ctx.stroke(); }
+            ctx.setLineDash([]);
+        }
+        else if (o.type === 'shape_triangle') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
+        else if (o.type === 'shape_rhombus') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h/2); ctx.lineTo(o.x + o.w/2, o.y + o.h); ctx.lineTo(o.x, o.y + o.h/2); ctx.fill(); }
+        else if (o.type === 'shape_parallelepiped') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w*0.2, o.y); ctx.lineTo(o.x + o.w, o.y); ctx.lineTo(o.x + o.w*0.8, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
+        else if (o.type === 'wall_square') { ctx.fillStyle = o.color || '#1e293b'; ctx.fillRect(o.x, o.y, o.w, o.h); }
+        ctx.restore();
+    });
+
     for (let tid in tokens) { const tkn = tokens[tid]; ctx.save(); ctx.translate(tkn.x, tkn.y + Math.sin(now/200)*10); const colorHex = tkn.color==='white'?'#f8fafc':tkn.color==='black'?'#1e293b':tkn.color==='red'?'#ef4444':tkn.color==='blue'?'#3b82f6':tkn.color==='brown'?'#78350f':'#9333ea'; ctx.shadowColor = colorHex; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI*2); ctx.fillStyle = '#0f172a'; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = colorHex; ctx.stroke(); ctx.fillStyle = colorHex; ctx.font = '16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('★', 0, 1); ctx.restore(); }
     
+    // --- ТІНІ ДЛЯ ВИСОКИХ ОБ'ЄКТІВ ---
     ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 15; ctx.shadowOffsetX = 8; ctx.shadowOffsetY = 12;
-    MAP_DATA[cMap].solids.forEach(o => { ctx.fillStyle = o.color; if (o.type === 'wall') { ctx.fillRect(o.x, o.y, o.w, o.h); if (o.neon) { ctx.strokeStyle = o.neon; ctx.lineWidth = 2; ctx.strokeRect(o.x, o.y, o.w, o.h); ctx.fillStyle = o.neon; ctx.globalAlpha = 0.2; ctx.fillRect(o.x, o.y, o.w, o.h); ctx.globalAlpha = 1.0; } if (o.stripe) { ctx.fillStyle = o.stripe; ctx.fillRect(o.x, o.y + o.h/2 - 10, o.w, 20); } if (!o.neon && !o.stripe) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(o.x, o.y, o.w, 5); } } else if (o.type === 'tree') { ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.arc(o.x+5, o.y+5, o.r-10, 0, Math.PI*2); ctx.fill(); } });
-    
-    // Скидаємо зміщення тіней від будинків
+    MAP_DATA[cMap].solids.forEach(o => {
+        if(o.type.includes('spawn') || o.type.includes('water') || o.type.includes('shape') || o.type === 'line') return;
+        if (o.type === 'wall' || o.type === 'wall_square') { ctx.fillStyle = o.color || '#1e293b'; ctx.fillRect(o.x, o.y, o.w, o.h); }
+        else if (o.type === 'tree') { ctx.beginPath(); ctx.arc(o.x, o.y, o.r||30, 0, Math.PI*2); ctx.fill(); }
+        else if (o.type.includes('prop_')) { drawProp(ctx, o, time); }
+    });
     ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+
+    // --- ДЕТАЛІ ТА НЕОН ---
+    MAP_DATA[cMap].solids.forEach(o => {
+        if(o.type.includes('spawn') || o.type.includes('water') || o.type.includes('shape') || o.type === 'line' || o.type.includes('prop_')) return;
+        ctx.save();
+        if (o.type === 'wall' || o.type === 'wall_square') {
+            if (o.neon) { ctx.strokeStyle = o.neon; ctx.lineWidth = 2; ctx.strokeRect(o.x, o.y, o.w, o.h); ctx.fillStyle = o.neon; ctx.globalAlpha = 0.2; ctx.fillRect(o.x, o.y, o.w, o.h); ctx.globalAlpha = 1.0; }
+            if (o.stripe) { ctx.fillStyle = o.stripe; ctx.fillRect(o.x, o.y + o.h/2 - 10, o.w, 20); }
+            if (!o.neon && !o.stripe) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(o.x, o.y, o.w, 5); }
+        } else if (o.type === 'tree') { ctx.fillStyle = 'rgba(22, 163, 74, 0.4)'; ctx.beginPath(); ctx.arc(o.x+5, o.y+5, Math.max(5,(o.r||30)-10), 0, Math.PI*2); ctx.fill(); }
+        else if (o.type.includes('neon')) {
+            ctx.strokeStyle = o.color || '#3b82f6'; ctx.lineWidth = 4; ctx.shadowColor = o.color || '#3b82f6'; ctx.shadowBlur = 15 + Math.sin(time*5)*5;
+            if(o.type === 'neon_wall') ctx.strokeRect(o.x, o.y, o.w, o.h);
+            else if(o.type === 'neon_circle') { ctx.beginPath(); ctx.arc(o.x+o.w/2, o.y+o.h/2, Math.min(o.w,o.h)/2, 0, Math.PI*2); ctx.stroke(); }
+            else if(o.type === 'neon_cross') { ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(o.x+o.w, o.y+o.h); ctx.moveTo(o.x+o.w, o.y); ctx.lineTo(o.x, o.y+o.h); ctx.stroke(); }
+            else if(o.type === 'neon_triangle') { ctx.beginPath(); ctx.moveTo(o.x+o.w/2, o.y); ctx.lineTo(o.x+o.w, o.y+o.h); ctx.lineTo(o.x, o.y+o.h); ctx.closePath(); ctx.stroke(); }
+            else if(o.type === 'neon_diamond') { ctx.beginPath(); ctx.moveTo(o.x+o.w/2, o.y); ctx.lineTo(o.x+o.w, o.y+o.h/2); ctx.lineTo(o.x+o.w/2, o.y+o.h); ctx.lineTo(o.x, o.y+o.h/2); ctx.closePath(); ctx.stroke(); }
+            else if(o.type === 'neon_arch') { ctx.beginPath(); ctx.moveTo(o.x, o.y+o.h); ctx.lineTo(o.x, o.y+o.h/2); ctx.arc(o.x+o.w/2, o.y+o.h/2, o.w/2, Math.PI, 0); ctx.lineTo(o.x+o.w, o.y+o.h); ctx.stroke(); }
+            else if(o.type === 'neon_pillar') { ctx.beginPath(); ctx.ellipse(o.x+o.w/2, o.y+o.h/2, o.w/2, o.h/2, 0, 0, Math.PI*2); ctx.stroke(); }
+            ctx.fillStyle = o.color || '#3b82f6'; ctx.globalAlpha = 0.2; ctx.fillRect(o.x, o.y, o.w, o.h); ctx.globalAlpha = 1.0;
+        }
+        ctx.restore();
+    });
     
     for(let pid in powerups) { const pu = powerups[pid]; const boxColor = PU_COLORS[pu.type] || '#38bdf8'; ctx.save(); ctx.translate(pu.x, pu.y); ctx.rotate(now / 500); ctx.fillStyle = '#334155'; ctx.fillRect(-20, -20, 40, 40); ctx.strokeStyle = boxColor; ctx.lineWidth = 3; ctx.strokeRect(-20, -20, 40, 40); ctx.fillStyle = boxColor; ctx.shadowBlur = 10; ctx.shadowColor = boxColor; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '24px Russo One'; ctx.fillText(PU_ICONS[pu.type], 0, 2); ctx.restore(); }
     
