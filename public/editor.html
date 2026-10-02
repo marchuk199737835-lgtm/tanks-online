@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Map Editor - Tanks</title>
+    <title>Ultimate Map Editor - Tanks</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Jura:wght@400;700;900&family=Russo+One&display=swap" rel="stylesheet">
     <style>
@@ -11,120 +11,46 @@
         .font-russo { font-family: 'Russo One', sans-serif; }
         #canvas-wrapper { width: calc(100vw - 360px); height: 100vh; overflow: auto; background: #000; position: absolute; right: 0; top: 0; }
         canvas { display: block; cursor: crosshair; box-shadow: 0 0 100px rgba(0,0,0,0.8); margin: 40px auto; }
-        
         .tab-btn { transition: all 0.2s; border-bottom: 2px solid transparent; }
         .tab-btn.active { color: #3b82f6; border-color: #3b82f6; }
-        
         .tool-btn { transition: all 0.2s; border: 2px solid transparent; }
         .tool-btn.active { border-color: #3b82f6; background-color: rgba(59, 130, 246, 0.2); box-shadow: 0 0 15px rgba(59, 130, 246, 0.4); }
-        
-        ::-webkit-scrollbar { width: 12px; height: 12px; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #020617; }
-        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 6px; border: 2px solid #020617; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
     </style>
 </head>
 <body>
-
     <!-- БОКОВА ПАНЕЛЬ -->
     <div class="w-[360px] h-screen bg-slate-900 border-r border-slate-700 flex flex-col absolute left-0 top-0 z-10 shadow-2xl">
         <div class="p-6 pb-0">
-            <h1 class="text-3xl font-russo text-blue-400 mb-6 tracking-widest text-center drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]">MAP EDITOR V2</h1>
-            
-            <!-- Вкладки Шарыв -->
-            <div class="flex border-b border-slate-700 mb-6">
-                <button class="tab-btn active flex-1 pb-3 text-sm font-bold uppercase tracking-widest text-slate-400 hover:text-white" data-target="tab-settings">Підлога</button>
-                <button class="tab-btn flex-1 pb-3 text-sm font-bold uppercase tracking-widest text-slate-400 hover:text-white" data-target="tab-build">Об'єкти</button>
+            <h1 class="text-3xl font-russo text-blue-400 mb-4 tracking-widest text-center">ULTIMATE EDITOR</h1>
+            <div class="flex border-b border-slate-700 mb-4 overflow-x-auto" id="tabs-container">
+                <!-- Вкладки генеруються JS -->
             </div>
         </div>
 
-        <div class="flex-1 overflow-y-auto px-6 pb-6">
-            <!-- ШАР 1: НАЛАШТУВАННЯ ТА ПІДЛОГА -->
-            <div id="tab-settings" class="tab-content block space-y-6">
-                <div>
-                    <label class="text-xs font-bold uppercase text-slate-400 block mb-2">Назва мапи (ID)</label>
-                    <input type="text" id="map-name" value="custom_arena" class="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600 focus:border-blue-500 outline-none font-mono text-sm">
-                </div>
-                <div>
-                    <label class="text-xs font-bold uppercase text-slate-400 block mb-2">Розмір Мапи (px)</label>
-                    <div class="flex gap-2">
-                        <input type="number" id="map-size" value="3000" min="1000" max="10000" step="500" class="w-full p-3 rounded-xl bg-slate-800 text-white border border-slate-600 outline-none font-bold">
-                        <button id="apply-size-btn" class="bg-blue-600 hover:bg-blue-500 px-4 rounded-xl font-bold uppercase text-xs transition">Застосувати</button>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
-                        <label class="text-[10px] font-bold uppercase text-slate-400 block mb-2">Колір Підлоги</label>
-                        <input type="color" id="bg-color" value="#020617" class="w-full h-10 rounded cursor-pointer bg-transparent border-0">
-                    </div>
-                    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
-                        <label class="text-[10px] font-bold uppercase text-slate-400 block mb-2">Колір Сітки</label>
-                        <input type="color" id="grid-color" value="#1e293b" class="w-full h-10 rounded cursor-pointer bg-transparent border-0">
-                    </div>
-                </div>
-                <div class="bg-blue-900/20 p-4 rounded-xl border border-blue-500/30">
-                    <p class="text-xs text-blue-300 leading-relaxed"><b>Підказка:</b> Сітка допомагає вирівнювати об'єкти. Кожна клітинка має розмір 50x50 пікселів.</p>
-                </div>
-            </div>
-
-            <!-- ШАР 2: ОБ'ЄКТИ (БАРИКАДИ) -->
-            <div id="tab-build" class="tab-content hidden space-y-4">
-                <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 border-b border-slate-700 pb-2">Інструменти (Тягни мишкою)</p>
-                
-                <button class="tool-btn active w-full p-3 rounded-xl bg-slate-800 flex items-center gap-4" data-type="wall_neon">
-                    <div class="w-8 h-8 bg-[#09090b] border-2 border-[#8b5cf6] rounded shadow-[0_0_10px_#8b5cf6]"></div> 
-                    <div class="text-left"><span class="font-bold text-sm block text-white">Неонова Стіна</span><span class="text-[10px] text-slate-400 uppercase">Міський стиль</span></div>
-                </button>
-                
-                <button class="tool-btn w-full p-3 rounded-xl bg-slate-800 flex items-center gap-4" data-type="wall_hangar">
-                    <div class="w-8 h-8 bg-[#0f172a] border border-slate-600 rounded flex flex-col justify-center"><div class="w-full h-2 bg-yellow-500"></div></div> 
-                    <div class="text-left"><span class="font-bold text-sm block text-white">Ангар</span><span class="text-[10px] text-slate-400 uppercase">Стіна зі смугою</span></div>
-                </button>
-
-                <button class="tool-btn w-full p-3 rounded-xl bg-slate-800 flex items-center gap-4" data-type="wall_container">
-                    <div class="w-8 h-8 bg-[#dc2626] rounded shadow-inner"></div> 
-                    <div class="text-left"><span class="font-bold text-sm block text-white">Контейнер</span><span class="text-[10px] text-slate-400 uppercase">Суцільний колір</span></div>
-                </button>
-
-                <button class="tool-btn w-full p-3 rounded-xl bg-slate-800 flex items-center gap-4" data-type="tree">
-                    <div class="w-8 h-8 bg-green-900 border-2 border-green-500 rounded-full flex items-center justify-center"><div class="w-4 h-4 bg-[#0c0a09] rounded-full"></div></div> 
-                    <div class="text-left"><span class="font-bold text-sm block text-white">Дерево / Кущ</span><span class="text-[10px] text-slate-400 uppercase">Кругла перешкода</span></div>
-                </button>
-
-                <div class="mt-8 pt-4 border-t border-slate-700">
-                    <button class="tool-btn w-full p-4 rounded-xl bg-slate-800 flex items-center gap-4 border-red-500/50 hover:bg-red-500/20 text-red-400" data-type="eraser">
-                        <div class="text-2xl drop-shadow-md">🗑️</div> 
-                        <div class="text-left"><span class="font-bold text-sm block">Гумка</span><span class="text-[10px] uppercase">Клікни щоб видалити</span></div>
-                    </button>
-                </div>
-            </div>
+        <div class="flex-1 overflow-y-auto px-6 pb-6" id="tools-container">
+            <!-- Вміст вкладок генерується JS -->
         </div>
 
-        <div class="p-6 border-t border-slate-700 bg-slate-900">
-            <button id="clear-btn" class="w-full py-3 rounded-xl font-bold uppercase tracking-widest text-slate-400 border border-slate-700 hover:bg-slate-800 hover:text-red-400 mb-4 transition">Очистити об'єкти</button>
-            <button id="export-btn" class="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-xl text-xl font-russo uppercase tracking-widest shadow-[0_0_20px_rgba(37,99,235,0.4)] transition text-white">ЕКСПОРТ КОДУ</button>
+        <div class="p-4 border-t border-slate-700 bg-slate-900">
+            <button id="clear-btn" class="w-full py-2 rounded-xl font-bold uppercase tracking-widest text-slate-400 border border-slate-700 hover:bg-slate-800 hover:text-red-400 mb-2 transition text-xs">Очистити все</button>
+            <button id="export-btn" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl text-lg font-russo uppercase tracking-widest shadow-[0_0_20px_rgba(37,99,235,0.4)] transition text-white">ЕКСПОРТ КОДУ</button>
         </div>
     </div>
 
-    <!-- Робоча зона мапи -->
-    <div id="canvas-wrapper">
-        <canvas id="map-canvas"></canvas>
-    </div>
+    <div id="canvas-wrapper"><canvas id="map-canvas"></canvas></div>
 
-    <!-- Вікно експорту -->
     <div id="export-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-8">
-        <div class="bg-slate-900 p-8 rounded-3xl w-full max-w-4xl border border-blue-500/50 shadow-[0_0_50px_rgba(37,99,235,0.3)] flex flex-col h-[85vh]">
+        <div class="bg-slate-900 p-8 rounded-3xl w-full max-w-4xl border border-blue-500/50 flex flex-col h-[85vh]">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-3xl font-russo text-blue-400 tracking-widest">ГОТОВИЙ КОД</h2>
+                <h2 class="text-3xl font-russo text-blue-400 tracking-widest">КОД МАПИ</h2>
                 <button onclick="document.getElementById('export-modal').classList.add('hidden')" class="text-slate-400 hover:text-white font-bold text-2xl">✖</button>
             </div>
-            <div class="bg-slate-800 border border-slate-600 p-4 rounded-xl mb-4 text-sm font-bold text-slate-300">
-                <p>1. Скопіюй код нижче.</p>
-                <p>2. Встав його у файли <span class="text-emerald-400">public/js/config.js</span> та <span class="text-emerald-400">server.js</span> (додай в об'єкт MAP_DATA).</p>
-                <p>3. В <span class="text-emerald-400">public/js/ui.js</span> додай кнопку з цим ID (<code>data-map="<span id="export-map-name"></span>"</code>) у меню створення кімнати.</p>
-            </div>
-            <textarea id="export-textarea" class="w-full flex-1 bg-[#020617] text-emerald-400 p-5 rounded-xl font-mono text-sm border border-slate-700 focus:outline-none focus:border-blue-500 mb-6 resize-none shadow-inner" readonly></textarea>
-            <button onclick="copyCode()" class="w-full bg-emerald-600 hover:bg-emerald-500 py-5 rounded-xl text-2xl font-russo uppercase tracking-widest transition shadow-[0_0_20px_rgba(16,185,129,0.4)] text-white">СКОПІЮВАТИ ДО БУФЕРУ</button>
+            <textarea id="export-textarea" class="w-full flex-1 bg-[#020617] text-emerald-400 p-5 rounded-xl font-mono text-sm border border-slate-700 focus:outline-none focus:border-blue-500 mb-6 resize-none" readonly></textarea>
+            <button onclick="copyCode()" class="w-full bg-emerald-600 py-5 rounded-xl text-2xl font-russo text-white">СКОПІЮВАТИ ДО БУФЕРУ</button>
         </div>
     </div>
 
@@ -133,205 +59,270 @@
         const ctx = canvas.getContext('2d');
         const GRID_SIZE = 50; 
         
-        let mapSettings = { size: 3000, bg: '#020617', grid: '#1e293b' };
+        let mapSettings = { name: 'epic_map', size: 3000, bg: '#020617', grid: '#1e293b' };
         let objects = [];
-        
-        let currentTool = 'wall_neon';
+        let currentTool = 'wall_square';
         let isDrawing = false;
         let startX = 0, startY = 0;
-        let currentDrawParams = null;
+        let currentLine = null;
+        let drawColor = '#3b82f6', drawWidth = 10;
 
-        // Кольори для випадкової генерації
-        const neonColors = ['#0ea5e9', '#ec4899', '#8b5cf6', '#10b981', '#f59e0b'];
-        const hangarColors = ['#0f172a', '#020617', '#1e293b'];
-        const containerColors = ['#0284c7', '#dc2626', '#16a34a', '#ca8a04', '#7e22ce'];
+        // --- ДАНІ ДЛЯ ІНТЕРФЕЙСУ ---
+        const TABS = [
+            { id: 'settings', name: 'Налашт.' }, { id: 'shapes', name: 'Фігури' }, 
+            { id: 'props', name: 'Декор(20)' }, { id: 'neon', name: 'Неон(6)' }, 
+            { id: 'water', name: 'Вода' }, { id: 'spawns', name: 'Спавни' }
+        ];
 
-        // --- ІНІЦІАЛІЗАЦІЯ ---
-        function resizeCanvas() {
-            canvas.width = mapSettings.size;
-            canvas.height = mapSettings.size;
-            draw();
-        }
-        resizeCanvas();
+        const TOOLS = {
+            'settings': [
+                { type: 'html', html: `<label class="text-xs text-slate-400 mb-1 block">Назва</label><input type="text" id="set-name" value="${mapSettings.name}" class="w-full p-2 bg-slate-800 rounded mb-3 text-white border border-slate-700">` },
+                { type: 'html', html: `<label class="text-xs text-slate-400 mb-1 block">Розмір</label><input type="number" id="set-size" value="${mapSettings.size}" step="500" class="w-full p-2 bg-slate-800 rounded mb-3 text-white border border-slate-700">` },
+                { type: 'html', html: `<label class="text-xs text-slate-400 mb-1 block">Підлога</label><input type="color" id="set-bg" value="${mapSettings.bg}" class="w-full h-8 mb-3 bg-transparent cursor-pointer">` },
+                { type: 'html', html: `<label class="text-xs text-slate-400 mb-1 block">Сітка</label><input type="color" id="set-grid" value="${mapSettings.grid}" class="w-full h-8 bg-transparent cursor-pointer">` }
+            ],
+            'shapes': [
+                { type: 'html', html: `<div class="mb-4 p-3 bg-slate-800 rounded-xl"><label class="text-[10px] text-slate-400 block mb-1">Колір об'єктів/ліній</label><input type="color" id="shape-color" value="#3b82f6" class="w-full h-8 mb-2"><label class="text-[10px] text-slate-400 block mb-1">Товщина лінії</label><input type="range" id="line-width" min="2" max="40" value="10" class="w-full"></div>` },
+                { id: 'shape_line', name: 'Крива Лінія (Пензель)', desc: 'Малюй вільно' },
+                { id: 'wall_square', name: 'Квадрат/Прямокутник', desc: 'Суцільна стіна' },
+                { id: 'shape_triangle', name: 'Трикутник', desc: 'Діагональні кути' },
+                { id: 'shape_rhombus', name: 'Ромб', desc: 'Алмазна форма' },
+                { id: 'shape_parallelepiped', name: 'Паралелепіпед', desc: 'Зміщений квадрат' },
+                { id: 'eraser', name: 'Гумка', desc: 'Видалення' }
+            ],
+            'water': [
+                { id: 'water_square', name: 'Куб Води', desc: 'Прямокутна річка' },
+                { id: 'water_curve', name: 'Заокруглена Вода', desc: 'Для поворотів ріки' },
+                { id: 'eraser', name: 'Гумка', desc: 'Видалення' }
+            ],
+            'neon': [
+                { id: 'neon_wall', name: 'Неонова Стіна', desc: 'Прямокутник з підсвіткою' },
+                { id: 'neon_circle', name: 'Неонове Кільце', desc: 'Світиться по колу' },
+                { id: 'neon_triangle', name: 'Неоновий Трикутник', desc: 'Сяюча піраміда' },
+                { id: 'neon_cross', name: 'Неоновий Хрест', desc: 'X-подібна перешкода' },
+                { id: 'neon_arch', name: 'Неонова Арка', desc: 'Ворота' },
+                { id: 'neon_pillar', name: 'Неонова Колона', desc: 'Кругла колона' },
+                { id: 'neon_diamond', name: 'Неоновий Ромб', desc: 'Сяючий кристал' },
+                { id: 'eraser', name: 'Гумка', desc: 'Видалення' }
+            ],
+            'props': [
+                { id: 'prop_crate', name: 'Ящик' }, { id: 'prop_barrel', name: 'Бочка' }, { id: 'prop_sandbag', name: 'Мішки з піском' },
+                { id: 'prop_rock', name: 'Камінь' }, { id: 'prop_bush', name: 'Кущ' }, { id: 'tree', name: 'Дерево' },
+                { id: 'prop_cone', name: 'Конус' }, { id: 'prop_concrete', name: 'Бетонний блок' }, { id: 'prop_hedgehog', name: 'Протитанк. Їжак' },
+                { id: 'prop_radar', name: 'Радар' }, { id: 'prop_tent', name: 'Намет' }, { id: 'prop_cont_red', name: 'Контейнер Ч' },
+                { id: 'prop_cont_blue', name: 'Контейнер С' }, { id: 'prop_fence_wood', name: 'Дерев. паркан' }, { id: 'prop_fence_metal', name: 'Метал. паркан' },
+                { id: 'prop_wreck', name: 'Знищений танк' }, { id: 'prop_tires', name: 'Шини' }, { id: 'prop_generator', name: 'Генератор' },
+                { id: 'prop_spotlight', name: 'Прожектор' }, { id: 'prop_puddle', name: 'Калюжа бруду' }, { id: 'prop_crater', name: 'Воронка' },
+                { id: 'eraser', name: 'Гумка', desc: 'Видалення' }
+            ],
+            'spawns': [
+                { id: 'spawn_player', name: 'Спавн: Гравець', desc: 'Синя точка' },
+                { id: 'spawn_zombie', name: 'Спавн: Зомбі', desc: 'Зелена точка' },
+                { id: 'spawn_powerup', name: 'Спавн: Ефекти', desc: 'Жовта точка' },
+                { id: 'eraser', name: 'Гумка', desc: 'Видалення' }
+            ]
+        };
 
-        // --- UI ЛОГІКА ---
+        // --- ГЕНЕРАЦІЯ UI ---
+        const tabsContainer = document.getElementById('tabs-container');
+        const toolsContainer = document.getElementById('tools-container');
+
+        TABS.forEach((tab, index) => {
+            tabsContainer.innerHTML += `<button class="tab-btn flex-1 pb-2 px-2 text-[10px] font-bold uppercase whitespace-nowrap ${index===0?'active':''} text-slate-400" data-target="tab-${tab.id}">${tab.name}</button>`;
+            
+            let html = `<div id="tab-${tab.id}" class="tab-content ${index===0?'block':'hidden'} space-y-2">`;
+            TOOLS[tab.id].forEach(tool => {
+                if (tool.type === 'html') html += tool.html;
+                else {
+                    let colorCls = tool.id === 'eraser' ? 'border-red-500/50 hover:bg-red-500/20 text-red-400' : 'bg-slate-800 text-white';
+                    html += `<button class="tool-btn w-full p-2 rounded-lg flex flex-col text-left ${colorCls} ${tool.id==='wall_square'?'active':''}" data-type="${tool.id}">
+                        <span class="font-bold text-xs">${tool.name}</span>
+                        ${tool.desc ? `<span class="text-[9px] text-slate-400 uppercase">${tool.desc}</span>` : ''}
+                    </button>`;
+                }
+            });
+            html += `</div>`;
+            toolsContainer.innerHTML += html;
+        });
+
+        // Навігація вкладок
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.onclick = () => {
                 document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-                btn.classList.add('active');
-                document.getElementById(btn.dataset.target).classList.remove('hidden');
+                btn.classList.add('active'); document.getElementById(btn.dataset.target).classList.remove('hidden');
             }
         });
 
         document.querySelectorAll('.tool-btn').forEach(btn => {
             btn.onclick = () => {
                 document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentTool = btn.dataset.type;
+                btn.classList.add('active'); currentTool = btn.dataset.type;
             }
         });
 
-        document.getElementById('apply-size-btn').onclick = () => { mapSettings.size = parseInt(document.getElementById('map-size').value); resizeCanvas(); };
-        document.getElementById('bg-color').oninput = (e) => { mapSettings.bg = e.target.value; draw(); };
-        document.getElementById('grid-color').oninput = (e) => { mapSettings.grid = e.target.value; draw(); };
-        document.getElementById('clear-btn').onclick = () => { if(confirm("Знести всі барикади?")) { objects = []; draw(); } };
+        // Слухачі налаштувань
+        document.getElementById('set-name').oninput = e => mapSettings.name = e.target.value;
+        document.getElementById('set-size').onchange = e => { mapSettings.size = parseInt(e.target.value); canvas.width = mapSettings.size; canvas.height = mapSettings.size; };
+        document.getElementById('set-bg').oninput = e => mapSettings.bg = e.target.value;
+        document.getElementById('set-grid').oninput = e => mapSettings.grid = e.target.value;
+        
+        const shapeColorEl = document.getElementById('shape-color'); if(shapeColorEl) shapeColorEl.oninput = e => drawColor = e.target.value;
+        const lineWidthEl = document.getElementById('line-width'); if(lineWidthEl) lineWidthEl.oninput = e => drawWidth = parseInt(e.target.value);
+        
+        document.getElementById('clear-btn').onclick = () => { if(confirm("Видалити все?")) objects = []; };
 
-        // --- ФІЗИКА МАЛЮВАННЯ ТА DRAG & DROP ---
+        // --- ЛОГІКА МАЛЮВАННЯ ТА ВЗАЄМОДІЇ ---
         function snap(val) { return Math.round(val / GRID_SIZE) * GRID_SIZE; }
 
-        canvas.addEventListener('mousedown', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            let rawX = e.clientX - rect.left; let rawY = e.clientY - rect.top;
+        canvas.width = mapSettings.size; canvas.height = mapSettings.size;
+
+        canvas.addEventListener('mousedown', e => {
+            const rect = canvas.getBoundingClientRect(); let rawX = e.clientX - rect.left; let rawY = e.clientY - rect.top;
             
             if (currentTool === 'eraser') {
+                // Спрощене видалення по bounding box
                 for (let i = objects.length - 1; i >= 0; i--) {
                     let o = objects[i];
-                    if (o.type === 'wall' && rawX >= o.x && rawX <= o.x + o.w && rawY >= o.y && rawY <= o.y + o.h) { objects.splice(i, 1); break; } 
-                    else if (o.type === 'tree' && Math.hypot(rawX - o.x, rawY - o.y) <= o.r) { objects.splice(i, 1); break; }
+                    let minX=o.x, maxX=o.x+(o.w||o.r*2||30), minY=o.y, maxY=o.y+(o.h||o.r*2||30);
+                    if(o.type === 'line') { minX = Math.min(...o.points.map(p=>p.x))-20; maxX = Math.max(...o.points.map(p=>p.x))+20; minY = Math.min(...o.points.map(p=>p.y))-20; maxY = Math.max(...o.points.map(p=>p.y))+20; }
+                    else if(o.type === 'tree' || o.type.includes('spawn')) { minX = o.x-20; maxX = o.x+20; minY = o.y-20; maxY = o.y+20; }
+                    
+                    if (rawX >= minX && rawX <= maxX && rawY >= minY && rawY <= maxY) { objects.splice(i, 1); break; }
                 }
-                draw(); return;
+                return;
             }
 
-            isDrawing = true;
-            startX = snap(rawX); startY = snap(rawY);
+            if (currentTool.includes('spawn')) {
+                objects.push({ type: currentTool, x: snap(rawX), y: snap(rawY) }); return;
+            }
+
+            isDrawing = true; startX = snap(rawX); startY = snap(rawY);
             
-            // Генеруємо випадкові кольори для нового об'єкта під час старту кліку
-            currentDrawParams = {
-                neon: neonColors[Math.floor(Math.random() * neonColors.length)],
-                hangarCol: hangarColors[Math.floor(Math.random() * hangarColors.length)],
-                stripeCol: Math.random() > 0.5 ? '#eab308' : '#ef4444',
-                contCol: containerColors[Math.floor(Math.random() * containerColors.length)]
-            };
+            if (currentTool === 'shape_line') {
+                currentLine = { type: 'line', points: [{x: rawX, y: rawY}], color: drawColor, width: drawWidth };
+                objects.push(currentLine);
+            }
         });
 
-        canvas.addEventListener('mousemove', (e) => {
+        canvas.addEventListener('mousemove', e => {
             if (!isDrawing) return;
-            const rect = canvas.getBoundingClientRect();
-            let currentX = snap(e.clientX - rect.left); let currentY = snap(e.clientY - rect.top);
+            const rect = canvas.getBoundingClientRect(); let rawX = e.clientX - rect.left; let rawY = e.clientY - rect.top;
             
-            draw(); // Очищаємо і малюємо існуючі
-            
-            // Малюємо ПРЕВ'Ю того, що тягнемо
-            let x = Math.min(startX, currentX); let y = Math.min(startY, currentY);
-            let w = Math.abs(currentX - startX); let h = Math.abs(currentY - startY);
-            
-            if (currentTool.includes('wall')) {
-                if(w === 0) w = GRID_SIZE; if(h === 0) h = GRID_SIZE;
-                drawWall(x, y, w, h, currentTool, currentDrawParams);
-            } else if (currentTool === 'tree') {
-                let r = Math.max(GRID_SIZE/2, Math.hypot(currentX - startX, currentY - startY));
-                drawTree(startX, startY, r); // Дерево тягнеться від центру
+            if (currentTool === 'shape_line' && currentLine) {
+                currentLine.points.push({x: rawX, y: rawY});
+            } else {
+                // Для прев'ю перемальовуємо все в рендер-лупі, просто зберігаємо координати миші
+                window.mouseX = snap(rawX); window.mouseY = snap(rawY);
             }
         });
 
-        canvas.addEventListener('mouseup', (e) => {
-            if (!isDrawing) return;
-            isDrawing = false;
+        canvas.addEventListener('mouseup', e => {
+            if (!isDrawing) return; isDrawing = false;
+            if (currentTool === 'shape_line') { currentLine = null; return; }
             
-            const rect = canvas.getBoundingClientRect();
-            let currentX = snap(e.clientX - rect.left); let currentY = snap(e.clientY - rect.top);
+            const rect = canvas.getBoundingClientRect(); let endX = snap(e.clientX - rect.left); let endY = snap(e.clientY - rect.top);
+            let x = Math.min(startX, endX); let y = Math.min(startY, endY);
+            let w = Math.abs(endX - startX); let h = Math.abs(endY - startY);
             
-            let x = Math.min(startX, currentX); let y = Math.min(startY, currentY);
-            let w = Math.abs(currentX - startX); let h = Math.abs(currentY - startY);
-            
-            if (currentTool.includes('wall')) {
-                if(w === 0) w = GRID_SIZE; if(h === 0) h = GRID_SIZE;
-                
-                let obj = { type: 'wall', x, y, w, h };
-                if (currentTool === 'wall_neon') { obj.color = '#09090b'; obj.neon = currentDrawParams.neon; }
-                else if (currentTool === 'wall_hangar') { obj.color = currentDrawParams.hangarCol; obj.stripe = currentDrawParams.stripeCol; }
-                else if (currentTool === 'wall_container') { obj.color = currentDrawParams.contCol; }
-                
-                objects.push(obj);
-            } else if (currentTool === 'tree') {
-                let r = Math.max(GRID_SIZE/2, Math.hypot(currentX - startX, currentY - startY));
-                objects.push({ type: 'tree', x: startX, y: startY, r: r, color: '#0c0a09' });
-            }
-            draw();
+            if(w===0) w=GRID_SIZE; if(h===0) h=GRID_SIZE;
+
+            if (currentTool === 'tree') { objects.push({ type: 'tree', x: startX, y: startY, r: Math.max(20, Math.hypot(endX-startX, endY-startY)) }); }
+            else if (currentTool.includes('water')) { objects.push({ type: currentTool, x, y, w, h }); }
+            else if (currentTool.includes('neon')) { objects.push({ type: currentTool, x, y, w, h, color: drawColor }); }
+            else if (currentTool.includes('prop_')) { objects.push({ type: currentTool, x, y, w, h }); }
+            else { objects.push({ type: currentTool, x, y, w, h, color: drawColor }); } // shape_
         });
 
-        // --- ФУНКЦІЇ МАЛЮВАННЯ ---
-        function drawWall(x, y, w, h, toolType, params) {
-            if (toolType === 'wall_neon' || toolType.neon) {
-                let neonC = toolType.neon ? toolType.neon : params.neon;
-                ctx.fillStyle = '#09090b'; ctx.fillRect(x, y, w, h);
-                ctx.strokeStyle = neonC; ctx.lineWidth = 4; ctx.strokeRect(x, y, w, h);
-                ctx.fillStyle = neonC; ctx.globalAlpha = 0.2; ctx.fillRect(x, y, w, h); ctx.globalAlpha = 1.0;
-            } else if (toolType === 'wall_hangar' || toolType.stripe) {
-                let bgC = toolType.color ? toolType.color : params.hangarCol;
-                let strC = toolType.stripe ? toolType.stripe : params.stripeCol;
-                ctx.fillStyle = bgC; ctx.fillRect(x, y, w, h);
-                ctx.fillStyle = strC; ctx.fillRect(x, y + h/2 - 10, w, 20); // Смуга по центру
-            } else { // Контейнер
-                let bgC = toolType.color ? toolType.color : params.contCol;
-                ctx.fillStyle = bgC; ctx.fillRect(x, y, w, h);
-                ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(x, y, w, 5); // Блік зверху
-            }
-        }
-
-        function drawTree(x, y, r) {
-            ctx.fillStyle = '#0c0a09'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = 'rgba(22, 163, 74, 0.4)'; ctx.beginPath(); ctx.arc(x+5, y+5, Math.max(5, r-10), 0, Math.PI*2); ctx.fill();
-        }
-
-        function draw() {
+        // --- РЕНДЕР ЛУП ---
+        function renderLoop() {
             ctx.clearRect(0, 0, mapSettings.size, mapSettings.size);
             ctx.fillStyle = mapSettings.bg; ctx.fillRect(0, 0, mapSettings.size, mapSettings.size);
-            
             ctx.strokeStyle = mapSettings.grid; ctx.lineWidth = 1;
-            for(let i=0; i<=mapSettings.size; i+=50) {
-                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, mapSettings.size); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(mapSettings.size, i); ctx.stroke();
-            }
+            for(let i=0; i<=mapSettings.size; i+=50) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, mapSettings.size); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(mapSettings.size, i); ctx.stroke(); }
 
-            // Малюємо тіні
-            ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 15; ctx.shadowOffsetX = 8; ctx.shadowOffsetY = 12;
-            objects.forEach(obj => {
-                if (obj.type === 'wall') { ctx.fillStyle = obj.color; ctx.fillRect(obj.x, obj.y, obj.w, obj.h); }
-                else if (obj.type === 'tree') { ctx.beginPath(); ctx.arc(obj.x, obj.y, obj.r, 0, Math.PI*2); ctx.fill(); }
-            });
-            ctx.shadowColor = 'transparent'; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+            let time = Date.now() / 200; // Для анімації води і неону
 
-            // Малюємо деталі об'єктів
-            objects.forEach(obj => {
-                if (obj.type === 'wall') drawWall(obj.x, obj.y, obj.w, obj.h, obj, null);
-                else if (obj.type === 'tree') drawTree(obj.x, obj.y, obj.r);
+            // Малюємо всі об'єкти
+            [...objects, ...(isDrawing && currentTool !== 'shape_line' ? [{type: currentTool, x: Math.min(startX, window.mouseX||startX), y: Math.min(startY, window.mouseY||startY), w: Math.max(GRID_SIZE, Math.abs((window.mouseX||startX)-startX)), h: Math.max(GRID_SIZE, Math.abs((window.mouseY||startY)-startY)), r: Math.hypot((window.mouseX||startX)-startX, (window.mouseY||startY)-startY), color: drawColor, preview: true}] : [])].forEach(o => {
+                
+                ctx.save();
+                if(o.preview) ctx.globalAlpha = 0.5;
+
+                if (o.type === 'line') {
+                    ctx.strokeStyle = o.color; ctx.lineWidth = o.width; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                    ctx.beginPath(); ctx.moveTo(o.points[0].x, o.points[0].y);
+                    for(let i=1; i<o.points.length; i++) ctx.lineTo(o.points[i].x, o.points[i].y);
+                    ctx.stroke();
+                } 
+                else if (o.type.includes('water')) {
+                    ctx.fillStyle = '#0369a1'; ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 2;
+                    if(o.type === 'water_curve') { ctx.beginPath(); ctx.roundRect(o.x, o.y, o.w, o.h, 50); ctx.fill(); ctx.clip(); } 
+                    else { ctx.fillRect(o.x, o.y, o.w, o.h); ctx.beginPath(); ctx.rect(o.x, o.y, o.w, o.h); ctx.clip(); }
+                    
+                    // Анімація хвиль
+                    ctx.setLineDash([20, 20]); ctx.lineDashOffset = -time * 5;
+                    for(let wy=o.y+10; wy<o.y+o.h; wy+=30) { ctx.beginPath(); ctx.moveTo(o.x, wy); ctx.lineTo(o.x+o.w, wy); ctx.stroke(); }
+                    ctx.setLineDash([]);
+                }
+                else if (o.type === 'shape_triangle') {
+                    ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill();
+                }
+                else if (o.type === 'shape_rhombus') {
+                    ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h/2); ctx.lineTo(o.x + o.w/2, o.y + o.h); ctx.lineTo(o.x, o.y + o.h/2); ctx.fill();
+                }
+                else if (o.type === 'shape_parallelepiped') {
+                    ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w*0.2, o.y); ctx.lineTo(o.x + o.w, o.y); ctx.lineTo(o.x + o.w*0.8, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill();
+                }
+                else if (o.type === 'wall_square') {
+                    ctx.fillStyle = o.color || '#1e293b'; ctx.fillRect(o.x, o.y, o.w, o.h);
+                }
+                else if (o.type.includes('neon')) {
+                    ctx.strokeStyle = o.color || '#3b82f6'; ctx.lineWidth = 4; ctx.shadowColor = o.color || '#3b82f6'; ctx.shadowBlur = 15 + Math.sin(time)*5;
+                    if(o.type === 'neon_wall') ctx.strokeRect(o.x, o.y, o.w, o.h);
+                    else if(o.type === 'neon_circle') { ctx.beginPath(); ctx.arc(o.x+o.w/2, o.y+o.h/2, o.w/2, 0, Math.PI*2); ctx.stroke(); }
+                    else if(o.type === 'neon_cross') { ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(o.x+o.w, o.y+o.h); ctx.moveTo(o.x+o.w, o.y); ctx.lineTo(o.x, o.y+o.h); ctx.stroke(); }
+                    else if(o.type === 'neon_triangle') { ctx.beginPath(); ctx.moveTo(o.x+o.w/2, o.y); ctx.lineTo(o.x+o.w, o.y+o.h); ctx.lineTo(o.x, o.y+o.h); ctx.closePath(); ctx.stroke(); }
+                    else if(o.type === 'neon_diamond') { ctx.beginPath(); ctx.moveTo(o.x+o.w/2, o.y); ctx.lineTo(o.x+o.w, o.y+o.h/2); ctx.lineTo(o.x+o.w/2, o.y+o.h); ctx.lineTo(o.x, o.y+o.h/2); ctx.closePath(); ctx.stroke(); }
+                    else if(o.type === 'neon_arch') { ctx.beginPath(); ctx.moveTo(o.x, o.y+o.h); ctx.lineTo(o.x, o.y+o.h/2); ctx.arc(o.x+o.w/2, o.y+o.h/2, o.w/2, Math.PI, 0); ctx.lineTo(o.x+o.w, o.y+o.h); ctx.stroke(); }
+                    else if(o.type === 'neon_pillar') { ctx.beginPath(); ctx.ellipse(o.x+o.w/2, o.y+o.h/2, o.w/2, o.h/2, 0, 0, Math.PI*2); ctx.stroke(); }
+                    ctx.fillStyle = o.color || '#3b82f6'; ctx.globalAlpha = 0.2; ctx.fillRect(o.x, o.y, o.w, o.h); ctx.globalAlpha = 1.0;
+                }
+                else if (o.type === 'tree') {
+                    ctx.fillStyle = '#0c0a09'; ctx.beginPath(); ctx.arc(o.x, o.y, o.r||30, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = 'rgba(22, 163, 74, 0.4)'; ctx.beginPath(); ctx.arc(o.x+5, o.y+5, Math.max(5, (o.r||30)-10), 0, Math.PI*2); ctx.fill();
+                }
+                else if (o.type.includes('spawn')) {
+                    ctx.beginPath(); ctx.arc(o.x, o.y, 20, 0, Math.PI*2); 
+                    ctx.fillStyle = o.type==='spawn_player'?'#3b82f6':o.type==='spawn_zombie'?'#22c55e':'#eab308'; ctx.fill();
+                    ctx.fillStyle = '#fff'; ctx.font = '16px Russo One'; ctx.textAlign='center'; ctx.textBaseline='middle';
+                    ctx.fillText(o.type==='spawn_player'?'P':o.type==='spawn_zombie'?'Z':'*', o.x, o.y);
+                }
+                else if (o.type.includes('prop_')) {
+                    // Базовий рендер декорацій у редакторі
+                    ctx.fillStyle = '#475569'; ctx.fillRect(o.x, o.y, o.w, o.h);
+                    ctx.fillStyle = '#fff'; ctx.font = '12px Jura'; ctx.textAlign='center'; ctx.fillText(o.type.replace('prop_',''), o.x+o.w/2, o.y+o.h/2);
+                }
+                
+                ctx.restore();
             });
+
+            requestAnimationFrame(renderLoop);
         }
+        renderLoop();
 
         // --- ЕКСПОРТ КОДУ ---
         document.getElementById('export-btn').onclick = () => {
-            let mapName = document.getElementById('map-name').value.trim() || 'custom_map';
-            document.getElementById('export-map-name').innerText = mapName;
-            
-            let code = `MAP_DATA['${mapName}'] = {\n`;
-            code += `    size: ${mapSettings.size},\n`;
-            code += `    bg: '${mapSettings.bg}',\n`;
-            code += `    grid: '${mapSettings.grid}',\n`;
-            code += `    solids: [\n`;
-            
-            objects.forEach(o => {
-                if (o.type === 'wall') {
-                    code += `        { type: 'wall', x: ${o.x}, y: ${o.y}, w: ${o.w}, h: ${o.h}, color: '${o.color}'`;
-                    if (o.neon) code += `, neon: '${o.neon}'`;
-                    if (o.stripe) code += `, stripe: '${o.stripe}'`;
-                    code += ` },\n`;
-                } else if (o.type === 'tree') {
-                    code += `        { type: 'tree', x: ${o.x}, y: ${o.y}, r: ${Math.round(o.r)}, color: '#0c0a09' },\n`;
-                }
-            });
-            
+            let code = `MAP_DATA['${mapSettings.name}'] = {\n    size: ${mapSettings.size},\n    bg: '${mapSettings.bg}',\n    grid: '${mapSettings.grid}',\n    solids: [\n`;
+            objects.forEach(o => { code += `        ${JSON.stringify(o)},\n`; });
             code += `    ]\n};\n`;
-            
             document.getElementById('export-textarea').value = code;
             document.getElementById('export-modal').classList.remove('hidden');
         };
 
         window.copyCode = function() {
-            const ta = document.getElementById('export-textarea');
-            ta.select(); document.execCommand('copy');
-            alert('Код успішно скопійовано!');
+            const ta = document.getElementById('export-textarea'); ta.select(); document.execCommand('copy');
+            alert('Код скопійовано! Додайте його в MAP_DATA у файлах config.js та server.js.');
         };
     </script>
 </body>
