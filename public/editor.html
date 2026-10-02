@@ -22,18 +22,13 @@
     </style>
 </head>
 <body>
-    <!-- БОКОВА ПАНЕЛЬ -->
     <div class="w-[360px] h-screen bg-slate-900 border-r border-slate-700 flex flex-col absolute left-0 top-0 z-10 shadow-2xl">
         <div class="p-6 pb-0">
             <h1 class="text-3xl font-russo text-blue-400 mb-4 tracking-widest text-center">ULTIMATE EDITOR</h1>
-            <div class="flex border-b border-slate-700 mb-4 overflow-x-auto" id="tabs-container">
-                <!-- Вкладки генеруються JS -->
-            </div>
+            <div class="flex border-b border-slate-700 mb-4 overflow-x-auto" id="tabs-container"></div>
         </div>
 
-        <div class="flex-1 overflow-y-auto px-6 pb-6" id="tools-container">
-            <!-- Вміст вкладок генерується JS -->
-        </div>
+        <div class="flex-1 overflow-y-auto px-6 pb-6" id="tools-container"></div>
 
         <div class="p-4 border-t border-slate-700 bg-slate-900">
             <button id="clear-btn" class="w-full py-2 rounded-xl font-bold uppercase tracking-widest text-slate-400 border border-slate-700 hover:bg-slate-800 hover:text-red-400 mb-2 transition text-xs">Очистити все</button>
@@ -62,12 +57,9 @@
         let mapSettings = { name: 'epic_map', size: 3000, bg: '#020617', grid: '#1e293b' };
         let objects = [];
         let currentTool = 'wall_square';
-        let isDrawing = false;
-        let startX = 0, startY = 0;
-        let currentLine = null;
+        let isDrawing = false; let startX = 0, startY = 0; let currentLine = null;
         let drawColor = '#3b82f6', drawWidth = 10;
 
-        // --- ДАНІ ДЛЯ ІНТЕРФЕЙСУ ---
         const TABS = [
             { id: 'settings', name: 'Налашт.' }, { id: 'shapes', name: 'Фігури' }, 
             { id: 'props', name: 'Декор(20)' }, { id: 'neon', name: 'Неон(6)' }, 
@@ -83,28 +75,11 @@
             ],
             'shapes': [
                 { type: 'html', html: `<div class="mb-4 p-3 bg-slate-800 rounded-xl"><label class="text-[10px] text-slate-400 block mb-1">Колір об'єктів/ліній</label><input type="color" id="shape-color" value="#3b82f6" class="w-full h-8 mb-2"><label class="text-[10px] text-slate-400 block mb-1">Товщина лінії</label><input type="range" id="line-width" min="2" max="40" value="10" class="w-full"></div>` },
-                { id: 'shape_line', name: 'Крива Лінія (Пензель)', desc: 'Малюй вільно' },
-                { id: 'wall_square', name: 'Квадрат/Прямокутник', desc: 'Суцільна стіна' },
-                { id: 'shape_triangle', name: 'Трикутник', desc: 'Діагональні кути' },
-                { id: 'shape_rhombus', name: 'Ромб', desc: 'Алмазна форма' },
-                { id: 'shape_parallelepiped', name: 'Паралелепіпед', desc: 'Зміщений квадрат' },
-                { id: 'eraser', name: 'Гумка', desc: 'Видалення' }
+                { id: 'shape_line', name: 'Крива Лінія (Пензель)' }, { id: 'wall_square', name: 'Квадрат/Прямокутник' },
+                { id: 'shape_triangle', name: 'Трикутник' }, { id: 'shape_rhombus', name: 'Ромб' }, { id: 'shape_parallelepiped', name: 'Паралелепіпед' }, { id: 'eraser', name: 'Гумка' }
             ],
-            'water': [
-                { id: 'water_square', name: 'Куб Води', desc: 'Прямокутна річка' },
-                { id: 'water_curve', name: 'Заокруглена Вода', desc: 'Для поворотів ріки' },
-                { id: 'eraser', name: 'Гумка', desc: 'Видалення' }
-            ],
-            'neon': [
-                { id: 'neon_wall', name: 'Неонова Стіна', desc: 'Прямокутник з підсвіткою' },
-                { id: 'neon_circle', name: 'Неонове Кільце', desc: 'Світиться по колу' },
-                { id: 'neon_triangle', name: 'Неоновий Трикутник', desc: 'Сяюча піраміда' },
-                { id: 'neon_cross', name: 'Неоновий Хрест', desc: 'X-подібна перешкода' },
-                { id: 'neon_arch', name: 'Неонова Арка', desc: 'Ворота' },
-                { id: 'neon_pillar', name: 'Неонова Колона', desc: 'Кругла колона' },
-                { id: 'neon_diamond', name: 'Неоновий Ромб', desc: 'Сяючий кристал' },
-                { id: 'eraser', name: 'Гумка', desc: 'Видалення' }
-            ],
+            'water': [ { id: 'water_square', name: 'Куб Води' }, { id: 'water_curve', name: 'Заокруглена Вода' }, { id: 'eraser', name: 'Гумка' } ],
+            'neon': [ { id: 'neon_wall', name: 'Неонова Стіна' }, { id: 'neon_circle', name: 'Неонове Кільце' }, { id: 'neon_triangle', name: 'Неоновий Трикутник' }, { id: 'neon_cross', name: 'Неоновий Хрест' }, { id: 'neon_arch', name: 'Неонова Арка' }, { id: 'neon_pillar', name: 'Неонова Колона' }, { id: 'neon_diamond', name: 'Неоновий Ромб' }, { id: 'eraser', name: 'Гумка' } ],
             'props': [
                 { id: 'prop_crate', name: 'Ящик' }, { id: 'prop_barrel', name: 'Бочка' }, { id: 'prop_sandbag', name: 'Мішки з піском' },
                 { id: 'prop_rock', name: 'Камінь' }, { id: 'prop_bush', name: 'Кущ' }, { id: 'tree', name: 'Дерево' },
@@ -113,174 +88,183 @@
                 { id: 'prop_cont_blue', name: 'Контейнер С' }, { id: 'prop_fence_wood', name: 'Дерев. паркан' }, { id: 'prop_fence_metal', name: 'Метал. паркан' },
                 { id: 'prop_wreck', name: 'Знищений танк' }, { id: 'prop_tires', name: 'Шини' }, { id: 'prop_generator', name: 'Генератор' },
                 { id: 'prop_spotlight', name: 'Прожектор' }, { id: 'prop_puddle', name: 'Калюжа бруду' }, { id: 'prop_crater', name: 'Воронка' },
-                { id: 'eraser', name: 'Гумка', desc: 'Видалення' }
+                { id: 'eraser', name: 'Гумка' }
             ],
-            'spawns': [
-                { id: 'spawn_player', name: 'Спавн: Гравець', desc: 'Синя точка' },
-                { id: 'spawn_zombie', name: 'Спавн: Зомбі', desc: 'Зелена точка' },
-                { id: 'spawn_powerup', name: 'Спавн: Ефекти', desc: 'Жовта точка' },
-                { id: 'eraser', name: 'Гумка', desc: 'Видалення' }
-            ]
+            'spawns': [ { id: 'spawn_player', name: 'Спавн: Гравець (Невидимий у грі)' }, { id: 'spawn_zombie', name: 'Спавн: Зомбі (Невидимий)' }, { id: 'spawn_powerup', name: 'Спавн: Лут (Невидимий)' }, { id: 'eraser', name: 'Гумка' } ]
         };
 
-        // --- ГЕНЕРАЦІЯ UI ---
-        const tabsContainer = document.getElementById('tabs-container');
-        const toolsContainer = document.getElementById('tools-container');
-
+        const tabsContainer = document.getElementById('tabs-container'); const toolsContainer = document.getElementById('tools-container');
         TABS.forEach((tab, index) => {
             tabsContainer.innerHTML += `<button class="tab-btn flex-1 pb-2 px-2 text-[10px] font-bold uppercase whitespace-nowrap ${index===0?'active':''} text-slate-400" data-target="tab-${tab.id}">${tab.name}</button>`;
-            
             let html = `<div id="tab-${tab.id}" class="tab-content ${index===0?'block':'hidden'} space-y-2">`;
             TOOLS[tab.id].forEach(tool => {
                 if (tool.type === 'html') html += tool.html;
-                else {
-                    let colorCls = tool.id === 'eraser' ? 'border-red-500/50 hover:bg-red-500/20 text-red-400' : 'bg-slate-800 text-white';
-                    html += `<button class="tool-btn w-full p-2 rounded-lg flex flex-col text-left ${colorCls} ${tool.id==='wall_square'?'active':''}" data-type="${tool.id}">
-                        <span class="font-bold text-xs">${tool.name}</span>
-                        ${tool.desc ? `<span class="text-[9px] text-slate-400 uppercase">${tool.desc}</span>` : ''}
-                    </button>`;
-                }
+                else { let colorCls = tool.id === 'eraser' ? 'border-red-500/50 hover:bg-red-500/20 text-red-400' : 'bg-slate-800 text-white'; html += `<button class="tool-btn w-full p-2 rounded-lg text-left font-bold text-xs ${colorCls} ${tool.id==='wall_square'?'active':''}" data-type="${tool.id}">${tool.name}</button>`; }
             });
-            html += `</div>`;
-            toolsContainer.innerHTML += html;
+            html += `</div>`; toolsContainer.innerHTML += html;
         });
 
-        // Навігація вкладок
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.onclick = () => {
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-                btn.classList.add('active'); document.getElementById(btn.dataset.target).classList.remove('hidden');
-            }
-        });
+        document.querySelectorAll('.tab-btn').forEach(btn => { btn.onclick = () => { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden')); btn.classList.add('active'); document.getElementById(btn.dataset.target).classList.remove('hidden'); } });
+        document.querySelectorAll('.tool-btn').forEach(btn => { btn.onclick = () => { document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); currentTool = btn.dataset.type; } });
 
-        document.querySelectorAll('.tool-btn').forEach(btn => {
-            btn.onclick = () => {
-                document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active'); currentTool = btn.dataset.type;
-            }
-        });
-
-        // Слухачі налаштувань
         document.getElementById('set-name').oninput = e => mapSettings.name = e.target.value;
         document.getElementById('set-size').onchange = e => { mapSettings.size = parseInt(e.target.value); canvas.width = mapSettings.size; canvas.height = mapSettings.size; };
         document.getElementById('set-bg').oninput = e => mapSettings.bg = e.target.value;
         document.getElementById('set-grid').oninput = e => mapSettings.grid = e.target.value;
-        
         const shapeColorEl = document.getElementById('shape-color'); if(shapeColorEl) shapeColorEl.oninput = e => drawColor = e.target.value;
         const lineWidthEl = document.getElementById('line-width'); if(lineWidthEl) lineWidthEl.oninput = e => drawWidth = parseInt(e.target.value);
-        
         document.getElementById('clear-btn').onclick = () => { if(confirm("Видалити все?")) objects = []; };
 
-        // --- ЛОГІКА МАЛЮВАННЯ ТА ВЗАЄМОДІЇ ---
         function snap(val) { return Math.round(val / GRID_SIZE) * GRID_SIZE; }
-
         canvas.width = mapSettings.size; canvas.height = mapSettings.size;
 
         canvas.addEventListener('mousedown', e => {
             const rect = canvas.getBoundingClientRect(); let rawX = e.clientX - rect.left; let rawY = e.clientY - rect.top;
-            
             if (currentTool === 'eraser') {
-                // Спрощене видалення по bounding box
                 for (let i = objects.length - 1; i >= 0; i--) {
                     let o = objects[i];
                     let minX=o.x, maxX=o.x+(o.w||o.r*2||30), minY=o.y, maxY=o.y+(o.h||o.r*2||30);
                     if(o.type === 'line') { minX = Math.min(...o.points.map(p=>p.x))-20; maxX = Math.max(...o.points.map(p=>p.x))+20; minY = Math.min(...o.points.map(p=>p.y))-20; maxY = Math.max(...o.points.map(p=>p.y))+20; }
                     else if(o.type === 'tree' || o.type.includes('spawn')) { minX = o.x-20; maxX = o.x+20; minY = o.y-20; maxY = o.y+20; }
-                    
                     if (rawX >= minX && rawX <= maxX && rawY >= minY && rawY <= maxY) { objects.splice(i, 1); break; }
-                }
-                return;
+                } return;
             }
-
-            if (currentTool.includes('spawn')) {
-                objects.push({ type: currentTool, x: snap(rawX), y: snap(rawY) }); return;
-            }
-
+            if (currentTool.includes('spawn')) { objects.push({ type: currentTool, x: snap(rawX), y: snap(rawY) }); return; }
             isDrawing = true; startX = snap(rawX); startY = snap(rawY);
-            
-            if (currentTool === 'shape_line') {
-                currentLine = { type: 'line', points: [{x: rawX, y: rawY}], color: drawColor, width: drawWidth };
-                objects.push(currentLine);
-            }
+            if (currentTool === 'shape_line') { currentLine = { type: 'line', points: [{x: rawX, y: rawY}], color: drawColor, width: drawWidth }; objects.push(currentLine); }
         });
 
         canvas.addEventListener('mousemove', e => {
             if (!isDrawing) return;
             const rect = canvas.getBoundingClientRect(); let rawX = e.clientX - rect.left; let rawY = e.clientY - rect.top;
-            
-            if (currentTool === 'shape_line' && currentLine) {
-                currentLine.points.push({x: rawX, y: rawY});
-            } else {
-                // Для прев'ю перемальовуємо все в рендер-лупі, просто зберігаємо координати миші
-                window.mouseX = snap(rawX); window.mouseY = snap(rawY);
-            }
+            if (currentTool === 'shape_line' && currentLine) { currentLine.points.push({x: rawX, y: rawY}); } 
+            else { window.mouseX = snap(rawX); window.mouseY = snap(rawY); }
         });
 
         canvas.addEventListener('mouseup', e => {
             if (!isDrawing) return; isDrawing = false;
             if (currentTool === 'shape_line') { currentLine = null; return; }
-            
             const rect = canvas.getBoundingClientRect(); let endX = snap(e.clientX - rect.left); let endY = snap(e.clientY - rect.top);
             let x = Math.min(startX, endX); let y = Math.min(startY, endY);
             let w = Math.abs(endX - startX); let h = Math.abs(endY - startY);
-            
             if(w===0) w=GRID_SIZE; if(h===0) h=GRID_SIZE;
 
             if (currentTool === 'tree') { objects.push({ type: 'tree', x: startX, y: startY, r: Math.max(20, Math.hypot(endX-startX, endY-startY)) }); }
             else if (currentTool.includes('water')) { objects.push({ type: currentTool, x, y, w, h }); }
             else if (currentTool.includes('neon')) { objects.push({ type: currentTool, x, y, w, h, color: drawColor }); }
             else if (currentTool.includes('prop_')) { objects.push({ type: currentTool, x, y, w, h }); }
-            else { objects.push({ type: currentTool, x, y, w, h, color: drawColor }); } // shape_
+            else { objects.push({ type: currentTool, x, y, w, h, color: drawColor }); }
         });
 
-        // --- РЕНДЕР ЛУП ---
+        // 🎨 ВЕКТОРНИЙ РЕНДЕР ДЕКОРАЦІЙ ТА ФІГУР
+        function drawProp(ctx, o, time) {
+            let x = o.x, y = o.y, w = o.w, h = o.h;
+            ctx.save();
+            switch(o.type) {
+                case 'prop_crate':
+                    ctx.fillStyle = '#b45309'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = '#78350f'; ctx.lineWidth = 3; ctx.strokeRect(x, y, w, h);
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x+w, y+h); ctx.moveTo(x+w, y); ctx.lineTo(x, y+h); ctx.stroke(); break;
+                case 'prop_barrel':
+                    ctx.fillStyle = '#dc2626'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, Math.min(w,h)/2, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = '#991b1b'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, Math.min(w,h)/2 - 4, 0, Math.PI*2); ctx.fill(); break;
+                case 'prop_sandbag':
+                    ctx.fillStyle = '#d4a373'; ctx.strokeStyle = '#a68a64'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.roundRect(x, y, w, h/2, 10); ctx.fill(); ctx.stroke();
+                    ctx.beginPath(); ctx.roundRect(x+5, y+h/2, w-10, h/2, 10); ctx.fill(); ctx.stroke(); break;
+                case 'prop_rock':
+                    ctx.fillStyle = '#52525b'; ctx.beginPath(); ctx.moveTo(x+w/2, y); ctx.lineTo(x+w, y+h/3); ctx.lineTo(x+w*0.8, y+h); ctx.lineTo(x+w*0.2, y+h); ctx.lineTo(x, y+h/2); ctx.fill(); break;
+                case 'prop_bush':
+                    ctx.fillStyle = '#15803d'; ctx.beginPath(); ctx.arc(x+w/3, y+h/3, w/2, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(x+w*0.7, y+h/3, w/2, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(x+w/2, y+h*0.7, w/2.5, 0, Math.PI*2); ctx.fill(); break;
+                case 'prop_cone':
+                    ctx.fillStyle = '#ea580c'; ctx.beginPath(); ctx.moveTo(x+w/2, y); ctx.lineTo(x+w, y+h); ctx.lineTo(x, y+h); ctx.fill();
+                    ctx.fillStyle = '#fff'; ctx.fillRect(x+w*0.3, y+h*0.5, w*0.4, h*0.2); break;
+                case 'prop_concrete':
+                    ctx.fillStyle = '#a1a1aa'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = '#71717a'; ctx.lineWidth = 2; ctx.strokeRect(x+2, y+2, w-4, h-4); break;
+                case 'prop_hedgehog':
+                    ctx.strokeStyle = '#71717a'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x+w, y+h); ctx.moveTo(x+w, y); ctx.lineTo(x, y+h); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(x+w/2, y); ctx.lineTo(x+w/2, y+h); ctx.moveTo(x, y+h/2); ctx.lineTo(x+w, y+h/2); ctx.stroke(); break;
+                case 'prop_radar':
+                    ctx.fillStyle = '#334155'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, w/2, 0, Math.PI*2); ctx.fill();
+                    ctx.translate(x+w/2, y+h/2); ctx.rotate(time * 2);
+                    ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(w/2, 0); ctx.stroke(); break;
+                case 'prop_tent':
+                    ctx.fillStyle = '#4d7c0f'; ctx.fillRect(x, y, w, h); ctx.fillStyle = '#1a2e05'; ctx.beginPath(); ctx.moveTo(x+w/2, y+h); ctx.lineTo(x+w/2 - 15, y+h - 20); ctx.lineTo(x+w/2 + 15, y+h - 20); ctx.fill(); break;
+                case 'prop_cont_red':
+                case 'prop_cont_blue':
+                    ctx.fillStyle = o.type === 'prop_cont_red' ? '#dc2626' : '#2563eb'; ctx.fillRect(x, y, w, h);
+                    ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 2;
+                    for(let l=x+10; l<x+w; l+=15) { ctx.beginPath(); ctx.moveTo(l, y); ctx.lineTo(l, y+h); ctx.stroke(); } break;
+                case 'prop_fence_wood':
+                    ctx.fillStyle = '#78350f'; ctx.fillRect(x, y+h/2-2, w, 4);
+                    for(let fx=x; fx<=x+w; fx+=20) { ctx.beginPath(); ctx.arc(fx, y+h/2, 4, 0, Math.PI*2); ctx.fill(); } break;
+                case 'prop_fence_metal':
+                    ctx.fillStyle = '#94a3b8'; ctx.fillRect(x, y+h/2-1, w, 2); ctx.setLineDash([5, 5]); ctx.strokeStyle='#94a3b8'; ctx.beginPath(); ctx.moveTo(x, y+h/2-5); ctx.lineTo(x+w, y+h/2-5); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x, y+h/2+5); ctx.lineTo(x+w, y+h/2+5); ctx.stroke(); break;
+                case 'prop_wreck':
+                    ctx.fillStyle = '#1c1917'; ctx.fillRect(x+5, y+10, w-10, h-20);
+                    ctx.fillStyle = '#09090b'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, 15, 0, Math.PI*2); ctx.fill();
+                    ctx.strokeStyle = '#09090b'; ctx.lineWidth=6; ctx.beginPath(); ctx.moveTo(x+w/2, y+h/2); ctx.lineTo(x+w, y+h); ctx.stroke(); break;
+                case 'prop_tires':
+                    ctx.fillStyle = '#171717'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, w/2, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = '#27272a'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, w/3, 0, Math.PI*2); ctx.fill(); break;
+                case 'prop_generator':
+                    ctx.fillStyle = '#eab308'; ctx.fillRect(x, y, w, h); ctx.fillStyle = '#171717'; ctx.fillRect(x+5, y+5, w-10, h/2); break;
+                case 'prop_spotlight':
+                    ctx.fillStyle = '#d4d4d8'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, 10, 0, Math.PI*2); ctx.fill();
+                    ctx.translate(x+w/2, y+h/2); ctx.rotate(Math.sin(time)*0.5);
+                    ctx.fillStyle = 'rgba(253, 224, 71, 0.2)'; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(150, -40); ctx.lineTo(150, 40); ctx.fill(); break;
+                case 'prop_puddle':
+                    ctx.fillStyle = '#451a03'; ctx.beginPath(); ctx.ellipse(x+w/2, y+h/2, w/2, h/3, Math.PI/4, 0, Math.PI*2); ctx.fill(); break;
+                case 'prop_crater':
+                    ctx.fillStyle = '#27272a'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, w/2, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = '#09090b'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, w/3, 0, Math.PI*2); ctx.fill(); break;
+            }
+            ctx.restore();
+        }
+
         function renderLoop() {
             ctx.clearRect(0, 0, mapSettings.size, mapSettings.size);
             ctx.fillStyle = mapSettings.bg; ctx.fillRect(0, 0, mapSettings.size, mapSettings.size);
             ctx.strokeStyle = mapSettings.grid; ctx.lineWidth = 1;
             for(let i=0; i<=mapSettings.size; i+=50) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, mapSettings.size); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(mapSettings.size, i); ctx.stroke(); }
 
-            let time = Date.now() / 200; // Для анімації води і неону
+            let time = Date.now() / 1000; 
 
             // Малюємо всі об'єкти
-            [...objects, ...(isDrawing && currentTool !== 'shape_line' ? [{type: currentTool, x: Math.min(startX, window.mouseX||startX), y: Math.min(startY, window.mouseY||startY), w: Math.max(GRID_SIZE, Math.abs((window.mouseX||startX)-startX)), h: Math.max(GRID_SIZE, Math.abs((window.mouseY||startY)-startY)), r: Math.hypot((window.mouseX||startX)-startX, (window.mouseY||startY)-startY), color: drawColor, preview: true}] : [])].forEach(o => {
-                
+            let renderList = [...objects];
+            if (isDrawing && currentTool !== 'shape_line' && !currentTool.includes('spawn')) {
+                let mw = Math.max(GRID_SIZE, Math.abs((window.mouseX||startX)-startX));
+                let mh = Math.max(GRID_SIZE, Math.abs((window.mouseY||startY)-startY));
+                renderList.push({type: currentTool, x: Math.min(startX, window.mouseX||startX), y: Math.min(startY, window.mouseY||startY), w: mw, h: mh, r: Math.hypot((window.mouseX||startX)-startX, (window.mouseY||startY)-startY), color: drawColor, preview: true});
+            }
+
+            renderList.forEach(o => {
                 ctx.save();
                 if(o.preview) ctx.globalAlpha = 0.5;
 
                 if (o.type === 'line') {
                     ctx.strokeStyle = o.color; ctx.lineWidth = o.width; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-                    ctx.beginPath(); ctx.moveTo(o.points[0].x, o.points[0].y);
-                    for(let i=1; i<o.points.length; i++) ctx.lineTo(o.points[i].x, o.points[i].y);
-                    ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(o.points[0].x, o.points[0].y); for(let i=1; i<o.points.length; i++) ctx.lineTo(o.points[i].x, o.points[i].y); ctx.stroke();
                 } 
                 else if (o.type.includes('water')) {
                     ctx.fillStyle = '#0369a1'; ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 2;
-                    if(o.type === 'water_curve') { ctx.beginPath(); ctx.roundRect(o.x, o.y, o.w, o.h, 50); ctx.fill(); ctx.clip(); } 
+                    if(o.type === 'water_curve') { ctx.beginPath(); ctx.roundRect(o.x, o.y, o.w, o.h, Math.min(o.w,o.h)/2); ctx.fill(); ctx.clip(); } 
                     else { ctx.fillRect(o.x, o.y, o.w, o.h); ctx.beginPath(); ctx.rect(o.x, o.y, o.w, o.h); ctx.clip(); }
                     
-                    // Анімація хвиль
-                    ctx.setLineDash([20, 20]); ctx.lineDashOffset = -time * 5;
+                    ctx.setLineDash([20, 20]); ctx.lineDashOffset = -time * 20;
                     for(let wy=o.y+10; wy<o.y+o.h; wy+=30) { ctx.beginPath(); ctx.moveTo(o.x, wy); ctx.lineTo(o.x+o.w, wy); ctx.stroke(); }
                     ctx.setLineDash([]);
                 }
-                else if (o.type === 'shape_triangle') {
-                    ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill();
-                }
-                else if (o.type === 'shape_rhombus') {
-                    ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h/2); ctx.lineTo(o.x + o.w/2, o.y + o.h); ctx.lineTo(o.x, o.y + o.h/2); ctx.fill();
-                }
-                else if (o.type === 'shape_parallelepiped') {
-                    ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w*0.2, o.y); ctx.lineTo(o.x + o.w, o.y); ctx.lineTo(o.x + o.w*0.8, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill();
-                }
-                else if (o.type === 'wall_square') {
-                    ctx.fillStyle = o.color || '#1e293b'; ctx.fillRect(o.x, o.y, o.w, o.h);
-                }
+                else if (o.type === 'shape_triangle') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
+                else if (o.type === 'shape_rhombus') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h/2); ctx.lineTo(o.x + o.w/2, o.y + o.h); ctx.lineTo(o.x, o.y + o.h/2); ctx.fill(); }
+                else if (o.type === 'shape_parallelepiped') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w*0.2, o.y); ctx.lineTo(o.x + o.w, o.y); ctx.lineTo(o.x + o.w*0.8, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
+                else if (o.type === 'wall_square') { ctx.fillStyle = o.color || '#1e293b'; ctx.fillRect(o.x, o.y, o.w, o.h); }
                 else if (o.type.includes('neon')) {
-                    ctx.strokeStyle = o.color || '#3b82f6'; ctx.lineWidth = 4; ctx.shadowColor = o.color || '#3b82f6'; ctx.shadowBlur = 15 + Math.sin(time)*5;
+                    ctx.strokeStyle = o.color || '#3b82f6'; ctx.lineWidth = 4; ctx.shadowColor = o.color || '#3b82f6'; ctx.shadowBlur = 15 + Math.sin(time*5)*5;
                     if(o.type === 'neon_wall') ctx.strokeRect(o.x, o.y, o.w, o.h);
-                    else if(o.type === 'neon_circle') { ctx.beginPath(); ctx.arc(o.x+o.w/2, o.y+o.h/2, o.w/2, 0, Math.PI*2); ctx.stroke(); }
+                    else if(o.type === 'neon_circle') { ctx.beginPath(); ctx.arc(o.x+o.w/2, o.y+o.h/2, Math.min(o.w,o.h)/2, 0, Math.PI*2); ctx.stroke(); }
                     else if(o.type === 'neon_cross') { ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(o.x+o.w, o.y+o.h); ctx.moveTo(o.x+o.w, o.y); ctx.lineTo(o.x, o.y+o.h); ctx.stroke(); }
                     else if(o.type === 'neon_triangle') { ctx.beginPath(); ctx.moveTo(o.x+o.w/2, o.y); ctx.lineTo(o.x+o.w, o.y+o.h); ctx.lineTo(o.x, o.y+o.h); ctx.closePath(); ctx.stroke(); }
                     else if(o.type === 'neon_diamond') { ctx.beginPath(); ctx.moveTo(o.x+o.w/2, o.y); ctx.lineTo(o.x+o.w, o.y+o.h/2); ctx.lineTo(o.x+o.w/2, o.y+o.h); ctx.lineTo(o.x, o.y+o.h/2); ctx.closePath(); ctx.stroke(); }
@@ -288,22 +272,18 @@
                     else if(o.type === 'neon_pillar') { ctx.beginPath(); ctx.ellipse(o.x+o.w/2, o.y+o.h/2, o.w/2, o.h/2, 0, 0, Math.PI*2); ctx.stroke(); }
                     ctx.fillStyle = o.color || '#3b82f6'; ctx.globalAlpha = 0.2; ctx.fillRect(o.x, o.y, o.w, o.h); ctx.globalAlpha = 1.0;
                 }
-                else if (o.type === 'tree') {
-                    ctx.fillStyle = '#0c0a09'; ctx.beginPath(); ctx.arc(o.x, o.y, o.r||30, 0, Math.PI*2); ctx.fill();
-                    ctx.fillStyle = 'rgba(22, 163, 74, 0.4)'; ctx.beginPath(); ctx.arc(o.x+5, o.y+5, Math.max(5, (o.r||30)-10), 0, Math.PI*2); ctx.fill();
-                }
+                else if (o.type === 'tree') { ctx.fillStyle = '#0c0a09'; ctx.beginPath(); ctx.arc(o.x, o.y, o.r||30, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = 'rgba(22, 163, 74, 0.4)'; ctx.beginPath(); ctx.arc(o.x+5, o.y+5, Math.max(5, (o.r||30)-10), 0, Math.PI*2); ctx.fill(); }
                 else if (o.type.includes('spawn')) {
+                    // Точки спавну: Вони видимі тільки тут, у редакторі
                     ctx.beginPath(); ctx.arc(o.x, o.y, 20, 0, Math.PI*2); 
                     ctx.fillStyle = o.type==='spawn_player'?'#3b82f6':o.type==='spawn_zombie'?'#22c55e':'#eab308'; ctx.fill();
                     ctx.fillStyle = '#fff'; ctx.font = '16px Russo One'; ctx.textAlign='center'; ctx.textBaseline='middle';
                     ctx.fillText(o.type==='spawn_player'?'P':o.type==='spawn_zombie'?'Z':'*', o.x, o.y);
                 }
                 else if (o.type.includes('prop_')) {
-                    // Базовий рендер декорацій у редакторі
-                    ctx.fillStyle = '#475569'; ctx.fillRect(o.x, o.y, o.w, o.h);
-                    ctx.fillStyle = '#fff'; ctx.font = '12px Jura'; ctx.textAlign='center'; ctx.fillText(o.type.replace('prop_',''), o.x+o.w/2, o.y+o.h/2);
+                    // Малювання кастомних 2D текстур
+                    drawProp(ctx, o, time);
                 }
-                
                 ctx.restore();
             });
 
@@ -316,13 +296,12 @@
             let code = `MAP_DATA['${mapSettings.name}'] = {\n    size: ${mapSettings.size},\n    bg: '${mapSettings.bg}',\n    grid: '${mapSettings.grid}',\n    solids: [\n`;
             objects.forEach(o => { code += `        ${JSON.stringify(o)},\n`; });
             code += `    ]\n};\n`;
-            document.getElementById('export-textarea').value = code;
-            document.getElementById('export-modal').classList.remove('hidden');
+            document.getElementById('export-textarea').value = code; document.getElementById('export-modal').classList.remove('hidden');
         };
 
         window.copyCode = function() {
             const ta = document.getElementById('export-textarea'); ta.select(); document.execCommand('copy');
-            alert('Код скопійовано! Додайте його в MAP_DATA у файлах config.js та server.js.');
+            alert('Код успішно скопійовано! Вставте його у MAP_DATA (config.js та server.js).');
         };
     </script>
 </body>
