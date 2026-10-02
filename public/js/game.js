@@ -1,16 +1,11 @@
 const canvas = document.getElementById('game-canvas'); const ctx = canvas.getContext('2d'); window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }); canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
 function createExplosion(x, y, count, color) {
-    for(let i=0; i<count; i++){
-        const ang = Math.random() * Math.PI * 2; const spd = Math.random() * 200 + 50;
-        particles.push({ x, y, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd, life: Math.random() * 0.4 + 0.1, color });
-    }
+    for(let i=0; i<count; i++){ const ang = Math.random() * Math.PI * 2; const spd = Math.random() * 200 + 50; particles.push({ x, y, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd, life: Math.random() * 0.4 + 0.1, color }); }
 }
 
 function checkCollision(x, y, r, checkSolids = true) {
-    if (!currentRoomData) return true;
-    let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'city';
-    let mSize = MAP_DATA[cMap].size; if (x - r < 0 || x + r > mSize || y - r < 0 || y + r > mSize) return true; 
+    if (!currentRoomData) return true; let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'city'; let mSize = MAP_DATA[cMap].size; if (x - r < 0 || x + r > mSize || y - r < 0 || y + r > mSize) return true; 
     if (checkSolids) { const solids = MAP_DATA[cMap].solids; for (let s of solids) { if (s.type === 'wall') { let testX = Math.max(s.x, Math.min(x, s.x + s.w)), testY = Math.max(s.y, Math.min(y, s.y + s.h)); if (Math.hypot(x - testX, y - testY) <= r) return true; } else if (s.type === 'tree') { if (Math.hypot(x - s.x, y - s.y) < r + s.r) return true; } } } return false;
 }
 
@@ -19,10 +14,13 @@ function updatePhysics(now, dt) {
     let myRadius = myLocalTank.buff === 'boss' ? 75 : 30;
     
     if (myLocalTank.hp > 0) {
-        let moveX = 0, moveY = 0; let speedMult = 1.0; 
-        if(myUpgrades.speed === 1) speedMult = 1.02; if(myUpgrades.speed === 2) speedMult = 1.05; if(myUpgrades.speed === 3) speedMult = 1.10;
-        if(myLocalTank.buff === 'samurai') speedMult *= 1.5; 
-        let speed = (myLocalTank.buff === 'boss' ? TANK_SPEED * 0.6 : TANK_SPEED) * speedMult;
+        let moveX = 0, moveY = 0; 
+        let totalSpeed = 1.0;
+        if(myEquipped.hull && MODULES[myEquipped.hull]) totalSpeed *= MODULES[myEquipped.hull].stats.speed || 1;
+        if(myEquipped.tracks && MODULES[myEquipped.tracks]) totalSpeed *= MODULES[myEquipped.tracks].stats.speed || 1;
+        
+        let speedMult = 1.0; if(myLocalTank.buff === 'samurai') speedMult *= 1.5; 
+        let speed = (myLocalTank.buff === 'boss' ? TANK_SPEED * 0.6 : TANK_SPEED) * speedMult * totalSpeed;
         
         if (keys.w) moveY -= 1; if (keys.s) moveY += 1; if (keys.a) moveX -= 1; if (keys.d) moveX += 1;
         if (moveX !== 0 || moveY !== 0) { 
@@ -38,14 +36,14 @@ function updatePhysics(now, dt) {
         socket.emit('move', { roomId: currentRoomId, x: myLocalTank.x, y: myLocalTank.y, bodyAngle: myLocalTank.bodyAngle, turretAngle: myLocalTank.turretAngle });
 
         let fCfg = BUFFS[myLocalTank.buff || 'none'];
-        if (keys.space && (now - lastShootTime >= fCfg.cd)) {
+        let totalCd = 1.0; let totalRange = 1.0;
+        if(myEquipped.cannon && MODULES[myEquipped.cannon]) { totalCd *= MODULES[myEquipped.cannon].stats.cd || 1; totalRange *= MODULES[myEquipped.cannon].stats.range || 1; }
+
+        if (keys.space && (now - lastShootTime >= fCfg.cd * totalCd)) {
             lastShootTime = now; let bId = Date.now() + Math.random(); let bSpd = (myLocalTank.buff === 'fast' || myLocalTank.buff === 'minigun') ? BASE_BULLET_SPEED * 1.8 : BASE_BULLET_SPEED;
-            let shot = { roomId: currentRoomId, id: bId, x: myLocalTank.x + Math.cos(myLocalTank.turretAngle)*(myRadius+10), y: myLocalTank.y + Math.sin(myLocalTank.turretAngle)*(myRadius+10), vx: Math.cos(myLocalTank.turretAngle)*bSpd, vy: Math.sin(myLocalTank.turretAngle)*bSpd, type: myLocalTank.buff || 'none' };
+            let shot = { roomId: currentRoomId, id: bId, x: myLocalTank.x + Math.cos(myLocalTank.turretAngle)*(myRadius+10), y: myLocalTank.y + Math.sin(myLocalTank.turretAngle)*(myRadius+10), vx: Math.cos(myLocalTank.turretAngle)*bSpd, vy: Math.sin(myLocalTank.turretAngle)*bSpd, type: myLocalTank.buff || 'none', lifeMult: totalRange };
             
-            if (myLocalTank.buff === 'samurai') { 
-                shot.x = myLocalTank.x + Math.cos(myLocalTank.turretAngle)*(myRadius+15); shot.y = myLocalTank.y + Math.sin(myLocalTank.turretAngle)*(myRadius+15);
-                shot.vx = Math.cos(myLocalTank.turretAngle) * 100; shot.vy = Math.sin(myLocalTank.turretAngle) * 100;
-            }
+            if (myLocalTank.buff === 'samurai') { shot.x = myLocalTank.x + Math.cos(myLocalTank.turretAngle)*(myRadius+15); shot.y = myLocalTank.y + Math.sin(myLocalTank.turretAngle)*(myRadius+15); shot.vx = Math.cos(myLocalTank.turretAngle) * 100; shot.vy = Math.sin(myLocalTank.turretAngle) * 100; }
             if (myLocalTank.buff === 'homing' && homingTargetId) shot.targetId = homingTargetId; 
             socket.emit('shoot', shot);
         }
@@ -60,91 +58,59 @@ function updatePhysics(now, dt) {
 
     for (let i = bullets.length - 1; i >= 0; i--) {
         let b = bullets[i]; 
-        if (b.type === 'homing' && b.targetId) { 
-            let tgt = (b.targetId === myId) ? myLocalTank : opponents[b.targetId]; 
-            if (tgt && tgt.hp > 0) { let ang = Math.atan2(tgt.y - b.y, tgt.x - b.x); let currentSpd = Math.hypot(b.vx, b.vy); b.vx = Math.cos(ang) * currentSpd; b.vy = Math.sin(ang) * currentSpd; } 
-        }
+        if (b.type === 'homing' && b.targetId) { let tgt = (b.targetId === myId) ? myLocalTank : opponents[b.targetId]; if (tgt && tgt.hp > 0) { let ang = Math.atan2(tgt.y - b.y, tgt.x - b.x); let currentSpd = Math.hypot(b.vx, b.vy); b.vx = Math.cos(ang) * currentSpd; b.vy = Math.sin(ang) * currentSpd; } }
         b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
         let hit = false; let bCfg = BUFFS[b.type] || BUFFS['none'];
-        
         if (b.type === 'samurai' || b.type === 'homing' || b.type.includes('piercing') || b.type === 'ghost_melee' || b.type === 'boss_proj') { hit = checkCollision(b.x, b.y, 4, false); } else { hit = checkCollision(b.x, b.y, 4, true); } 
-        
         let isSurvival = currentRoomData.mode === 'survival';
 
-        // АВТОРИТЕТ СТРІЛЬЦЯ: Якщо Я випустив кулю, Я перевіряю, чи влучила вона у ВОРОГА
         if (!hit && b.owner === myId && !isSurvival) {
-            for (let oid in opponents) {
-                let op = opponents[oid];
-                if (op.hp > 0) {
-                    let opRadius = op.buff === 'boss' ? 75 : 30;
-                    let hitDist = b.type === 'samurai' ? opRadius + 30 : opRadius + 4;
-                    
-                    if (Math.hypot(b.x - op.x, b.y - op.y) < hitDist) { 
-                        hit = true; 
-                        let dmgToDeal = b.dmgOverride || bCfg.dmg; 
-                        socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: dmgToDeal });
-                        
-                        if(b.type === 'incendiary') { 
-                            let end = now + 5000; 
-                            let int = setInterval(() => { 
-                                if(Date.now() > end || !opponents[oid] || opponents[oid].hp <= 0) clearInterval(int); 
-                                else { 
-                                    socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: 10 });
-                                    createExplosion(opponents[oid].x, opponents[oid].y, 5, '#f97316'); 
-                                } 
-                            }, 1000); 
-                        } 
-                        break;
-                    }
-                }
-            }
+            for (let oid in opponents) { let op = opponents[oid]; if (op.hp > 0) { let opRadius = op.buff === 'boss' ? 75 : 30; let hitDist = b.type === 'samurai' ? opRadius + 30 : opRadius + 4; if (Math.hypot(b.x - op.x, b.y - op.y) < hitDist) { hit = true; let dmgToDeal = b.dmgOverride || bCfg.dmg; socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: dmgToDeal }); if(b.type === 'incendiary') { let end = now + 5000; let int = setInterval(() => { if(Date.now() > end || !opponents[oid] || opponents[oid].hp <= 0) clearInterval(int); else { socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: 10 }); createExplosion(opponents[oid].x, opponents[oid].y, 5, '#f97316'); } }, 1000); } break; } } }
         }
 
-        // Попадання МОГО снаряду по ЗОМБІ (Виживання)
-        if (!hit && isSurvival && b.owner === myId) { 
-            for(let zid in zombies) { 
-                let z = zombies[zid]; let zDist = b.type === 'samurai' ? Z_TYPES[z.type].radius + 35 : Z_TYPES[z.type].radius + 10;
-                if (Math.hypot(b.x - z.x, b.y - z.y) < zDist) { hit = true; socket.emit('zombieHit', { roomId: currentRoomId, zid: zid, dmg: bCfg.dmg }); createExplosion(b.x, b.y, 5, Z_TYPES[z.type].color); break; } 
-            } 
-        }
+        if (!hit && isSurvival && b.owner === myId) { for(let zid in zombies) { let z = zombies[zid]; let zDist = b.type === 'samurai' ? Z_TYPES[z.type].radius + 35 : Z_TYPES[z.type].radius + 10; if (Math.hypot(b.x - z.x, b.y - z.y) < zDist) { hit = true; socket.emit('zombieHit', { roomId: currentRoomId, zid: zid, dmg: bCfg.dmg }); createExplosion(b.x, b.y, 5, Z_TYPES[z.type].color); break; } } }
 
-        // ВЛУЧАННЯ СНАРЯДІВ ЗОМБІ В МЕНЕ
-        if (!hit && b.owner === 'zombie' && myLocalTank.hp > 0) {
-            let hitDist = myRadius + 4;
-            if (Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < hitDist) { 
-                hit = true; 
-                let dmgToDeal = b.dmgOverride || bCfg.dmg; 
-                playSound('hurt'); shakeTime = 0.3; 
-                socket.emit('takeDamage', { roomId: currentRoomId, amt: dmgToDeal, attacker: 'zombie' }); 
-            }
-        }
+        if (!hit && b.owner === 'zombie' && myLocalTank.hp > 0) { let hitDist = myRadius + 4; if (Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < hitDist) { hit = true; let dmgToDeal = b.dmgOverride || bCfg.dmg; playSound('hurt'); shakeTime = 0.3; socket.emit('takeDamage', { roomId: currentRoomId, amt: dmgToDeal, attacker: 'zombie' }); } }
         
-        // Візуалізація вибуху та знищення кулі
         if (hit || b.life <= 0) { 
-            if (b.type !== 'shotgun' && b.type !== 'minigun' && b.type !== 'acid' && b.type !== 'samurai') {
-                createExplosion(b.x, b.y, bCfg.type === 'explosive' ? 30 : 10, bCfg.type === 'explosive' ? '#ea580c' : '#fcd34d'); 
-            }
-            
-            // Сплеш-урон від вибухівки
-            if (hit && bCfg.type === 'explosive' && b.owner === myId) { 
-                let splashRad = b.type === 'boss' ? 250 : 120;
-                for (let oid in opponents) {
-                    if (opponents[oid].hp > 0 && Math.hypot(b.x - opponents[oid].x, b.y - opponents[oid].y) < splashRad) {
-                         socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: bCfg.dmg });
-                    }
-                }
-            } 
+            if (b.type !== 'shotgun' && b.type !== 'minigun' && b.type !== 'acid' && b.type !== 'samurai') { createExplosion(b.x, b.y, bCfg.type === 'explosive' ? 30 : 10, bCfg.type === 'explosive' ? '#ea580c' : '#fcd34d'); }
+            if (hit && bCfg.type === 'explosive' && b.owner === myId) { let splashRad = b.type === 'boss' ? 250 : 120; for (let oid in opponents) { if (opponents[oid].hp > 0 && Math.hypot(b.x - opponents[oid].x, b.y - opponents[oid].y) < splashRad) { socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: bCfg.dmg }); } } } 
             bullets.splice(i, 1); 
         }
     }
     for(let i=particles.length-1; i>=0; i--){ particles[i].life -= dt; particles[i].x += particles[i].vx * dt; particles[i].y += particles[i].vy * dt; if(particles[i].life <= 0) particles.splice(i, 1); }
 }
 
-function drawTank(x, y, bodyAngle, turretAngle, colorHex, name, isMe, hp, buff) {
+function drawTank(x, y, bodyAngle, turretAngle, colorHex, name, isMe, hp, buff, equipped) {
     if (hp <= 0) return; ctx.save(); ctx.translate(x, y); let scale = buff === 'boss' ? 2.5 : 1.0; ctx.scale(scale, scale); if (buff === 'invisible') ctx.globalAlpha = isMe ? 0.2 : 0.03; else ctx.globalAlpha = 1.0;
     ctx.shadowColor = 'transparent'; ctx.fillStyle = isMe ? '#60a5fa' : '#cbd5e1'; ctx.font = '14px Russo One'; ctx.textAlign = 'center'; if(buff !== 'invisible' || isMe) ctx.fillText(name, 0, -45);
-    ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 10; ctx.save(); ctx.rotate(bodyAngle); ctx.fillStyle = '#0f172a'; ctx.fillRect(-32, -28, 64, 12); ctx.fillRect(-32, 16, 64, 12); ctx.fillStyle = colorHex; ctx.fillRect(-28, -22, 56, 44); ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 2; ctx.strokeRect(-28, -22, 56, 44); ctx.restore();
-    ctx.save(); ctx.rotate(turretAngle); ctx.fillStyle = '#334155'; ctx.fillRect(0, -5, 45, 10); ctx.strokeStyle = '#0f172a'; ctx.lineWidth=1; ctx.strokeRect(0, -5, 45, 10); ctx.fillStyle = colorHex; ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.beginPath(); ctx.arc(-4, -4, 8, 0, Math.PI*2); ctx.fill(); ctx.restore(); ctx.restore();
+    
+    let hCol = equipped && equipped.hull && MODULES[equipped.hull] ? RARITY[MODULES[equipped.hull].rarity].color : '#0f172a';
+    let trCol = equipped && equipped.tracks && MODULES[equipped.tracks] ? RARITY[MODULES[equipped.tracks].rarity].color : '#0f172a';
+    let cCol = equipped && equipped.cannon && MODULES[equipped.cannon] ? RARITY[MODULES[equipped.cannon].rarity].color : '#0f172a';
+    let tuCol = equipped && equipped.turret && MODULES[equipped.turret] ? RARITY[MODULES[equipped.turret].rarity].color : '#334155';
+
+    ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 10; ctx.save(); ctx.rotate(bodyAngle); 
+    ctx.fillStyle = trCol; ctx.shadowColor = trCol; ctx.shadowBlur = equipped && equipped.tracks ? 15 : 0;
+    ctx.fillRect(-36, -32, 72, 14); ctx.fillRect(-36, 18, 72, 14); ctx.shadowBlur = 0;
+    
+    ctx.fillStyle = colorHex; ctx.strokeStyle = hCol; ctx.lineWidth = equipped && equipped.hull ? 3 : 1;
+    if(equipped && equipped.hull) { ctx.shadowColor = hCol; ctx.shadowBlur = 10; }
+    ctx.fillRect(-30, -22, 60, 44); ctx.strokeRect(-30, -22, 60, 44); ctx.shadowBlur = 0;
+    ctx.restore();
+    
+    ctx.save(); ctx.rotate(turretAngle); 
+    ctx.fillStyle = '#334155'; ctx.strokeStyle = cCol; ctx.lineWidth = equipped && equipped.cannon ? 3 : 1;
+    if(equipped && equipped.cannon) { ctx.shadowColor = cCol; ctx.shadowBlur = 10; }
+    let cLen = 45; if(equipped && equipped.cannon && MODULES[equipped.cannon] && MODULES[equipped.cannon].stats.range > 1.1) cLen = 60;
+    if(equipped && equipped.cannon && MODULES[equipped.cannon] && MODULES[equipped.cannon].stats.range < 1.0) cLen = 35;
+    ctx.fillRect(0, -6, cLen, 12); ctx.strokeRect(0, -6, cLen, 12); ctx.shadowBlur = 0;
+    
+    ctx.fillStyle = colorHex; ctx.strokeStyle = tuCol; ctx.lineWidth = equipped && equipped.turret ? 3 : 1;
+    if(equipped && equipped.turret) { ctx.shadowColor = tuCol; ctx.shadowBlur = 15; }
+    ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI*2); ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.beginPath(); ctx.arc(-4, -4, 8, 0, Math.PI*2); ctx.fill(); 
+    ctx.restore(); ctx.restore();
 }
 
 function draw(now) {
@@ -163,10 +129,10 @@ function draw(now) {
     for(let pid in powerups) { const pu = powerups[pid]; const boxColor = PU_COLORS[pu.type] || '#38bdf8'; ctx.save(); ctx.translate(pu.x, pu.y); ctx.rotate(now / 500); ctx.fillStyle = '#334155'; ctx.fillRect(-20, -20, 40, 40); ctx.strokeStyle = boxColor; ctx.lineWidth = 3; ctx.strokeRect(-20, -20, 40, 40); ctx.fillStyle = boxColor; ctx.shadowBlur = 10; ctx.shadowColor = boxColor; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '24px Russo One'; ctx.fillText(PU_ICONS[pu.type], 0, 2); ctx.restore(); }
     
     for (let id in opponents) { 
-        const p = opponents[id]; const sn = currentRoomData.players[id] || { name: 'Гравець', color: 'white' }; 
-        const cHex = sn.color==='white'?'#f8fafc':sn.color==='black'?'#1e293b':sn.color==='red'?'#ef4444':sn.color==='blue'?'#3b82f6':sn.color==='brown'?'#78350f':'#9333ea'; drawTank(p.x, p.y, p.bodyAngle, p.turretAngle, cHex, sn.name, false, p.hp, p.buff); if (myLocalTank.buff === 'homing' && id === homingTargetId && p.hp > 0) { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(now/300); ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3; ctx.setLineDash([15, 10]); ctx.strokeRect(-45, -45, 90, 90); ctx.restore(); } 
+        const p = opponents[id]; const sn = currentRoomData.players[id] || { name: 'Гравець', color: 'white', equipped: {} }; 
+        const cHex = sn.color==='white'?'#f8fafc':sn.color==='black'?'#1e293b':sn.color==='red'?'#ef4444':sn.color==='blue'?'#3b82f6':sn.color==='brown'?'#78350f':'#9333ea'; drawTank(p.x, p.y, p.bodyAngle, p.turretAngle, cHex, sn.name, false, p.hp, p.buff, sn.equipped); if (myLocalTank.buff === 'homing' && id === homingTargetId && p.hp > 0) { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(now/300); ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3; ctx.setLineDash([15, 10]); ctx.strokeRect(-45, -45, 90, 90); ctx.restore(); } 
     }
-    if (myLocalTank.hp > 0) { const myCHex = myColor==='white'?'#f8fafc':myColor==='black'?'#1e293b':myColor==='red'?'#ef4444':myColor==='blue'?'#3b82f6':myColor==='brown'?'#78350f':'#9333ea'; drawTank(myLocalTank.x, myLocalTank.y, myLocalTank.bodyAngle, myLocalTank.turretAngle, myCHex, myName, true, myLocalTank.hp, myLocalTank.buff); }
+    if (myLocalTank.hp > 0) { const myCHex = myColor==='white'?'#f8fafc':myColor==='black'?'#1e293b':myColor==='red'?'#ef4444':myColor==='blue'?'#3b82f6':myColor==='brown'?'#78350f':'#9333ea'; drawTank(myLocalTank.x, myLocalTank.y, myLocalTank.bodyAngle, myLocalTank.turretAngle, myCHex, myName, true, myLocalTank.hp, myLocalTank.buff, myEquipped); }
     
     if (currentRoomData.mode === 'survival') { 
         for (let zid in zombies) { 
@@ -187,15 +153,24 @@ function draw(now) {
     
     particles.forEach(p => { ctx.fillStyle = p.color; ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2.5)); ctx.beginPath(); ctx.arc(p.x, p.y, Math.random()*4+2, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1.0; }); ctx.restore();
     
-    let cd = (BUFFS[myLocalTank.buff] || BUFFS['none']).cd; let bar = document.getElementById('cooldown-bar'); if (now - lastShootTime < cd) { bar.style.transition = 'none'; bar.style.width = ((now - lastShootTime) / cd * 100) + '%'; } else { bar.style.width = '100%'; }
+    let totalCd = 1.0; if(myEquipped.cannon && MODULES[myEquipped.cannon]) totalCd *= MODULES[myEquipped.cannon].stats.cd || 1;
+    let cd = (BUFFS[myLocalTank.buff] || BUFFS['none']).cd * totalCd; 
+    let bar = document.getElementById('cooldown-bar'); if (now - lastShootTime < cd) { bar.style.transition = 'none'; bar.style.width = ((now - lastShootTime) / cd * 100) + '%'; } else { bar.style.width = '100%'; }
     const timerContainer = document.getElementById('buff-timer-container'); if (myLocalTank.buff && myLocalTank.buffProgress > 0) { timerContainer.classList.remove('hidden'); document.getElementById('buff-timer-icon').innerText = PU_ICONS[myLocalTank.buff]; document.getElementById('buff-timer-name').innerText = BUFF_NAMES[myLocalTank.buff]; document.getElementById('buff-timer-name').style.color = PU_COLORS[myLocalTank.buff] || '#cbd5e1'; document.getElementById('buff-timer-bar').style.width = (myLocalTank.buffProgress * 100) + '%'; } else { timerContainer.classList.add('hidden'); }
 }
 
 function updateHUD() {
     if(!currentRoomData) return;
-    document.getElementById('hp-bar').style.width = Math.max(0, (myLocalTank.hp/MAX_HP)*100) + '%'; document.getElementById('hp-text').innerText = `${Math.ceil(myLocalTank.hp)}/${MAX_HP}`;
-    let vignetteOpacity = 0; if (myLocalTank.hp < MAX_HP) vignetteOpacity = (1 - (myLocalTank.hp / MAX_HP)) * 0.85; document.getElementById('damage-vignette').style.opacity = vignetteOpacity;
-    if(myLocalTank.hp < MAX_HP * 0.3) document.getElementById('hp-bar').className = 'h-full bg-gradient-to-r from-red-600 to-red-400 w-full transition-all duration-300 shadow-[0_0_15px_rgba(239,68,68,0.8)]'; else document.getElementById('hp-bar').className = 'h-full bg-gradient-to-r from-green-500 to-emerald-400 w-full transition-all duration-300 shadow-[0_0_10px_rgba(34,197,94,0.5)]';
+    
+    let myTotalHp = 1.0;
+    if(myEquipped.hull && MODULES[myEquipped.hull]) myTotalHp *= MODULES[myEquipped.hull].stats.hp || 1;
+    if(myEquipped.turret && MODULES[myEquipped.turret]) myTotalHp *= MODULES[myEquipped.turret].stats.hp || 1;
+    if(myEquipped.tracks && MODULES[myEquipped.tracks]) myTotalHp *= MODULES[myEquipped.tracks].stats.hp || 1;
+    let myMaxHp = Math.round(MAX_HP * myTotalHp);
+
+    document.getElementById('hp-bar').style.width = Math.max(0, (myLocalTank.hp/myMaxHp)*100) + '%'; document.getElementById('hp-text').innerText = `${Math.ceil(myLocalTank.hp)}/${myMaxHp}`;
+    let vignetteOpacity = 0; if (myLocalTank.hp < myMaxHp) vignetteOpacity = (1 - (myLocalTank.hp / myMaxHp)) * 0.85; document.getElementById('damage-vignette').style.opacity = vignetteOpacity;
+    if(myLocalTank.hp < myMaxHp * 0.3) document.getElementById('hp-bar').className = 'h-full bg-gradient-to-r from-red-600 to-red-400 w-full transition-all duration-300 shadow-[0_0_15px_rgba(239,68,68,0.8)]'; else document.getElementById('hp-bar').className = 'h-full bg-gradient-to-r from-green-500 to-emerald-400 w-full transition-all duration-300 shadow-[0_0_10px_rgba(34,197,94,0.5)]';
     const targetUI = document.getElementById('homing-target-ui'); if (myLocalTank.buff === 'homing') targetUI.classList.remove('hidden'); else targetUI.classList.add('hidden');
     const slist = document.getElementById('score-list'); slist.innerHTML = ''; if (currentRoomData.mode === 'survival') { document.getElementById('target-score-display').innerText = currentRoomData.wave; }
     Object.values(currentRoomData.players).sort((a,b) => b.score - a.score).forEach(p => { slist.innerHTML += `<div class="flex justify-between w-full ${p.id===myId?'text-blue-400':'text-slate-300'} border-b border-slate-700/50 pb-1 ${p.hp<=0?'opacity-30 line-through':''}"><span>${p.name}</span><span class="font-bold">${currentRoomData.mode === 'survival' ? Math.ceil(p.hp) : p.score}</span></div>`; });
