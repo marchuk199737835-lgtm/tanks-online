@@ -1,11 +1,25 @@
-let audioCtx = null, volMusic = 0.3, volSfx = 0.6;
-let bgMusic = new Audio(); bgMusic.volume = volMusic;
+// Завантажуємо збережені налаштування, або ставимо стандартні (0.3 та 0.6)
+let volMusic = localStorage.getItem('tankVolMusic') !== null ? parseFloat(localStorage.getItem('tankVolMusic')) : 0.3;
+let volSfx = localStorage.getItem('tankVolSfx') !== null ? parseFloat(localStorage.getItem('tankVolSfx')) : 0.6;
+
+let audioCtx = null;
+let bgMusic = new Audio(); 
+bgMusic.volume = volMusic;
 let myMusicPlaylists = { loby: [], dezmatch: [], survive: [], main: [] };
 let activePlaylist = []; let currentMusicState = ''; let currentTrackIndex = 0;
 
 function initAudio() { if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } }
-window.setMusicVolume = function(val) { volMusic = val; bgMusic.volume = val; };
-window.setSfxVolume = function(val) { volSfx = val; };
+
+// Зберігаємо нові значення в пам'ять браузера при кожній зміні
+window.setMusicVolume = function(val) { 
+    volMusic = val; 
+    bgMusic.volume = val; 
+    localStorage.setItem('tankVolMusic', val);
+};
+window.setSfxVolume = function(val) { 
+    volSfx = val; 
+    localStorage.setItem('tankVolSfx', val);
+};
 
 function switchMusicState(newState) {
     if (currentMusicState === newState) return; currentMusicState = newState;

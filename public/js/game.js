@@ -73,8 +73,9 @@ function updatePhysics(now, dt) {
 function drawTank(x, y, bodyAngle, turretAngle, colorHex, name, isMe, hp, buff, equipped) {
     if (hp <= 0) return; ctx.save(); ctx.translate(x, y); let scale = buff === 'boss' ? 2.5 : 1.0; ctx.scale(scale, scale); if (buff === 'invisible') ctx.globalAlpha = isMe ? 0.2 : 0.03; else ctx.globalAlpha = 1.0;
     
-    // ІМ'Я ГРАВЦЯ має колір команди, ТАНК - колір ангару
-    ctx.shadowColor = 'transparent'; ctx.fillStyle = colorHex; ctx.font = '14px Russo One'; ctx.textAlign = 'center'; if(buff !== 'invisible' || isMe) ctx.fillText(name, 0, -45);
+    // ІМ'Я ГРАВЦЯ має колір команди
+    ctx.shadowColor = 'transparent'; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; 
+    ctx.fillStyle = colorHex; ctx.font = '14px Russo One'; ctx.textAlign = 'center'; if(buff !== 'invisible' || isMe) ctx.fillText(name, 0, -45);
     
     let baseHullCol = '#1e293b'; 
     let hCol = equipped && equipped.hull && MODULES[equipped.hull] ? RARITY[MODULES[equipped.hull].rarity].color : '#0f172a';
@@ -82,7 +83,10 @@ function drawTank(x, y, bodyAngle, turretAngle, colorHex, name, isMe, hp, buff, 
     let cCol = equipped && equipped.cannon && MODULES[equipped.cannon] ? RARITY[MODULES[equipped.cannon].rarity].color : '#0f172a';
     let tuCol = equipped && equipped.turret && MODULES[equipped.turret] ? RARITY[MODULES[equipped.turret].rarity].color : '#334155';
 
-    ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 10; ctx.save(); ctx.rotate(bodyAngle); 
+    // ФІКС ВІЗУАЛУ ТАНКА: Забороняємо тіням від барикад з'їжджати на танк
+    ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+
+    ctx.save(); ctx.rotate(bodyAngle); 
     ctx.fillStyle = trCol; ctx.shadowColor = trCol; ctx.shadowBlur = equipped && equipped.tracks ? 15 : 0;
     ctx.fillRect(-36, -32, 72, 14); ctx.fillRect(-36, 18, 72, 14); ctx.shadowBlur = 0;
     
@@ -117,6 +121,9 @@ function draw(now) {
     
     ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 15; ctx.shadowOffsetX = 8; ctx.shadowOffsetY = 12;
     MAP_DATA[cMap].solids.forEach(o => { ctx.fillStyle = o.color; if (o.type === 'wall') { ctx.fillRect(o.x, o.y, o.w, o.h); if (o.neon) { ctx.strokeStyle = o.neon; ctx.lineWidth = 2; ctx.strokeRect(o.x, o.y, o.w, o.h); ctx.fillStyle = o.neon; ctx.globalAlpha = 0.2; ctx.fillRect(o.x, o.y, o.w, o.h); ctx.globalAlpha = 1.0; } if (o.stripe) { ctx.fillStyle = o.stripe; ctx.fillRect(o.x, o.y + o.h/2 - 10, o.w, 20); } if (!o.neon && !o.stripe) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(o.x, o.y, o.w, 5); } } else if (o.type === 'tree') { ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.arc(o.x+5, o.y+5, o.r-10, 0, Math.PI*2); ctx.fill(); } });
+    
+    // Скидаємо зміщення тіней від будинків
+    ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
     
     for(let pid in powerups) { const pu = powerups[pid]; const boxColor = PU_COLORS[pu.type] || '#38bdf8'; ctx.save(); ctx.translate(pu.x, pu.y); ctx.rotate(now / 500); ctx.fillStyle = '#334155'; ctx.fillRect(-20, -20, 40, 40); ctx.strokeStyle = boxColor; ctx.lineWidth = 3; ctx.strokeRect(-20, -20, 40, 40); ctx.fillStyle = boxColor; ctx.shadowBlur = 10; ctx.shadowColor = boxColor; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '24px Russo One'; ctx.fillText(PU_ICONS[pu.type], 0, 2); ctx.restore(); }
     

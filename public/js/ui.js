@@ -7,8 +7,17 @@ function showScreen(screenId) {
 }
 function updateGlobalBucks() { document.querySelectorAll('.global-bucks-display').forEach(el => el.innerText = myBucks); }
 
-const musicSlider = document.getElementById('vol-music'); if(musicSlider) { musicSlider.addEventListener('input', e => { if (typeof setMusicVolume === 'function') setMusicVolume(parseFloat(e.target.value)); }); }
-const sfxSlider = document.getElementById('vol-sfx'); if(sfxSlider) { sfxSlider.addEventListener('input', e => { if (typeof setSfxVolume === 'function') setSfxVolume(parseFloat(e.target.value)); }); }
+// Синхронізуємо повзунки зі збереженими налаштуваннями
+const musicSlider = document.getElementById('vol-music'); 
+if(musicSlider) { 
+    if(typeof volMusic !== 'undefined') musicSlider.value = volMusic;
+    musicSlider.addEventListener('input', e => { if (typeof setMusicVolume === 'function') setMusicVolume(parseFloat(e.target.value)); }); 
+}
+const sfxSlider = document.getElementById('vol-sfx'); 
+if(sfxSlider) { 
+    if(typeof volSfx !== 'undefined') sfxSlider.value = volSfx;
+    sfxSlider.addEventListener('input', e => { if (typeof setSfxVolume === 'function') setSfxVolume(parseFloat(e.target.value)); }); 
+}
 
 document.getElementById('tab-login').onclick = () => { authMode='login'; if (typeof playSound === 'function') playSound('ui_click'); document.getElementById('tab-login').className='flex-1 py-3 text-xs font-bold uppercase transition bg-blue-600 text-white tracking-wider'; document.getElementById('tab-register').className='flex-1 py-3 text-xs font-bold uppercase transition text-slate-400 hover:bg-slate-800 tracking-wider'; document.getElementById('auth-btn').innerText='АВТОРИЗАЦІЯ'; };
 document.getElementById('tab-register').onclick = () => { authMode='register'; if (typeof playSound === 'function') playSound('ui_click'); document.getElementById('tab-register').className='flex-1 py-3 text-xs font-bold uppercase transition bg-blue-600 text-white tracking-wider'; document.getElementById('tab-login').className='flex-1 py-3 text-xs font-bold uppercase transition text-slate-400 hover:bg-slate-800 tracking-wider'; document.getElementById('auth-btn').innerText='СТВОРИТИ АКАУНТ'; };
@@ -46,7 +55,6 @@ document.querySelectorAll('.create-map-select').forEach(btn => { btn.onclick = (
 document.getElementById('create-max-players').oninput = (e) => { createConfig.maxPlayers = e.target.value; document.getElementById('max-players-val').innerText = e.target.value; };
 document.getElementById('confirm-create-btn').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); createConfig.winScore = document.getElementById('create-win-score').value; document.getElementById('create-room-modal').classList.add('hidden'); socket.emit('createRoom', createConfig); };
 
-// --- DRAG AND DROP ЛОГІКА ---
 let dragSource = null;
 window.dragStartInv = function(e, modId, index) { dragSource = { type: 'inv', index: index, id: modId }; e.dataTransfer.setData('text/plain', modId); };
 window.dragStartEq = function(e, modId, slotType) { dragSource = { type: 'eq', slotType: slotType, id: modId }; e.dataTransfer.setData('text/plain', modId); };
