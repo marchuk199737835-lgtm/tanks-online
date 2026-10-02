@@ -3,10 +3,7 @@ function showScreen(screenId) {
     screens.forEach(id => { const el = document.getElementById(id); if (el) { el.classList.add('hidden'); el.classList.remove('flex'); } });
     const s = document.getElementById(screenId); if (s) { s.classList.remove('hidden'); if (screenId !== 'game-screen') s.classList.add('flex'); }
     if (typeof playSound === 'function') playSound('ui_click');
-    
-    // Анімація прев'ю танка
-    if (screenId === 'hangar-screen') startHangarPreview();
-    else stopHangarPreview();
+    if (screenId === 'hangar-screen') startHangarPreview(); else stopHangarPreview();
 }
 function updateGlobalBucks() { document.querySelectorAll('.global-bucks-display').forEach(el => el.innerText = myBucks); }
 
@@ -49,8 +46,6 @@ document.querySelectorAll('.create-map-select').forEach(btn => { btn.onclick = (
 document.getElementById('create-max-players').oninput = (e) => { createConfig.maxPlayers = e.target.value; document.getElementById('max-players-val').innerText = e.target.value; };
 document.getElementById('confirm-create-btn').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); createConfig.winScore = document.getElementById('create-win-score').value; document.getElementById('create-room-modal').classList.add('hidden'); socket.emit('createRoom', createConfig); };
 
-// --- АНГАР ТА ІНВЕНТАР ---
-let selectedInvItem = null;
 function renderHangar() {
     document.getElementById('hangar-player-name').innerText = myName;
     document.getElementById('stat-kills').innerText = myStats.kills || 0;
@@ -58,7 +53,6 @@ function renderHangar() {
     document.getElementById('stat-earned').innerText = myStats.earned || 0;
     
     let totalDmg = 1.0, totalRange = 1.0, totalCd = 1.0, totalHp = 1.0, totalSpeed = 1.0, totalRot = 1.0;
-    
     const eqHtml = [];
     const types = [{k: 'cannon', n: 'Дуло'}, {k: 'turret', n: 'Башта'}, {k: 'hull', n: 'Корпус'}, {k: 'tracks', n: 'Гусениці'}];
     
@@ -69,8 +63,8 @@ function renderHangar() {
             if(m.stats.dmg) totalDmg *= m.stats.dmg; if(m.stats.range) totalRange *= m.stats.range; if(m.stats.cd) totalCd *= m.stats.cd;
             if(m.stats.hp) totalHp *= m.stats.hp; if(m.stats.speed) totalSpeed *= m.stats.speed; if(m.stats.rotSpeed) totalRot *= m.stats.rotSpeed;
             
-            let icon = t.k==='cannon'?'🔫':t.k==='turret'?'🔄':t.k==='hull'?'🛡️':'⚙️';
-            eqHtml.push(`<div class="flex items-center gap-3 bg-slate-800/50 p-2 rounded-xl border border-slate-700"><div class="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-900 border" style="border-color:${RARITY[m.rarity].color}">${icon}</div><div><p class="text-xs text-white font-bold">${m.name}</p><p class="text-[9px] uppercase font-bold" style="color:${RARITY[m.rarity].color}">${RARITY[m.rarity].name}</p></div></div>`);
+            let iconSvg = SVG_ICONS[t.k](RARITY[m.rarity].color);
+            eqHtml.push(`<div class="flex items-center gap-3 bg-slate-800/50 p-2 rounded-xl border border-slate-700"><div class="w-10 h-10 p-2 flex items-center justify-center rounded-lg bg-slate-900 border" style="border-color:${RARITY[m.rarity].color}">${iconSvg}</div><div><p class="text-xs text-white font-bold">${m.name}</p><p class="text-[9px] uppercase font-bold" style="color:${RARITY[m.rarity].color}">${CAT_NAMES[t.k]} | ${RARITY[m.rarity].name}</p></div></div>`);
         } else {
             eqHtml.push(`<div class="flex items-center gap-3 bg-slate-900/50 p-2 rounded-xl border border-slate-800 opacity-50"><div class="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-900 border border-slate-700">❌</div><div><p class="text-xs text-slate-500 font-bold">Стандарт</p><p class="text-[9px] uppercase font-bold text-slate-600">${t.n}</p></div></div>`);
         }
@@ -94,8 +88,8 @@ function renderHangar() {
         if (i < myInventory.length) {
             let modId = myInventory[i]; let mod = MODULES[modId];
             if(!mod) continue;
-            let icon = mod.type==='cannon'?'🔫':mod.type==='turret'?'🔄':mod.type==='hull'?'🛡️':'⚙️';
-            invGrid.innerHTML += `<div class="inv-slot item-${mod.rarity}" onclick="openCtxMenu(event, '${modId}')" title="${mod.name}">${icon}</div>`;
+            let iconSvg = SVG_ICONS[mod.type](RARITY[mod.rarity].color);
+            invGrid.innerHTML += `<div class="inv-slot item-${mod.rarity} p-2" onclick="openCtxMenu(event, '${modId}')" title="${mod.name}">${iconSvg}</div>`;
         } else {
             invGrid.innerHTML += `<div class="inv-slot empty"></div>`;
         }
@@ -108,6 +102,7 @@ function openCtxMenu(e, modId) {
     let mod = MODULES[modId];
     document.getElementById('ctx-name').innerText = mod.name;
     document.getElementById('ctx-name').style.color = RARITY[mod.rarity].color;
+    document.getElementById('ctx-cat').innerText = `${CAT_NAMES[mod.type]} | ${RARITY[mod.rarity].name}`;
     
     let desc = [];
     if(mod.stats.dmg) desc.push(`Урон: ${Math.round(mod.stats.dmg*100)}%`);
@@ -115,6 +110,7 @@ function openCtxMenu(e, modId) {
     if(mod.stats.speed) desc.push(`Рух: ${Math.round(mod.stats.speed*100)}%`);
     if(mod.stats.cd) desc.push(`Перезарядка: ${Math.round(mod.stats.cd*100)}%`);
     if(mod.stats.range) desc.push(`Дальність: ${Math.round(mod.stats.range*100)}%`);
+    if(mod.stats.rotSpeed) desc.push(`Башта: ${Math.round(mod.stats.rotSpeed*100)}%`);
     
     document.getElementById('ctx-desc').innerHTML = desc.join('<br>');
     document.getElementById('ctx-sell').innerText = `Продати ($${RARITY[mod.rarity].price})`;
@@ -122,7 +118,6 @@ function openCtxMenu(e, modId) {
     const menu = document.getElementById('context-menu');
     menu.classList.remove('hidden');
     
-    // Позиціонування
     let x = e.clientX; let y = e.clientY;
     if (x + 200 > window.innerWidth) x -= 200;
     if (y + 150 > window.innerHeight) y -= 150;
@@ -160,61 +155,58 @@ window.buyShopCase = function(caseId, price) {
 };
 
 document.getElementById('cancel-case-btn').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); document.getElementById('case-confirm-modal').classList.add('hidden'); };
-document.getElementById('close-reward-btn').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); document.getElementById('reward-modal').classList.add('hidden'); };
 
-// --- АНІМАЦІЯ ПРЕВ'Ю ТАНКА ---
-let hangarAnimId = null;
-let hMouseX = 150, hMouseY = 150;
-const hCanvas = document.getElementById('hangar-canvas');
-const hCtx = hCanvas.getContext('2d');
+// ФІКС ВІКНА НАГОРОДИ (Перемалювання Ангару після закриття)
+document.getElementById('close-reward-btn').onclick = () => { 
+    if (typeof playSound === 'function') playSound('ui_click'); 
+    document.getElementById('reward-modal').classList.add('hidden'); 
+    updateGlobalBucks(); // Відразу оновлюємо гроші
+    if (!document.getElementById('hangar-screen').classList.contains('hidden')) {
+        renderHangar(); // Одразу оновлюємо інвентар
+    }
+};
+
+let hangarAnimId = null; let hMouseX = 150, hMouseY = 150;
+const hCanvas = document.getElementById('hangar-canvas'); const hCtx = hCanvas.getContext('2d');
 hCanvas.addEventListener('mousemove', e => { const rect = hCanvas.getBoundingClientRect(); hMouseX = e.clientX - rect.left; hMouseY = e.clientY - rect.top; });
 
 function startHangarPreview() {
     if (hangarAnimId) cancelAnimationFrame(hangarAnimId);
     let angle = 0;
-    
     function drawPreview() {
-        hCtx.clearRect(0, 0, hCanvas.width, hCanvas.height);
-        hCtx.save(); hCtx.translate(150, 150);
-        
+        hCtx.clearRect(0, 0, hCanvas.width, hCanvas.height); hCtx.save(); hCtx.translate(150, 150);
         let tAng = Math.atan2(hMouseY - 150, hMouseX - 150);
-        let cHex = myColor==='white'?'#f8fafc':myColor==='black'?'#1e293b':myColor==='red'?'#ef4444':myColor==='blue'?'#3b82f6':myColor==='brown'?'#78350f':myColor==='purple'?'#9333ea':'#475569';
+        let cHex = '#1e293b'; // В Ангарі корпус завжди базово темний, колір команди працює в грі
         
-        // Перевіряємо екіпіровку для кольорів неону
         let hCol = myEquipped.hull ? RARITY[MODULES[myEquipped.hull].rarity].color : '#0f172a';
         let trCol = myEquipped.tracks ? RARITY[MODULES[myEquipped.tracks].rarity].color : '#0f172a';
         let cCol = myEquipped.cannon ? RARITY[MODULES[myEquipped.cannon].rarity].color : '#0f172a';
         let tuCol = myEquipped.turret ? RARITY[MODULES[myEquipped.turret].rarity].color : '#334155';
 
-        // Гусениці
         hCtx.fillStyle = trCol; hCtx.shadowColor = trCol; hCtx.shadowBlur = myEquipped.tracks ? 15 : 0;
         hCtx.fillRect(-36, -32, 72, 14); hCtx.fillRect(-36, 18, 72, 14); hCtx.shadowBlur = 0;
         
-        // Корпус
         hCtx.fillStyle = cHex; hCtx.strokeStyle = hCol; hCtx.lineWidth = myEquipped.hull ? 3 : 1;
         if(myEquipped.hull) { hCtx.shadowColor = hCol; hCtx.shadowBlur = 10; }
         hCtx.fillRect(-30, -22, 60, 44); hCtx.strokeRect(-30, -22, 60, 44); hCtx.shadowBlur = 0;
 
-        // Башта і Дуло
         hCtx.save(); hCtx.rotate(tAng); 
         hCtx.fillStyle = '#334155'; hCtx.strokeStyle = cCol; hCtx.lineWidth = myEquipped.cannon ? 3 : 1;
         if(myEquipped.cannon) { hCtx.shadowColor = cCol; hCtx.shadowBlur = 10; }
         let cLen = 45; if(myEquipped.cannon && MODULES[myEquipped.cannon].stats.range > 1.1) cLen = 60;
+        if(myEquipped.cannon && MODULES[myEquipped.cannon].stats.range < 1.0) cLen = 35;
         hCtx.fillRect(0, -6, cLen, 12); hCtx.strokeRect(0, -6, cLen, 12); hCtx.shadowBlur = 0;
 
         hCtx.fillStyle = cHex; hCtx.strokeStyle = tuCol; hCtx.lineWidth = myEquipped.turret ? 3 : 1;
         if(myEquipped.turret) { hCtx.shadowColor = tuCol; hCtx.shadowBlur = 15; }
         hCtx.beginPath(); hCtx.arc(0, 0, 20, 0, Math.PI*2); hCtx.fill(); hCtx.stroke(); hCtx.shadowBlur = 0;
-        hCtx.restore();
-
-        hCtx.restore();
+        hCtx.restore(); hCtx.restore();
         hangarAnimId = requestAnimationFrame(drawPreview);
     }
     drawPreview();
 }
 function stopHangarPreview() { if (hangarAnimId) cancelAnimationFrame(hangarAnimId); }
 
-// --- ЛОБІ КІМНАТИ ---
 document.getElementById('leave-room-btn').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); if(currentRoomId) socket.emit('leaveRoom', currentRoomId); currentRoomId = null; currentRoomData = null; showScreen('room-browser-screen'); };
 
 function updateLobbyUI() {

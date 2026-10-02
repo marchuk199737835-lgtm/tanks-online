@@ -46,7 +46,6 @@
         </div>
         <h1 class="text-7xl text-white font-russo mb-16 drop-shadow-[0_0_20px_rgba(255,255,255,0.3)] tracking-widest fade-in">ОБЕРІТЬ ДІЮ</h1>
         
-        <!-- ТРИ КНОПКИ МЕНЮ -->
         <div class="flex gap-6 slide-up max-w-6xl w-full px-8 justify-center">
             <button id="nav-sessions-btn" class="flex-1 max-w-[320px] h-80 glass-panel rounded-3xl border border-blue-500/30 hover:border-blue-500 hover:shadow-[0_0_30px_rgba(37,99,235,0.4)] transition-all group flex flex-col items-center justify-center gap-4">
                 <div class="text-7xl group-hover:scale-110 transition-transform duration-300">🌍</div>
@@ -66,7 +65,7 @@
         </div>
     </div>
 
-    <!-- Екран 2.5: АНГАР (НОВИЙ) -->
+    <!-- Екран 2.5: АНГАР -->
     <div id="hangar-screen" class="screen-container hidden fixed inset-0 z-40 flex-col p-8 overflow-y-auto">
         <div class="flex justify-between items-center mb-6 fade-in">
             <button id="hangar-back-btn" class="glass-panel px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-slate-300 hover:text-white transition">← Назад</button>
@@ -77,13 +76,11 @@
         </div>
 
         <div class="flex flex-col md:flex-row gap-6 mb-6">
-            <!-- Canvas Передперегляду -->
             <div class="glass-panel p-4 rounded-3xl border border-slate-700 w-full md:w-1/3 flex flex-col items-center justify-center relative overflow-hidden" style="min-height: 350px;">
                 <h3 class="absolute top-4 left-6 text-sm font-russo text-slate-400 tracking-widest uppercase">Креслення</h3>
                 <canvas id="hangar-canvas" width="300" height="300" class="cursor-crosshair"></canvas>
             </div>
             
-            <!-- Інфо-блок -->
             <div class="glass-panel p-6 rounded-3xl border border-slate-700 w-full md:w-2/3 flex flex-col gap-4">
                 <div class="flex justify-between items-end border-b border-slate-700 pb-4">
                     <div>
@@ -100,9 +97,7 @@
                 <div class="grid grid-cols-2 gap-8 mt-2 flex-1">
                     <div>
                         <h4 class="text-xs uppercase text-slate-500 font-bold tracking-widest mb-4">Екіпірування</h4>
-                        <div class="space-y-3" id="equipped-slots-container">
-                            <!-- Слоти генеруються в JS -->
-                        </div>
+                        <div class="space-y-3" id="equipped-slots-container"></div>
                     </div>
                     <div>
                         <h4 class="text-xs uppercase text-slate-500 font-bold tracking-widest mb-4">Показники Танку</h4>
@@ -117,15 +112,13 @@
             </div>
         </div>
 
-        <!-- Інвентар 30 слотів -->
+        <!-- Інвентар -->
         <div class="glass-panel p-6 rounded-3xl border border-slate-700 flex-1">
             <div class="flex justify-between items-center mb-4">
                 <h4 class="text-sm uppercase text-slate-400 font-bold tracking-widest">Рюкзак Модулів</h4>
                 <span class="text-xs font-bold text-slate-500"><span id="inv-count">0</span> / 30</span>
             </div>
-            <div class="grid grid-cols-5 sm:grid-cols-10 gap-3" id="inventory-grid">
-                <!-- Слоти генеруються в JS -->
-            </div>
+            <div class="grid grid-cols-5 sm:grid-cols-10 gap-3" id="inventory-grid"></div>
         </div>
     </div>
 
@@ -133,7 +126,8 @@
     <div id="context-menu" class="hidden absolute z-[110] glass-panel border border-slate-600 rounded-xl overflow-hidden shadow-2xl w-48 flex flex-col text-sm font-bold uppercase tracking-wider">
         <div id="ctx-info" class="p-3 bg-slate-900/80 border-b border-slate-700 text-center">
             <p id="ctx-name" class="text-white font-russo">Назва</p>
-            <p id="ctx-desc" class="text-[10px] text-slate-400 mt-1 leading-tight">Характеристики</p>
+            <p id="ctx-cat" class="text-[9px] text-purple-400 mt-1 uppercase tracking-widest font-bold">КАТЕГОРІЯ | РІДКІСТЬ</p>
+            <p id="ctx-desc" class="text-[10px] text-slate-400 mt-1 leading-tight border-t border-slate-700 pt-1">Характеристики</p>
         </div>
         <button id="ctx-equip" class="p-3 hover:bg-blue-600 hover:text-white text-blue-400 transition text-left">Одягнути</button>
         <button id="ctx-sell" class="p-3 hover:bg-emerald-600 hover:text-white text-emerald-400 transition text-left border-t border-slate-700">Продати ($0)</button>
@@ -178,7 +172,7 @@
         </div>
     </div>
 
-    <!-- Екран 4: Крамниця (КЕЙСИ) -->
+    <!-- Екран 4: Крамниця -->
     <div id="shop-screen" class="screen-container hidden fixed inset-0 z-40 flex-col p-8 overflow-y-auto">
         <div class="flex justify-between items-center mb-8 fade-in">
             <button id="shop-back-btn" class="glass-panel px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-slate-300 hover:text-white transition">← Назад</button>
@@ -189,7 +183,6 @@
         </div>
 
         <div class="flex flex-col md:flex-row gap-8 justify-center items-center flex-1 slide-up pb-8">
-            <!-- Кейс 1 -->
             <div class="glass-panel p-8 rounded-[3rem] border border-slate-600 flex flex-col items-center w-full max-w-sm hover:border-slate-400 transition hover:shadow-2xl">
                 <div class="text-8xl mb-4 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">📦</div>
                 <h3 class="text-2xl font-russo text-white mb-2 tracking-widest uppercase">БАЗОВИЙ ЯЩИК</h3>
@@ -197,7 +190,6 @@
                 <button onclick="buyShopCase(1, 50)" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-4 rounded-2xl text-xl font-russo uppercase tracking-widest transition shadow-lg border border-slate-500">💵 50</button>
             </div>
 
-            <!-- Кейс 2 -->
             <div class="glass-panel p-8 rounded-[3rem] border border-purple-500/50 flex flex-col items-center w-full max-w-sm hover:border-purple-400 transition hover:shadow-[0_0_30px_rgba(168,85,247,0.3)] transform scale-105">
                 <div class="text-9xl mb-4 drop-shadow-[0_0_20px_rgba(168,85,247,0.5)]">🎁</div>
                 <h3 class="text-3xl font-russo text-purple-400 mb-2 tracking-widest uppercase text-center">ШТУРМОВИЙ КЕЙС</h3>
@@ -205,7 +197,6 @@
                 <button onclick="buyShopCase(2, 100)" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-5 rounded-2xl text-2xl font-russo uppercase tracking-widest transition shadow-[0_0_20px_rgba(168,85,247,0.4)]">💵 100</button>
             </div>
 
-            <!-- Кейс 3 -->
             <div class="glass-panel p-8 rounded-[3rem] border border-yellow-500/50 flex flex-col items-center w-full max-w-sm hover:border-yellow-400 transition hover:shadow-[0_0_30px_rgba(234,179,8,0.3)]">
                 <div class="text-8xl mb-4 drop-shadow-[0_0_20px_rgba(234,179,8,0.5)]">💎</div>
                 <h3 class="text-2xl font-russo text-yellow-500 mb-2 tracking-widest uppercase text-center">ЕЛІТНИЙ КОНТЕЙНЕР</h3>
@@ -239,9 +230,9 @@
     <div id="reward-modal" class="modal hidden fixed inset-0 z-[70] flex items-center justify-center p-4">
         <div class="glass-panel p-10 rounded-[3rem] max-w-sm w-full text-center border shadow-[0_0_60px_rgba(16,185,129,0.4)] slide-up" id="reward-modal-panel">
             <h2 class="text-4xl font-russo mb-6 tracking-widest" id="reward-title">ТРИМАЙ!</h2>
-            <div class="text-8xl mb-6 drop-shadow-2xl" id="reward-item-icon">📦</div>
+            <div class="w-24 h-24 mx-auto mb-6 drop-shadow-2xl flex items-center justify-center" id="reward-item-icon"></div>
             <p class="text-2xl font-bold text-white mb-2 tracking-wider" id="reward-item-name">Апгрейд</p>
-            <p class="text-xs font-bold uppercase tracking-widest mb-8" id="reward-item-rarity">Рідкість</p>
+            <p class="text-[10px] font-bold uppercase tracking-widest mb-8 text-slate-400" id="reward-item-cat">КАТЕГОРІЯ | РІДКІСТЬ</p>
             <button id="close-reward-btn" class="w-full bg-slate-700 hover:bg-slate-600 py-4 rounded-2xl font-russo text-xl uppercase tracking-widest text-white shadow-lg transition">ОК</button>
         </div>
     </div>
@@ -286,8 +277,8 @@
 
                 <div class="glass-panel p-8 rounded-3xl border border-slate-700">
                     <h3 class="text-sm uppercase text-white mb-6 font-russo tracking-widest flex justify-between">
-                        <span>КАМУФЛЯЖ</span>
-                        <span class="text-[10px] text-slate-400">Характеристики залежать від Ангару</span>
+                        <span>Колір Команди</span>
+                        <span class="text-[10px] text-slate-400">Візуал танка залежить від Ангару</span>
                     </h3>
                     <div class="grid grid-cols-6 gap-4" id="color-selectors">
                         <button class="color-btn bg-white h-16 rounded-2xl shadow-lg border-2 border-transparent" data-color="white"></button>
@@ -375,14 +366,13 @@
                     <p class="text-4xl font-russo text-white">💵 +<span id="winner-reward">0</span></p>
                 </div>
                 
-                <!-- БЛОК ДРОПУ ПІСЛЯ МАТЧУ -->
                 <div id="drop-notification" class="hidden bg-slate-800/80 border border-purple-500 rounded-2xl p-4 mb-6 relative z-10">
                     <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2">Щось зацепилось за гуслю, перевір інвентар</p>
                     <div class="flex items-center justify-center gap-3">
-                        <span class="text-3xl" id="drop-icon">📦</span>
+                        <div class="w-12 h-12 flex items-center justify-center" id="drop-icon"></div>
                         <div class="text-left">
                             <p class="font-russo text-white tracking-wider" id="drop-name">Модуль</p>
-                            <p class="text-[10px] font-bold uppercase" id="drop-rarity">Рідкість</p>
+                            <p class="text-[10px] font-bold uppercase" id="drop-cat">КАТЕГОРІЯ | РІДКІСТЬ</p>
                         </div>
                     </div>
                 </div>

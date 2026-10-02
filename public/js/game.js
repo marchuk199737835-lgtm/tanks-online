@@ -1,24 +1,17 @@
 const canvas = document.getElementById('game-canvas'); const ctx = canvas.getContext('2d'); window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }); canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
-function createExplosion(x, y, count, color) {
-    for(let i=0; i<count; i++){ const ang = Math.random() * Math.PI * 2; const spd = Math.random() * 200 + 50; particles.push({ x, y, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd, life: Math.random() * 0.4 + 0.1, color }); }
-}
+function createExplosion(x, y, count, color) { for(let i=0; i<count; i++){ const ang = Math.random() * Math.PI * 2; const spd = Math.random() * 200 + 50; particles.push({ x, y, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd, life: Math.random() * 0.4 + 0.1, color }); } }
 
-function checkCollision(x, y, r, checkSolids = true) {
-    if (!currentRoomData) return true; let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'city'; let mSize = MAP_DATA[cMap].size; if (x - r < 0 || x + r > mSize || y - r < 0 || y + r > mSize) return true; 
-    if (checkSolids) { const solids = MAP_DATA[cMap].solids; for (let s of solids) { if (s.type === 'wall') { let testX = Math.max(s.x, Math.min(x, s.x + s.w)), testY = Math.max(s.y, Math.min(y, s.y + s.h)); if (Math.hypot(x - testX, y - testY) <= r) return true; } else if (s.type === 'tree') { if (Math.hypot(x - s.x, y - s.y) < r + s.r) return true; } } } return false;
-}
+function checkCollision(x, y, r, checkSolids = true) { if (!currentRoomData) return true; let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'city'; let mSize = MAP_DATA[cMap].size; if (x - r < 0 || x + r > mSize || y - r < 0 || y + r > mSize) return true; if (checkSolids) { const solids = MAP_DATA[cMap].solids; for (let s of solids) { if (s.type === 'wall') { let testX = Math.max(s.x, Math.min(x, s.x + s.w)), testY = Math.max(s.y, Math.min(y, s.y + s.h)); if (Math.hypot(x - testX, y - testY) <= r) return true; } else if (s.type === 'tree') { if (Math.hypot(x - s.x, y - s.y) < r + s.r) return true; } } } return false; }
 
 function updatePhysics(now, dt) {
     if (!currentRoomData || !currentRoomId) return;
     let myRadius = myLocalTank.buff === 'boss' ? 75 : 30;
     
     if (myLocalTank.hp > 0) {
-        let moveX = 0, moveY = 0; 
-        let totalSpeed = 1.0;
+        let moveX = 0, moveY = 0; let totalSpeed = 1.0;
         if(myEquipped.hull && MODULES[myEquipped.hull]) totalSpeed *= MODULES[myEquipped.hull].stats.speed || 1;
         if(myEquipped.tracks && MODULES[myEquipped.tracks]) totalSpeed *= MODULES[myEquipped.tracks].stats.speed || 1;
-        
         let speedMult = 1.0; if(myLocalTank.buff === 'samurai') speedMult *= 1.5; 
         let speed = (myLocalTank.buff === 'boss' ? TANK_SPEED * 0.6 : TANK_SPEED) * speedMult * totalSpeed;
         
@@ -26,7 +19,6 @@ function updatePhysics(now, dt) {
         if (moveX !== 0 || moveY !== 0) { 
             let len = Math.hypot(moveX, moveY); moveX /= len; moveY /= len; myLocalTank.bodyAngle = Math.atan2(moveY, moveX); 
             let nextX = myLocalTank.x + moveX * speed * dt, nextY = myLocalTank.y + moveY * speed * dt; 
-            
             let isBoss = (myLocalTank.buff === 'boss');
             if (!checkCollision(nextX, myLocalTank.y, myRadius) || isBoss) myLocalTank.x = nextX; 
             if (!checkCollision(myLocalTank.x, nextY, myRadius) || isBoss) myLocalTank.y = nextY; 
@@ -42,10 +34,8 @@ function updatePhysics(now, dt) {
         if (keys.space && (now - lastShootTime >= fCfg.cd * totalCd)) {
             lastShootTime = now; let bId = Date.now() + Math.random(); let bSpd = (myLocalTank.buff === 'fast' || myLocalTank.buff === 'minigun') ? BASE_BULLET_SPEED * 1.8 : BASE_BULLET_SPEED;
             let shot = { roomId: currentRoomId, id: bId, x: myLocalTank.x + Math.cos(myLocalTank.turretAngle)*(myRadius+10), y: myLocalTank.y + Math.sin(myLocalTank.turretAngle)*(myRadius+10), vx: Math.cos(myLocalTank.turretAngle)*bSpd, vy: Math.sin(myLocalTank.turretAngle)*bSpd, type: myLocalTank.buff || 'none', lifeMult: totalRange };
-            
             if (myLocalTank.buff === 'samurai') { shot.x = myLocalTank.x + Math.cos(myLocalTank.turretAngle)*(myRadius+15); shot.y = myLocalTank.y + Math.sin(myLocalTank.turretAngle)*(myRadius+15); shot.vx = Math.cos(myLocalTank.turretAngle) * 100; shot.vy = Math.sin(myLocalTank.turretAngle) * 100; }
-            if (myLocalTank.buff === 'homing' && homingTargetId) shot.targetId = homingTargetId; 
-            socket.emit('shoot', shot);
+            if (myLocalTank.buff === 'homing' && homingTargetId) shot.targetId = homingTargetId; socket.emit('shoot', shot);
         }
 
         for(let pid in powerups) { if (Math.hypot(powerups[pid].x - myLocalTank.x, powerups[pid].y - myLocalTank.y) < myRadius + 30) socket.emit('collectPowerup', {roomId: currentRoomId, pid: pid}); }
@@ -69,7 +59,6 @@ function updatePhysics(now, dt) {
         }
 
         if (!hit && isSurvival && b.owner === myId) { for(let zid in zombies) { let z = zombies[zid]; let zDist = b.type === 'samurai' ? Z_TYPES[z.type].radius + 35 : Z_TYPES[z.type].radius + 10; if (Math.hypot(b.x - z.x, b.y - z.y) < zDist) { hit = true; socket.emit('zombieHit', { roomId: currentRoomId, zid: zid, dmg: bCfg.dmg }); createExplosion(b.x, b.y, 5, Z_TYPES[z.type].color); break; } } }
-
         if (!hit && b.owner === 'zombie' && myLocalTank.hp > 0) { let hitDist = myRadius + 4; if (Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < hitDist) { hit = true; let dmgToDeal = b.dmgOverride || bCfg.dmg; playSound('hurt'); shakeTime = 0.3; socket.emit('takeDamage', { roomId: currentRoomId, amt: dmgToDeal, attacker: 'zombie' }); } }
         
         if (hit || b.life <= 0) { 
@@ -83,8 +72,11 @@ function updatePhysics(now, dt) {
 
 function drawTank(x, y, bodyAngle, turretAngle, colorHex, name, isMe, hp, buff, equipped) {
     if (hp <= 0) return; ctx.save(); ctx.translate(x, y); let scale = buff === 'boss' ? 2.5 : 1.0; ctx.scale(scale, scale); if (buff === 'invisible') ctx.globalAlpha = isMe ? 0.2 : 0.03; else ctx.globalAlpha = 1.0;
-    ctx.shadowColor = 'transparent'; ctx.fillStyle = isMe ? '#60a5fa' : '#cbd5e1'; ctx.font = '14px Russo One'; ctx.textAlign = 'center'; if(buff !== 'invisible' || isMe) ctx.fillText(name, 0, -45);
     
+    // ІМ'Я ГРАВЦЯ має колір команди, ТАНК - колір ангару
+    ctx.shadowColor = 'transparent'; ctx.fillStyle = colorHex; ctx.font = '14px Russo One'; ctx.textAlign = 'center'; if(buff !== 'invisible' || isMe) ctx.fillText(name, 0, -45);
+    
+    let baseHullCol = '#1e293b'; 
     let hCol = equipped && equipped.hull && MODULES[equipped.hull] ? RARITY[MODULES[equipped.hull].rarity].color : '#0f172a';
     let trCol = equipped && equipped.tracks && MODULES[equipped.tracks] ? RARITY[MODULES[equipped.tracks].rarity].color : '#0f172a';
     let cCol = equipped && equipped.cannon && MODULES[equipped.cannon] ? RARITY[MODULES[equipped.cannon].rarity].color : '#0f172a';
@@ -94,7 +86,7 @@ function drawTank(x, y, bodyAngle, turretAngle, colorHex, name, isMe, hp, buff, 
     ctx.fillStyle = trCol; ctx.shadowColor = trCol; ctx.shadowBlur = equipped && equipped.tracks ? 15 : 0;
     ctx.fillRect(-36, -32, 72, 14); ctx.fillRect(-36, 18, 72, 14); ctx.shadowBlur = 0;
     
-    ctx.fillStyle = colorHex; ctx.strokeStyle = hCol; ctx.lineWidth = equipped && equipped.hull ? 3 : 1;
+    ctx.fillStyle = baseHullCol; ctx.strokeStyle = hCol; ctx.lineWidth = equipped && equipped.hull ? 3 : 1;
     if(equipped && equipped.hull) { ctx.shadowColor = hCol; ctx.shadowBlur = 10; }
     ctx.fillRect(-30, -22, 60, 44); ctx.strokeRect(-30, -22, 60, 44); ctx.shadowBlur = 0;
     ctx.restore();
@@ -106,7 +98,7 @@ function drawTank(x, y, bodyAngle, turretAngle, colorHex, name, isMe, hp, buff, 
     if(equipped && equipped.cannon && MODULES[equipped.cannon] && MODULES[equipped.cannon].stats.range < 1.0) cLen = 35;
     ctx.fillRect(0, -6, cLen, 12); ctx.strokeRect(0, -6, cLen, 12); ctx.shadowBlur = 0;
     
-    ctx.fillStyle = colorHex; ctx.strokeStyle = tuCol; ctx.lineWidth = equipped && equipped.turret ? 3 : 1;
+    ctx.fillStyle = baseHullCol; ctx.strokeStyle = tuCol; ctx.lineWidth = equipped && equipped.turret ? 3 : 1;
     if(equipped && equipped.turret) { ctx.shadowColor = tuCol; ctx.shadowBlur = 15; }
     ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI*2); ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
     ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.beginPath(); ctx.arc(-4, -4, 8, 0, Math.PI*2); ctx.fill(); 

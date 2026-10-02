@@ -46,10 +46,10 @@ socket.on('sync', (data) => {
         if (id !== myId) {
             if (!opponents[id]) activeOpponents[id] = { ...data.players[id] };
             else { activeOpponents[id] = opponents[id]; activeOpponents[id].targetX = data.players[id].x; activeOpponents[id].targetY = data.players[id].y; activeOpponents[id].targetBody = data.players[id].bodyAngle; activeOpponents[id].targetTurret = data.players[id].turretAngle; }
-            activeOpponents[id].hp = data.players[id].hp; activeOpponents[id].buff = data.players[id].buff; activeOpponents[id].equipped = data.players[id].equipped;
+            activeOpponents[id].hp = data.players[id].hp; activeOpponents[id].buff = data.players[id].buff; activeOpponents[id].equipped = data.players[id].equipped; activeOpponents[id].color = data.players[id].color;
         } else {
             myLocalTank.hp = data.players[id].hp; myLocalTank.buff = data.players[id].buff; myLocalTank.buffProgress = data.players[id].buffProgress; myLocalTank.score = data.players[id].score;
-            myEquipped = data.players[id].equipped || myEquipped;
+            myEquipped = data.players[id].equipped || myEquipped; myColor = data.players[id].color;
         }
     }
     opponents = activeOpponents; zombies = data.zombies || {}; powerups = data.powerups || {}; tokens = data.tokens || {};
@@ -79,8 +79,11 @@ socket.on('gameOver', (data) => {
     
     const dropNotif = document.getElementById('drop-notification');
     if (pendingDrop && MODULES[pendingDrop]) {
-        let mod = MODULES[pendingDrop]; document.getElementById('drop-name').innerText = mod.name; document.getElementById('drop-rarity').innerText = RARITY[mod.rarity].name; document.getElementById('drop-rarity').style.color = RARITY[mod.rarity].color;
-        let icon = mod.type === 'cannon' ? '🔫' : mod.type === 'turret' ? '🔄' : mod.type === 'hull' ? '🛡️' : '⚙️'; document.getElementById('drop-icon').innerText = icon; dropNotif.classList.remove('hidden');
+        let mod = MODULES[pendingDrop]; document.getElementById('drop-name').innerText = mod.name; 
+        document.getElementById('drop-cat').innerText = `${CAT_NAMES[mod.type]} | ${RARITY[mod.rarity].name}`; 
+        document.getElementById('drop-cat').style.color = RARITY[mod.rarity].color;
+        document.getElementById('drop-icon').innerHTML = SVG_ICONS[mod.type](RARITY[mod.rarity].color); 
+        dropNotif.classList.remove('hidden');
     } else { dropNotif.classList.add('hidden'); }
     
     if (data.winner === 'ZOMBIES') { 
@@ -102,14 +105,24 @@ socket.on('caseResult', (result) => {
     document.getElementById('roulette-modal').classList.remove('hidden'); const tape = document.getElementById('roulette-tape'); tape.style.transition = 'none'; tape.style.transform = 'translateX(0)'; tape.innerHTML = '';
     let items = []; const allModsKeys = Object.keys(MODULES);
     for(let i=0; i<65; i++) { if (i === 44) { items.push(result.modId); } else { items.push(allModsKeys[Math.floor(Math.random() * allModsKeys.length)]); } }
+    
     items.forEach(modId => { 
-        let mod = MODULES[modId]; let icon = mod.type === 'cannon' ? '🔫' : mod.type === 'turret' ? '🔄' : mod.type === 'hull' ? '🛡️' : '⚙️'; let rColor = RARITY[mod.rarity].color;
-        tape.innerHTML += `<div class="roulette-item text-center min-w-[90px] w-[90px] border-r border-slate-700 bg-slate-800" style="border-bottom: 3px solid ${rColor}"><div class="text-3xl">${icon}</div><div class="text-[8px] text-slate-300 mt-1 uppercase truncate w-full px-1">${mod.name}</div></div>`; 
+        let mod = MODULES[modId]; let rColor = RARITY[mod.rarity].color;
+        let iconSvg = SVG_ICONS[mod.type](rColor);
+        tape.innerHTML += `<div class="roulette-item text-center min-w-[90px] w-[90px] border-r border-slate-700 bg-slate-800" style="border-bottom: 3px solid ${rColor}"><div class="w-10 h-10 mx-auto">${iconSvg}</div><div class="text-[8px] text-slate-300 mt-2 uppercase truncate w-full px-1">${mod.name}</div></div>`; 
     });
+    
     setTimeout(() => { playSound('shoot'); tape.style.transition = 'transform 3.5s cubic-bezier(0.1, 1, 0.3, 1)'; let containerWidth = tape.parentElement.offsetWidth || 600; let targetX = (44 * 90 + 45) - (containerWidth / 2); tape.style.transform = `translateX(-${targetX}px)`; }, 100);
     setTimeout(() => { 
         playSound('powerup'); document.getElementById('roulette-modal').classList.add('hidden'); const rw = document.getElementById('reward-modal'); 
-        if(rw) { let mod = MODULES[result.modId]; let icon = mod.type === 'cannon' ? '🔫' : mod.type === 'turret' ? '🔄' : mod.type === 'hull' ? '🛡️' : '⚙️'; document.getElementById('reward-title').innerText = "ТРИМАЙ!"; document.getElementById('reward-title').className = "text-4xl font-russo mb-6 tracking-widest text-emerald-400"; document.getElementById('reward-modal-panel').style.borderColor = RARITY[mod.rarity].color; document.getElementById('reward-item-name').innerText = mod.name; document.getElementById('reward-item-icon').innerText = icon; document.getElementById('reward-item-rarity').innerText = RARITY[mod.rarity].name; document.getElementById('reward-item-rarity').style.color = RARITY[mod.rarity].color; rw.classList.remove('hidden'); } 
+        if(rw) { 
+            let mod = MODULES[result.modId]; 
+            document.getElementById('reward-title').innerText = "ТРИМАЙ!"; document.getElementById('reward-title').className = "text-4xl font-russo mb-6 tracking-widest text-emerald-400"; 
+            document.getElementById('reward-modal-panel').style.borderColor = RARITY[mod.rarity].color; document.getElementById('reward-item-name').innerText = mod.name; 
+            document.getElementById('reward-item-icon').innerHTML = SVG_ICONS[mod.type](RARITY[mod.rarity].color); 
+            document.getElementById('reward-item-cat').innerText = `${CAT_NAMES[mod.type]} | ${RARITY[mod.rarity].name}`; document.getElementById('reward-item-cat').style.color = RARITY[mod.rarity].color; 
+            rw.classList.remove('hidden'); 
+        } 
     }, 3600);
 });
 
