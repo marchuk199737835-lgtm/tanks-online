@@ -9,7 +9,8 @@ socket.on('authError', (msg) => { alert(msg); localStorage.removeItem('tankToken
 
 socket.on('economyUpdate', (data) => { 
     myBucks = data.bucks; myInventory = data.inventory || []; myEquipped = data.equipped || { cannon: null, turret: null, hull: null, tracks: null }; myStats = data.stats || { kills: 0, matches: 0, earned: 0 };
-    if (typeof updateGlobalBucks === 'function') updateGlobalBucks(); if (typeof renderHangar === 'function' && !document.getElementById('hangar-screen').classList.contains('hidden')) renderHangar(); 
+    if (typeof updateGlobalBucks === 'function') updateGlobalBucks(); 
+    if (typeof renderHangar === 'function' && !document.getElementById('hangar-screen').classList.contains('hidden')) renderHangar(); 
 });
 
 let pendingDrop = null;
@@ -102,6 +103,12 @@ socket.on('gameOver', (data) => {
 });
 
 socket.on('caseResult', (result) => {
+    // МИТТЄВЕ ОНОВЛЕННЯ БАЛАНСУ ТА ІНВЕНТАРЯ ЩЕ ДО ВІДМАЛЬОВКИ РУЛЕТКИ
+    myBucks = result.bucks;
+    if(result.inventory) myInventory = result.inventory;
+    if(result.equipped) myEquipped = result.equipped;
+    if (typeof updateGlobalBucks === 'function') updateGlobalBucks();
+    
     document.getElementById('roulette-modal').classList.remove('hidden'); const tape = document.getElementById('roulette-tape'); tape.style.transition = 'none'; tape.style.transform = 'translateX(0)'; tape.innerHTML = '';
     let items = []; const allModsKeys = Object.keys(MODULES);
     for(let i=0; i<65; i++) { if (i === 44) { items.push(result.modId); } else { items.push(allModsKeys[Math.floor(Math.random() * allModsKeys.length)]); } }

@@ -46,15 +46,40 @@ document.querySelectorAll('.create-map-select').forEach(btn => { btn.onclick = (
 document.getElementById('create-max-players').oninput = (e) => { createConfig.maxPlayers = e.target.value; document.getElementById('max-players-val').innerText = e.target.value; };
 document.getElementById('confirm-create-btn').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); createConfig.winScore = document.getElementById('create-win-score').value; document.getElementById('create-room-modal').classList.add('hidden'); socket.emit('createRoom', createConfig); };
 
+// --- DRAG AND DROP ЛОГІКА ---
+let dragSource = null;
+window.dragStartInv = function(e, modId, index) { dragSource = { type: 'inv', index: index, id: modId }; e.dataTransfer.setData('text/plain', modId); };
+window.dragStartEq = function(e, modId, slotType) { dragSource = { type: 'eq', slotType: slotType, id: modId }; e.dataTransfer.setData('text/plain', modId); };
+window.allowDrop = function(e) { e.preventDefault(); };
+
+window.dropInv = function(e, targetIndex) {
+    e.preventDefault(); if (!dragSource) return;
+    if (dragSource.type === 'inv') {
+        if(dragSource.index !== targetIndex) {
+            let item = myInventory.splice(dragSource.index, 1)[0];
+            let target = targetIndex > myInventory.length ? myInventory.length : targetIndex;
+            myInventory.splice(target, 0, item);
+            renderHangar(); socket.emit('reorderInventory', myInventory);
+        }
+    } else if (dragSource.type === 'eq') { socket.emit('unequipModule', { type: dragSource.slotType }); }
+    dragSource = null;
+};
+
+window.dropEq = function(e, slotType) {
+    e.preventDefault(); if (!dragSource) return;
+    if (dragSource.type === 'inv') {
+        let mod = MODULES[dragSource.id];
+        if (mod && mod.type === slotType) { if (typeof playSound === 'function') playSound('powerup'); socket.emit('equipModule', { id: dragSource.id, type: slotType }); } 
+        else { if (typeof playSound === 'function') playSound('ui_click'); }
+    }
+    dragSource = null;
+};
+
 function renderHangar() {
     document.getElementById('hangar-player-name').innerText = myName;
-    document.getElementById('stat-kills').innerText = myStats.kills || 0;
-    document.getElementById('stat-matches').innerText = myStats.matches || 0;
-    document.getElementById('stat-earned').innerText = myStats.earned || 0;
-    
+    document.getElementById('stat-kills').innerText = myStats.kills || 0; document.getElementById('stat-matches').innerText = myStats.matches || 0; document.getElementById('stat-earned').innerText = myStats.earned || 0;
     let totalDmg = 1.0, totalRange = 1.0, totalCd = 1.0, totalHp = 1.0, totalSpeed = 1.0, totalRot = 1.0;
-    const eqHtml = [];
-    const types = [{k: 'cannon', n: 'Дуло'}, {k: 'turret', n: 'Башта'}, {k: 'hull', n: 'Корпус'}, {k: 'tracks', n: 'Гусениці'}];
+    const eqHtml = []; const types = [{k: 'cannon', n: 'Дуло'}, {k: 'turret', n: 'Башта'}, {k: 'hull', n: 'Корпус'}, {k: 'tracks', n: 'Гусениці'}];
     
     types.forEach(t => {
         let modId = myEquipped[t.k];
@@ -62,108 +87,81 @@ function renderHangar() {
             let m = MODULES[modId];
             if(m.stats.dmg) totalDmg *= m.stats.dmg; if(m.stats.range) totalRange *= m.stats.range; if(m.stats.cd) totalCd *= m.stats.cd;
             if(m.stats.hp) totalHp *= m.stats.hp; if(m.stats.speed) totalSpeed *= m.stats.speed; if(m.stats.rotSpeed) totalRot *= m.stats.rotSpeed;
-            
             let iconSvg = SVG_ICONS[t.k](RARITY[m.rarity].color);
-            eqHtml.push(`<div class="flex items-center gap-3 bg-slate-800/50 p-2 rounded-xl border border-slate-700"><div class="w-10 h-10 p-2 flex items-center justify-center rounded-lg bg-slate-900 border" style="border-color:${RARITY[m.rarity].color}">${iconSvg}</div><div><p class="text-xs text-white font-bold">${m.name}</p><p class="text-[9px] uppercase font-bold" style="color:${RARITY[m.rarity].color}">${CAT_NAMES[t.k]} | ${RARITY[m.rarity].name}</p></div></div>`);
+            eqHtml.push(`<div class="flex items-center gap-3 bg-slate-800/50 p-2 rounded-xl border border-slate-700 cursor-pointer hover:bg-slate-700/50 transition" draggable="true" ondragstart="dragStartEq(event, '${modId}', '${t.k}')" ondragover="allowDrop(event)" ondrop="dropEq(event, '${t.k}')" onclick="openCtxMenu(event, '${modId}', 'eq', '${t.k}')"><div class="w-10 h-10 p-2 flex items-center justify-center rounded-lg bg-slate-900 border" style="border-color:${RARITY[m.rarity].color}">${iconSvg}</div><div><p class="text-xs text-white font-bold">${m.name}</p><p class="text-[9px] uppercase font-bold" style="color:${RARITY[m.rarity].color}">${CAT_NAMES[t.k]} | ${RARITY[m.rarity].name}</p></div></div>`);
         } else {
-            eqHtml.push(`<div class="flex items-center gap-3 bg-slate-900/50 p-2 rounded-xl border border-slate-800 opacity-50"><div class="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-900 border border-slate-700">❌</div><div><p class="text-xs text-slate-500 font-bold">Стандарт</p><p class="text-[9px] uppercase font-bold text-slate-600">${t.n}</p></div></div>`);
+            eqHtml.push(`<div class="flex items-center gap-3 bg-slate-900/50 p-2 rounded-xl border border-slate-800 opacity-50" ondragover="allowDrop(event)" ondrop="dropEq(event, '${t.k}')"><div class="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-900 border border-slate-700">❌</div><div><p class="text-xs text-slate-500 font-bold">Стандарт</p><p class="text-[9px] uppercase font-bold text-slate-600">${t.n}</p></div></div>`);
         }
     });
     document.getElementById('equipped-slots-container').innerHTML = eqHtml.join('');
     
-    document.getElementById('stat-hp').innerText = Math.round(MAX_HP * totalHp);
-    document.getElementById('stat-speed').innerText = Math.round(totalSpeed * 100) + '%';
-    document.getElementById('stat-dmg').innerText = Math.round(totalDmg * 100) + '%';
-    document.getElementById('stat-rot').innerText = Math.round(totalRot * 100) + '%';
-    
-    document.getElementById('bar-hp').style.width = Math.min(100, (totalHp/2) * 100) + '%';
-    document.getElementById('bar-speed').style.width = Math.min(100, (totalSpeed/2) * 100) + '%';
-    document.getElementById('bar-dmg').style.width = Math.min(100, (totalDmg/2) * 100) + '%';
-    document.getElementById('bar-rot').style.width = Math.min(100, (totalRot/2) * 100) + '%';
+    document.getElementById('stat-hp').innerText = Math.round(MAX_HP * totalHp); document.getElementById('stat-speed').innerText = Math.round(totalSpeed * 100) + '%';
+    document.getElementById('stat-dmg').innerText = Math.round(totalDmg * 100) + '%'; document.getElementById('stat-rot').innerText = Math.round(totalRot * 100) + '%';
+    document.getElementById('bar-hp').style.width = Math.min(100, (totalHp/2) * 100) + '%'; document.getElementById('bar-speed').style.width = Math.min(100, (totalSpeed/2) * 100) + '%';
+    document.getElementById('bar-dmg').style.width = Math.min(100, (totalDmg/2) * 100) + '%'; document.getElementById('bar-rot').style.width = Math.min(100, (totalRot/2) * 100) + '%';
 
-    document.getElementById('inv-count').innerText = myInventory.length;
-    const invGrid = document.getElementById('inventory-grid'); invGrid.innerHTML = '';
+    document.getElementById('inv-count').innerText = myInventory.length; const invGrid = document.getElementById('inventory-grid'); invGrid.innerHTML = '';
     
     for(let i=0; i<30; i++) {
         if (i < myInventory.length) {
-            let modId = myInventory[i]; let mod = MODULES[modId];
-            if(!mod) continue;
+            let modId = myInventory[i]; let mod = MODULES[modId]; if(!mod) continue;
             let iconSvg = SVG_ICONS[mod.type](RARITY[mod.rarity].color);
-            invGrid.innerHTML += `<div class="inv-slot item-${mod.rarity} p-2" onclick="openCtxMenu(event, '${modId}')" title="${mod.name}">${iconSvg}</div>`;
+            invGrid.innerHTML += `<div class="inv-slot item-${mod.rarity} p-2 cursor-grab active:cursor-grabbing" onclick="openCtxMenu(event, '${modId}', 'inv')" draggable="true" ondragstart="dragStartInv(event, '${modId}', ${i})" ondragover="allowDrop(event)" ondrop="dropInv(event, ${i})" title="${mod.name}">${iconSvg}</div>`;
         } else {
-            invGrid.innerHTML += `<div class="inv-slot empty"></div>`;
+            invGrid.innerHTML += `<div class="inv-slot empty" ondragover="allowDrop(event)" ondrop="dropInv(event, ${i})"></div>`;
         }
     }
 }
 
-function openCtxMenu(e, modId) {
-    if (typeof playSound === 'function') playSound('ui_click');
-    selectedInvItem = modId;
-    let mod = MODULES[modId];
-    document.getElementById('ctx-name').innerText = mod.name;
-    document.getElementById('ctx-name').style.color = RARITY[mod.rarity].color;
-    document.getElementById('ctx-cat').innerText = `${CAT_NAMES[mod.type]} | ${RARITY[mod.rarity].name}`;
+let contextMode = 'inv'; let selectedEqSlot = null; let selectedInvItem = null;
+window.openCtxMenu = function(e, modId, mode = 'inv', slot = null) {
+    e.preventDefault(); if (typeof playSound === 'function') playSound('ui_click');
+    selectedInvItem = modId; contextMode = mode; selectedEqSlot = slot;
+    
+    let mod = MODULES[modId]; document.getElementById('ctx-name').innerText = mod.name; document.getElementById('ctx-name').style.color = RARITY[mod.rarity].color;
+    document.getElementById('ctx-cat').innerText = `${CAT_NAMES[mod.type]} | ${RARITY[mod.rarity].name}`; document.getElementById('ctx-cat').style.color = RARITY[mod.rarity].color;
     
     let desc = [];
-    if(mod.stats.dmg) desc.push(`Урон: ${Math.round(mod.stats.dmg*100)}%`);
-    if(mod.stats.hp) desc.push(`Броня: ${Math.round(mod.stats.hp*100)}%`);
-    if(mod.stats.speed) desc.push(`Рух: ${Math.round(mod.stats.speed*100)}%`);
-    if(mod.stats.cd) desc.push(`Перезарядка: ${Math.round(mod.stats.cd*100)}%`);
-    if(mod.stats.range) desc.push(`Дальність: ${Math.round(mod.stats.range*100)}%`);
-    if(mod.stats.rotSpeed) desc.push(`Башта: ${Math.round(mod.stats.rotSpeed*100)}%`);
-    
+    if(mod.stats.dmg) desc.push(`Урон: ${Math.round(mod.stats.dmg*100)}%`); if(mod.stats.hp) desc.push(`Броня: ${Math.round(mod.stats.hp*100)}%`);
+    if(mod.stats.speed) desc.push(`Рух: ${Math.round(mod.stats.speed*100)}%`); if(mod.stats.cd) desc.push(`Перезарядка: ${Math.round(mod.stats.cd*100)}%`);
+    if(mod.stats.range) desc.push(`Дальність: ${Math.round(mod.stats.range*100)}%`); if(mod.stats.rotSpeed) desc.push(`Башта: ${Math.round(mod.stats.rotSpeed*100)}%`);
     document.getElementById('ctx-desc').innerHTML = desc.join('<br>');
-    document.getElementById('ctx-sell').innerText = `Продати ($${RARITY[mod.rarity].price})`;
     
-    const menu = document.getElementById('context-menu');
-    menu.classList.remove('hidden');
+    if (mode === 'inv') {
+        document.getElementById('ctx-equip').innerText = "Одягнути"; document.getElementById('ctx-sell').style.display = 'block'; document.getElementById('ctx-drop').style.display = 'block'; document.getElementById('ctx-sell').innerText = `Продати ($${RARITY[mod.rarity].price})`;
+    } else {
+        document.getElementById('ctx-equip').innerText = "Зняти"; document.getElementById('ctx-sell').style.display = 'none'; document.getElementById('ctx-drop').style.display = 'none';
+    }
     
-    let x = e.clientX; let y = e.clientY;
-    if (x + 200 > window.innerWidth) x -= 200;
-    if (y + 150 > window.innerHeight) y -= 150;
+    const menu = document.getElementById('context-menu'); menu.classList.remove('hidden');
+    let x = e.clientX; let y = e.clientY; if (x + 200 > window.innerWidth) x -= 200; if (y + 150 > window.innerHeight) y -= 150;
     menu.style.left = x + 'px'; menu.style.top = y + 'px';
-}
+};
 
-document.addEventListener('click', (e) => { if (!e.target.closest('.inv-slot') && !e.target.closest('#context-menu')) document.getElementById('context-menu').classList.add('hidden'); });
+document.addEventListener('click', (e) => { if (!e.target.closest('.inv-slot') && !e.target.closest('#equipped-slots-container') && !e.target.closest('#context-menu')) document.getElementById('context-menu').classList.add('hidden'); });
 
 document.getElementById('ctx-equip').onclick = () => { 
     if (typeof playSound === 'function') playSound('powerup'); 
-    socket.emit('equipModule', { id: selectedInvItem, type: MODULES[selectedInvItem].type }); 
+    if (contextMode === 'inv') { socket.emit('equipModule', { id: selectedInvItem, type: MODULES[selectedInvItem].type }); } 
+    else { socket.emit('unequipModule', { type: selectedEqSlot }); }
     document.getElementById('context-menu').classList.add('hidden'); 
 };
-document.getElementById('ctx-sell').onclick = () => { 
-    if (typeof playSound === 'function') playSound('ui_buy'); 
-    socket.emit('sellModule', { id: selectedInvItem }); 
-    document.getElementById('context-menu').classList.add('hidden'); 
-};
-document.getElementById('ctx-drop').onclick = () => { 
-    if (typeof playSound === 'function') playSound('ui_click'); 
-    socket.emit('dropModule', { id: selectedInvItem }); 
-    document.getElementById('context-menu').classList.add('hidden'); 
-};
+document.getElementById('ctx-sell').onclick = () => { if (typeof playSound === 'function') playSound('ui_buy'); socket.emit('sellModule', { id: selectedInvItem }); document.getElementById('context-menu').classList.add('hidden'); };
+document.getElementById('ctx-drop').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); socket.emit('dropModule', { id: selectedInvItem }); document.getElementById('context-menu').classList.add('hidden'); };
 
 window.buyShopCase = function(caseId, price) {
     if (myBucks >= price) { 
         if(myInventory.length >= 30) { alert('Звільніть місце в Інвентарі!'); return; }
         document.getElementById('case-confirm-modal').classList.remove('hidden'); 
-        document.getElementById('confirm-case-btn').onclick = () => { 
-            if (typeof playSound === 'function') playSound('ui_buy'); 
-            document.getElementById('case-confirm-modal').classList.add('hidden'); 
-            socket.emit('buyCase', caseId); 
-        };
+        document.getElementById('confirm-case-btn').onclick = () => { if (typeof playSound === 'function') playSound('ui_buy'); document.getElementById('case-confirm-modal').classList.add('hidden'); socket.emit('buyCase', caseId); };
     } else { alert('Недостатньо баксів!'); }
 };
 
 document.getElementById('cancel-case-btn').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); document.getElementById('case-confirm-modal').classList.add('hidden'); };
-
-// ФІКС ВІКНА НАГОРОДИ (Перемалювання Ангару після закриття)
 document.getElementById('close-reward-btn').onclick = () => { 
     if (typeof playSound === 'function') playSound('ui_click'); 
     document.getElementById('reward-modal').classList.add('hidden'); 
-    updateGlobalBucks(); // Відразу оновлюємо гроші
-    if (!document.getElementById('hangar-screen').classList.contains('hidden')) {
-        renderHangar(); // Одразу оновлюємо інвентар
-    }
+    if (!document.getElementById('hangar-screen').classList.contains('hidden')) renderHangar(); 
 };
 
 let hangarAnimId = null; let hMouseX = 150, hMouseY = 150;
@@ -172,12 +170,9 @@ hCanvas.addEventListener('mousemove', e => { const rect = hCanvas.getBoundingCli
 
 function startHangarPreview() {
     if (hangarAnimId) cancelAnimationFrame(hangarAnimId);
-    let angle = 0;
     function drawPreview() {
         hCtx.clearRect(0, 0, hCanvas.width, hCanvas.height); hCtx.save(); hCtx.translate(150, 150);
-        let tAng = Math.atan2(hMouseY - 150, hMouseX - 150);
-        let cHex = '#1e293b'; // В Ангарі корпус завжди базово темний, колір команди працює в грі
-        
+        let tAng = Math.atan2(hMouseY - 150, hMouseX - 150); let cHex = '#1e293b'; 
         let hCol = myEquipped.hull ? RARITY[MODULES[myEquipped.hull].rarity].color : '#0f172a';
         let trCol = myEquipped.tracks ? RARITY[MODULES[myEquipped.tracks].rarity].color : '#0f172a';
         let cCol = myEquipped.cannon ? RARITY[MODULES[myEquipped.cannon].rarity].color : '#0f172a';

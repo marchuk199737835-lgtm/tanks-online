@@ -46,25 +46,7 @@ let rooms = {}; let globalPlayers = {};
 const Z_TYPES = { 'normal': { hp: 25, speed: 120, dmg: 10, radius: 15, color: '#22c55e' }, 'runner': { hp: 15, speed: 250, dmg: 5, radius: 12, color: '#84cc16' }, 'tanker': { hp: 100, speed: 60, dmg: 25, radius: 25, color: '#15803d' }, 'spitter': { hp: 40, speed: 90, dmg: 15, radius: 15, color: '#a3e635', ranged: true }, 'bomber': { hp: 30, speed: 140, dmg: 50, radius: 18, color: '#dc2626', explode: true }, 'ghost': { hp: 20, speed: 100, dmg: 10, radius: 15, color: '#cbd5e1', ghost: true }, 'pikus': { isBoss: true, name: 'ПІКУС', hp: 1000, speed: 294, dmg: 100, radius: 30, color: '#9333ea', bullets: 3, cd: 3000 }, 'shurik': { isBoss: true, name: 'ШУРІК', hp: 2000, speed: 280, dmg: 100, radius: 22.5, color: '#f43f5e', bullets: 10, cd: 3000 }, 'oneshot': { isBoss: true, name: 'ВАНШОТУС', hp: 3000, speed: 294, dmg: 1000, radius: 30, color: '#fbbf24', bullets: 2, cd: 2000 }, 'padlo': { isBoss: true, name: 'ПАДЛО', hp: 5000, speed: 280, dmg: 75, radius: 15, color: '#10b981', bullets: 25, cd: 1500 } };
 
 const RARITY_PRICES = { 'common': 5, 'rare': 10, 'epic': 50, 'legendary': 250 };
-const MODULES = {
-    'can_c1': { id: 'can_c1', type: 'cannon', rarity: 'common', name: 'Вкорочене', stats: { dmg: 1.01, range: 0.90, cd: 1.00 } }, 'can_c2': { id: 'can_c2', type: 'cannon', rarity: 'common', name: 'Труба', stats: { dmg: 1.00, range: 1.05, cd: 0.99 } }, 'can_c3': { id: 'can_c3', type: 'cannon', rarity: 'common', name: 'Самопал', stats: { dmg: 1.02, range: 1.00, cd: 0.98 } },
-    'can_r1': { id: 'can_r1', type: 'cannon', rarity: 'rare', name: 'Снайпер', stats: { dmg: 1.05, range: 1.15, cd: 1.00 } }, 'can_r2': { id: 'can_r2', type: 'cannon', rarity: 'rare', name: 'Штурмове', stats: { dmg: 1.02, range: 1.00, cd: 0.90 } }, 'can_r3': { id: 'can_r3', type: 'cannon', rarity: 'rare', name: 'Важке', stats: { dmg: 1.12, range: 0.95, cd: 1.05 } },
-    'can_e1': { id: 'can_e1', type: 'cannon', rarity: 'epic', name: 'Рейлгун', stats: { dmg: 1.15, range: 1.30, cd: 1.05 } }, 'can_e2': { id: 'can_e2', type: 'cannon', rarity: 'epic', name: 'Вулкан', stats: { dmg: 1.05, range: 0.90, cd: 0.75 } }, 'can_e3': { id: 'can_e3', type: 'cannon', rarity: 'epic', name: 'Руйнівник', stats: { dmg: 1.25, range: 1.00, cd: 0.90 } },
-    'can_l1': { id: 'can_l1', type: 'cannon', rarity: 'legendary', name: 'Плазма', stats: { dmg: 1.40, range: 1.00, cd: 0.85 } }, 'can_l2': { id: 'can_l2', type: 'cannon', rarity: 'legendary', name: 'Око Смерті', stats: { dmg: 1.20, range: 1.50, cd: 0.90 } }, 'can_l3': { id: 'can_l3', type: 'cannon', rarity: 'legendary', name: 'Армагеддон', stats: { dmg: 1.50, range: 1.20, cd: 0.85 } },
-    'tur_c1': { id: 'tur_c1', type: 'turret', rarity: 'common', name: 'Іржа', stats: { rotSpeed: 1.01, hp: 1.01 } }, 'tur_c2': { id: 'tur_c2', type: 'turret', rarity: 'common', name: 'Клепана', stats: { rotSpeed: 1.00, hp: 1.02 } }, 'tur_c3': { id: 'tur_c3', type: 'turret', rarity: 'common', name: 'Полегшена', stats: { rotSpeed: 1.02, hp: 1.00 } },
-    'tur_r1': { id: 'tur_r1', type: 'turret', rarity: 'rare', name: 'Лицар', stats: { rotSpeed: 0.98, hp: 1.10 } }, 'tur_r2': { id: 'tur_r2', type: 'turret', rarity: 'rare', name: 'Скаут', stats: { rotSpeed: 1.10, hp: 0.98 } }, 'tur_r3': { id: 'tur_r3', type: 'turret', rarity: 'rare', name: 'Баланс', stats: { rotSpeed: 1.05, hp: 1.05 } },
-    'tur_e1': { id: 'tur_e1', type: 'turret', rarity: 'epic', name: 'Фортеця', stats: { rotSpeed: 0.95, hp: 1.25 } }, 'tur_e2': { id: 'tur_e2', type: 'turret', rarity: 'epic', name: 'Торнадо', stats: { rotSpeed: 1.25, hp: 0.95 } }, 'tur_e3': { id: 'tur_e3', type: 'turret', rarity: 'epic', name: 'Вартовий', stats: { rotSpeed: 1.15, hp: 1.15 } },
-    'tur_l1': { id: 'tur_l1', type: 'turret', rarity: 'legendary', name: 'Титан', stats: { rotSpeed: 0.90, hp: 1.50 } }, 'tur_l2': { id: 'tur_l2', type: 'turret', rarity: 'legendary', name: 'Вихор', stats: { rotSpeed: 1.50, hp: 1.10 } }, 'tur_l3': { id: 'tur_l3', type: 'turret', rarity: 'legendary', name: 'Сингулярність', stats: { rotSpeed: 1.35, hp: 1.35 } },
-    'hul_c1': { id: 'hul_c1', type: 'hull', rarity: 'common', name: 'Іржа', stats: { hp: 1.01, speed: 1.01 } }, 'hul_c2': { id: 'hul_c2', type: 'hull', rarity: 'common', name: 'Корито', stats: { hp: 1.03, speed: 0.99 } }, 'hul_c3': { id: 'hul_c3', type: 'hull', rarity: 'common', name: 'Каркас', stats: { hp: 0.99, speed: 1.03 } },
-    'hul_r1': { id: 'hul_r1', type: 'hull', rarity: 'rare', name: 'Панцер', stats: { hp: 1.12, speed: 0.95 } }, 'hul_r2': { id: 'hul_r2', type: 'hull', rarity: 'rare', name: 'Болід', stats: { hp: 0.95, speed: 1.12 } }, 'hul_r3': { id: 'hul_r3', type: 'hull', rarity: 'rare', name: 'Ветеран', stats: { hp: 1.06, speed: 1.06 } },
-    'hul_e1': { id: 'hul_e1', type: 'hull', rarity: 'epic', name: 'Моноліт', stats: { hp: 1.30, speed: 0.90 } }, 'hul_e2': { id: 'hul_e2', type: 'hull', rarity: 'epic', name: 'Фантом', stats: { hp: 0.90, speed: 1.30 } }, 'hul_e3': { id: 'hul_e3', type: 'hull', rarity: 'epic', name: 'Центуріон', stats: { hp: 1.15, speed: 1.15 } },
-    'hul_l1': { id: 'hul_l1', type: 'hull', rarity: 'legendary', name: 'Голіаф', stats: { hp: 1.60, speed: 0.85 } }, 'hul_l2': { id: 'hul_l2', type: 'hull', rarity: 'legendary', name: 'Тінь', stats: { hp: 1.10, speed: 1.50 } }, 'hul_l3': { id: 'hul_l3', type: 'hull', rarity: 'legendary', name: 'Нано-броня', stats: { hp: 1.40, speed: 1.40 } },
-    'trk_c1': { id: 'trk_c1', type: 'tracks', rarity: 'common', name: 'Іржаві', stats: { speed: 1.01, hp: 1.01 } }, 'trk_c2': { id: 'trk_c2', type: 'tracks', rarity: 'common', name: 'Шиповані', stats: { speed: 1.02, hp: 1.00 } }, 'trk_c3': { id: 'trk_c3', type: 'tracks', rarity: 'common', name: 'Тракторні', stats: { speed: 1.00, hp: 1.02 } },
-    'trk_r1': { id: 'trk_r1', type: 'tracks', rarity: 'rare', name: 'Ралійні', stats: { speed: 1.10, hp: 0.98 } }, 'trk_r2': { id: 'trk_r2', type: 'tracks', rarity: 'rare', name: 'Всюдихідні', stats: { speed: 0.98, hp: 1.10 } }, 'trk_r3': { id: 'trk_r3', type: 'tracks', rarity: 'rare', name: 'Посилені', stats: { speed: 1.05, hp: 1.05 } },
-    'trk_e1': { id: 'trk_e1', type: 'tracks', rarity: 'epic', name: 'Турбінні', stats: { speed: 1.25, hp: 0.95 } }, 'trk_e2': { id: 'trk_e2', type: 'tracks', rarity: 'epic', name: 'Магнітні', stats: { speed: 0.95, hp: 1.25 } }, 'trk_e3': { id: 'trk_e3', type: 'tracks', rarity: 'epic', name: 'Елітні', stats: { speed: 1.15, hp: 1.15 } },
-    'trk_l1': { id: 'trk_l1', type: 'tracks', rarity: 'legendary', name: 'Гравітаційні', stats: { speed: 1.50, hp: 1.00 } }, 'trk_l2': { id: 'trk_l2', type: 'tracks', rarity: 'legendary', name: 'Кібернетичні', stats: { speed: 1.00, hp: 1.50 } }, 'trk_l3': { id: 'trk_l3', type: 'tracks', rarity: 'legendary', name: 'Омега', stats: { speed: 1.35, hp: 1.35 } }
-};
-const ALL_MODULES = Object.keys(MODULES);
+const ALL_MODULES = ['can_c1','can_c2','can_c3','can_r1','can_r2','can_r3','can_e1','can_e2','can_e3','can_l1','can_l2','can_l3', 'tur_c1','tur_c2','tur_c3','tur_r1','tur_r2','tur_r3','tur_e1','tur_e2','tur_e3','tur_l1','tur_l2','tur_l3', 'hul_c1','hul_c2','hul_c3','hul_r1','hul_r2','hul_r3','hul_e1','hul_e2','hul_e3','hul_l1','hul_l2','hul_l3', 'trk_c1','trk_c2','trk_c3','trk_r1','trk_r2','trk_r3','trk_e1','trk_e2','trk_e3','trk_l1','trk_l2','trk_l3'];
 
 function getRandomModuleId(rarity) { let filtered = ALL_MODULES.filter(m => m.includes(`_${rarity.charAt(0)}`)); return filtered[Math.floor(Math.random() * filtered.length)]; }
 function sendEconomy(socketId, name) { if (dbUsers[name]) io.to(socketId).emit('economyUpdate', { bucks: dbUsers[name].bucks, inventory: dbUsers[name].inventory, equipped: dbUsers[name].equipped, stats: dbUsers[name].stats }); }
@@ -73,10 +55,17 @@ function getActiveRooms() { return Object.values(rooms).map(r => ({ id: r.id, ho
 // РОЗРАХУНОК МАКС ХП ВІД МОДУЛІВ
 function getMaxHp(equipped) {
     let hpMult = 1.0;
+    // Оскільки ми на сервері, прописуємо базові множники для ХП:
     if (equipped) {
-        if (equipped.hull && MODULES[equipped.hull] && MODULES[equipped.hull].stats.hp) hpMult *= MODULES[equipped.hull].stats.hp;
-        if (equipped.turret && MODULES[equipped.turret] && MODULES[equipped.turret].stats.hp) hpMult *= MODULES[equipped.turret].stats.hp;
-        if (equipped.tracks && MODULES[equipped.tracks] && MODULES[equipped.tracks].stats.hp) hpMult *= MODULES[equipped.tracks].stats.hp;
+        if (equipped.hull && equipped.hull.includes('_c')) hpMult *= 1.01;
+        if (equipped.hull && equipped.hull.includes('_r')) hpMult *= 1.10;
+        if (equipped.hull && equipped.hull.includes('_e')) hpMult *= 1.25;
+        if (equipped.hull && equipped.hull.includes('_l')) hpMult *= 1.40;
+        
+        if (equipped.turret && equipped.turret.includes('_c')) hpMult *= 1.01;
+        if (equipped.turret && equipped.turret.includes('_r')) hpMult *= 1.05;
+        if (equipped.turret && equipped.turret.includes('_e')) hpMult *= 1.15;
+        if (equipped.turret && equipped.turret.includes('_l')) hpMult *= 1.30;
     }
     return Math.round(MAX_HP * hpMult);
 }
@@ -102,6 +91,24 @@ io.on('connection', (socket) => {
             else if (caseId === 3) { rarity='rare'; if(r>55 && r<=80) rarity='epic'; else if(r>80) rarity='legendary'; }
             let modId = getRandomModuleId(rarity); u.inventory.push(modId); saveUser(name); socket.emit('caseResult', { modId: modId, bucks: u.bucks, inventory: u.inventory, equipped: u.equipped, stats: u.stats }); 
         } 
+    });
+
+    // ПЕРЕМІЩЕННЯ ТА ЗНЯТТЯ МОДУЛІВ
+    socket.on('reorderInventory', (newInv) => {
+        let name = globalPlayers[socket.id]; if(!name || !dbUsers[name]) return; let u = dbUsers[name];
+        if (Array.isArray(newInv) && newInv.length === u.inventory.length) { u.inventory = newInv; saveUser(name); }
+    });
+
+    socket.on('unequipModule', (data) => {
+        let name = globalPlayers[socket.id]; if(!name || !dbUsers[name]) return; let u = dbUsers[name];
+        let modId = u.equipped[data.type];
+        if (modId) {
+            if (u.inventory.length < 30) {
+                u.inventory.push(modId); u.equipped[data.type] = null;
+                saveUser(name); sendEconomy(socket.id, name);
+                for(let rId in rooms) { let r = rooms[rId]; if (r.players[socket.id] && r.status === 'lobby') { r.players[socket.id].equipped = u.equipped; r.players[socket.id].hp = getMaxHp(u.equipped); io.to(rId).emit('updateLobby', r); } }
+            } else { socket.emit('authError', 'Інвентар повний!'); }
+        }
     });
 
     socket.on('equipModule', (data) => {
@@ -155,10 +162,10 @@ io.on('connection', (socket) => {
 
         let finalDmg = data.amt; let atkName = globalPlayers[attackerSocketId];
         
-        // РОЗРАХУНОК УРОНУ З МОДУЛІВ СТРІЛЬЦЯ
         if (atkName && dbUsers[atkName] && dbUsers[atkName].equipped && dbUsers[atkName].equipped.cannon) { 
             let cId = dbUsers[atkName].equipped.cannon;
-            if (MODULES[cId] && MODULES[cId].stats.dmg) finalDmg *= MODULES[cId].stats.dmg;
+            // Спрощений прорахунок на сервері для базових множників
+            if (cId.includes('_c')) finalDmg *= 1.02; else if (cId.includes('_r')) finalDmg *= 1.08; else if (cId.includes('_e')) finalDmg *= 1.15; else if (cId.includes('_l')) finalDmg *= 1.30;
         }
 
         victim.hp = Math.max(0, victim.hp - finalDmg); io.to(attackerSocketId).emit('hitConfirmed');
@@ -207,7 +214,7 @@ io.on('connection', (socket) => {
         let room = rooms[data.roomId]; if (room && room.zombies[data.zid] && room.zombies[data.zid].hp > 0) {
             let finalDmg = data.dmg; let atkName = room.players[socket.id]?.name;
             if (atkName && dbUsers[atkName] && dbUsers[atkName].equipped && dbUsers[atkName].equipped.cannon) { 
-                let cId = dbUsers[atkName].equipped.cannon; if (MODULES[cId] && MODULES[cId].stats.dmg) finalDmg *= MODULES[cId].stats.dmg; 
+                let cId = dbUsers[atkName].equipped.cannon; if (cId.includes('_c')) finalDmg *= 1.02; else if (cId.includes('_r')) finalDmg *= 1.08; else if (cId.includes('_e')) finalDmg *= 1.15; else if (cId.includes('_l')) finalDmg *= 1.30;
             }
             room.zombies[data.zid].hp -= finalDmg;
             if (room.zombies[data.zid].hp <= 0) { if(room.zombies[data.zid].type === 'bomber') io.to(data.roomId).emit('bomberExplode', { x: room.zombies[data.zid].x, y: room.zombies[data.zid].y }); delete room.zombies[data.zid]; }
