@@ -8,10 +8,19 @@ function checkCollision(x, y, r, checkSolids = true) {
     if (checkSolids) { 
         const solids = MAP_DATA[cMap].solids; 
         for (let s of solids) { 
-            if(s.type.includes('spawn')) continue; // Точки спавну не є перешкодами
-            if(s.type === 'tree' || s.type === 'neon_circle' || s.type === 'neon_pillar') { if(Math.hypot(x-(s.x+(s.w||0)/2), y-(s.y+(s.h||0)/2)) <= r+(s.r||s.w/2||30)) return true; } 
-            else if(s.type === 'line') { for(let p of s.points) { if(Math.hypot(x-p.x, y-p.y) <= r+(s.width||10)/2) return true; } }
-            else { let testX = Math.max(s.x, Math.min(x, s.x+(s.w||30))), testY = Math.max(s.y, Math.min(y, s.y+(s.h||30))); if(Math.hypot(x-testX, y-testY) <= r) return true; } 
+            // ІГНОРУЄМО ПІДЛОГУ (ВОДУ, ЛІНІЇ, ФІГУРИ, СПАВНИ, КАЛЮЖІ, ВОРОНКИ)
+            if(s.type.includes('spawn') || s.type.includes('water') || s.type.includes('shape') || s.type === 'line' || s.type === 'prop_puddle' || s.type === 'prop_crater') continue;
+            
+            if(s.type === 'tree' || s.type === 'neon_circle' || s.type === 'neon_pillar') { 
+                let cx = s.x + (s.w ? s.w/2 : 0);
+                let cy = s.y + (s.h ? s.h/2 : 0);
+                let sr = s.r || (s.w ? s.w/2 : 30);
+                if(Math.hypot(x - cx, y - cy) <= r + sr) return true; 
+            } 
+            else { 
+                let testX = Math.max(s.x, Math.min(x, s.x+(s.w||30))), testY = Math.max(s.y, Math.min(y, s.y+(s.h||30))); 
+                if(Math.hypot(x-testX, y-testY) <= r) return true; 
+            } 
         } 
     } return false; 
 }
@@ -108,8 +117,8 @@ function drawTank(x, y, bodyAngle, turretAngle, colorHex, name, isMe, hp, buff, 
     ctx.save(); ctx.rotate(turretAngle); 
     ctx.fillStyle = '#334155'; ctx.strokeStyle = cCol; ctx.lineWidth = equipped && equipped.cannon ? 3 : 1;
     if(equipped && equipped.cannon) { ctx.shadowColor = cCol; ctx.shadowBlur = 10; }
-    let cLen = 45; if(equipped && equipped.cannon && MODULES[equipped.cannon] && MODULES[equipped.cannon].stats.range > 1.1) cLen = 60;
-    if(equipped && equipped.cannon && MODULES[equipped.cannon] && MODULES[equipped.cannon].stats.range < 1.0) cLen = 35;
+    let cLen = 45; if(equipped && equipped.cannon && MODULES[equipped.cannon].stats.range > 1.1) cLen = 60;
+    if(equipped && equipped.cannon && MODULES[equipped.cannon].stats.range < 1.0) cLen = 35;
     ctx.fillRect(0, -6, cLen, 12); ctx.strokeRect(0, -6, cLen, 12); ctx.shadowBlur = 0;
     
     ctx.fillStyle = baseHullCol; ctx.strokeStyle = tuCol; ctx.lineWidth = equipped && equipped.turret ? 3 : 1;
