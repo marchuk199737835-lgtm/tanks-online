@@ -52,25 +52,24 @@ function getRandomModuleId(rarity) { let filtered = ALL_MODULES.filter(m => m.in
 function sendEconomy(socketId, name) { if (dbUsers[name]) io.to(socketId).emit('economyUpdate', { bucks: dbUsers[name].bucks, inventory: dbUsers[name].inventory, equipped: dbUsers[name].equipped, stats: dbUsers[name].stats }); }
 function getActiveRooms() { return Object.values(rooms).map(r => ({ id: r.id, hostName: r.hostName, mode: r.mode, map: r.map, playersCount: Object.keys(r.players).length, maxPlayers: r.maxPlayers, status: r.status })); }
 
-// РОЗРАХУНОК МАКС ХП ВІД МОДУЛІВ
 function getMaxHp(equipped) {
     let hpMult = 1.0;
-    // Оскільки ми на сервері, прописуємо базові множники для ХП:
     if (equipped) {
-        if (equipped.hull && equipped.hull.includes('_c')) hpMult *= 1.01;
-        if (equipped.hull && equipped.hull.includes('_r')) hpMult *= 1.10;
-        if (equipped.hull && equipped.hull.includes('_e')) hpMult *= 1.25;
-        if (equipped.hull && equipped.hull.includes('_l')) hpMult *= 1.40;
-        
-        if (equipped.turret && equipped.turret.includes('_c')) hpMult *= 1.01;
-        if (equipped.turret && equipped.turret.includes('_r')) hpMult *= 1.05;
-        if (equipped.turret && equipped.turret.includes('_e')) hpMult *= 1.15;
-        if (equipped.turret && equipped.turret.includes('_l')) hpMult *= 1.30;
+        if (equipped.hull && equipped.hull.includes('_c')) hpMult *= 1.01; if (equipped.hull && equipped.hull.includes('_r')) hpMult *= 1.10; if (equipped.hull && equipped.hull.includes('_e')) hpMult *= 1.25; if (equipped.hull && equipped.hull.includes('_l')) hpMult *= 1.40;
+        if (equipped.turret && equipped.turret.includes('_c')) hpMult *= 1.01; if (equipped.turret && equipped.turret.includes('_r')) hpMult *= 1.05; if (equipped.turret && equipped.turret.includes('_e')) hpMult *= 1.15; if (equipped.turret && equipped.turret.includes('_l')) hpMult *= 1.30;
     }
     return Math.round(MAX_HP * hpMult);
 }
 
-function validateUser(u) { if(!u.inventory) u.inventory = []; if(!u.equipped) u.equipped = { cannon: null, turret: null, hull: null, tracks: null }; if(!u.stats) u.stats = { kills: 0, matches: 0, earned: 0 }; return u; }
+// ДОДАНО МАСИВ usedPromos ДЛЯ ЗБЕРЕЖЕННЯ В БАЗІ ДАНИХ
+function validateUser(u) { 
+    if(!u.inventory) u.inventory = []; 
+    if(!u.equipped) u.equipped = { cannon: null, turret: null, hull: null, tracks: null }; 
+    if(!u.stats) u.stats = { kills: 0, matches: 0, earned: 0 }; 
+    if(!u.usedPromos) u.usedPromos = []; 
+    return u; 
+}
+
 function rollDrop(name) { if (Math.random() <= 0.10) { let r = Math.random() * 100; let rarity = 'common'; if (r > 90 && r <= 98) rarity = 'rare'; else if (r > 98 && r <= 99.5) rarity = 'epic'; else if (r > 99.5) rarity = 'legendary'; let modId = getRandomModuleId(rarity); if (dbUsers[name].inventory.length < 30) { dbUsers[name].inventory.push(modId); return modId; } } return null; }
 
 io.on('connection', (socket) => {
@@ -79,6 +78,25 @@ io.on('connection', (socket) => {
     socket.on('register', (data) => { const { name, password } = data; if(!name || !password || name.length < 3 || password.length < 4) return socket.emit('authError', 'Логін від 3 символів, пароль від 4!'); if(dbUsers[name]) return socket.emit('authError', 'Цей логін вже зайнятий!'); const token = crypto.randomUUID(); dbUsers[name] = validateUser({ name: name, password: hashPwd(password), token: token, bucks: 0 }); saveUser(name); globalPlayers[socket.id] = name; socket.emit('authSuccess', { name, token }); sendEconomy(socket.id, name); });
     socket.on('login', (data) => { const { name, password } = data; let u = dbUsers[name]; if(!u || u.password !== hashPwd(password)) return socket.emit('authError', 'Невірний логін або пароль!'); const token = crypto.randomUUID(); u.token = token; u = validateUser(u); saveUser(name); globalPlayers[socket.id] = name; socket.emit('authSuccess', { name, token }); sendEconomy(socket.id, name); });
     socket.on('authToken', (token) => { let foundName = null; for(let n in dbUsers) { if(dbUsers[n].token === token) foundName = n; } if(foundName) { globalPlayers[socket.id] = foundName; dbUsers[foundName] = validateUser(dbUsers[foundName]); socket.emit('authSuccess', { name: foundName, token }); sendEconomy(socket.id, foundName); } else socket.emit('authError', 'Сесія закінчилась, увійдіть знову'); });
+
+    // СИСТЕМА ПРОМОКОДІВ
+    socket.on('usePromo', (code) => {
+        let name = globalPlayers[socket.id]; if(!name || !dbUsers[name]) return;
+        let u = dbUsers[name];
+        let normalizedCode = code.trim().toLowerCase();
+        
+        if (normalizedCode === 'alex-top1') {
+            if (u.usedPromos.includes(normalizedCode)) return socket.emit('promoError', 'Промокод вже використано на цьому акаунті!');
+            u.bucks += 200;
+            u.stats.earned += 200;
+            u.usedPromos.push(normalizedCode);
+            saveUser(name);
+            sendEconomy(socket.id, name);
+            socket.emit('promoSuccess', 'Успішно! +200 баксів нараховано.');
+        } else {
+            socket.emit('promoError', 'Невірний або неіснуючий промокод!');
+        }
+    });
 
     socket.on('buyCase', (caseId) => { 
         let name = globalPlayers[socket.id]; if(!name || !dbUsers[name]) return; let u = dbUsers[name]; 
@@ -93,35 +111,9 @@ io.on('connection', (socket) => {
         } 
     });
 
-    // ПЕРЕМІЩЕННЯ ТА ЗНЯТТЯ МОДУЛІВ
-    socket.on('reorderInventory', (newInv) => {
-        let name = globalPlayers[socket.id]; if(!name || !dbUsers[name]) return; let u = dbUsers[name];
-        if (Array.isArray(newInv) && newInv.length === u.inventory.length) { u.inventory = newInv; saveUser(name); }
-    });
-
-    socket.on('unequipModule', (data) => {
-        let name = globalPlayers[socket.id]; if(!name || !dbUsers[name]) return; let u = dbUsers[name];
-        let modId = u.equipped[data.type];
-        if (modId) {
-            if (u.inventory.length < 30) {
-                u.inventory.push(modId); u.equipped[data.type] = null;
-                saveUser(name); sendEconomy(socket.id, name);
-                for(let rId in rooms) { let r = rooms[rId]; if (r.players[socket.id] && r.status === 'lobby') { r.players[socket.id].equipped = u.equipped; r.players[socket.id].hp = getMaxHp(u.equipped); io.to(rId).emit('updateLobby', r); } }
-            } else { socket.emit('authError', 'Інвентар повний!'); }
-        }
-    });
-
-    socket.on('equipModule', (data) => {
-        let name = globalPlayers[socket.id]; if(!name || !dbUsers[name]) return; let u = dbUsers[name];
-        let idx = u.inventory.indexOf(data.id);
-        if (idx !== -1) {
-            if (u.equipped[data.type]) u.inventory.push(u.equipped[data.type]); 
-            u.equipped[data.type] = data.id; u.inventory.splice(idx, 1); 
-            saveUser(name); sendEconomy(socket.id, name);
-            for(let rId in rooms) { let r = rooms[rId]; if (r.players[socket.id] && r.status === 'lobby') { r.players[socket.id].equipped = u.equipped; r.players[socket.id].hp = getMaxHp(u.equipped); io.to(rId).emit('updateLobby', r); } }
-        }
-    });
-
+    socket.on('reorderInventory', (newInv) => { let name = globalPlayers[socket.id]; if(!name || !dbUsers[name]) return; let u = dbUsers[name]; if (Array.isArray(newInv) && newInv.length === u.inventory.length) { u.inventory = newInv; saveUser(name); } });
+    socket.on('unequipModule', (data) => { let name = globalPlayers[socket.id]; if(!name || !dbUsers[name]) return; let u = dbUsers[name]; let modId = u.equipped[data.type]; if (modId) { if (u.inventory.length < 30) { u.inventory.push(modId); u.equipped[data.type] = null; saveUser(name); sendEconomy(socket.id, name); for(let rId in rooms) { let r = rooms[rId]; if (r.players[socket.id] && r.status === 'lobby') { r.players[socket.id].equipped = u.equipped; r.players[socket.id].hp = getMaxHp(u.equipped); io.to(rId).emit('updateLobby', r); } } } else { socket.emit('authError', 'Інвентар повний!'); } } });
+    socket.on('equipModule', (data) => { let name = globalPlayers[socket.id]; if(!name || !dbUsers[name]) return; let u = dbUsers[name]; let idx = u.inventory.indexOf(data.id); if (idx !== -1) { if (u.equipped[data.type]) u.inventory.push(u.equipped[data.type]); u.equipped[data.type] = data.id; u.inventory.splice(idx, 1); saveUser(name); sendEconomy(socket.id, name); for(let rId in rooms) { let r = rooms[rId]; if (r.players[socket.id] && r.status === 'lobby') { r.players[socket.id].equipped = u.equipped; r.players[socket.id].hp = getMaxHp(u.equipped); io.to(rId).emit('updateLobby', r); } } } });
     socket.on('sellModule', (data) => { let name = globalPlayers[socket.id]; if(!name || !dbUsers[name]) return; let u = dbUsers[name]; let idx = u.inventory.indexOf(data.id); if (idx !== -1) { let rarityText = data.id.includes('_c') ? 'common' : data.id.includes('_r') ? 'rare' : data.id.includes('_e') ? 'epic' : 'legendary'; u.bucks += RARITY_PRICES[rarityText] || 5; u.stats.earned += RARITY_PRICES[rarityText] || 5; u.inventory.splice(idx, 1); saveUser(name); sendEconomy(socket.id, name); } });
     socket.on('dropModule', (data) => { let name = globalPlayers[socket.id]; if(!name || !dbUsers[name]) return; let u = dbUsers[name]; let idx = u.inventory.indexOf(data.id); if (idx !== -1) { u.inventory.splice(idx, 1); saveUser(name); sendEconomy(socket.id, name); } });
 
@@ -161,10 +153,8 @@ io.on('connection', (socket) => {
         if (room.mode === 'survival') return; if (victim.hp <= 0) return;
 
         let finalDmg = data.amt; let atkName = globalPlayers[attackerSocketId];
-        
         if (atkName && dbUsers[atkName] && dbUsers[atkName].equipped && dbUsers[atkName].equipped.cannon) { 
             let cId = dbUsers[atkName].equipped.cannon;
-            // Спрощений прорахунок на сервері для базових множників
             if (cId.includes('_c')) finalDmg *= 1.02; else if (cId.includes('_r')) finalDmg *= 1.08; else if (cId.includes('_e')) finalDmg *= 1.15; else if (cId.includes('_l')) finalDmg *= 1.30;
         }
 

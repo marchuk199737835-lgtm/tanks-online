@@ -13,6 +13,15 @@ socket.on('economyUpdate', (data) => {
     if (typeof renderHangar === 'function' && !document.getElementById('hangar-screen').classList.contains('hidden')) renderHangar(); 
 });
 
+// ПРОМОКОДИ
+socket.on('promoSuccess', (msg) => { 
+    if (typeof playSound === 'function') playSound('ui_buy'); 
+    alert(msg); 
+    document.getElementById('promo-modal').classList.add('hidden'); 
+    document.getElementById('promo-input').value = ''; 
+});
+socket.on('promoError', (msg) => { alert(msg); });
+
 let pendingDrop = null;
 socket.on('dropReceived', (modId) => { pendingDrop = modId; });
 
@@ -103,7 +112,6 @@ socket.on('gameOver', (data) => {
 });
 
 socket.on('caseResult', (result) => {
-    // МИТТЄВЕ ОНОВЛЕННЯ БАЛАНСУ ТА ІНВЕНТАРЯ ЩЕ ДО ВІДМАЛЬОВКИ РУЛЕТКИ
     myBucks = result.bucks;
     if(result.inventory) myInventory = result.inventory;
     if(result.equipped) myEquipped = result.equipped;

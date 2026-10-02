@@ -38,7 +38,7 @@
     <!-- Екран 2: Головне меню -->
     <div id="main-menu-screen" class="screen-container hidden fixed inset-0 z-40 flex-col items-center justify-center">
         <div class="absolute top-6 right-8 flex gap-4 z-50">
-            <div class="glass-panel px-6 py-2 rounded-full border border-emerald-500/30 flex items-center gap-3">
+            <div class="glass-panel px-6 py-2 rounded-full border border-emerald-500/30 flex items-center gap-3 cursor-pointer hover:bg-emerald-900/40 transition" onclick="document.getElementById('promo-modal').classList.remove('hidden'); playSound('ui_click');">
                 <span class="text-emerald-400 font-russo text-xl">💵 <span class="global-bucks-display">0</span></span>
             </div>
             <button class="settings-btn glass-panel p-3 rounded-full text-slate-300 hover:text-white transition">⚙️</button>
@@ -70,7 +70,7 @@
         <div class="flex justify-between items-center mb-6 fade-in">
             <button id="hangar-back-btn" class="glass-panel px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-slate-300 hover:text-white transition">← Назад</button>
             <h2 class="text-4xl font-russo text-white tracking-widest">АНГАР</h2>
-            <div class="glass-panel px-6 py-2 rounded-full border border-emerald-500/30">
+            <div class="glass-panel px-6 py-2 rounded-full border border-emerald-500/30 cursor-pointer hover:bg-emerald-900/40 transition" onclick="document.getElementById('promo-modal').classList.remove('hidden'); playSound('ui_click');">
                 <span class="text-emerald-400 font-russo text-xl">💵 <span class="global-bucks-display">0</span></span>
             </div>
         </div>
@@ -112,7 +112,6 @@
             </div>
         </div>
 
-        <!-- Інвентар -->
         <div class="glass-panel p-6 rounded-3xl border border-slate-700 flex-1">
             <div class="flex justify-between items-center mb-4">
                 <h4 class="text-sm uppercase text-slate-400 font-bold tracking-widest">Рюкзак Модулів</h4>
@@ -177,7 +176,7 @@
         <div class="flex justify-between items-center mb-8 fade-in">
             <button id="shop-back-btn" class="glass-panel px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-slate-300 hover:text-white transition">← Назад</button>
             <h2 class="text-4xl font-russo text-white tracking-widest">КРАМНИЦЯ МОДУЛІВ</h2>
-            <div class="glass-panel px-6 py-2 rounded-full border border-emerald-500/30">
+            <div class="glass-panel px-6 py-2 rounded-full border border-emerald-500/30 cursor-pointer hover:bg-emerald-900/40 transition" onclick="document.getElementById('promo-modal').classList.remove('hidden'); playSound('ui_click');">
                 <span class="text-emerald-400 font-russo text-xl">💵 <span class="global-bucks-display">0</span></span>
             </div>
         </div>
@@ -381,6 +380,19 @@
             </div>
         </div>
         <div id="game-container"><canvas id="game-canvas"></canvas></div>
+    </div>
+
+    <!-- ВІКНО ПРОМОКОДІВ -->
+    <div id="promo-modal" class="modal hidden fixed inset-0 z-[120] flex items-center justify-center p-4">
+        <div class="glass-panel p-8 rounded-3xl max-w-sm w-full text-center border border-emerald-500/50 shadow-[0_0_40px_rgba(16,185,129,0.3)] slide-up">
+            <h2 class="text-2xl font-russo mb-4 text-emerald-400 tracking-widest uppercase">ПРОМОКОД</h2>
+            <p class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-6">Введіть код для отримання нагороди</p>
+            <input type="text" id="promo-input" placeholder="ВВЕДІТЬ КОД" class="w-full p-4 rounded-xl bg-slate-900/80 text-white mb-6 border border-slate-700 focus:outline-none focus:border-emerald-500 text-lg font-russo text-center tracking-widest transition">
+            <div class="flex gap-4">
+                <button onclick="document.getElementById('promo-modal').classList.add('hidden'); playSound('ui_click');" class="flex-1 bg-slate-700/80 hover:bg-slate-600 py-3 rounded-xl font-bold tracking-widest uppercase transition">ВІДМІНА</button>
+                <button id="submit-promo-btn" class="flex-1 bg-emerald-600 hover:bg-emerald-500 py-3 rounded-xl font-bold tracking-widest uppercase transition text-white shadow-[0_0_15px_rgba(16,185,129,0.5)]">ОТРИМАТИ</button>
+            </div>
+        </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>

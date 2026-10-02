@@ -7,7 +7,6 @@ function showScreen(screenId) {
 }
 function updateGlobalBucks() { document.querySelectorAll('.global-bucks-display').forEach(el => el.innerText = myBucks); }
 
-// Синхронізуємо повзунки зі збереженими налаштуваннями
 const musicSlider = document.getElementById('vol-music'); 
 if(musicSlider) { 
     if(typeof volMusic !== 'undefined') musicSlider.value = volMusic;
@@ -32,6 +31,17 @@ document.getElementById('nav-hangar-btn').onclick = () => { renderHangar(); show
 document.getElementById('shop-back-btn').onclick = () => { showScreen('main-menu-screen'); };
 document.getElementById('hangar-back-btn').onclick = () => { showScreen('main-menu-screen'); };
 document.getElementById('back-to-menu-btn').onclick = () => { showScreen('main-menu-screen'); };
+
+// ОБРОБНИК ПРОМОКОДІВ
+const submitPromoBtn = document.getElementById('submit-promo-btn');
+if(submitPromoBtn) {
+    submitPromoBtn.onclick = () => {
+        if (typeof playSound === 'function') playSound('ui_click');
+        const code = document.getElementById('promo-input').value;
+        if(!code) return alert('Введіть промокод!');
+        socket.emit('usePromo', code);
+    };
+}
 
 function renderRoomsList(rooms) {
     const list = document.getElementById('rooms-list'); list.innerHTML = '';
@@ -166,6 +176,7 @@ window.buyShopCase = function(caseId, price) {
 };
 
 document.getElementById('cancel-case-btn').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); document.getElementById('case-confirm-modal').classList.add('hidden'); };
+
 document.getElementById('close-reward-btn').onclick = () => { 
     if (typeof playSound === 'function') playSound('ui_click'); 
     document.getElementById('reward-modal').classList.add('hidden'); 
