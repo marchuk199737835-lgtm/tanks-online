@@ -35,6 +35,39 @@ function checkCollision(x, y, r, checkSolids = true, isBullet = false) {
     } return false; 
 }
 
+// Нова функція: перевірка зіткнення із замаскованими гравцями
+function checkPlayerCollision(newX, newY, radius) {
+    if (!currentRoomData || currentRoomData.mode !== 'prophunt') return false;
+    for (let id in opponents) {
+        let op = opponents[id];
+        // Якщо опонент живий і замаскований, він стає твердим блоком 50x50
+        if (op.hp > 0 && op.isDisguised) {
+            let propX = op.x - 25;
+            let propY = op.y - 25;
+            let propW = 50;
+            let propH = 50;
+            
+            let testX = newX;
+            let testY = newY;
+            
+            if (newX < propX) testX = propX;
+            else if (newX > propX + propW) testX = propX + propW;
+            
+            if (newY < propY) testY = propY;
+            else if (newY > propY + propH) testY = propY + propH;
+            
+            let distX = newX - testX;
+            let distY = newY - testY;
+            let distance = Math.sqrt((distX*distX) + (distY*distY));
+            
+            if (distance <= radius) {
+                return true; // Є зіткнення з гравцем-пропом!
+            }
+        }
+    }
+    return false;
+}
+
 function findNextSpectateTarget(dir) {
     if (!currentRoomData) return;
     let aliveOps = Object.keys(currentRoomData.players).filter(id => currentRoomData.players[id].hp > 0 && id !== myId);
@@ -82,8 +115,13 @@ function updatePhysics(now, dt) {
             myLocalTank.bodyAngle = Math.atan2(moveY, moveX); 
             let nextX = myLocalTank.x + moveX * speed * dt, nextY = myLocalTank.y + moveY * speed * dt; 
             let isBoss = (myLocalTank.buff === 'boss');
-            if (!checkCollision(nextX, myLocalTank.y, myRadius, true, false) || isBoss) myLocalTank.x = nextX; 
-            if (!checkCollision(myLocalTank.x, nextY, myRadius, true, false) || isBoss) myLocalTank.y = nextY; 
+            
+            // Перевіряємо колізію і з картою, і з замаскованими гравцями
+            let canMoveX = (!checkCollision(nextX, myLocalTank.y, myRadius, true, false) && !checkPlayerCollision(nextX, myLocalTank.y, myRadius));
+            if (canMoveX || isBoss) myLocalTank.x = nextX; 
+            
+            let canMoveY = (!checkCollision(myLocalTank.x, nextY, myRadius, true, false) && !checkPlayerCollision(myLocalTank.x, nextY, myRadius));
+            if (canMoveY || isBoss) myLocalTank.y = nextY; 
         }
 
         if (joysticks.right.active) {
@@ -169,7 +207,6 @@ function updatePhysics(now, dt) {
             if (b.type === 'hunter_gun') createExplosion(b.x, b.y, 10, '#dc2626');
             if (hit && bCfg.type === 'explosive' && b.owner === myId) { let splashRad = b.type === 'boss' ? 250 : 120; for (let oid in opponents) { if (opponents[oid].hp > 0 && Math.hypot(b.x - opponents[oid].x, b.y - opponents[oid].y) < splashRad) { socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: bCfg.dmg }); } } } 
             
-            // Відправка промаху мисливця на сервер
             if (!hit && b.owner === myId && b.type === 'hunter_gun') { socket.emit('bulletMissed', { roomId: currentRoomId }); }
             bullets.splice(i, 1); 
         }
@@ -195,7 +232,6 @@ function drawTank(x, y, bodyAngle, turretAngle, colorHex, name, isMe, hp, buff, 
     
     ctx.shadowColor = 'transparent'; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; 
     
-    // Відображення імені
     if (drawName && (buff !== 'invisible' || isMe)) {
         ctx.fillStyle = colorHex; ctx.font = '14px Russo One'; ctx.textAlign = 'center'; ctx.fillText(name, 0, -45);
     }
@@ -316,6 +352,81 @@ function drawPCAimArrow() {
     ctx.restore();
 }
 
+socket.on('sync', (data) => {
+    if (!currentRoomData || currentRoomData.status !== 'playing') return;
+    currentRoomData.players = data.players; 
+    
+    if (currentRoomData.mode === 'prophunt' && data.phState) {
+        currentRoomData.state = data.phState;
+        const phTimerEl = document.getElementById('prophunt-hud-timer');
+        const phTimeText = document.getElementById('ph-time-text');
+        const phPhaseText = document.getElementById('ph-phase-text');
+        const blindOverlay = document.getElementById('hunter-blind-overlay');
+        
+        if(phTimerEl) {
+            phTimerEl.classList.remove('hidden');
+            let mins = Math.floor(data.phTimeLeft / 60);
+            let secs = data.phTimeLeft % 60;
+            if(phTimeText) phTimeText.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            
+            if (data.phState === 'hiding') {
+                if(phPhaseText) {
+                    phPhaseText.innerText = 'ХОВАНКИ';
+                    phPhaseText.className = 'text-[8px] lg:text-xs text-blue-400 font-bold tracking-widest uppercase';
+                }
+                if (myLocalTank.team === 'hunter' && blindOverlay) {
+                    blindOverlay.classList.remove('hidden');
+                    blindOverlay.classList.add('flex');
+                }
+            } else if (data.phState === 'seeking') {
+                if(phPhaseText) {
+                    phPhaseText.innerText = 'ПОШУК';
+                    phPhaseText.className = 'text-[8px] lg:text-xs text-red-500 font-bold tracking-widest uppercase';
+                }
+                if (blindOverlay) {
+                    blindOverlay.classList.add('hidden');
+                    blindOverlay.classList.remove('flex');
+                }
+            }
+        }
+    }
+
+    let activeOpponents = {};
+    for (let id in data.players) {
+        if (id !== myId) {
+            if (!opponents[id]) activeOpponents[id] = { ...data.players[id] };
+            else { 
+                activeOpponents[id] = opponents[id]; 
+                activeOpponents[id].targetX = data.players[id].x; 
+                activeOpponents[id].targetY = data.players[id].y; 
+                activeOpponents[id].targetBody = data.players[id].bodyAngle; 
+                activeOpponents[id].targetTurret = data.players[id].turretAngle; 
+            }
+            activeOpponents[id].hp = data.players[id].hp; 
+            activeOpponents[id].buff = data.players[id].buff; 
+            activeOpponents[id].equipped = data.players[id].equipped; 
+            activeOpponents[id].color = data.players[id].color;
+            activeOpponents[id].team = data.players[id].team; 
+            activeOpponents[id].isDisguised = data.players[id].isDisguised; 
+            activeOpponents[id].propType = data.players[id].propType;
+        } else {
+            // Зняття маскування, якщо по гравцю попали (впало ХП)
+            if (currentRoomData.mode === 'prophunt' && myLocalTank.hp > data.players[id].hp) {
+                myLocalTank.isDisguised = false;
+            }
+            myLocalTank.hp = data.players[id].hp; 
+            myLocalTank.buff = data.players[id].buff; 
+            myLocalTank.buffProgress = data.players[id].buffProgress; 
+            myLocalTank.score = data.players[id].score;
+            myEquipped = data.players[id].equipped || myEquipped; 
+            myColor = data.players[id].color; 
+            myLocalTank.propType = data.players[id].propType;
+        }
+    }
+    opponents = activeOpponents; zombies = data.zombies || {}; powerups = data.powerups || {}; tokens = data.tokens || {};
+    if (typeof updateHUD === 'function') updateHUD();
+});
+
 function draw(now) {
     if(!currentRoomData) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.save();
@@ -390,8 +501,8 @@ function draw(now) {
         const p = opponents[id]; const sn = currentRoomData.players[id] || { name: 'Гравець', color: 'white', equipped: {} }; 
         const cHex = sn.color ? (sn.color==='white'?'#f8fafc':sn.color==='black'?'#1e293b':sn.color==='red'?'#ef4444':sn.color==='blue'?'#3b82f6':sn.color==='brown'?'#78350f':'#9333ea') : '#ef4444'; 
         
-        // ВАЖЛИВО: Використовуємо p.propType для правильного малювання
         if (p.isDisguised) {
+            // Відмальовуємо проп. Центрування: віднімаємо 25px, щоб відмалювати від верхнього лівого кута блоку 50x50
             drawProp(ctx, { type: p.propType, x: p.x - 25, y: p.y - 25, w: 50, h: 50, r: 25 }, time);
         } else {
             drawTank(p.x, p.y, p.bodyAngle, p.turretAngle, cHex, sn.name, false, p.hp, p.buff, sn.equipped, true); 
@@ -460,7 +571,6 @@ function draw(now) {
         let specName = currentRoomData.players[spectatingId] ? currentRoomData.players[spectatingId].name : 'ГРАВЕЦЬ';
         let specTank = opponents[spectatingId];
         
-        // Якщо той за ким спостерігаємо захований, ми бачимо його як декор, але з текстом "СПОСТЕРІГАННЯ"
         if (specTank.isDisguised) {
             drawProp(ctx, { type: specTank.propType, x: specTank.x - 25, y: specTank.y - 25, w: 50, h: 50, r: 25 }, time);
         }
