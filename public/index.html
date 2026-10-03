@@ -16,7 +16,7 @@
         .cobweb:hover { transform: scale(1.1); opacity: 0.6; filter: drop-shadow(0 0 10px #ea580c); }
     </style>
 </head>
-<body class="relative text-white antialiased bg-[#020617] overflow-hidden">
+<body class="relative text-white antialiased bg-[#020617] h-screen w-screen overflow-hidden">
 
     <!-- Глобальні налаштування -->
     <div id="settings-modal" class="modal hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -29,7 +29,7 @@
     </div>
 
     <!-- Екран 1: Авторизація -->
-    <div id="login-screen" class="screen-container fixed inset-0 z-50 flex flex-col items-center justify-center">
+    <div id="login-screen" class="screen-container fixed inset-0 z-50 flex flex-col items-center justify-center h-full w-full bg-gradient-to-br from-[#020617] via-[#0f172a] to-[#020617]">
         <div class="glass-panel p-8 rounded-2xl max-w-md w-full text-center neon-border relative slide-up">
             <button class="settings-btn absolute top-4 right-4 text-slate-400 hover:text-white transition">⚙️</button>
             <h1 class="text-6xl mb-2 text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.8)] font-russo mt-4 tracking-wider">ТАНКИ</h1>
@@ -45,7 +45,7 @@
     </div>
 
     <!-- Екран 2: Головне меню -->
-    <div id="main-menu-screen" class="screen-container hidden fixed inset-0 z-40 flex-col items-center justify-center relative">
+    <div id="main-menu-screen" class="screen-container hidden fixed inset-0 z-40 flex-col items-center justify-center relative h-full w-full bg-gradient-to-br from-[#020617] via-[#0f172a] to-[#020617]">
         
         <!-- Хелоуін Декор -->
         <div class="absolute top-0 left-0 w-40 h-40 cobweb z-0 cursor-crosshair">
@@ -67,7 +67,7 @@
         </div>
 
         <!-- ХЕЛОУІН БАНЕР -->
-        <div class="relative w-full max-w-2xl mx-auto mb-10 mt-10 p-1 rounded-2xl bg-gradient-to-r from-orange-600 via-purple-600 to-orange-600 animate-pulse group cursor-pointer shadow-[0_0_40px_rgba(234,88,12,0.4)] fade-in" onclick="openAdvent()">
+        <div class="relative w-full max-w-2xl mx-auto mb-10 p-1 rounded-2xl bg-gradient-to-r from-orange-600 via-purple-600 to-orange-600 animate-pulse group cursor-pointer shadow-[0_0_40px_rgba(234,88,12,0.4)] fade-in" onclick="openAdvent()">
             <div class="bg-slate-950 p-6 rounded-xl flex items-center justify-center relative overflow-hidden transition-transform transform group-hover:scale-[1.02]">
                 <div class="absolute -left-4 -top-4 text-7xl opacity-40 group-hover:opacity-100 transition duration-500 transform group-hover:rotate-12 pointer-events-none">🕸️</div>
                 <div class="absolute right-4 bottom-2 text-6xl opacity-70 group-hover:-translate-y-2 transition duration-300 pointer-events-none">🎃</div>
@@ -83,18 +83,18 @@
 
         <h1 class="text-5xl text-white font-russo mb-12 drop-shadow-[0_0_20px_rgba(255,255,255,0.3)] tracking-widest slide-up relative z-10">ОБЕРІТЬ ДІЮ</h1>
         
-        <div class="flex gap-6 slide-up max-w-6xl w-full px-8 justify-center relative z-10">
-            <button id="nav-sessions-btn" class="flex-1 max-w-[320px] h-80 glass-panel rounded-3xl border border-blue-500/30 hover:border-blue-500 hover:shadow-[0_0_30px_rgba(37,99,235,0.4)] transition-all group flex flex-col items-center justify-center gap-4">
+        <div class="flex gap-6 slide-up max-w-6xl w-full px-8 justify-center relative z-10 flex-1 max-h-[350px]">
+            <button id="nav-sessions-btn" class="flex-1 h-full glass-panel rounded-3xl border border-blue-500/30 hover:border-blue-500 hover:shadow-[0_0_30px_rgba(37,99,235,0.4)] transition-all group flex flex-col items-center justify-center gap-4">
                 <div class="text-7xl group-hover:scale-110 transition-transform duration-300">🌍</div>
                 <h2 class="text-2xl font-russo text-white tracking-widest">СЕСІЇ</h2>
                 <p class="text-slate-400 text-xs font-bold uppercase tracking-wider">Знайти або створити</p>
             </button>
-            <button id="nav-hangar-btn" class="flex-1 max-w-[320px] h-80 glass-panel rounded-3xl border border-purple-500/30 hover:border-purple-500 hover:shadow-[0_0_30px_rgba(168,85,247,0.4)] transition-all group flex flex-col items-center justify-center gap-4">
+            <button id="nav-hangar-btn" class="flex-1 h-full glass-panel rounded-3xl border border-purple-500/30 hover:border-purple-500 hover:shadow-[0_0_30px_rgba(168,85,247,0.4)] transition-all group flex flex-col items-center justify-center gap-4">
                 <div class="text-7xl group-hover:scale-110 transition-transform duration-300">🛡️</div>
                 <h2 class="text-2xl font-russo text-white tracking-widest">АНГАР</h2>
                 <p class="text-slate-400 text-xs font-bold uppercase tracking-wider">Інвентар та Модулі</p>
             </button>
-            <button id="nav-shop-btn" class="flex-1 max-w-[320px] h-80 glass-panel rounded-3xl border border-emerald-500/30 hover:border-emerald-500 hover:shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all group flex flex-col items-center justify-center gap-4">
+            <button id="nav-shop-btn" class="flex-1 h-full glass-panel rounded-3xl border border-emerald-500/30 hover:border-emerald-500 hover:shadow-[0_0_30px_rgba(16,185,129,0.4)] transition-all group flex flex-col items-center justify-center gap-4">
                 <div class="text-7xl group-hover:scale-110 transition-transform duration-300">📦</div>
                 <h2 class="text-2xl font-russo text-white tracking-widest">КРАМНИЦЯ</h2>
                 <p class="text-slate-400 text-xs font-bold uppercase tracking-wider">Кейси з деталями</p>
@@ -126,7 +126,7 @@
     </div>
 
     <!-- Екран 2.5: АНГАР -->
-    <div id="hangar-screen" class="screen-container hidden fixed inset-0 z-40 flex-col p-8 overflow-y-auto relative">
+    <div id="hangar-screen" class="screen-container hidden fixed inset-0 z-40 flex flex-col p-8 h-full w-full bg-[#020617]">
         <!-- Хелоуін Декор -->
         <div class="absolute top-0 right-10 w-32 h-32 cobweb z-0 cursor-crosshair transform scale-x-[-1]">
             <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.5" class="text-slate-400 w-full h-full opacity-50"><path d="M0,0 L100,100 M0,0 L100,40 M0,0 L40,100 M0,20 Q20,20 20,0 M0,40 Q40,40 40,0 M0,60 Q60,60 60,0 M0,80 Q80,80 80,0 M0,100 Q100,100 100,0"/></svg>
@@ -140,8 +140,8 @@
             </div>
         </div>
 
-        <div class="flex flex-col md:flex-row gap-6 mb-6 relative z-10">
-            <div class="glass-panel p-4 rounded-3xl border border-slate-700 w-full md:w-1/3 flex flex-col items-center justify-center relative overflow-hidden" style="min-height: 350px;">
+        <div class="flex flex-col md:flex-row gap-6 mb-6 relative z-10 flex-shrink-0">
+            <div class="glass-panel p-4 rounded-3xl border border-slate-700 w-full md:w-1/3 flex flex-col items-center justify-center relative overflow-hidden min-h-[350px]">
                 <h3 class="absolute top-4 left-6 text-sm font-russo text-slate-400 tracking-widest uppercase">Креслення</h3>
                 <canvas id="hangar-canvas" width="300" height="300" class="cursor-crosshair"></canvas>
             </div>
@@ -177,7 +177,7 @@
             </div>
         </div>
 
-        <div class="glass-panel p-6 rounded-3xl border border-slate-700 flex-1 relative z-10">
+        <div class="glass-panel p-6 rounded-3xl border border-slate-700 flex-1 relative z-10 overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
                 <h4 class="text-sm uppercase text-slate-400 font-bold tracking-widest">Рюкзак Модулів</h4>
                 <span class="text-xs font-bold text-slate-500"><span id="inv-count">0</span> / 30</span>
@@ -199,13 +199,13 @@
     </div>
 
     <!-- Екран 3: Браузер Сесій -->
-    <div id="room-browser-screen" class="screen-container hidden fixed inset-0 z-40 flex-col p-8 relative">
+    <div id="room-browser-screen" class="screen-container hidden fixed inset-0 z-40 flex flex-col p-8 h-full w-full bg-[#020617]">
         <!-- Хелоуін Декор -->
         <div class="absolute top-20 right-8 spider-container cursor-pointer z-50 flex flex-col items-center">
             <div class="spider-thread h-4"></div><div class="text-2xl spider-emoji">🕷️</div>
         </div>
 
-        <div class="flex justify-between items-center mb-8 fade-in relative z-10">
+        <div class="flex justify-between items-center mb-8 fade-in relative z-10 flex-shrink-0">
             <button id="back-to-menu-btn" class="glass-panel px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-slate-300 hover:text-white transition">← Назад</button>
             <h2 class="text-4xl font-russo text-white tracking-widest">АКТИВНІ СЕСІЇ</h2>
             <button id="open-create-room-btn" class="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-xl font-russo text-lg uppercase tracking-widest transition shadow-[0_0_15px_rgba(37,99,235,0.5)]">+ СТВОРИТИ</button>
@@ -247,13 +247,13 @@
     </div>
 
     <!-- Екран 4: Крамниця -->
-    <div id="shop-screen" class="screen-container hidden fixed inset-0 z-40 flex-col p-8 overflow-y-auto relative">
+    <div id="shop-screen" class="screen-container hidden fixed inset-0 z-40 flex flex-col p-8 h-full w-full bg-[#020617]">
         <!-- Хелоуін Декор -->
         <div class="absolute top-0 left-10 w-32 h-32 cobweb z-0 cursor-crosshair">
             <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.5" class="text-slate-400 w-full h-full opacity-50"><path d="M0,0 L100,100 M0,0 L100,40 M0,0 L40,100 M0,20 Q20,20 20,0 M0,40 Q40,40 40,0 M0,60 Q60,60 60,0 M0,80 Q80,80 80,0 M0,100 Q100,100 100,0"/></svg>
         </div>
 
-        <div class="flex justify-between items-center mb-8 fade-in relative z-10">
+        <div class="flex justify-between items-center mb-8 fade-in relative z-10 flex-shrink-0">
             <button id="shop-back-btn" class="glass-panel px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-slate-300 hover:text-white transition">← Назад</button>
             <h2 class="text-4xl font-russo text-white tracking-widest">КРАМНИЦЯ МОДУЛІВ</h2>
             <div class="glass-panel px-6 py-2 rounded-full border border-emerald-500/30 cursor-pointer hover:bg-emerald-900/40 transition" onclick="document.getElementById('promo-modal').classList.remove('hidden'); playSound('ui_click');">
@@ -261,29 +261,29 @@
             </div>
         </div>
 
-        <div class="flex flex-col md:flex-row gap-8 justify-center items-center flex-1 slide-up pb-8 relative z-10">
-            <div class="glass-panel p-8 rounded-[3rem] border border-slate-600 flex flex-col items-center w-full max-w-sm hover:border-slate-400 transition hover:shadow-2xl relative">
+        <div class="flex flex-col md:flex-row gap-8 justify-center items-center flex-1 slide-up relative z-10">
+            <div class="glass-panel p-8 rounded-[3rem] border border-slate-600 flex flex-col items-center w-full max-w-sm hover:border-slate-400 transition hover:shadow-2xl relative h-full max-h-[450px] justify-center">
                 <button onclick="openCaseInfo(1)" class="absolute top-6 right-6 w-10 h-10 bg-slate-800 text-slate-400 rounded-full hover:bg-slate-700 hover:text-white transition font-russo text-lg border border-slate-600">i</button>
                 <div class="text-8xl mb-4 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">📦</div>
                 <h3 class="text-2xl font-russo text-white mb-2 tracking-widest uppercase">БАЗОВИЙ ЯЩИК</h3>
                 <p class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-6 text-center h-12">Звичайний: 75%<br>Рідкісний: 15%<br>Епічний: 9% | Легендарний: 1%</p>
-                <button onclick="buyShopCase(1, 50)" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-4 rounded-2xl text-xl font-russo uppercase tracking-widest transition shadow-lg border border-slate-500">💵 50</button>
+                <button onclick="buyShopCase(1, 50)" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-4 rounded-2xl text-xl font-russo uppercase tracking-widest transition shadow-lg border border-slate-500 mt-auto">💵 50</button>
             </div>
 
-            <div class="glass-panel p-8 rounded-[3rem] border border-purple-500/50 flex flex-col items-center w-full max-w-sm hover:border-purple-400 transition hover:shadow-[0_0_30px_rgba(168,85,247,0.3)] transform scale-105 relative">
+            <div class="glass-panel p-8 rounded-[3rem] border border-purple-500/50 flex flex-col items-center w-full max-w-sm hover:border-purple-400 transition hover:shadow-[0_0_30px_rgba(168,85,247,0.3)] transform scale-105 relative h-full max-h-[500px] justify-center">
                 <button onclick="openCaseInfo(2)" class="absolute top-6 right-6 w-10 h-10 bg-purple-900/50 text-purple-400 rounded-full hover:bg-purple-800 hover:text-white transition font-russo text-lg border border-purple-500">i</button>
                 <div class="text-9xl mb-4 drop-shadow-[0_0_20px_rgba(168,85,247,0.5)]">🎁</div>
                 <h3 class="text-3xl font-russo text-purple-400 mb-2 tracking-widest uppercase text-center">ШТУРМОВИЙ КЕЙС</h3>
                 <p class="text-xs text-purple-200/50 font-bold uppercase tracking-wider mb-6 text-center h-12">Звичайний: 55% | Рідкісний: 25%<br>Епічний: 15% | Легендарний: 5%</p>
-                <button onclick="buyShopCase(2, 100)" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-5 rounded-2xl text-2xl font-russo uppercase tracking-widest transition shadow-[0_0_20px_rgba(168,85,247,0.4)]">💵 100</button>
+                <button onclick="buyShopCase(2, 100)" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-5 rounded-2xl text-2xl font-russo uppercase tracking-widest transition shadow-[0_0_20px_rgba(168,85,247,0.4)] mt-auto">💵 100</button>
             </div>
 
-            <div class="glass-panel p-8 rounded-[3rem] border border-yellow-500/50 flex flex-col items-center w-full max-w-sm hover:border-yellow-400 transition hover:shadow-[0_0_30px_rgba(234,179,8,0.3)] relative">
+            <div class="glass-panel p-8 rounded-[3rem] border border-yellow-500/50 flex flex-col items-center w-full max-w-sm hover:border-yellow-400 transition hover:shadow-[0_0_30px_rgba(234,179,8,0.3)] relative h-full max-h-[450px] justify-center">
                 <button onclick="openCaseInfo(3)" class="absolute top-6 right-6 w-10 h-10 bg-yellow-900/50 text-yellow-500 rounded-full hover:bg-yellow-800 hover:text-white transition font-russo text-lg border border-yellow-500">i</button>
                 <div class="text-8xl mb-4 drop-shadow-[0_0_20px_rgba(234,179,8,0.5)]">💎</div>
                 <h3 class="text-2xl font-russo text-yellow-500 mb-2 tracking-widest uppercase text-center">ЕЛІТНИЙ КОНТЕЙНЕР</h3>
                 <p class="text-xs text-yellow-200/50 font-bold uppercase tracking-wider mb-6 text-center h-12">Звичайний: 0%<br>Рідкісний: 55% | Епічний: 25%<br>Легендарний: 20%</p>
-                <button onclick="buyShopCase(3, 150)" class="w-full bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-4 rounded-2xl text-xl font-russo uppercase tracking-widest transition shadow-[0_0_20px_rgba(234,179,8,0.4)]">💵 150</button>
+                <button onclick="buyShopCase(3, 150)" class="w-full bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-4 rounded-2xl text-xl font-russo uppercase tracking-widest transition shadow-[0_0_20px_rgba(234,179,8,0.4)] mt-auto">💵 150</button>
             </div>
         </div>
     </div>
