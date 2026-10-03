@@ -96,20 +96,20 @@ window.openCaseInfo = function(caseId) {
     const modal = document.getElementById('case-info-modal'); const grid = document.getElementById('case-info-grid'); const title = document.getElementById('case-info-title');
     grid.innerHTML = '';
     let allowedRarities = [];
-    if (caseId === 1) { title.innerText = "БАЗОВИЙ ЯЩИК"; title.className = "text-3xl font-russo text-white tracking-widest"; allowedRarities = ['common', 'rare', 'epic', 'legendary']; }
-    else if (caseId === 2) { title.innerText = "ШТУРМОВИЙ КЕЙС"; title.className = "text-3xl font-russo text-purple-400 tracking-widest"; allowedRarities = ['common', 'rare', 'epic', 'legendary']; }
-    else if (caseId === 3) { title.innerText = "ЕЛІТНИЙ КОНТЕЙНЕР"; title.className = "text-3xl font-russo text-yellow-500 tracking-widest"; allowedRarities = ['rare', 'epic', 'legendary']; }
+    if (caseId === 1) { title.innerText = "БАЗОВИЙ ЯЩИК"; title.className = "text-2xl md:text-3xl font-russo text-white tracking-widest"; allowedRarities = ['common', 'rare', 'epic', 'legendary']; }
+    else if (caseId === 2) { title.innerText = "ШТУРМОВИЙ КЕЙС"; title.className = "text-2xl md:text-3xl font-russo text-purple-400 tracking-widest"; allowedRarities = ['common', 'rare', 'epic', 'legendary']; }
+    else if (caseId === 3) { title.innerText = "ЕЛІТНИЙ КОНТЕЙНЕР"; title.className = "text-2xl md:text-3xl font-russo text-yellow-500 tracking-widest"; allowedRarities = ['rare', 'epic', 'legendary']; }
 
     const sortedRarities = ['legendary', 'epic', 'rare', 'common'];
     sortedRarities.forEach(rar => {
         if (!allowedRarities.includes(rar)) return;
-        grid.innerHTML += `<div class="col-span-full mt-4 mb-2"><span class="text-sm font-bold uppercase tracking-widest px-3 py-1 rounded" style="background-color: ${RARITY[rar].color}40; color: ${RARITY[rar].color}">${RARITY[rar].name}</span></div>`;
-        let sectionGrid = `<div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">`;
+        grid.innerHTML += `<div class="col-span-full mt-4 mb-2"><span class="text-[10px] md:text-sm font-bold uppercase tracking-widest px-3 py-1 rounded" style="background-color: ${RARITY[rar].color}40; color: ${RARITY[rar].color}">${RARITY[rar].name}</span></div>`;
+        let sectionGrid = `<div class="grid grid-cols-2 sm:grid-cols-3 gap-2 md:gap-3 mb-4 md:mb-6">`;
         Object.keys(MODULES).forEach(modId => {
             let mod = MODULES[modId];
             if (mod.rarity === rar) {
                 let iconSvg = SVG_ICONS[mod.type](RARITY[mod.rarity].color);
-                sectionGrid += `<div class="flex items-center gap-3 bg-slate-800/50 p-3 rounded-xl border border-slate-700"><div class="w-10 h-10 p-2 flex-shrink-0 flex items-center justify-center rounded-lg bg-slate-900 border" style="border-color:${RARITY[mod.rarity].color}">${iconSvg}</div><div class="overflow-hidden"><p class="text-xs text-white font-bold truncate">${mod.name}</p><p class="text-[9px] uppercase font-bold truncate" style="color:${RARITY[mod.rarity].color}">${CAT_NAMES[mod.type]}</p></div></div>`;
+                sectionGrid += `<div class="flex items-center gap-2 md:gap-3 bg-slate-800/50 p-2 md:p-3 rounded-xl border border-slate-700"><div class="w-8 h-8 md:w-10 md:h-10 p-1.5 md:p-2 flex-shrink-0 flex items-center justify-center rounded-lg bg-slate-900 border" style="border-color:${RARITY[mod.rarity].color}">${iconSvg}</div><div class="overflow-hidden"><p class="text-[10px] md:text-xs text-white font-bold truncate">${mod.name}</p><p class="text-[8px] md:text-[9px] uppercase font-bold truncate" style="color:${RARITY[mod.rarity].color}">${CAT_NAMES[mod.type]}</p></div></div>`;
             }
         });
         sectionGrid += `</div>`; grid.innerHTML += sectionGrid;
@@ -119,14 +119,14 @@ window.openCaseInfo = function(caseId) {
 
 function renderRoomsList(rooms) {
     const list = document.getElementById('rooms-list'); list.innerHTML = '';
-    if (rooms.length === 0) { list.innerHTML = '<div class="text-center text-slate-500 py-10 font-bold tracking-widest uppercase">Немає активних сесій</div>'; return; }
+    if (rooms.length === 0) { list.innerHTML = '<div class="text-center text-slate-500 py-10 font-bold tracking-widest uppercase text-xs md:text-sm">Немає активних сесій</div>'; return; }
     rooms.forEach(r => {
         let isFull = r.playersCount >= r.maxPlayers; let inProgress = r.status === 'playing'; let btnHtml = '';
-        if (inProgress) btnHtml = '<button disabled class="bg-slate-700 text-slate-500 px-4 py-2 rounded font-bold uppercase text-xs">В ГРІ</button>';
-        else if (isFull) btnHtml = '<button disabled class="bg-red-900/50 text-red-500 px-4 py-2 rounded font-bold uppercase text-xs border border-red-500/30">ПОВНА</button>';
-        else btnHtml = `<button onclick="joinRoomBtn('${r.id}')" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-bold uppercase text-xs transition shadow-[0_0_10px_rgba(37,99,235,0.4)]">ПІД'ЄДНАТИСЬ</button>`;
+        if (inProgress) btnHtml = '<button disabled class="bg-slate-700 text-slate-500 px-3 md:px-4 py-1.5 md:py-2 rounded font-bold uppercase text-[9px] md:text-xs">В ГРІ</button>';
+        else if (isFull) btnHtml = '<button disabled class="bg-red-900/50 text-red-500 px-3 md:px-4 py-1.5 md:py-2 rounded font-bold uppercase text-[9px] md:text-xs border border-red-500/30">ПОВНА</button>';
+        else btnHtml = `<button onclick="joinRoomBtn('${r.id}')" class="bg-blue-600 hover:bg-blue-500 text-white px-3 md:px-4 py-1.5 md:py-2 rounded font-bold uppercase text-[9px] md:text-xs transition shadow-[0_0_10px_rgba(37,99,235,0.4)]">ПІД'ЄДНАТИСЬ</button>`;
         const modeEmoji = r.mode === 'survival' ? '🧟' : '⚔️';
-        list.innerHTML += `<div class="grid grid-cols-5 gap-4 items-center p-4 bg-slate-800/50 hover:bg-slate-800 rounded-xl border border-slate-700 transition"><div class="col-span-2 flex flex-col"><span class="font-bold text-white text-sm">${r.hostName}</span><span class="text-[10px] text-slate-500 font-mono">${r.id}</span></div><div class="text-sm font-bold text-slate-300 uppercase">${modeEmoji} ${r.mode === 'survival'?'ВИЖИВАННЯ':'ДЕТМАТЧ'}</div><div class="text-sm text-slate-300 uppercase">${r.map}</div><div class="flex justify-between items-center"><span class="font-russo ${isFull?'text-red-400':'text-blue-400'}">${r.playersCount}/${r.maxPlayers}</span>${btnHtml}</div></div>`;
+        list.innerHTML += `<div class="grid grid-cols-4 md:grid-cols-5 gap-2 md:gap-4 items-center p-3 md:p-4 bg-slate-800/50 hover:bg-slate-800 rounded-xl border border-slate-700 transition"><div class="col-span-2 flex flex-col"><span class="font-bold text-white text-[10px] md:text-sm truncate">${r.hostName}</span><span class="text-[8px] md:text-[10px] text-slate-500 font-mono hidden sm:block">${r.id}</span></div><div class="text-[9px] md:text-sm font-bold text-slate-300 uppercase hidden md:block">${modeEmoji} ${r.mode === 'survival'?'ВИЖИВАННЯ':'ДЕТМАТЧ'}</div><div class="text-[9px] md:text-sm text-slate-300 uppercase truncate">${r.map}</div><div class="flex justify-between items-center"><span class="font-russo text-xs md:text-base ${isFull?'text-red-400':'text-blue-400'} mr-2">${r.playersCount}/${r.maxPlayers}</span>${btnHtml}</div></div>`;
     });
 }
 window.joinRoomBtn = function(roomId) { if (typeof playSound === 'function') playSound('ui_click'); socket.emit('joinRoom', roomId); };
@@ -139,6 +139,7 @@ document.querySelectorAll('.create-map-select').forEach(btn => { btn.onclick = (
 document.getElementById('create-max-players').oninput = (e) => { createConfig.maxPlayers = e.target.value; document.getElementById('max-players-val').innerText = e.target.value; };
 document.getElementById('confirm-create-btn').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); createConfig.winScore = document.getElementById('create-win-score').value; document.getElementById('create-room-modal').classList.add('hidden'); socket.emit('createRoom', createConfig); };
 
+// Адаптація Drag & Drop для мобільних не потрібна, бо ми використовуємо тапи для відкриття меню
 let dragSource = null;
 window.dragStartInv = function(e, modId, index) { dragSource = { type: 'inv', index: index, id: modId }; e.dataTransfer.setData('text/plain', modId); };
 window.dragStartEq = function(e, modId, slotType) { dragSource = { type: 'eq', slotType: slotType, id: modId }; e.dataTransfer.setData('text/plain', modId); };
@@ -180,9 +181,9 @@ function renderHangar() {
             if(m.stats.dmg) totalDmg *= m.stats.dmg; if(m.stats.range) totalRange *= m.stats.range; if(m.stats.cd) totalCd *= m.stats.cd;
             if(m.stats.hp) totalHp *= m.stats.hp; if(m.stats.speed) totalSpeed *= m.stats.speed; if(m.stats.rotSpeed) totalRot *= m.stats.rotSpeed;
             let iconSvg = SVG_ICONS[t.k](RARITY[m.rarity].color);
-            eqHtml.push(`<div class="flex items-center gap-3 bg-slate-800/50 p-2 rounded-xl border border-slate-700 cursor-pointer hover:bg-slate-700/50 transition relative overflow-hidden group" draggable="true" ondragstart="dragStartEq(event, '${modId}', '${t.k}')" ondragover="allowDrop(event)" ondrop="dropEq(event, '${t.k}')" onclick="openCtxMenu(event, '${modId}', 'eq', '${t.k}')"><div class="absolute -right-2 -bottom-2 text-3xl opacity-0 group-hover:opacity-10 transition pointer-events-none">🕸️</div><div class="w-10 h-10 p-2 flex items-center justify-center rounded-lg bg-slate-900 border z-10" style="border-color:${RARITY[m.rarity].color}">${iconSvg}</div><div class="z-10"><p class="text-xs text-white font-bold">${m.name}</p><p class="text-[9px] uppercase font-bold" style="color:${RARITY[m.rarity].color}">${CAT_NAMES[t.k]} | ${RARITY[m.rarity].name}</p></div></div>`);
+            eqHtml.push(`<div class="flex items-center gap-2 md:gap-3 bg-slate-800/50 p-2 rounded-xl border border-slate-700 cursor-pointer hover:bg-slate-700/50 transition relative overflow-hidden group" draggable="true" ondragstart="dragStartEq(event, '${modId}', '${t.k}')" ondragover="allowDrop(event)" ondrop="dropEq(event, '${t.k}')" onclick="openCtxMenu(event, '${modId}', 'eq', '${t.k}')"><div class="absolute -right-2 -bottom-2 text-3xl opacity-0 group-hover:opacity-10 transition pointer-events-none">🕸️</div><div class="w-8 h-8 md:w-10 md:h-10 p-1.5 md:p-2 flex items-center justify-center rounded-lg bg-slate-900 border z-10 flex-shrink-0" style="border-color:${RARITY[m.rarity].color}">${iconSvg}</div><div class="z-10 overflow-hidden"><p class="text-[10px] md:text-xs text-white font-bold truncate">${m.name}</p><p class="text-[8px] md:text-[9px] uppercase font-bold truncate" style="color:${RARITY[m.rarity].color}">${CAT_NAMES[t.k]} | ${RARITY[m.rarity].name}</p></div></div>`);
         } else {
-            eqHtml.push(`<div class="flex items-center gap-3 bg-slate-900/50 p-2 rounded-xl border border-slate-800 opacity-50" ondragover="allowDrop(event)" ondrop="dropEq(event, '${t.k}')"><div class="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-900 border border-slate-700">❌</div><div><p class="text-xs text-slate-500 font-bold">Стандарт</p><p class="text-[9px] uppercase font-bold text-slate-600">${t.n}</p></div></div>`);
+            eqHtml.push(`<div class="flex items-center gap-2 md:gap-3 bg-slate-900/50 p-2 rounded-xl border border-slate-800 opacity-50" ondragover="allowDrop(event)" ondrop="dropEq(event, '${t.k}')"><div class="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-lg bg-slate-900 border border-slate-700 flex-shrink-0 text-[10px] md:text-xs">❌</div><div class="overflow-hidden"><p class="text-[10px] md:text-xs text-slate-500 font-bold truncate">Стандарт</p><p class="text-[8px] md:text-[9px] uppercase font-bold text-slate-600 truncate">${t.n}</p></div></div>`);
         }
     });
     document.getElementById('equipped-slots-container').innerHTML = eqHtml.join('');
@@ -198,7 +199,7 @@ function renderHangar() {
         if (i < myInventory.length) {
             let modId = myInventory[i]; let mod = MODULES[modId]; if(!mod) continue;
             let iconSvg = SVG_ICONS[mod.type](RARITY[mod.rarity].color);
-            invGrid.innerHTML += `<div class="inv-slot item-${mod.rarity} p-2 cursor-grab active:cursor-grabbing hover:scale-105 transition" onclick="openCtxMenu(event, '${modId}', 'inv')" draggable="true" ondragstart="dragStartInv(event, '${modId}', ${i})" ondragover="allowDrop(event)" ondrop="dropInv(event, ${i})" title="${mod.name}">${iconSvg}</div>`;
+            invGrid.innerHTML += `<div class="inv-slot item-${mod.rarity} p-1.5 md:p-2 cursor-pointer md:cursor-grab md:active:cursor-grabbing hover:scale-105 transition" onclick="openCtxMenu(event, '${modId}', 'inv')" draggable="true" ondragstart="dragStartInv(event, '${modId}', ${i})" ondragover="allowDrop(event)" ondrop="dropInv(event, ${i})" title="${mod.name}">${iconSvg}</div>`;
         } else {
             invGrid.innerHTML += `<div class="inv-slot empty border border-dashed border-slate-700 bg-slate-900/30 rounded-lg" ondragover="allowDrop(event)" ondrop="dropInv(event, ${i})"></div>`;
         }
@@ -209,7 +210,7 @@ function renderHangar() {
 function spawnSpiders(x, y) {
     for (let i = 0; i < 5; i++) {
         let spider = document.createElement('div');
-        spider.innerText = '🕷️';
+        spider.innerText = '🕷️️';
         spider.className = 'scatter-spider';
         spider.style.left = x + 'px';
         spider.style.top = y + 'px';
@@ -232,8 +233,14 @@ window.openCtxMenu = function(e, modId, mode = 'inv', slot = null) {
     e.preventDefault(); if (typeof playSound === 'function') playSound('ui_click');
     selectedInvItem = modId; contextMode = mode; selectedEqSlot = slot;
     
+    // Адаптація координат для миші та дотиків
+    let clickX = e.clientX; let clickY = e.clientY;
+    if (e.touches && e.touches.length > 0) {
+        clickX = e.touches[0].clientX; clickY = e.touches[0].clientY;
+    }
+
     // Спавн павучків
-    spawnSpiders(e.clientX, e.clientY);
+    spawnSpiders(clickX, clickY);
 
     let mod = MODULES[modId]; document.getElementById('ctx-name').innerText = mod.name; document.getElementById('ctx-name').style.color = RARITY[mod.rarity].color;
     document.getElementById('ctx-cat').innerText = `${CAT_NAMES[mod.type]} | ${RARITY[mod.rarity].name}`; document.getElementById('ctx-cat').style.color = RARITY[mod.rarity].color;
@@ -245,13 +252,18 @@ window.openCtxMenu = function(e, modId, mode = 'inv', slot = null) {
     document.getElementById('ctx-desc').innerHTML = desc.join('<br>');
     
     if (mode === 'inv') {
-        document.getElementById('ctx-equip').innerText = "Одягнути"; document.getElementById('ctx-sell').style.display = 'block'; document.getElementById('ctx-drop').style.display = 'block'; document.getElementById('ctx-sell').innerText = `Продати ($${RARITY[mod.rarity].price})`;
+        document.getElementById('ctx-equip').innerText = "Одягнути"; document.getElementById('ctx-sell').style.display = 'block'; document.getElementById('ctx-drop').style.display = 'block'; document.getElementById('ctx-sell').querySelector('span').innerText = `Продати ($${RARITY[mod.rarity].price})`;
     } else {
         document.getElementById('ctx-equip').innerText = "Зняти"; document.getElementById('ctx-sell').style.display = 'none'; document.getElementById('ctx-drop').style.display = 'none';
     }
     
     const menu = document.getElementById('context-menu'); menu.classList.remove('hidden');
-    let x = e.clientX; let y = e.clientY; if (x + 200 > window.innerWidth) x -= 200; if (y + 150 > window.innerHeight) y -= 150;
+    let x = clickX; let y = clickY; 
+    let menuWidth = menu.offsetWidth || 192; // приблизно w-48
+    let menuHeight = menu.offsetHeight || 150;
+    
+    if (x + menuWidth > window.innerWidth) x -= menuWidth; 
+    if (y + menuHeight > window.innerHeight) y -= menuHeight;
     menu.style.left = x + 'px'; menu.style.top = y + 'px';
 };
 
@@ -283,7 +295,21 @@ document.getElementById('close-reward-btn').onclick = () => {
 
 let hangarAnimId = null; let hMouseX = 150, hMouseY = 150;
 const hCanvas = document.getElementById('hangar-canvas'); const hCtx = hCanvas.getContext('2d');
-hCanvas.addEventListener('mousemove', e => { const rect = hCanvas.getBoundingClientRect(); hMouseX = e.clientX - rect.left; hMouseY = e.clientY - rect.top; });
+
+function updateHangarMousePos(e) {
+    const rect = hCanvas.getBoundingClientRect(); 
+    let cx = e.clientX; let cy = e.clientY;
+    if (e.touches && e.touches.length > 0) { cx = e.touches[0].clientX; cy = e.touches[0].clientY; }
+    
+    // Масштабуємо координати під внутрішній розмір canvas (300x300)
+    let scaleX = hCanvas.width / rect.width;
+    let scaleY = hCanvas.height / rect.height;
+    
+    hMouseX = (cx - rect.left) * scaleX; 
+    hMouseY = (cy - rect.top) * scaleY;
+}
+hCanvas.addEventListener('mousemove', updateHangarMousePos);
+hCanvas.addEventListener('touchmove', updateHangarMousePos, {passive: true});
 
 function startHangarPreview() {
     if (hangarAnimId) cancelAnimationFrame(hangarAnimId);
@@ -347,18 +373,18 @@ function updateLobbyUI() {
         const p = currentRoomData.players[id]; if (p.color) takenColors.add(p.color); if (id === myId) { myColor = p.color; isReady = p.ready; }
         const colorHex = p.color ? (p.color==='white'?'#f8fafc':p.color==='black'?'#1e293b':p.color==='red'?'#ef4444':p.color==='blue'?'#3b82f6':p.color==='brown'?'#78350f':'#9333ea') : '#475569';
         const isLeader = (id === currentRoomData.hostSocket) ? '👑' : '';
-        list.innerHTML += `<div class="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 mb-2 transition transform hover:scale-[1.02]"><div class="flex items-center gap-3"><div class="w-6 h-6 rounded-lg border border-slate-500 shadow-inner" style="background-color: ${colorHex}"></div><span class="font-bold text-white tracking-widest uppercase">${p.name} ${isLeader}</span></div><span class="text-xs font-bold px-3 py-1.5 rounded border ${p.ready ? 'bg-emerald-900/30 text-emerald-400 border-emerald-500/30' : 'bg-slate-800 text-slate-500 border-slate-700'}">${p.ready ? 'ГОТОВИЙ' : 'ЧЕКАЄ'}</span></div>`;
+        list.innerHTML += `<div class="flex items-center justify-between p-3 md:p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 mb-2 transition transform hover:scale-[1.02]"><div class="flex items-center gap-2 md:gap-3 overflow-hidden"><div class="w-4 h-4 md:w-6 md:h-6 rounded border border-slate-500 shadow-inner flex-shrink-0" style="background-color: ${colorHex}"></div><span class="font-bold text-white tracking-widest uppercase text-[10px] md:text-sm truncate">${p.name} ${isLeader}</span></div><span class="text-[8px] md:text-xs font-bold px-2 py-1 md:px-3 md:py-1.5 rounded border ${p.ready ? 'bg-emerald-900/30 text-emerald-400 border-emerald-500/30' : 'bg-slate-800 text-slate-500 border-slate-700'} flex-shrink-0">${p.ready ? 'ГОТОВИЙ' : 'ЧЕКАЄ'}</span></div>`;
     }
     
     document.querySelectorAll('.color-btn').forEach(btn => { const c = btn.dataset.color; btn.classList.toggle('selected', c === myColor); btn.disabled = takenColors.has(c) && c !== myColor; });
 
     const btn = document.getElementById('btn-ready'); const allReady = pKeys.every(id => currentRoomData.players[id].ready);
-    if (!myColor) { btn.innerText = "ОБЕРІТЬ КАМУФЛЯЖ"; btn.disabled = true; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-slate-800 text-slate-500 transition shadow-inner border border-slate-700 relative z-10"; } else {
+    if (!myColor) { btn.innerText = "ОБЕРІТЬ КАМУФЛЯЖ"; btn.disabled = true; btn.className = "w-full py-4 md:py-6 rounded-xl md:rounded-2xl font-russo text-lg md:text-2xl uppercase tracking-widest bg-slate-800 text-slate-500 transition shadow-inner border border-slate-700 relative z-10"; } else {
         btn.disabled = false;
         if (myId === currentRoomData.hostSocket) {
-            if (isReady) { if (pKeys.length >= 2 && allReady) { btn.innerText = "🚀 ЗАПУСК СЕСІЇ"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white transition shadow-[0_0_30px_rgba(37,99,235,0.6)] relative z-10"; } else { btn.innerText = "ГОТОВИЙ (ЧЕКАЄМО...)"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-emerald-600 text-white transition shadow-[0_0_20px_rgba(16,185,129,0.4)] relative z-10"; } } else { btn.innerText = "ПІДТВЕРДИТИ"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-slate-700 hover:bg-slate-600 text-white transition border border-slate-500 relative z-10"; }
+            if (isReady) { if (pKeys.length >= 2 && allReady) { btn.innerText = "🚀 ЗАПУСК СЕСІЇ"; btn.className = "w-full py-4 md:py-6 rounded-xl md:rounded-2xl font-russo text-lg md:text-2xl uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white transition shadow-[0_0_30px_rgba(37,99,235,0.6)] relative z-10"; } else { btn.innerText = "ГОТОВИЙ (ЧЕКАЄМО...)"; btn.className = "w-full py-4 md:py-6 rounded-xl md:rounded-2xl font-russo text-sm md:text-2xl uppercase tracking-widest bg-emerald-600 text-white transition shadow-[0_0_20px_rgba(16,185,129,0.4)] relative z-10"; } } else { btn.innerText = "ПІДТВЕРДИТИ"; btn.className = "w-full py-4 md:py-6 rounded-xl md:rounded-2xl font-russo text-lg md:text-2xl uppercase tracking-widest bg-slate-700 hover:bg-slate-600 text-white transition border border-slate-500 relative z-10"; }
         } else {
-            if (isReady) { btn.innerText = "ВІДМІНИТИ"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-[0_0_20px_rgba(16,185,129,0.4)] relative z-10"; } else { btn.innerText = "ПІДТВЕРДИТИ"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white transition shadow-[0_0_20px_rgba(37,99,235,0.4)] relative z-10"; }
+            if (isReady) { btn.innerText = "ВІДМІНИТИ"; btn.className = "w-full py-4 md:py-6 rounded-xl md:rounded-2xl font-russo text-lg md:text-2xl uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-[0_0_20px_rgba(16,185,129,0.4)] relative z-10"; } else { btn.innerText = "ПІДТВЕРДИТИ"; btn.className = "w-full py-4 md:py-6 rounded-xl md:rounded-2xl font-russo text-lg md:text-2xl uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white transition shadow-[0_0_20px_rgba(37,99,235,0.4)] relative z-10"; }
         }
     }
 }
@@ -376,7 +402,7 @@ document.getElementById('btn-ready').onclick = () => { if (typeof playSound === 
 function doCountdown() {
     showScreen('game-screen');
     const overlay = document.getElementById('countdown-overlay'), text = document.getElementById('countdown-text'); overlay.classList.remove('hidden');
-    bullets = []; particles = []; let count = 3; text.innerText = count; text.className = "text-[15rem] font-russo text-white drop-shadow-[0_0_50px_rgba(37,99,235,0.8)] scale-150 transition-transform";
+    bullets = []; particles = []; let count = 3; text.innerText = count; text.className = "text-[10rem] md:text-[15rem] font-russo text-white drop-shadow-[0_0_50px_rgba(37,99,235,0.8)] scale-150 transition-transform";
     const iv = setInterval(() => { count--; if (count > 0) { text.innerText = count; if (typeof playSound === 'function') playSound('ui_click'); } else if (count === 0) { text.innerText = "БІЙ!"; text.classList.add('text-emerald-400', 'drop-shadow-[0_0_50px_rgba(16,185,129,0.8)]'); if (typeof playSound === 'function') playSound('shoot'); startGameLoop(); } else { clearInterval(iv); overlay.classList.add('hidden'); } }, 1000);
 }
 
