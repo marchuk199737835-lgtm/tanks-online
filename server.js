@@ -57,6 +57,8 @@ const MAP_DATA = {
             {"type":"wall_square","x":550,"y":1400,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":550,"y":1450,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":550,"y":1500,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":550,"y":1550,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":500,"y":1400,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":500,"y":1350,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":500,"y":1450,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":500,"y":1500,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":500,"y":1550,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":500,"y":1600,"w":50,"h":50,"color":"#21252c"},
             {"type":"wall_square","x":2100,"y":1400,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":2100,"y":1450,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":2100,"y":1500,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":2100,"y":1550,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":2150,"y":1350,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":2150,"y":1400,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":2150,"y":1450,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":2150,"y":1500,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":2150,"y":1550,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":2150,"y":1600,"w":50,"h":50,"color":"#21252c"},
             {"type":"line","points":[{"x":136,"y":955},{"x":130,"y":956},{"x":124,"y":956},{"x":122,"y":956},{"x":120,"y":956},{"x":115,"y":956},{"x":112,"y":956},{"x":102,"y":956},{"x":99,"y":956},{"x":98,"y":957},{"x":98,"y":959},{"x":98,"y":960},{"x":98,"y":961},{"x":98,"y":964},{"x":98,"y":966},{"x":98,"y":967},{"x":98,"y":968},{"x":98,"y":971},{"x":98,"y":973},{"x":98,"y":974},{"x":98,"y":976},{"x":98,"y":976},{"x":98,"y":978},{"x":98,"y":980},{"x":98,"y":983},{"x":98,"y":984},{"x":98,"y":985},{"x":98,"y":987},{"x":98,"y":988},{"x":99,"y":992},{"x":99,"y":993},{"x":99,"y":995},{"x":99,"y":997},{"x":99,"y":998},{"x":99,"y":1000},{"x":99,"y":1000},{"x":99,"y":1001},{"x":99,"y":1002},{"x":99,"y":1004},{"x":99,"y":1005},{"x":101,"y":1007},{"x":101,"y":1009},{"x":101,"y":1011},{"x":101,"y":1012},{"x":101,"y":1014},{"x":102,"y":1015},{"x":102,"y":1016},{"x":102,"y":1018},{"x":102,"y":1019},{"x":102,"y":1021},{"x":102,"y":1022},{"x":102,"y":1024},{"x":102,"y":1025},{"x":102,"y":1026},{"x":102,"y":1028},{"x":102,"y":1029},{"x":102,"y":1031},{"x":102,"y":1032},{"x":99,"y":1032},{"x":95,"y":1032},{"x":89,"y":1032},{"x":83,"y":1031},{"x":81,"y":1029},{"x":80,"y":1029},{"x":76,"y":1029},{"x":75,"y":1029}],"color":"#21252c","width":16},
+            {"type":"line","points":[{"x":54,"y":964},{"x":54,"y":966},{"x":54,"y":968},{"x":54,"y":968},{"x":54,"y":971},{"x":54,"y":972},{"x":54,"y":973},{"x":54,"y":975},{"x":54,"y":976},{"x":54,"y":977},{"x":54,"y":979},{"x":54,"y":980},{"x":54,"y":981},{"x":54,"y":982},{"x":54,"y":983},{"x":54,"y":984},{"x":56,"y":984},{"x":60,"y":984},{"x":61,"y":984},{"x":63,"y":984},{"x":64,"y":984},{"x":65,"y":984},{"x":68,"y":984},{"x":70,"y":984},{"x":72,"y":985},{"x":78,"y":988},{"x":79,"y":988},{"x":80,"y":988},{"x":81,"y":988},{"x":82,"y":988},{"x":84,"y":988},{"x":86,"y":988},{"x":88,"y":988},{"x":88,"y":988},{"x":91,"y":988},{"x":93,"y":988},{"x":95,"y":988},{"x":96,"y":988},{"x":98,"y":988},{"x":101,"y":988},{"x":104,"y":988},{"x":105,"y":988},{"x":110,"y":988},{"x":113,"y":988},{"x":115,"y":988},{"x":117,"y":988},{"x":118,"y":988},{"x":120,"y":988},{"x":120,"y":988},{"x":122,"y":988},{"x":123,"y":988},{"x":124,"y":988},{"x":125,"y":988},{"x":127,"y":988},{"x":128,"y":988},{"x":128,"y":988},{"x":129,"y":988},{"x":131,"y":988},{"x":132,"y":988},{"x":134,"y":988},{"x":135,"y":988},{"x":136,"y":988},{"x":136,"y":988},{"x":137,"y":988},{"x":138,"y":988},{"x":139,"y":988},{"x":142,"y":988},{"x":143,"y":988},{"x":144,"y":988},{"x":144,"y":988},{"x":144,"y":989},{"x":144,"y":990},{"x":144,"y":992},{"x":144,"y":992},{"x":144,"y":994},{"x":144,"y":995},{"x":144,"y":996},{"x":144,"y":997},{"x":144,"y":999},{"x":144,"y":1000},{"x":145,"y":1000},{"x":146,"y":1000},{"x":146,"y":1001},{"x":146,"y":1003},{"x":146,"y":1004},{"x":146,"y":1006},{"x":147,"y":1007},{"x":147,"y":1008},{"x":147,"y":1008},{"x":147,"y":1010},{"x":147,"y":1011},{"x":147,"y":1013},{"x":147,"y":1014},{"x":147,"y":1015},{"x":147,"y":1016},{"x":147,"y":1017},{"x":147,"y":1018},{"x":147,"y":1020},{"x":147,"y":1021},{"x":147,"y":1022},{"x":147,"y":1023},{"x":147,"y":1024},{"x":147,"y":1025}],"color":"#21252c","width":16},
+            {"type":"line","points":[{"x":1095,"y":864}],"color":"#21252c","width":16},
             {"type":"prop_crate","x":3000,"y":2950,"w":50,"h":50}, {"type":"prop_crate","x":2200,"y":1000,"w":100,"h":100}, {"type":"prop_crate","x":450,"y":1100,"w":100,"h":100}, {"type":"prop_crate","x":350,"y":1850,"w":250,"h":100}, {"type":"prop_crate","x":700,"y":2500,"w":300,"h":100}, {"type":"prop_crate","x":1800,"y":2200,"w":100,"h":100},
             {"type":"spawn_powerup","x":1600,"y":1700}, {"type":"spawn_powerup","x":1100,"y":1250}, {"type":"spawn_powerup","x":850,"y":2700}, {"type":"spawn_powerup","x":150,"y":2150}, {"type":"spawn_powerup","x":800,"y":1000}, {"type":"spawn_powerup","x":750,"y":2000}, {"type":"spawn_powerup","x":1950,"y":2000}, {"type":"spawn_powerup","x":1900,"y":1000},
             {"type":"spawn_player","x":250,"y":2750}, {"type":"spawn_player","x":2850,"y":2850}, {"type":"spawn_player","x":1500,"y":2750},
@@ -244,34 +246,146 @@ io.on('connection', (socket) => {
     socket.on('dropModule', (data) => { let name = globalPlayers[socket.id]; if(!name || !dbUsers[name]) return; let u = dbUsers[name]; let idx = u.inventory.indexOf(data.id); if (idx !== -1) { u.inventory.splice(idx, 1); saveUser(name); sendEconomy(socket.id, name); } });
 
     socket.on('requestRooms', () => { socket.emit('roomsList', getActiveRooms()); });
-    socket.on('createRoom', (config) => { let name = globalPlayers[socket.id]; if(!name) return; let roomId = 'room_' + Date.now(); rooms[roomId] = { id: roomId, hostName: name, hostSocket: socket.id, mode: config.mode, map: config.map, maxPlayers: Math.max(2, Math.min(10, config.maxPlayers)), winScore: Math.max(5, config.winScore), status: 'lobby', players: {}, powerups: {}, tokens: {}, zombies: {}, wave: 1, survivalState: 'waiting', nextWaveTime: 0, lastPowerupSpawn: Date.now() }; socket.emit('roomCreated', roomId); io.emit('roomsList', getActiveRooms()); });
+    
+    socket.on('createRoom', (config) => { 
+        let name = globalPlayers[socket.id]; if(!name) return; 
+        let roomId = 'room_' + Date.now(); 
+        rooms[roomId] = { 
+            id: roomId, hostName: name, hostSocket: socket.id, 
+            mode: config.mode, map: config.map, maxPlayers: Math.max(2, Math.min(10, config.maxPlayers)), 
+            winScore: Math.max(5, config.winScore), 
+            hideTime: config.hideTime || 30, seekTime: config.seekTime || 120, hunterCount: config.hunterCount || 1,
+            status: 'lobby', state: 'waiting', phaseEndTime: 0,
+            players: {}, powerups: {}, tokens: {}, zombies: {}, wave: 1, nextWaveTime: 0, lastPowerupSpawn: Date.now() 
+        }; 
+        socket.emit('roomCreated', roomId); io.emit('roomsList', getActiveRooms()); 
+    });
     
     socket.on('joinRoom', (roomId) => { 
         let name = globalPlayers[socket.id]; if(!name || !rooms[roomId]) return socket.emit('joinError', 'Кімната не знайдена'); let room = rooms[roomId]; if (Object.keys(room.players).length >= room.maxPlayers) return socket.emit('joinError', 'Кімната повна'); if (room.status !== 'lobby') return socket.emit('joinError', 'Гра вже почалася'); 
         socket.join(roomId); let userEq = dbUsers[name].equipped || { cannon: null, turret: null, hull: null, tracks: null };
-        room.players[socket.id] = { id: socket.id, name: name, color: null, ready: false, hp: getMaxHp(userEq), score: 0, x: 0, y: 0, bodyAngle: 0, turretAngle: 0, buff: null, buffEndTime: 0, buffProgress: 0, equipped: userEq }; 
+        room.players[socket.id] = { id: socket.id, name: name, color: null, team: null, ready: false, hp: getMaxHp(userEq), score: 0, x: 0, y: 0, bodyAngle: 0, turretAngle: 0, buff: null, buffEndTime: 0, buffProgress: 0, equipped: userEq, propType: 'prop_crate', isDisguised: false }; 
         socket.emit('joinedRoom', { roomId: roomId, roomData: room }); io.to(roomId).emit('updateLobby', room); io.emit('roomsList', getActiveRooms()); 
     });
     
     socket.on('leaveRoom', (roomId) => { if(rooms[roomId] && rooms[roomId].players[socket.id]) { delete rooms[roomId].players[socket.id]; socket.leave(roomId); if(Object.keys(rooms[roomId].players).length === 0) { delete rooms[roomId]; } else if (rooms[roomId].hostSocket === socket.id) { rooms[roomId].hostSocket = Object.keys(rooms[roomId].players)[0]; rooms[roomId].hostName = rooms[roomId].players[rooms[roomId].hostSocket].name; } if (rooms[roomId]) io.to(roomId).emit('updateLobby', rooms[roomId]); io.emit('roomsList', getActiveRooms()); } });
-    socket.on('updateRoomSettings', (data) => { let room = rooms[data.roomId]; if (room && room.hostSocket === socket.id && room.status === 'lobby') { if (data.mode) room.mode = data.mode; if (data.map) room.map = data.map; if (data.maxPlayers) room.maxPlayers = Math.max(2, Math.min(10, data.maxPlayers)); if (data.winScore) room.winScore = Math.max(5, data.winScore); io.to(data.roomId).emit('updateLobby', room); io.emit('roomsList', getActiveRooms()); } });
+    
+    socket.on('updateRoomSettings', (data) => { 
+        let room = rooms[data.roomId]; 
+        if (room && room.hostSocket === socket.id && room.status === 'lobby') { 
+            if (data.mode) {
+                room.mode = data.mode;
+                Object.values(room.players).forEach(p => p.ready = false);
+            }
+            if (data.map) room.map = data.map; 
+            if (data.maxPlayers) room.maxPlayers = Math.max(2, Math.min(10, data.maxPlayers)); 
+            if (data.winScore) room.winScore = Math.max(5, data.winScore); 
+            if (data.hunterCount) room.hunterCount = Math.max(1, Math.min(Object.keys(room.players).length - 1, data.hunterCount));
+            io.to(data.roomId).emit('updateLobby', room); io.emit('roomsList', getActiveRooms()); 
+        } 
+    });
+    
     socket.on('setColor', (data) => { let room = rooms[data.roomId]; if(room && room.players[socket.id]) { room.players[socket.id].color = data.color; room.players[socket.id].ready = false; io.to(data.roomId).emit('updateLobby', room); } });
-    socket.on('toggleReady', (roomId) => { let room = rooms[roomId]; if(room && room.players[socket.id] && room.players[socket.id].color) { room.players[socket.id].ready = !room.players[socket.id].ready; io.to(roomId).emit('updateLobby', room); } });
+    
+    socket.on('setTeam', (data) => { 
+        let room = rooms[data.roomId]; 
+        if(room && room.players[socket.id] && room.mode === 'prophunt') { 
+            let currentHunters = 0;
+            Object.values(room.players).forEach(p => { if(p.team === 'hunter' && p.id !== socket.id) currentHunters++; });
+            
+            if (data.team === 'hunter' && currentHunters >= room.hunterCount) return;
+            
+            room.players[socket.id].team = data.team; 
+            room.players[socket.id].ready = false; 
+            io.to(data.roomId).emit('updateLobby', room); 
+        } 
+    });
+
+    socket.on('toggleReady', (roomId) => { 
+        let room = rooms[roomId]; 
+        if(room && room.players[socket.id]) { 
+            if (room.mode === 'prophunt' && !room.players[socket.id].team) return;
+            if (room.mode !== 'prophunt' && !room.players[socket.id].color) return;
+            room.players[socket.id].ready = !room.players[socket.id].ready; 
+            io.to(roomId).emit('updateLobby', room); 
+        } 
+    });
     
     socket.on('startGame', (roomId) => { 
         let room = rooms[roomId]; 
         if (room && room.hostSocket === socket.id && room.status === 'lobby') { 
             const pKeys = Object.keys(room.players); 
             if (pKeys.length >= 2 && pKeys.every(id => room.players[id].ready)) { 
-                room.status = 'playing'; if (room.mode === 'survival') { room.wave = 1; room.survivalState = 'spawning'; room.zombies = {}; } 
-                pKeys.forEach((id) => { room.players[id].hp = getMaxHp(room.players[id].equipped); room.players[id].score = 0; room.players[id].buff = null; let spawn = getValidSpawn(room.map, 30, 'spawn_player'); room.players[id].x = spawn.x; room.players[id].y = spawn.y; }); 
+                room.status = 'playing'; 
+                
+                if (room.mode === 'survival') { 
+                    room.wave = 1; room.state = 'spawning'; room.zombies = {}; 
+                } else if (room.mode === 'prophunt') {
+                    room.state = 'hiding';
+                    room.phaseEndTime = Date.now() + (room.hideTime * 1000);
+                    // Видаємо випадковий проп всім, хто ховається (на випадок якщо не виберуть)
+                    const props = ['prop_crate', 'prop_barrel', 'prop_sandbag', 'prop_rock', 'prop_bush', 'tree', 'prop_cone', 'prop_concrete', 'prop_tent', 'prop_generator', 'prop_tires'];
+                    pKeys.forEach(id => {
+                        if(room.players[id].team === 'hider') {
+                            room.players[id].propType = props[Math.floor(Math.random() * props.length)];
+                            room.players[id].isDisguised = false;
+                        }
+                    });
+                }
+
+                pKeys.forEach((id) => { 
+                    room.players[id].hp = getMaxHp(room.players[id].equipped); 
+                    room.players[id].score = 0; room.players[id].buff = null; 
+                    let spawn = getValidSpawn(room.map, 30, 'spawn_player'); 
+                    room.players[id].x = spawn.x; room.players[id].y = spawn.y; 
+                }); 
+                
                 io.to(roomId).emit('gameStarting', room); io.emit('roomsList', getActiveRooms()); 
             } 
         } 
     });
 
+    socket.on('selectProp', (type) => {
+        let room = currentRoomId ? rooms[currentRoomId] : null;
+        if(room && room.status === 'playing' && room.mode === 'prophunt' && room.players[socket.id]) {
+            room.players[socket.id].propType = type;
+        }
+    });
+
+    socket.on('updateDisguise', (data) => {
+        let room = currentRoomId ? rooms[currentRoomId] : null;
+        if(room && room.status === 'playing' && room.mode === 'prophunt' && room.players[socket.id]) {
+            room.players[socket.id].isDisguised = data.state;
+            if(data.state) {
+                room.players[socket.id].x = data.x;
+                room.players[socket.id].y = data.y;
+                room.players[socket.id].bodyAngle = 0;
+                room.players[socket.id].turretAngle = 0;
+            }
+        }
+    });
+
     socket.on('move', (data) => { let room = rooms[data.roomId]; if(room && room.players[socket.id] && room.status === 'playing') { room.players[socket.id].x = data.x; room.players[socket.id].y = data.y; room.players[socket.id].bodyAngle = data.bodyAngle; room.players[socket.id].turretAngle = data.turretAngle; } });
     socket.on('shoot', (data) => { let room = rooms[data.roomId]; if(room && room.status === 'playing') io.to(data.roomId).emit('spawnBullet', { ...data, owner: socket.id }); });
+
+    socket.on('bulletMissed', () => {
+        let room = currentRoomId ? rooms[currentRoomId] : null;
+        if (room && room.mode === 'prophunt' && room.status === 'playing' && room.players[socket.id]) {
+            let p = room.players[socket.id];
+            if (p.team === 'hunter' && p.hp > 0) {
+                p.hp = Math.max(0, p.hp - 15);
+                
+                if (p.hp === 0) {
+                    io.to(room.id).emit('playerDied', { id: socket.id, killer: null });
+                    // Перевірка, чи залишились мисливці
+                    let huntersAlive = Object.values(room.players).filter(pl => pl.team === 'hunter' && pl.hp > 0).length;
+                    if (huntersAlive === 0) {
+                        endPropHuntGame(room, 'hider');
+                    }
+                }
+            }
+        }
+    });
 
     socket.on('registerHit', (data) => {
         let room = rooms[data.roomId]; if(!room || room.status !== 'playing' || !room.players[data.targetId]) return; 
@@ -279,20 +393,36 @@ io.on('connection', (socket) => {
         if (room.mode === 'survival') return; if (victim.hp <= 0) return;
 
         let finalDmg = data.amt; let atkName = globalPlayers[attackerSocketId];
-        if (atkName && dbUsers[atkName] && dbUsers[atkName].equipped && dbUsers[atkName].equipped.cannon) { 
-            let cId = dbUsers[atkName].equipped.cannon;
-            if (MODULES[cId] && MODULES[cId].stats.dmg) finalDmg *= MODULES[cId].stats.dmg;
+        
+        if (room.mode === 'prophunt') {
+            if (room.state !== 'seeking') return; // не можна вбивати поки ховаються
+            let attacker = room.players[attackerSocketId];
+            if (!attacker || attacker.team !== 'hunter' || victim.team === 'hunter') return;
+            finalDmg = 250; // Урон мисливця
+            victim.isDisguised = false;
+        } else {
+            if (atkName && dbUsers[atkName] && dbUsers[atkName].equipped && dbUsers[atkName].equipped.cannon) { 
+                let cId = dbUsers[atkName].equipped.cannon;
+                if (MODULES[cId] && MODULES[cId].stats.dmg) finalDmg *= MODULES[cId].stats.dmg;
+            }
         }
 
         victim.hp = Math.max(0, victim.hp - finalDmg); io.to(attackerSocketId).emit('hitConfirmed');
 
         if (victim.hp === 0) { 
             victim.buff = null; io.to(data.roomId).emit('playerDied', { id: data.targetId, killer: attackerSocketId }); 
-            if(atkName && dbUsers[atkName]) { dbUsers[atkName].stats.kills++; saveUser(atkName); }
+            if(atkName && dbUsers[atkName] && room.mode !== 'prophunt') { dbUsers[atkName].stats.kills++; saveUser(atkName); }
+            
             if (room.mode === 'deathmatch') { const tid = 'tkn_' + Date.now() + Math.random(); room.tokens[tid] = { id: tid, x: victim.x, y: victim.y, color: victim.color, active: true }; } 
             
-            if (room.mode !== 'survival') {
+            if (room.mode === 'deathmatch') {
                 setTimeout(() => { if(room && room.players[data.targetId] && room.status === 'playing') { room.players[data.targetId].hp = getMaxHp(room.players[data.targetId].equipped); let spawn = getValidSpawn(room.map, 30, 'spawn_player'); room.players[data.targetId].x = spawn.x; room.players[data.targetId].y = spawn.y; io.to(data.roomId).emit('playerRespawn', room.players[data.targetId]); } }, 3000); 
+            } else if (room.mode === 'prophunt') {
+                // Перевірка, чи всі хто ховається мертві
+                let hidersAlive = Object.values(room.players).filter(pl => pl.team === 'hider' && pl.hp > 0).length;
+                if (hidersAlive === 0) {
+                    endPropHuntGame(room, 'hunter');
+                }
             }
         }
     });
@@ -321,7 +451,7 @@ io.on('connection', (socket) => {
 
     socket.on('collectPowerup', (data) => { 
         let room = rooms[data.roomId]; 
-        if (room && room.powerups[data.pid] && room.powerups[data.pid].active && room.players[socket.id] && room.players[socket.id].hp > 0) { 
+        if (room && room.powerups[data.pid] && room.powerups[data.pid].active && room.players[socket.id] && room.players[socket.id].hp > 0 && room.mode !== 'prophunt') { 
             let pType = room.powerups[data.pid].type; room.players[socket.id].buff = pType; room.players[socket.id].buffEndTime = Date.now() + BUFF_DURATION; room.powerups[data.pid].active = false; 
             if (pType === 'healing') { room.players[socket.id].hp = Math.min(getMaxHp(room.players[socket.id].equipped), room.players[socket.id].hp + 100); }
             io.to(data.roomId).emit('powerupCollected', { pid: data.pid, playerId: socket.id, type: pType }); delete room.powerups[data.pid]; 
@@ -340,25 +470,99 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('backToRoomLobby', (roomId) => { let room = rooms[roomId]; if (room && room.status === 'finished') { room.status = 'lobby'; room.powerups = {}; room.tokens = {}; room.zombies = {}; room.wave = 1; Object.values(room.players).forEach(p => { p.ready = false; p.score = 0; p.hp = getMaxHp(p.equipped); p.buff = null; }); io.to(roomId).emit('updateLobby', room); io.emit('roomsList', getActiveRooms()); } });
+    socket.on('backToRoomLobby', (roomId) => { 
+        let room = rooms[roomId]; 
+        if (room && room.status === 'finished') { 
+            room.status = 'lobby'; room.powerups = {}; room.tokens = {}; room.zombies = {}; room.wave = 1; 
+            Object.values(room.players).forEach(p => { p.ready = false; p.score = 0; p.hp = getMaxHp(p.equipped); p.buff = null; p.isDisguised = false; }); 
+            io.to(roomId).emit('updateLobby', room); io.emit('roomsList', getActiveRooms()); 
+        } 
+    });
 
     socket.on('disconnect', () => {
         delete globalPlayers[socket.id];
         for(let roomId in rooms) {
             if(rooms[roomId].players[socket.id]) {
+                let wasHider = rooms[roomId].players[socket.id].team === 'hider';
+                let wasHunter = rooms[roomId].players[socket.id].team === 'hunter';
                 delete rooms[roomId].players[socket.id];
+                
                 if(Object.keys(rooms[roomId].players).length === 0) { delete rooms[roomId]; } else if (rooms[roomId].hostSocket === socket.id) { rooms[roomId].hostSocket = Object.keys(rooms[roomId].players)[0]; rooms[roomId].hostName = rooms[roomId].players[rooms[roomId].hostSocket].name; }
-                if (rooms[roomId]) { if(Object.keys(rooms[roomId].players).length < 2 && rooms[roomId].status === 'playing') { rooms[roomId].status = 'lobby'; io.to(roomId).emit('updateLobby', rooms[roomId]); } else { io.to(roomId).emit('updateLobby', rooms[roomId]); } }
+                
+                if (rooms[roomId]) { 
+                    if(Object.keys(rooms[roomId].players).length < 2 && rooms[roomId].status === 'playing') { 
+                        rooms[roomId].status = 'lobby'; io.to(roomId).emit('updateLobby', rooms[roomId]); 
+                    } else if (rooms[roomId].status === 'playing' && rooms[roomId].mode === 'prophunt') {
+                        if (wasHider) {
+                            let hidersAlive = Object.values(rooms[roomId].players).filter(pl => pl.team === 'hider' && pl.hp > 0).length;
+                            if (hidersAlive === 0) endPropHuntGame(rooms[roomId], 'hunter');
+                        }
+                        if (wasHunter) {
+                            let huntersAlive = Object.values(rooms[roomId].players).filter(pl => pl.team === 'hunter' && pl.hp > 0).length;
+                            if (huntersAlive === 0) endPropHuntGame(rooms[roomId], 'hider');
+                        }
+                    } else { io.to(roomId).emit('updateLobby', rooms[roomId]); } 
+                }
             }
         }
         io.emit('roomsList', getActiveRooms());
     });
 });
 
+function endPropHuntGame(room, winnerTeam) {
+    room.status = 'finished';
+    let rewards = {};
+    let winnerId = null;
+    let winnerName = null;
+
+    Object.values(room.players).forEach(p => { 
+        let isWinner = (p.team === winnerTeam);
+        let amt = isWinner ? 15 : 3; 
+        rewards[p.id] = amt; 
+        
+        if (isWinner && !winnerId) { winnerId = p.id; winnerName = p.name; } // Для інтерфейсу
+
+        if(dbUsers[p.name]) { 
+            dbUsers[p.name].bucks += amt; dbUsers[p.name].stats.earned += amt; dbUsers[p.name].stats.matches++; 
+            let dropped = rollDrop(p.name); saveUser(p.name); 
+            io.to(p.id).emit('economyUpdate', { bucks: dbUsers[p.name].bucks, inventory: dbUsers[p.name].inventory, equipped: dbUsers[p.name].equipped, stats: dbUsers[p.name].stats, adventClaims: dbUsers[p.name].adventClaims }); 
+            if(dropped) io.to(p.id).emit('dropReceived', dropped); 
+        } 
+    });
+    
+    let wName = winnerTeam === 'hunter' ? 'КОМАНДА МИСЛИВЦІВ' : 'ТІ, ХТО ХОВАВСЯ';
+    io.to(room.id).emit('gameOver', { winner: winnerId, name: wName, rewards: rewards, isTeamWin: true }); 
+    io.emit('roomsList', getActiveRooms());
+}
+
 setInterval(() => {
     const now = Date.now();
     for(let roomId in rooms) {
         let room = rooms[roomId]; if (room.status !== 'playing') continue;
+        
+        // --- ЛОГІКА ХОВАНОК (ПЕРЕВІРКА ТАЙМЕРІВ) ---
+        if (room.mode === 'prophunt') {
+            if (room.state === 'hiding' && now >= room.phaseEndTime) {
+                room.state = 'seeking';
+                room.phaseEndTime = now + (room.seekTime * 1000);
+                
+                // Спавн мисливців
+                Object.values(room.players).forEach(p => {
+                    if (p.team === 'hunter') {
+                        p.hp = getMaxHp(p.equipped);
+                        let spawn = getValidSpawn(room.map, 30, 'spawn_player'); 
+                        p.x = spawn.x; p.y = spawn.y;
+                    }
+                });
+                io.to(roomId).emit('phPhaseChange', { phase: 'seeking', time: room.seekTime });
+            } 
+            else if (room.state === 'seeking' && now >= room.phaseEndTime) {
+                // Час вийшов = Ті хто ховаються перемогли
+                endPropHuntGame(room, 'hider');
+                continue;
+            }
+        }
+
         Object.values(room.players).forEach(p => { 
             if (p.buff) { 
                 p.buffProgress = Math.max(0, (p.buffEndTime - now) / BUFF_DURATION); 
@@ -372,7 +576,7 @@ setInterval(() => {
             } else p.buffProgress = 0; 
         });
 
-        if (now - room.lastPowerupSpawn > 30000) {
+        if (room.mode !== 'prophunt' && now - room.lastPowerupSpawn > 30000) {
             room.lastPowerupSpawn = now; 
             const types = ['explosive', 'minigun', 'boss', 'shotgun', 'healing', 'samurai', 'piercing', 'invisible', 'homing'];
             if (Object.keys(room.powerups).length > 10) delete room.powerups[Object.keys(room.powerups)[0]];
@@ -389,8 +593,8 @@ setInterval(() => {
             }
             
             if (Object.keys(room.zombies).length === 0) {
-                if (room.survivalState === 'playing') { 
-                    room.survivalState = 'waiting'; 
+                if (room.state === 'playing') { 
+                    room.state = 'waiting'; 
                     room.nextWaveTime = now + 5000; 
                     
                     let nextWave = room.wave + 1;
@@ -398,7 +602,7 @@ setInterval(() => {
                         io.to(roomId).emit('bossWarning');
                     }
                 } 
-                else if (room.survivalState === 'waiting' && now > room.nextWaveTime) {
+                else if (room.state === 'waiting' && now > room.nextWaveTime) {
                     room.wave++; 
                     let isBossWave = (room.wave === 10 || room.wave === 20 || room.wave === 30 || room.wave === 40);
                     
@@ -436,11 +640,11 @@ setInterval(() => {
                         } 
                         io.to(roomId).emit('newWave', { wave: room.wave, isBoss: false });
                     }
-                    room.survivalState = 'playing'; 
-                } else if (room.survivalState === 'spawning') { 
-                    room.survivalState = 'waiting'; room.nextWaveTime = now + 1000; 
+                    room.state = 'playing'; 
+                } else if (room.state === 'spawning') { 
+                    room.state = 'waiting'; room.nextWaveTime = now + 1000; 
                 }
-            } else if (room.survivalState === 'playing') {
+            } else if (room.state === 'playing') {
                 for (let zid in room.zombies) {
                     let z = room.zombies[zid]; let target = null; let minDist = Infinity; alivePlayers.forEach(p => { let dist = Math.hypot(p.x - z.x, p.y - z.y); if (p.buff === 'invisible') dist *= 3; if (dist < minDist) { minDist = dist; target = p; } });
                     if (target) {
@@ -453,7 +657,13 @@ setInterval(() => {
                 }
             }
         }
-        io.to(roomId).emit('sync', { players: room.players, zombies: room.zombies, powerups: room.powerups, tokens: room.tokens });
+        
+        let syncData = { players: room.players, zombies: room.zombies, powerups: room.powerups, tokens: room.tokens };
+        if (room.mode === 'prophunt') {
+            syncData.phState = room.state;
+            syncData.phTimeLeft = Math.max(0, Math.ceil((room.phaseEndTime - now) / 1000));
+        }
+        io.to(roomId).emit('sync', syncData);
     }
 }, 1000 / 30);
 

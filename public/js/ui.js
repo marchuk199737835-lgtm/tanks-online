@@ -100,8 +100,9 @@ function renderRoomsList(rooms) {
         if (inProgress) btnHtml = '<button disabled class="bg-slate-700 text-slate-500 px-3 md:px-4 py-1.5 md:py-2 rounded font-bold uppercase text-[9px] md:text-xs">В ГРІ</button>';
         else if (isFull) btnHtml = '<button disabled class="bg-red-900/50 text-red-500 px-3 md:px-4 py-1.5 md:py-2 rounded font-bold uppercase text-[9px] md:text-xs border border-red-500/30">ПОВНА</button>';
         else btnHtml = `<button onclick="joinRoomBtn('${r.id}')" class="bg-blue-600 hover:bg-blue-500 text-white px-3 md:px-4 py-1.5 md:py-2 rounded font-bold uppercase text-[9px] md:text-xs transition shadow-[0_0_10px_rgba(37,99,235,0.4)]">ПІД'ЄДНАТИСЬ</button>`;
-        const modeEmoji = r.mode === 'survival' ? '🧟' : '⚔️';
-        list.innerHTML += `<div class="grid grid-cols-4 md:grid-cols-5 gap-2 md:gap-4 items-center p-3 md:p-4 bg-slate-800/50 hover:bg-slate-800 rounded-xl border border-slate-700 transition"><div class="col-span-2 flex flex-col"><span class="font-bold text-white text-[10px] md:text-sm truncate">${r.hostName}</span><span class="text-[8px] md:text-[10px] text-slate-500 font-mono hidden sm:block">${r.id}</span></div><div class="text-[9px] md:text-sm font-bold text-slate-300 uppercase hidden md:block">${modeEmoji} ${r.mode === 'survival'?'ВИЖИВАННЯ':'ДЕТМАТЧ'}</div><div class="text-[9px] md:text-sm text-slate-300 uppercase truncate">${r.map}</div><div class="flex justify-between items-center"><span class="font-russo text-xs md:text-base ${isFull?'text-red-400':'text-blue-400'} mr-2">${r.playersCount}/${r.maxPlayers}</span>${btnHtml}</div></div>`;
+        const modeEmoji = r.mode === 'survival' ? '🧟' : r.mode === 'prophunt' ? '📦' : '⚔️';
+        const modeName = r.mode === 'survival' ? 'ВИЖИВАННЯ' : r.mode === 'prophunt' ? 'ХОВАНКИ' : 'ДЕТМАТЧ';
+        list.innerHTML += `<div class="grid grid-cols-4 md:grid-cols-5 gap-2 md:gap-4 items-center p-3 md:p-4 bg-slate-800/50 hover:bg-slate-800 rounded-xl border border-slate-700 transition"><div class="col-span-2 flex flex-col"><span class="font-bold text-white text-[10px] md:text-sm truncate">${r.hostName}</span><span class="text-[8px] md:text-[10px] text-slate-500 font-mono hidden sm:block">${r.id}</span></div><div class="text-[9px] md:text-sm font-bold text-slate-300 uppercase hidden md:block">${modeEmoji} ${modeName}</div><div class="text-[9px] md:text-sm text-slate-300 uppercase truncate">${r.map}</div><div class="flex justify-between items-center"><span class="font-russo text-xs md:text-base ${isFull?'text-red-400':'text-blue-400'} mr-2">${r.playersCount}/${r.maxPlayers}</span>${btnHtml}</div></div>`;
     });
 }
 window.joinRoomBtn = function(roomId) { if (typeof playSound === 'function') playSound('ui_click'); socket.emit('joinRoom', roomId); };
@@ -109,10 +110,39 @@ window.joinRoomBtn = function(roomId) { if (typeof playSound === 'function') pla
 let createConfig = { mode: 'deathmatch', map: 'площя', maxPlayers: 6, winScore: 50 };
 document.getElementById('open-create-room-btn').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); document.getElementById('create-room-modal').classList.remove('hidden'); };
 document.getElementById('cancel-create-btn').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); document.getElementById('create-room-modal').classList.add('hidden'); };
-document.querySelectorAll('.create-mode-select').forEach(btn => { btn.onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); document.querySelectorAll('.create-mode-select').forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); createConfig.mode = btn.dataset.mode; document.getElementById('create-score-wrap').style.display = createConfig.mode === 'survival' ? 'none' : 'block'; }; });
+document.querySelectorAll('.create-mode-select').forEach(btn => { 
+    btn.onclick = () => { 
+        if (typeof playSound === 'function') playSound('ui_click'); 
+        document.querySelectorAll('.create-mode-select').forEach(b => b.classList.remove('selected')); 
+        btn.classList.add('selected'); 
+        createConfig.mode = btn.dataset.mode; 
+        
+        // Відображення налаштувань відповідно до режиму
+        document.getElementById('create-score-wrap').style.display = createConfig.mode === 'deathmatch' ? 'block' : 'none'; 
+        const phWrap = document.getElementById('create-prophunt-wrap');
+        if (phWrap) phWrap.style.display = createConfig.mode === 'prophunt' ? 'block' : 'none';
+    }; 
+});
 document.querySelectorAll('.create-map-select').forEach(btn => { btn.onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); document.querySelectorAll('.create-map-select').forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); createConfig.map = btn.dataset.map; }; });
 document.getElementById('create-max-players').oninput = (e) => { createConfig.maxPlayers = e.target.value; document.getElementById('max-players-val').innerText = e.target.value; };
-document.getElementById('confirm-create-btn').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); createConfig.winScore = document.getElementById('create-win-score').value; document.getElementById('create-room-modal').classList.add('hidden'); socket.emit('createRoom', createConfig); };
+
+document.getElementById('confirm-create-btn').onclick = () => { 
+    if (typeof playSound === 'function') playSound('ui_click'); 
+    createConfig.winScore = document.getElementById('create-win-score').value; 
+    
+    // Дані для хованок
+    if (createConfig.mode === 'prophunt') {
+        const hTime = document.getElementById('create-hide-time');
+        const sTime = document.getElementById('create-seek-time');
+        const hCount = document.getElementById('create-hunter-count');
+        if(hTime) createConfig.hideTime = Math.max(30, Math.min(200, parseInt(hTime.value)));
+        if(sTime) createConfig.seekTime = Math.max(120, Math.min(600, parseInt(sTime.value)));
+        if(hCount) createConfig.hunterCount = Math.max(1, parseInt(hCount.value));
+    }
+    
+    document.getElementById('create-room-modal').classList.add('hidden'); 
+    socket.emit('createRoom', createConfig); 
+};
 
 let dragSource = null;
 window.dragStartInv = function(e, modId, index) { dragSource = { type: 'inv', index: index, id: modId }; e.dataTransfer.setData('text/plain', modId); };
@@ -144,7 +174,6 @@ window.dropEq = function(e, slotType) {
 
 function renderHangar() {
     document.getElementById('hangar-player-name').innerText = myName;
-    // Виправлення багу: Перевірка перед вставкою тексту, щоб запобігти помилці null
     if(document.getElementById('stat-kills')) document.getElementById('stat-kills').innerText = myStats.kills || 0; 
     if(document.getElementById('stat-matches')) document.getElementById('stat-matches').innerText = myStats.matches || 0;
     if(document.getElementById('stat-earned')) document.getElementById('stat-earned').innerText = myStats.earned || 0;
@@ -310,8 +339,13 @@ function updateLobbyUI() {
     if(!currentRoomData || currentRoomData.status === 'playing') return;
     document.getElementById('lobby-room-name').innerText = currentRoomData.hostName + " СЕСІЯ";
     const MAP_NAMES = { 'площя': '🔲 ПЛОЩА', 'epic_map': '🌐 EPIC MAP', 'Бравл_map': '🌵 БРАВЛ', 'Бій Насмерть': '🔥 ДЕЗМАТЧ' };
-    document.getElementById('view-map-name').innerText = (currentRoomData.mode === 'survival' ? '🧟 ' : '⚔️ ') + MAP_NAMES[currentRoomData.map];
-    document.getElementById('view-win-score').innerText = currentRoomData.mode === 'survival' ? 'БЕЗКІНЕЧНО' : currentRoomData.winScore;
+    const modeNameStr = currentRoomData.mode === 'survival' ? '🧟 ' : currentRoomData.mode === 'prophunt' ? '📦 ' : '⚔️ ';
+    document.getElementById('view-map-name').innerText = modeNameStr + MAP_NAMES[currentRoomData.map];
+    
+    let winScoreText = currentRoomData.winScore;
+    if (currentRoomData.mode === 'survival') winScoreText = 'БЕЗКІНЕЧНО';
+    if (currentRoomData.mode === 'prophunt') winScoreText = 'ЧАС';
+    document.getElementById('view-win-score').innerText = winScoreText;
 
     const isHost = (myId === currentRoomData.hostSocket); const hostPanel = document.getElementById('host-settings-panel');
     if(hostPanel) { hostPanel.classList.toggle('hidden', !isHost); hostPanel.classList.toggle('flex', isHost); }
@@ -322,23 +356,88 @@ function updateLobbyUI() {
         if (maxPInput && document.activeElement !== maxPInput) { maxPInput.value = currentRoomData.maxPlayers; document.getElementById('host-max-players-val').innerText = currentRoomData.maxPlayers; }
         const winSInput = document.getElementById('host-win-score');
         if (winSInput && document.activeElement !== winSInput) winSInput.value = currentRoomData.winScore;
+        
         const scoreWrap = document.getElementById('host-score-wrap');
-        if(scoreWrap) scoreWrap.style.display = currentRoomData.mode === 'survival' ? 'none' : 'block';
+        if(scoreWrap) scoreWrap.style.display = currentRoomData.mode === 'deathmatch' ? 'block' : 'none';
+        
+        const phWrap = document.getElementById('host-prophunt-wrap');
+        if(phWrap) {
+            phWrap.style.display = currentRoomData.mode === 'prophunt' ? 'block' : 'none';
+            if (currentRoomData.mode === 'prophunt') {
+                document.getElementById('host-hide-time').value = currentRoomData.hideTime || 30;
+                document.getElementById('host-seek-time').value = currentRoomData.seekTime || 120;
+                let maxHuntersAllowed = Math.max(1, Object.keys(currentRoomData.players).length - 1);
+                let hInput = document.getElementById('host-hunter-count');
+                hInput.max = maxHuntersAllowed;
+                if(parseInt(hInput.value) > maxHuntersAllowed) { hInput.value = maxHuntersAllowed; socket.emit('updateRoomSettings', { roomId: currentRoomId, hunterCount: maxHuntersAllowed }); }
+                hInput.value = currentRoomData.hunterCount || 1;
+            }
+        }
     }
 
     const list = document.getElementById('players-list'); list.innerHTML = ''; const takenColors = new Set(); const pKeys = Object.keys(currentRoomData.players);
     document.getElementById('lobby-count').innerText = `${pKeys.length} / ${currentRoomData.maxPlayers}`;
+    
+    // Перемикання вибору (Колір або Команда)
+    const colorSelectors = document.getElementById('color-selectors');
+    const teamSelectors = document.getElementById('team-selectors');
+    if (currentRoomData.mode === 'prophunt') {
+        if(colorSelectors) colorSelectors.classList.add('hidden');
+        if(teamSelectors) teamSelectors.classList.remove('hidden');
+        document.getElementById('color-title-text').innerText = "Команда";
+    } else {
+        if(colorSelectors) colorSelectors.classList.remove('hidden');
+        if(teamSelectors) teamSelectors.classList.add('hidden');
+        document.getElementById('color-title-text').innerText = "Колір";
+    }
+
+    let myTeam = null;
+    let currentHuntersCount = 0;
     for(let id in currentRoomData.players) {
-        const p = currentRoomData.players[id]; if (p.color) takenColors.add(p.color); if (id === myId) { myColor = p.color; isReady = p.ready; }
-        const colorHex = p.color ? (p.color==='white'?'#f8fafc':p.color==='black'?'#1e293b':p.color==='red'?'#ef4444':p.color==='blue'?'#3b82f6':p.color==='brown'?'#78350f':'#9333ea') : '#475569';
+        if(currentRoomData.players[id].team === 'hunter') currentHuntersCount++;
+    }
+
+    for(let id in currentRoomData.players) {
+        const p = currentRoomData.players[id]; if (p.color) takenColors.add(p.color); 
+        if (id === myId) { myColor = p.color; isReady = p.ready; myTeam = p.team; }
+        
+        let visualColor = '#475569';
+        let visualText = '';
+        if (currentRoomData.mode === 'prophunt') {
+            if (p.team === 'hunter') { visualColor = '#ef4444'; visualText = '🔴 МИСЛИВЕЦЬ'; }
+            else if (p.team === 'hider') { visualColor = '#3b82f6'; visualText = '🔵 ХОВАЄТЬСЯ'; }
+        } else {
+            visualColor = p.color ? (p.color==='white'?'#f8fafc':p.color==='black'?'#1e293b':p.color==='red'?'#ef4444':p.color==='blue'?'#3b82f6':p.color==='brown'?'#78350f':'#9333ea') : '#475569';
+        }
+
         const isLeader = (id === currentRoomData.hostSocket) ? '👑' : '';
-        list.innerHTML += `<div class="flex items-center justify-between p-3 md:p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 mb-2 transition transform hover:scale-[1.02]"><div class="flex items-center gap-2 md:gap-3 overflow-hidden"><div class="w-4 h-4 md:w-6 md:h-6 rounded border border-slate-500 shadow-inner flex-shrink-0" style="background-color: ${colorHex}"></div><span class="font-bold text-white tracking-widest uppercase text-[10px] md:text-sm truncate">${p.name} ${isLeader}</span></div><span class="text-[8px] md:text-xs font-bold px-2 py-1 md:px-3 md:py-1.5 rounded border ${p.ready ? 'bg-emerald-900/30 text-emerald-400 border-emerald-500/30' : 'bg-slate-800 text-slate-500 border-slate-700'} flex-shrink-0">${p.ready ? 'ГОТОВИЙ' : 'ЧЕКАЄ'}</span></div>`;
+        list.innerHTML += `<div class="flex items-center justify-between p-3 md:p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 mb-2 transition transform hover:scale-[1.02]"><div class="flex items-center gap-2 md:gap-3 overflow-hidden"><div class="w-4 h-4 md:w-6 md:h-6 rounded border border-slate-500 shadow-inner flex-shrink-0" style="background-color: ${visualColor}"></div><span class="font-bold text-white tracking-widest uppercase text-[10px] md:text-sm truncate">${p.name} ${isLeader} <span class="text-[8px] text-slate-400 ml-2">${visualText}</span></span></div><span class="text-[8px] md:text-xs font-bold px-2 py-1 md:px-3 md:py-1.5 rounded border ${p.ready ? 'bg-emerald-900/30 text-emerald-400 border-emerald-500/30' : 'bg-slate-800 text-slate-500 border-slate-700'} flex-shrink-0">${p.ready ? 'ГОТОВИЙ' : 'ЧЕКАЄ'}</span></div>`;
     }
     
-    document.querySelectorAll('.color-btn').forEach(btn => { const c = btn.dataset.color; btn.classList.toggle('selected', c === myColor); btn.disabled = takenColors.has(c) && c !== myColor; });
+    if (currentRoomData.mode === 'prophunt') {
+        document.querySelectorAll('.team-btn').forEach(btn => { 
+            btn.classList.toggle('selected', btn.dataset.team === myTeam); 
+            // Якщо ліміт мисливців вичерпано, блокуємо кнопку "Мисливець"
+            if (btn.dataset.team === 'hunter' && currentHuntersCount >= (currentRoomData.hunterCount || 1) && myTeam !== 'hunter') {
+                btn.disabled = true;
+                btn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        });
+    } else {
+        document.querySelectorAll('.color-btn').forEach(btn => { const c = btn.dataset.color; btn.classList.toggle('selected', c === myColor); btn.disabled = takenColors.has(c) && c !== myColor; });
+    }
 
     const btn = document.getElementById('btn-ready'); const allReady = pKeys.every(id => currentRoomData.players[id].ready);
-    if (!myColor) { btn.innerText = "ОБЕРІТЬ КАМУФЛЯЖ"; btn.disabled = true; btn.className = "w-full py-4 md:py-6 rounded-xl md:rounded-2xl font-russo text-lg md:text-2xl uppercase tracking-widest bg-slate-800 text-slate-500 transition shadow-inner border border-slate-700 relative z-10"; } else {
+    let canBeReady = currentRoomData.mode === 'prophunt' ? !!myTeam : !!myColor;
+    
+    if (!canBeReady) { 
+        btn.innerText = currentRoomData.mode === 'prophunt' ? "ОБЕРІТЬ КОМАНДУ" : "ОБЕРІТЬ КАМУФЛЯЖ"; 
+        btn.disabled = true; 
+        btn.className = "w-full py-4 md:py-6 rounded-xl md:rounded-2xl font-russo text-lg md:text-2xl uppercase tracking-widest bg-slate-800 text-slate-500 transition shadow-inner border border-slate-700 relative z-10"; 
+    } else {
         btn.disabled = false;
         if (myId === currentRoomData.hostSocket) {
             if (isReady) { if (pKeys.length >= 2 && allReady) { btn.innerText = "🚀 ЗАПУСК СЕСІЇ"; btn.className = "w-full py-4 md:py-6 rounded-xl md:rounded-2xl font-russo text-lg md:text-2xl uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white transition shadow-[0_0_30px_rgba(37,99,235,0.6)] relative z-10"; } else { btn.innerText = "ГОТОВИЙ (ЧЕКАЄМО...)"; btn.className = "w-full py-4 md:py-6 rounded-xl md:rounded-2xl font-russo text-sm md:text-2xl uppercase tracking-widest bg-emerald-600 text-white transition shadow-[0_0_20px_rgba(16,185,129,0.4)] relative z-10"; } } else { btn.innerText = "ПІДТВЕРДИТИ"; btn.className = "w-full py-4 md:py-6 rounded-xl md:rounded-2xl font-russo text-lg md:text-2xl uppercase tracking-widest bg-slate-700 hover:bg-slate-600 text-white transition border border-slate-500 relative z-10"; }
@@ -356,12 +455,14 @@ const hostWinScore = document.getElementById('host-win-score');
 if(hostWinScore) hostWinScore.onchange = (e) => { if (typeof playSound === 'function') playSound('ui_click'); socket.emit('updateRoomSettings', { roomId: currentRoomId, winScore: parseInt(e.target.value) }); };
 
 document.querySelectorAll('.color-btn').forEach(btn => { btn.onclick = () => { if(!btn.disabled) { if (typeof playSound === 'function') playSound('ui_click'); socket.emit('setColor', { roomId: currentRoomId, color: btn.dataset.color }); } } });
+document.querySelectorAll('.team-btn').forEach(btn => { btn.onclick = () => { if(!btn.disabled) { if (typeof playSound === 'function') playSound('ui_click'); socket.emit('setTeam', { roomId: currentRoomId, team: btn.dataset.team }); } } });
+
 document.getElementById('btn-ready').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); const pKeys = Object.keys(currentRoomData.players); const allReady = pKeys.every(id => currentRoomData.players[id].ready); if (myId === currentRoomData.hostSocket && isReady && pKeys.length >= 2 && allReady) { socket.emit('startGame', currentRoomId); } else { socket.emit('toggleReady', currentRoomId); } };
 
 function doCountdown() {
     showScreen('game-screen');
     const overlay = document.getElementById('countdown-overlay'), text = document.getElementById('countdown-text'); overlay.classList.remove('hidden');
-    bullets = []; particles = []; let count = 3; text.innerText = count; text.className = "text-[10rem] md:text-[15rem] font-russo text-white drop-shadow-[0_0_50px_rgba(37,99,235,0.8)] scale-150 transition-transform";
+    bullets = []; particles = []; let count = 3; text.innerText = count; text.className = "text-[10rem] lg:text-[15rem] font-russo text-white drop-shadow-[0_0_50px_rgba(37,99,235,0.8)] scale-150 transition-transform";
     const iv = setInterval(() => { count--; if (count > 0) { text.innerText = count; if (typeof playSound === 'function') playSound('ui_click'); } else if (count === 0) { text.innerText = "БІЙ!"; text.classList.add('text-emerald-400', 'drop-shadow-[0_0_50px_rgba(16,185,129,0.8)]'); if (typeof playSound === 'function') playSound('shoot'); startGameLoop(); } else { clearInterval(iv); overlay.classList.add('hidden'); } }, 1000);
 }
 
@@ -371,6 +472,74 @@ document.getElementById('back-to-room-lobby-btn').onclick = () => {
     socket.emit('backToRoomLobby', currentRoomId); 
     if(typeof switchMusicState === 'function') switchMusicState('loby'); 
     showScreen('lobby-screen');
+};
+
+// Меню вибору пропів для гравців (Режим Хованки)
+window.showPropMenu = function(timeLeft) {
+    let propMenu = document.getElementById('prop-selection-menu');
+    if (!propMenu) {
+        propMenu = document.createElement('div');
+        propMenu.id = 'prop-selection-menu';
+        propMenu.className = 'fixed inset-0 z-[100] flex flex-col items-center justify-center p-4 bg-black/90 backdrop-blur-md fade-in';
+        
+        const propsHtml = [
+            'prop_crate', 'prop_barrel', 'prop_sandbag', 'prop_rock', 'prop_bush', 'tree', 
+            'prop_cone', 'prop_concrete', 'prop_hedgehog', 'prop_radar', 'prop_tent',
+            'prop_cont_red', 'prop_cont_blue', 'prop_fence_wood', 'prop_fence_metal',
+            'prop_wreck', 'prop_tires', 'prop_generator', 'prop_spotlight'
+        ].map(type => {
+            // Малюємо об'єкти на мікро-канвасах для іконок
+            return `<div class="bg-slate-800 border-2 border-slate-600 rounded-xl p-2 cursor-pointer hover:border-blue-500 hover:scale-105 transition prop-card" data-proptype="${type}" onclick="selectPropType('${type}')">
+                        <canvas width="60" height="60" id="cvs_${type}"></canvas>
+                    </div>`;
+        }).join('');
+
+        propMenu.innerHTML = `
+            <h2 class="text-3xl font-russo text-white tracking-widest mb-2">ОБЕРІТЬ МАСКУВАННЯ</h2>
+            <p class="text-blue-400 font-bold mb-6">Залишилось: <span id="prop-timer-text" class="text-xl">${timeLeft}</span> сек</p>
+            <div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-3 max-w-4xl max-h-[60vh] overflow-y-auto p-4 glass-panel rounded-3xl border border-slate-700">
+                ${propsHtml}
+            </div>
+        `;
+        document.body.appendChild(propMenu);
+
+        // Малюємо предмети на канвасах
+        setTimeout(() => {
+            document.querySelectorAll('.prop-card').forEach(card => {
+                let pType = card.dataset.proptype;
+                let c = document.getElementById(`cvs_${pType}`);
+                if(c) {
+                    let ctx = c.getContext('2d');
+                    ctx.translate(30, 30);
+                    // Викликаємо існуючу функцію drawProp
+                    drawProp(ctx, {type: pType, x: -15, y: -15, w: 30, h: 30, r: 20}, 0);
+                }
+            });
+        }, 100);
+    } else {
+        propMenu.classList.remove('hidden');
+    }
+
+    let tl = timeLeft;
+    let timerInt = setInterval(() => {
+        tl--;
+        let span = document.getElementById('prop-timer-text');
+        if(span) span.innerText = tl;
+        if(tl <= 0) {
+            clearInterval(timerInt);
+            let propMenuEl = document.getElementById('prop-selection-menu');
+            if (propMenuEl && !propMenuEl.classList.contains('hidden')) {
+                // Якщо час вийшов і гравець нічого не вибрав, сервер сам видасть рандомний проп
+                propMenuEl.classList.add('hidden');
+            }
+        }
+    }, 1000);
+};
+
+window.selectPropType = function(type) {
+    if (typeof playSound === 'function') playSound('ui_click');
+    socket.emit('selectProp', type);
+    document.getElementById('prop-selection-menu').classList.add('hidden');
 };
 
 const savedToken = localStorage.getItem('tankToken');

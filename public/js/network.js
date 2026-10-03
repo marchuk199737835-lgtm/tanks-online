@@ -45,32 +45,87 @@ socket.on('updateLobby', (roomData) => {
 socket.on('gameStarting', (roomData) => {
     currentRoomData = roomData; const pData = currentRoomData.players[myId];
     myLocalTank.x = pData.x; myLocalTank.y = pData.y; myLocalTank.hp = pData.hp; camera.x = pData.x; camera.y = pData.y;
+    myLocalTank.team = pData.team; myLocalTank.isDisguised = false; myLocalTank.propType = pData.propType;
+    
     homingTargetId = null; document.getElementById('damage-vignette').style.opacity = 0; spectatingId = null; 
     pendingDrop = null; document.getElementById('drop-notification').classList.add('hidden'); 
     
-    // Скидання UI виживання при старті
+    // Скидання UI
     isBossIncoming = false;
     document.getElementById('survival-warning').classList.add('hidden');
+    document.getElementById('prophunt-hud-timer')?.classList.add('hidden');
+    document.getElementById('hunter-blind-overlay')?.classList.add('hidden');
     
-    if (currentRoomData.mode === 'survival') switchMusicState('survive'); else switchMusicState('dezmatch');
+    if (currentRoomData.mode === 'survival' || currentRoomData.mode === 'prophunt') switchMusicState('survive'); 
+    else switchMusicState('dezmatch');
+    
     if (typeof doCountdown === 'function') doCountdown();
+
+    // Якщо це хованки і ми ховаємося - через 3 секунди показуємо меню вибору пропу (щоб не перекрити відлік "3, 2, 1")
+    if (currentRoomData.mode === 'prophunt' && myLocalTank.team === 'hider') {
+        setTimeout(() => { if(typeof showPropMenu === 'function') showPropMenu(15); }, 3000);
+    }
 });
 
 socket.on('sync', (data) => {
     if (!currentRoomData || currentRoomData.status !== 'playing') return;
-    currentRoomData.players = data.players; let activeOpponents = {};
+    currentRoomData.players = data.players; 
+    
+    // Оновлення HUD для Хованок
+    if (currentRoomData.mode === 'prophunt' && data.phState) {
+        currentRoomData.state = data.phState;
+        const phTimerEl = document.getElementById('prophunt-hud-timer');
+        const phTimeText = document.getElementById('ph-time-text');
+        const phPhaseText = document.getElementById('ph-phase-text');
+        const blindOverlay = document.getElementById('hunter-blind-overlay');
+        
+        phTimerEl.classList.remove('hidden');
+        let mins = Math.floor(data.phTimeLeft / 60);
+        let secs = data.phTimeLeft % 60;
+        phTimeText.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        
+        if (data.phState === 'hiding') {
+            phPhaseText.innerText = 'ХОВАНКИ';
+            phPhaseText.className = 'text-[8px] lg:text-xs text-blue-400 font-bold tracking-widest uppercase';
+            if (myLocalTank.team === 'hunter' && blindOverlay) {
+                blindOverlay.classList.remove('hidden');
+                blindOverlay.classList.add('flex');
+            }
+        } else if (data.phState === 'seeking') {
+            phPhaseText.innerText = 'ПОШУК';
+            phPhaseText.className = 'text-[8px] lg:text-xs text-red-500 font-bold tracking-widest uppercase';
+            if (blindOverlay) {
+                blindOverlay.classList.add('hidden');
+                blindOverlay.classList.remove('flex');
+            }
+        }
+    }
+
+    let activeOpponents = {};
     for (let id in data.players) {
         if (id !== myId) {
             if (!opponents[id]) activeOpponents[id] = { ...data.players[id] };
             else { activeOpponents[id] = opponents[id]; activeOpponents[id].targetX = data.players[id].x; activeOpponents[id].targetY = data.players[id].y; activeOpponents[id].targetBody = data.players[id].bodyAngle; activeOpponents[id].targetTurret = data.players[id].turretAngle; }
             activeOpponents[id].hp = data.players[id].hp; activeOpponents[id].buff = data.players[id].buff; activeOpponents[id].equipped = data.players[id].equipped; activeOpponents[id].color = data.players[id].color;
+            activeOpponents[id].team = data.players[id].team; activeOpponents[id].isDisguised = data.players[id].isDisguised; activeOpponents[id].propType = data.players[id].propType;
         } else {
             myLocalTank.hp = data.players[id].hp; myLocalTank.buff = data.players[id].buff; myLocalTank.buffProgress = data.players[id].buffProgress; myLocalTank.score = data.players[id].score;
-            myEquipped = data.players[id].equipped || myEquipped; myColor = data.players[id].color;
+            myEquipped = data.players[id].equipped || myEquipped; myColor = data.players[id].color; myLocalTank.propType = data.players[id].propType;
         }
     }
     opponents = activeOpponents; zombies = data.zombies || {}; powerups = data.powerups || {}; tokens = data.tokens || {};
     if (typeof updateHUD === 'function') updateHUD();
+});
+
+socket.on('phPhaseChange', (data) => {
+    if (data.phase === 'seeking') {
+        const blindOverlay = document.getElementById('hunter-blind-overlay');
+        if (blindOverlay) {
+            blindOverlay.classList.add('hidden');
+            blindOverlay.classList.remove('flex');
+        }
+        playSound('boss_shoot'); // Звук початку полювання
+    }
 });
 
 socket.on('spawnBullet', (data) => {
@@ -94,12 +149,11 @@ socket.on('playerDied', (data) => {
     }
 });
 
-socket.on('playerRespawn', (data) => { if(data.id === myId) { myLocalTank.x = data.x; myLocalTank.y = data.y; myLocalTank.hp = data.hp; camera.x = data.x; camera.y = data.y; document.getElementById('damage-vignette').style.opacity = 0; spectatingId = null; } });
+socket.on('playerRespawn', (data) => { if(data.id === myId) { myLocalTank.x = data.x; myLocalTank.y = data.y; myLocalTank.hp = data.hp; camera.x = data.x; camera.y = data.y; document.getElementById('damage-vignette').style.opacity = 0; spectatingId = null; myLocalTank.isDisguised = false; } });
 socket.on('tokenCollected', (data) => { playSound('token'); });
 socket.on('bomberExplode', (data) => { if (typeof createExplosion === 'function') createExplosion(data.x, data.y, 40, '#dc2626'); if(Math.hypot(data.x - myLocalTank.x, data.y - myLocalTank.y) < 120) emitDamage(50, 'bomber'); });
 socket.on('zombieMeleeHit', (data) => { if (data.targetId === myId && myLocalTank.hp > 0) emitDamage(data.dmg, 'zombie'); });
 
-// --- ЛОГІКА ХВИЛЬ ТА БОСІВ ---
 socket.on('bossWarning', () => {
     isBossIncoming = true;
     document.getElementById('survival-warning').classList.remove('hidden');
@@ -119,12 +173,12 @@ socket.on('newWave', (data) => {
     
     if (data.isBoss) {
         title.innerText = `БОС ${data.bossName}`;
-        title.className = "text-8xl font-russo text-red-600 drop-shadow-[0_0_50px_rgba(220,38,38,1)] tracking-widest";
+        title.className = "text-8xl font-russo text-red-600 drop-shadow-[0_0_50px_rgba(220,38,38,1)] tracking-widest text-center px-4";
         subTitle.innerText = `Хвиля ${data.wave}`;
         subTitle.classList.remove('hidden');
     } else {
         title.innerText = `ХВИЛЯ ${data.wave}`;
-        title.className = "text-8xl font-russo text-red-500 drop-shadow-[0_0_40px_rgba(220,38,38,1)] tracking-widest";
+        title.className = "text-8xl font-russo text-red-500 drop-shadow-[0_0_40px_rgba(220,38,38,1)] tracking-widest text-center px-4";
         subTitle.classList.add('hidden');
     }
     
@@ -145,13 +199,23 @@ socket.on('gameOver', (data) => {
     if (data.winner === 'ZOMBIES') { 
         document.getElementById('winner-title').innerText = "ВИ НЕ ВИЖИЛИ"; document.getElementById('winner-title').className = "text-6xl font-russo mb-4 text-red-500 tracking-widest drop-shadow-[0_0_15px_rgba(239,68,68,0.5)] relative z-10"; 
         document.getElementById('winner-emoji').innerText = "💀"; document.getElementById('winner-message').innerText = `Ви протримались до ${data.wave} хвилі.`; document.getElementById('winner-reward').innerText = data.wave;
+    } else if (data.isTeamWin) {
+        // Командна перемога (Хованки)
+        let myReward = data.rewards ? (data.rewards[myId] || 0) : 0; document.getElementById('winner-reward').innerText = myReward;
+        if (myReward === 15) {
+            document.getElementById('winner-title').innerText = "ПЕРЕМОГА!"; document.getElementById('winner-title').className = "text-5xl lg:text-6xl font-russo mb-4 text-white tracking-widest drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] relative z-10"; 
+            document.getElementById('winner-emoji').innerText = "🏆"; document.getElementById('winner-message').innerText = `${data.name} ПЕРЕМОГЛИ!`; 
+        } else {
+            document.getElementById('winner-title').innerText = "ПОРАЗКА"; document.getElementById('winner-title').className = "text-5xl lg:text-6xl font-russo mb-4 text-slate-400 tracking-widest relative z-10"; 
+            document.getElementById('winner-emoji').innerText = "💔"; document.getElementById('winner-message').innerText = `${data.name} ПЕРЕМОГЛИ...`; 
+        }
     } else { 
         let myReward = data.rewards ? (data.rewards[myId] || 0) : 0; document.getElementById('winner-reward').innerText = myReward;
         if (data.winner === myId) {
-            document.getElementById('winner-title').innerText = "ПЕРЕМОГА!"; document.getElementById('winner-title').className = "text-6xl font-russo mb-4 text-white tracking-widest drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] relative z-10"; 
+            document.getElementById('winner-title').innerText = "ПЕРЕМОГА!"; document.getElementById('winner-title').className = "text-5xl lg:text-6xl font-russo mb-4 text-white tracking-widest drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] relative z-10"; 
             document.getElementById('winner-emoji').innerText = "🏆"; document.getElementById('winner-message').innerText = "Ви розбили ворогів!"; 
         } else {
-            document.getElementById('winner-title').innerText = "ЕХХ..."; document.getElementById('winner-title').className = "text-6xl font-russo mb-4 text-slate-400 tracking-widest relative z-10"; 
+            document.getElementById('winner-title').innerText = "ЕХХ..."; document.getElementById('winner-title').className = "text-5xl lg:text-6xl font-russo mb-4 text-slate-400 tracking-widest relative z-10"; 
             document.getElementById('winner-emoji').innerText = "💔"; document.getElementById('winner-message').innerText = `${data.name} здобуває перемогу.`; 
         }
     }
@@ -169,15 +233,15 @@ socket.on('caseResult', (result) => {
     
     items.forEach(modId => { 
         let mod = MODULES[modId]; let rColor = RARITY[mod.rarity].color; let iconSvg = SVG_ICONS[mod.type](rColor);
-        tape.innerHTML += `<div class="roulette-item text-center min-w-[90px] w-[90px] border-r border-slate-700 bg-slate-800" style="border-bottom: 3px solid ${rColor}"><div class="w-10 h-10 mx-auto">${iconSvg}</div><div class="text-[8px] text-slate-300 mt-2 uppercase truncate w-full px-1">${mod.name}</div></div>`; 
+        tape.innerHTML += `<div class="roulette-item text-center min-w-[60px] lg:min-w-[90px] w-[60px] lg:w-[90px] border-r border-slate-700 bg-slate-800" style="border-bottom: 3px solid ${rColor}"><div class="w-6 h-6 lg:w-10 lg:h-10 mx-auto">${iconSvg}</div><div class="text-[6px] lg:text-[8px] text-slate-300 mt-1 lg:mt-2 uppercase truncate w-full px-1">${mod.name}</div></div>`; 
     });
     
-    setTimeout(() => { playSound('shoot'); tape.style.transition = 'transform 3.5s cubic-bezier(0.1, 1, 0.3, 1)'; let containerWidth = tape.parentElement.offsetWidth || 600; let targetX = (44 * 90 + 45) - (containerWidth / 2); tape.style.transform = `translateX(-${targetX}px)`; }, 100);
+    setTimeout(() => { playSound('shoot'); tape.style.transition = 'transform 3.5s cubic-bezier(0.1, 1, 0.3, 1)'; let containerWidth = tape.parentElement.offsetWidth || 600; let itemWidth = window.innerWidth > 1024 ? 90 : 60; let targetX = (44 * itemWidth + (itemWidth/2)) - (containerWidth / 2); tape.style.transform = `translateX(-${targetX}px)`; }, 100);
     setTimeout(() => { 
         playSound('powerup'); document.getElementById('roulette-modal').classList.add('hidden'); const rw = document.getElementById('reward-modal'); 
         if(rw) { 
             let mod = MODULES[result.modId]; 
-            document.getElementById('reward-title').innerText = "ТРИМАЙ!"; document.getElementById('reward-title').className = "text-4xl font-russo mb-6 tracking-widest text-emerald-400"; 
+            document.getElementById('reward-title').innerText = "ТРИМАЙ!"; document.getElementById('reward-title').className = "text-3xl lg:text-4xl font-russo mb-6 tracking-widest text-emerald-400"; 
             document.getElementById('reward-modal-panel').style.borderColor = RARITY[mod.rarity].color; document.getElementById('reward-item-name').innerText = mod.name; 
             document.getElementById('reward-item-icon').innerHTML = SVG_ICONS[mod.type](RARITY[mod.rarity].color); 
             document.getElementById('reward-item-cat').innerText = `${CAT_NAMES[mod.type]} | ${RARITY[mod.rarity].name}`; document.getElementById('reward-item-cat').style.color = RARITY[mod.rarity].color; 

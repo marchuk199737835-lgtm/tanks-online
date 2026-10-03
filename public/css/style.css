@@ -16,6 +16,10 @@ canvas { display: block; cursor: crosshair; }
 .color-btn.selected { transform: scale(1.1); border-color: #60a5fa; box-shadow: 0 0 20px rgba(96, 165, 250, 0.6); }
 .color-btn:disabled { opacity: 0.2; cursor: not-allowed; }
 
+.team-btn { transition: all 0.2s; cursor: pointer; border: 2px solid transparent; }
+.team-btn.selected { transform: scale(1.05); border-color: currentColor; box-shadow: 0 0 20px currentColor; }
+.team-btn:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(100%); }
+
 .modal { background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px); }
 .select-btn { cursor: pointer; border: 2px solid transparent; transition: all 0.2s; }
 .select-btn.selected { border-color: #3b82f6; background-color: rgba(59, 130, 246, 0.3); box-shadow: 0 0 15px rgba(59, 130, 246, 0.5); }
@@ -53,18 +57,15 @@ canvas { display: block; cursor: crosshair; }
 }
 
 @media (max-height: 500px) and (orientation: landscape) {
-    /* Зменшуємо відступи панелей, щоб усе влізло без скролу */
     .screen-container { padding: 0.25rem !important; }
     .glass-panel { padding: 0.25rem !important; }
     .landscape-hide { display: none !important; }
     
-    /* Приховуємо другорядні описи, щоб дати більше місця іконкам і заголовкам */
     #shop-screen p.text-slate-400, 
     #shop-screen p.text-purple-200\/50, 
     #shop-screen p.text-yellow-200\/50 { display: none !important; } 
     #main-menu-screen p.text-slate-400 { display: none !important; }
     
-    /* Стискання margin/gap */
     .mb-2, .mb-4, .mb-6, .mb-8, .mb-10 { margin-bottom: 0.25rem !important; }
     .mt-2, .mt-4, .mt-6, .mt-8 { margin-top: 0.25rem !important; }
     .gap-2, .gap-4, .gap-6, .gap-8 { gap: 0.25rem !important; }
