@@ -45,3 +45,31 @@ canvas { display: block; cursor: crosshair; }
 ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 10px; }
 ::-webkit-scrollbar-thumb { background: rgba(59, 130, 246, 0.5); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(59, 130, 246, 0.8); }
+
+/* --- АГРЕСИВНА ОПТИМІЗАЦІЯ ДЛЯ МОБІЛЬНИХ І ПЛАНШЕТІВ (БЕЗ СКРОЛІНГУ) --- */
+@media (max-width: 1024px) {
+    .screen-container { padding: 0.5rem !important; }
+    .glass-panel { padding: 0.5rem !important; }
+    
+    h1 { font-size: 1.5rem !important; margin-bottom: 0.5rem !important; }
+    h2 { font-size: 1.25rem !important; margin-bottom: 0.5rem !important; }
+    h3, h4 { font-size: 0.9rem !important; margin-bottom: 0.25rem !important; }
+    
+    .text-2xl, .text-3xl, .text-4xl, .text-5xl, .text-6xl { font-size: 1.2rem !important; }
+    .mb-4, .mb-6, .mb-8, .mb-10 { margin-bottom: 0.5rem !important; }
+    .gap-3, .gap-4, .gap-6, .gap-8 { gap: 0.5rem !important; }
+    
+    /* Зменшення інвентарю для мобільних екранів */
+    .roulette-item { width: 60px !important; min-width: 60px !important; height: 60px !important; }
+    .roulette-item svg { width: 24px !important; height: 24px !important; }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+    /* Сильне стиснення для альбомної орієнтації на смартфонах */
+    .screen-container { padding: 0.25rem !important; }
+    .glass-panel { padding: 0.25rem !important; }
+    h1, h2 { font-size: 1rem !important; margin-bottom: 0.25rem !important; }
+    .text-4xl, .text-5xl, .text-6xl { font-size: 1.2rem !important; }
+    #hangar-canvas { max-height: 80px !important; }
+    .mb-2, .mb-3, .mb-4 { margin-bottom: 0.25rem !important; }
+}

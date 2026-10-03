@@ -35,7 +35,6 @@ document.getElementById('back-to-menu-btn').onclick = () => { showScreen('main-m
 const submitPromoBtn = document.getElementById('submit-promo-btn');
 if(submitPromoBtn) { submitPromoBtn.onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); const code = document.getElementById('promo-input').value; if(!code) return alert('Введіть промокод!'); socket.emit('usePromo', code); }; }
 
-// --- АДВЕНТ КАЛЕНДАР ---
 window.openAdvent = function() {
     if(typeof playSound==='function') playSound('ui_click');
     document.getElementById('advent-modal').classList.remove('hidden');
@@ -46,56 +45,32 @@ window.renderAdvent = function() {
     let grid = document.getElementById('advent-grid');
     grid.innerHTML = '';
     let today = new Date();
-    // Працює тільки в Жовтні (місяць 9 в JS). Якщо інший місяць - currentDay = 0
     let currentDay = (today.getMonth() === 9) ? today.getDate() : 0; 
     let claims = myAdventClaims || [];
     document.getElementById('advent-counter').innerText = claims.length;
 
     for(let d = 3; d <= 31; d++) {
         let state = ''; let content = ''; let bg = 'bg-slate-800 border-slate-700'; let cursor = 'cursor-not-allowed opacity-50'; let onclick = '';
-        
-        if (claims.includes(d)) {
-            state = 'ЗАБРАНО'; bg = 'bg-emerald-900/50 border-emerald-500 text-emerald-400'; content = '✔️';
-        } else if (d < currentDay) {
-            state = 'ПРОПУЩЕНО'; bg = 'bg-red-900/30 border-red-800 text-red-500'; content = '❌';
-        } else if (d === currentDay) {
-            state = 'ЗАБРАТИ'; bg = 'bg-orange-600 border-orange-400 text-white animate-pulse shadow-[0_0_15px_#ea580c]'; cursor = 'cursor-pointer hover:bg-orange-500';
-            content = d === 31 ? '🎁' : `💵 ${20 + (d-3)*5}`;
-            onclick = `onclick="claimAdventDay()"`;
-        } else {
-            state = 'ЗАКРИТО'; bg = 'bg-slate-900 border-slate-700 text-slate-500'; content = '🔒';
-        }
-
+        if (claims.includes(d)) { state = 'ЗАБРАНО'; bg = 'bg-emerald-900/50 border-emerald-500 text-emerald-400'; content = '✔️'; }
+        else if (d < currentDay) { state = 'ПРОПУЩЕНО'; bg = 'bg-red-900/30 border-red-800 text-red-500'; content = '❌'; }
+        else if (d === currentDay) { state = 'ЗАБРАТИ'; bg = 'bg-orange-600 border-orange-400 text-white animate-pulse shadow-[0_0_15px_#ea580c]'; cursor = 'cursor-pointer hover:bg-orange-500'; content = d === 31 ? '🎁' : `💵 ${20 + (d-3)*5}`; onclick = `onclick="claimAdventDay()"`; }
+        else { state = 'ЗАКРИТО'; bg = 'bg-slate-900 border-slate-700 text-slate-500'; content = '🔒'; }
         if(d === 31 && state !== 'ЗАБРАНО' && state !== 'ЗАБРАТИ') { content = '🎃'; }
-
-        grid.innerHTML += `<div class="flex flex-col items-center justify-center p-2 rounded-xl border ${bg} ${cursor} transition h-20 relative overflow-hidden group" ${onclick}>
-            <span class="text-[10px] font-bold mb-1 opacity-70">${d}.10</span>
-            <span class="text-xl font-russo z-10 group-hover:scale-110 transition">${content}</span>
-        </div>`;
+        grid.innerHTML += `<div class="flex flex-col items-center justify-center p-2 rounded-xl border ${bg} ${cursor} transition h-20 relative overflow-hidden group" ${onclick}><span class="text-[10px] font-bold mb-1 opacity-70">${d}.10</span><span class="text-xl font-russo z-10 group-hover:scale-110 transition">${content}</span></div>`;
     }
 }
 window.claimAdventDay = function() { socket.emit('claimAdvent'); }
 
 setInterval(() => {
-    let now = new Date();
-    let hw = new Date(now.getFullYear(), 9, 31, 23, 59, 59);
-    let diff = hw - now;
-    let timerEl = document.getElementById('hw-timer');
-    if(diff > 0 && timerEl) {
-        let d = Math.floor(diff / (1000*60*60*24));
-        let h = Math.floor((diff / (1000*60*60)) % 24);
-        let m = Math.floor((diff / 1000/60) % 60);
-        let s = Math.floor((diff / 1000) % 60);
-        timerEl.innerText = `${d}Д ${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-    } else if (timerEl) { timerEl.innerText = "ХЕЛОУІН НАСТАВ!"; }
+    let now = new Date(); let hw = new Date(now.getFullYear(), 9, 31, 23, 59, 59); let diff = hw - now; let timerEl = document.getElementById('hw-timer');
+    if(diff > 0 && timerEl) { let d = Math.floor(diff / (1000*60*60*24)); let h = Math.floor((diff / (1000*60*60)) % 24); let m = Math.floor((diff / 1000/60) % 60); let s = Math.floor((diff / 1000) % 60); timerEl.innerText = `${d}Д ${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`; }
+    else if (timerEl) { timerEl.innerText = "ХЕЛОУІН НАСТАВ!"; }
 }, 1000);
 
-// --- ІНФО КЕЙСІВ ---
 window.openCaseInfo = function(caseId) {
     if (typeof playSound === 'function') playSound('ui_click');
     const modal = document.getElementById('case-info-modal'); const grid = document.getElementById('case-info-grid'); const title = document.getElementById('case-info-title');
-    grid.innerHTML = '';
-    let allowedRarities = [];
+    grid.innerHTML = ''; let allowedRarities = [];
     if (caseId === 1) { title.innerText = "БАЗОВИЙ ЯЩИК"; title.className = "text-2xl md:text-3xl font-russo text-white tracking-widest"; allowedRarities = ['common', 'rare', 'epic', 'legendary']; }
     else if (caseId === 2) { title.innerText = "ШТУРМОВИЙ КЕЙС"; title.className = "text-2xl md:text-3xl font-russo text-purple-400 tracking-widest"; allowedRarities = ['common', 'rare', 'epic', 'legendary']; }
     else if (caseId === 3) { title.innerText = "ЕЛІТНИЙ КОНТЕЙНЕР"; title.className = "text-2xl md:text-3xl font-russo text-yellow-500 tracking-widest"; allowedRarities = ['rare', 'epic', 'legendary']; }
@@ -139,7 +114,6 @@ document.querySelectorAll('.create-map-select').forEach(btn => { btn.onclick = (
 document.getElementById('create-max-players').oninput = (e) => { createConfig.maxPlayers = e.target.value; document.getElementById('max-players-val').innerText = e.target.value; };
 document.getElementById('confirm-create-btn').onclick = () => { if (typeof playSound === 'function') playSound('ui_click'); createConfig.winScore = document.getElementById('create-win-score').value; document.getElementById('create-room-modal').classList.add('hidden'); socket.emit('createRoom', createConfig); };
 
-// Адаптація Drag & Drop для мобільних не потрібна, бо ми використовуємо тапи для відкриття меню
 let dragSource = null;
 window.dragStartInv = function(e, modId, index) { dragSource = { type: 'inv', index: index, id: modId }; e.dataTransfer.setData('text/plain', modId); };
 window.dragStartEq = function(e, modId, slotType) { dragSource = { type: 'eq', slotType: slotType, id: modId }; e.dataTransfer.setData('text/plain', modId); };
@@ -170,7 +144,11 @@ window.dropEq = function(e, slotType) {
 
 function renderHangar() {
     document.getElementById('hangar-player-name').innerText = myName;
-    document.getElementById('stat-kills').innerText = myStats.kills || 0; document.getElementById('stat-matches').innerText = myStats.matches || 0; document.getElementById('stat-earned').innerText = myStats.earned || 0;
+    // Виправлення багу: Перевірка перед вставкою тексту, щоб запобігти помилці null
+    if(document.getElementById('stat-kills')) document.getElementById('stat-kills').innerText = myStats.kills || 0; 
+    if(document.getElementById('stat-matches')) document.getElementById('stat-matches').innerText = myStats.matches || 0;
+    if(document.getElementById('stat-earned')) document.getElementById('stat-earned').innerText = myStats.earned || 0;
+
     let totalDmg = 1.0, totalRange = 1.0, totalCd = 1.0, totalHp = 1.0, totalSpeed = 1.0, totalRot = 1.0;
     const eqHtml = []; const types = [{k: 'cannon', n: 'Дуло'}, {k: 'turret', n: 'Башта'}, {k: 'hull', n: 'Корпус'}, {k: 'tracks', n: 'Гусениці'}];
     
@@ -188,10 +166,12 @@ function renderHangar() {
     });
     document.getElementById('equipped-slots-container').innerHTML = eqHtml.join('');
     
-    document.getElementById('stat-hp').innerText = Math.round(MAX_HP * totalHp); document.getElementById('stat-speed').innerText = Math.round(totalSpeed * 100) + '%';
-    document.getElementById('stat-dmg').innerText = Math.round(totalDmg * 100) + '%'; document.getElementById('stat-rot').innerText = Math.round(totalRot * 100) + '%';
-    document.getElementById('bar-hp').style.width = Math.min(100, (totalHp/2) * 100) + '%'; document.getElementById('bar-speed').style.width = Math.min(100, (totalSpeed/2) * 100) + '%';
-    document.getElementById('bar-dmg').style.width = Math.min(100, (totalDmg/2) * 100) + '%'; document.getElementById('bar-rot').style.width = Math.min(100, (totalRot/2) * 100) + '%';
+    if(document.getElementById('stat-hp')) {
+        document.getElementById('stat-hp').innerText = Math.round(MAX_HP * totalHp); document.getElementById('stat-speed').innerText = Math.round(totalSpeed * 100) + '%';
+        document.getElementById('stat-dmg').innerText = Math.round(totalDmg * 100) + '%'; document.getElementById('stat-rot').innerText = Math.round(totalRot * 100) + '%';
+        document.getElementById('bar-hp').style.width = Math.min(100, (totalHp/2) * 100) + '%'; document.getElementById('bar-speed').style.width = Math.min(100, (totalSpeed/2) * 100) + '%';
+        document.getElementById('bar-dmg').style.width = Math.min(100, (totalDmg/2) * 100) + '%'; document.getElementById('bar-rot').style.width = Math.min(100, (totalRot/2) * 100) + '%';
+    }
 
     document.getElementById('inv-count').innerText = myInventory.length; const invGrid = document.getElementById('inventory-grid'); invGrid.innerHTML = '';
     
@@ -206,24 +186,13 @@ function renderHangar() {
     }
 }
 
-// Анімація павучків при відкритті контекстного меню
 function spawnSpiders(x, y) {
     for (let i = 0; i < 5; i++) {
-        let spider = document.createElement('div');
-        spider.innerText = '🕷️️';
-        spider.className = 'scatter-spider';
-        spider.style.left = x + 'px';
-        spider.style.top = y + 'px';
+        let spider = document.createElement('div'); spider.innerText = '🕷'; spider.className = 'scatter-spider';
+        spider.style.left = x + 'px'; spider.style.top = y + 'px';
         document.body.appendChild(spider);
-        
-        let angle = Math.random() * Math.PI * 2;
-        let dist = 100 + Math.random() * 150;
-        
-        setTimeout(() => {
-            spider.style.transform = `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist}px) rotate(${Math.random() * 360}deg)`;
-            spider.style.opacity = '0';
-        }, 10);
-        
+        let angle = Math.random() * Math.PI * 2; let dist = 100 + Math.random() * 150;
+        setTimeout(() => { spider.style.transform = `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist}px) rotate(${Math.random() * 360}deg)`; spider.style.opacity = '0'; }, 10);
         setTimeout(() => spider.remove(), 700);
     }
 }
@@ -233,13 +202,8 @@ window.openCtxMenu = function(e, modId, mode = 'inv', slot = null) {
     e.preventDefault(); if (typeof playSound === 'function') playSound('ui_click');
     selectedInvItem = modId; contextMode = mode; selectedEqSlot = slot;
     
-    // Адаптація координат для миші та дотиків
     let clickX = e.clientX; let clickY = e.clientY;
-    if (e.touches && e.touches.length > 0) {
-        clickX = e.touches[0].clientX; clickY = e.touches[0].clientY;
-    }
-
-    // Спавн павучків
+    if (e.touches && e.touches.length > 0) { clickX = e.touches[0].clientX; clickY = e.touches[0].clientY; }
     spawnSpiders(clickX, clickY);
 
     let mod = MODULES[modId]; document.getElementById('ctx-name').innerText = mod.name; document.getElementById('ctx-name').style.color = RARITY[mod.rarity].color;
@@ -259,8 +223,7 @@ window.openCtxMenu = function(e, modId, mode = 'inv', slot = null) {
     
     const menu = document.getElementById('context-menu'); menu.classList.remove('hidden');
     let x = clickX; let y = clickY; 
-    let menuWidth = menu.offsetWidth || 192; // приблизно w-48
-    let menuHeight = menu.offsetHeight || 150;
+    let menuWidth = menu.offsetWidth || 192; let menuHeight = menu.offsetHeight || 150;
     
     if (x + menuWidth > window.innerWidth) x -= menuWidth; 
     if (y + menuHeight > window.innerHeight) y -= menuHeight;
@@ -301,12 +264,8 @@ function updateHangarMousePos(e) {
     let cx = e.clientX; let cy = e.clientY;
     if (e.touches && e.touches.length > 0) { cx = e.touches[0].clientX; cy = e.touches[0].clientY; }
     
-    // Масштабуємо координати під внутрішній розмір canvas (300x300)
-    let scaleX = hCanvas.width / rect.width;
-    let scaleY = hCanvas.height / rect.height;
-    
-    hMouseX = (cx - rect.left) * scaleX; 
-    hMouseY = (cy - rect.top) * scaleY;
+    let scaleX = hCanvas.width / rect.width; let scaleY = hCanvas.height / rect.height;
+    hMouseX = (cx - rect.left) * scaleX; hMouseY = (cy - rect.top) * scaleY;
 }
 hCanvas.addEventListener('mousemove', updateHangarMousePos);
 hCanvas.addEventListener('touchmove', updateHangarMousePos, {passive: true});
