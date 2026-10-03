@@ -1,5 +1,3 @@
-let myAdventClaims = [];
-
 socket.on('initMusic', (data) => { myMusicPlaylists = data; });
 
 socket.on('authSuccess', (data) => { 
