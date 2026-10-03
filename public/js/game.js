@@ -75,7 +75,7 @@ function updatePhysics(now, dt) {
             // Якщо гравець ховається і рухається - він втрачає маскування
             if (currentRoomData.mode === 'prophunt' && myLocalTank.team === 'hider' && myLocalTank.isDisguised) {
                 myLocalTank.isDisguised = false;
-                socket.emit('updateDisguise', { state: false, x: myLocalTank.x, y: myLocalTank.y });
+                socket.emit('updateDisguise', { roomId: currentRoomId, state: false, x: myLocalTank.x, y: myLocalTank.y });
             }
 
             let len = Math.hypot(moveX, moveY); if(len > 1 && !joysticks.left.active) { moveX /= len; moveY /= len; }
@@ -120,7 +120,7 @@ function updatePhysics(now, dt) {
                 myLocalTank.x = Math.round((myLocalTank.x - 25) / 50) * 50 + 25;
                 myLocalTank.y = Math.round((myLocalTank.y - 25) / 50) * 50 + 25;
                 myLocalTank.bodyAngle = 0; myLocalTank.turretAngle = 0;
-                socket.emit('updateDisguise', { state: true, x: myLocalTank.x, y: myLocalTank.y });
+                socket.emit('updateDisguise', { roomId: currentRoomId, state: true, x: myLocalTank.x, y: myLocalTank.y });
                 keys.space = false; keys.lmb = false; joysticks.right.released = false;
             }
         } 
@@ -170,7 +170,7 @@ function updatePhysics(now, dt) {
             if (hit && bCfg.type === 'explosive' && b.owner === myId) { let splashRad = b.type === 'boss' ? 250 : 120; for (let oid in opponents) { if (opponents[oid].hp > 0 && Math.hypot(b.x - opponents[oid].x, b.y - opponents[oid].y) < splashRad) { socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: bCfg.dmg }); } } } 
             
             // Відправка промаху мисливця на сервер
-            if (!hit && b.owner === myId && b.type === 'hunter_gun') { socket.emit('bulletMissed'); }
+            if (!hit && b.owner === myId && b.type === 'hunter_gun') { socket.emit('bulletMissed', { roomId: currentRoomId }); }
             bullets.splice(i, 1); 
         }
     }
@@ -460,6 +460,7 @@ function draw(now) {
         let specName = currentRoomData.players[spectatingId] ? currentRoomData.players[spectatingId].name : 'ГРАВЕЦЬ';
         let specTank = opponents[spectatingId];
         
+        // Якщо той за ким спостерігаємо захований, ми бачимо його як декор, але з текстом "СПОСТЕРІГАННЯ"
         if (specTank.isDisguised) {
             drawProp(ctx, { type: specTank.propType, x: specTank.x - 25, y: specTank.y - 25, w: 50, h: 50, r: 25 }, time);
         }

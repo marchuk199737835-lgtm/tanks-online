@@ -117,7 +117,6 @@ document.querySelectorAll('.create-mode-select').forEach(btn => {
         btn.classList.add('selected'); 
         createConfig.mode = btn.dataset.mode; 
         
-        // Відображення налаштувань відповідно до режиму
         document.getElementById('create-score-wrap').style.display = createConfig.mode === 'deathmatch' ? 'block' : 'none'; 
         const phWrap = document.getElementById('create-prophunt-wrap');
         if (phWrap) phWrap.style.display = createConfig.mode === 'prophunt' ? 'block' : 'none';
@@ -130,7 +129,6 @@ document.getElementById('confirm-create-btn').onclick = () => {
     if (typeof playSound === 'function') playSound('ui_click'); 
     createConfig.winScore = document.getElementById('create-win-score').value; 
     
-    // Дані для хованок
     if (createConfig.mode === 'prophunt') {
         const hTime = document.getElementById('create-hide-time');
         const sTime = document.getElementById('create-seek-time');
@@ -378,7 +376,6 @@ function updateLobbyUI() {
     const list = document.getElementById('players-list'); list.innerHTML = ''; const takenColors = new Set(); const pKeys = Object.keys(currentRoomData.players);
     document.getElementById('lobby-count').innerText = `${pKeys.length} / ${currentRoomData.maxPlayers}`;
     
-    // Перемикання вибору (Колір або Команда)
     const colorSelectors = document.getElementById('color-selectors');
     const teamSelectors = document.getElementById('team-selectors');
     if (currentRoomData.mode === 'prophunt') {
@@ -417,7 +414,6 @@ function updateLobbyUI() {
     if (currentRoomData.mode === 'prophunt') {
         document.querySelectorAll('.team-btn').forEach(btn => { 
             btn.classList.toggle('selected', btn.dataset.team === myTeam); 
-            // Якщо ліміт мисливців вичерпано, блокуємо кнопку "Мисливець"
             if (btn.dataset.team === 'hunter' && currentHuntersCount >= (currentRoomData.hunterCount || 1) && myTeam !== 'hunter') {
                 btn.disabled = true;
                 btn.classList.add('opacity-50', 'cursor-not-allowed');
@@ -474,7 +470,6 @@ document.getElementById('back-to-room-lobby-btn').onclick = () => {
     showScreen('lobby-screen');
 };
 
-// Меню вибору пропів для гравців (Режим Хованки)
 window.showPropMenu = function(timeLeft) {
     let propMenu = document.getElementById('prop-selection-menu');
     if (!propMenu) {
@@ -488,7 +483,6 @@ window.showPropMenu = function(timeLeft) {
             'prop_cont_red', 'prop_cont_blue', 'prop_fence_wood', 'prop_fence_metal',
             'prop_wreck', 'prop_tires', 'prop_generator', 'prop_spotlight'
         ].map(type => {
-            // Малюємо об'єкти на мікро-канвасах для іконок
             return `<div class="bg-slate-800 border-2 border-slate-600 rounded-xl p-2 cursor-pointer hover:border-blue-500 hover:scale-105 transition prop-card" data-proptype="${type}" onclick="selectPropType('${type}')">
                         <canvas width="60" height="60" id="cvs_${type}"></canvas>
                     </div>`;
@@ -503,7 +497,6 @@ window.showPropMenu = function(timeLeft) {
         `;
         document.body.appendChild(propMenu);
 
-        // Малюємо предмети на канвасах
         setTimeout(() => {
             document.querySelectorAll('.prop-card').forEach(card => {
                 let pType = card.dataset.proptype;
@@ -511,8 +504,7 @@ window.showPropMenu = function(timeLeft) {
                 if(c) {
                     let ctx = c.getContext('2d');
                     ctx.translate(30, 30);
-                    // Викликаємо існуючу функцію drawProp
-                    drawProp(ctx, {type: pType, x: -15, y: -15, w: 30, h: 30, r: 20}, 0);
+                    if(typeof drawProp === 'function') drawProp(ctx, {type: pType, x: -25, y: -25, w: 50, h: 50, r: 25}, 0);
                 }
             });
         }, 100);
@@ -529,7 +521,6 @@ window.showPropMenu = function(timeLeft) {
             clearInterval(timerInt);
             let propMenuEl = document.getElementById('prop-selection-menu');
             if (propMenuEl && !propMenuEl.classList.contains('hidden')) {
-                // Якщо час вийшов і гравець нічого не вибрав, сервер сам видасть рандомний проп
                 propMenuEl.classList.add('hidden');
             }
         }
@@ -538,7 +529,7 @@ window.showPropMenu = function(timeLeft) {
 
 window.selectPropType = function(type) {
     if (typeof playSound === 'function') playSound('ui_click');
-    socket.emit('selectProp', type);
+    socket.emit('selectProp', { roomId: currentRoomId, type: type });
     document.getElementById('prop-selection-menu').classList.add('hidden');
 };
 
