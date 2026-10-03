@@ -1,9 +1,16 @@
-const canvas = document.getElementById('game-canvas'); const ctx = canvas.getContext('2d'); window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }); canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+const canvas = document.getElementById('game-canvas'); const ctx = canvas.getContext('2d');
+window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
-let spectatingId = null; let isBossIncoming = false;
-const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-let jL = { a: false, id: null, cx: 0, cy: 0, dx: 0, dy: 0 };
-let jR = { a: false, id: null, cx: 0, cy: 0, dx: 0, dy: 0, r: false };
+let spectatingId = null;
+let isBossIncoming = false;
+
+// Мобільне керування
+let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+let joysticks = {
+    left: { active: false, startX: 0, startY: 0, currentX: 0, currentY: 0, angle: 0, force: 0, id: null },
+    right: { active: false, startX: 0, startY: 0, currentX: 0, currentY: 0, angle: 0, force: 0, id: null, hasAimed: false, released: false }
+};
 
 function createExplosion(x, y, count, color) { for(let i=0; i<count; i++){ const ang = Math.random() * Math.PI * 2; const spd = Math.random() * 200 + 50; particles.push({ x, y, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd, life: Math.random() * 0.4 + 0.1, color }); } }
 
@@ -54,21 +61,30 @@ function updatePhysics(now, dt) {
         if(myEquipped.hull && MODULES[myEquipped.hull]) totalSpeed *= MODULES[myEquipped.hull].stats.speed || 1;
         if(myEquipped.tracks && MODULES[myEquipped.tracks]) totalSpeed *= MODULES[myEquipped.tracks].stats.speed || 1;
         let speedMult = 1.0; if(myLocalTank.buff === 'samurai') speedMult *= 1.5; 
+        
         let speed = (myLocalTank.buff === 'boss' ? TANK_SPEED * 0.6 : TANK_SPEED) * speedMult * totalSpeed;
         
+        // Зчитування кнопок (ПК)
         if (keys.w) moveY -= 1; if (keys.s) moveY += 1; if (keys.a) moveX -= 1; if (keys.d) moveX += 1;
-        if (jL.a) { moveX = jL.dx / 50; moveY = jL.dy / 50; } 
+        
+        // Зчитування лівого джойстика (Мобілки)
+        if (joysticks.left.active) {
+            moveX = Math.cos(joysticks.left.angle) * joysticks.left.force;
+            moveY = Math.sin(joysticks.left.angle) * joysticks.left.force;
+        }
 
         if (moveX !== 0 || moveY !== 0) { 
-            let len = Math.hypot(moveX, moveY); moveX /= len; moveY /= len; myLocalTank.bodyAngle = Math.atan2(moveY, moveX); 
+            let len = Math.hypot(moveX, moveY); if(len > 1 && !joysticks.left.active) { moveX /= len; moveY /= len; }
+            myLocalTank.bodyAngle = Math.atan2(moveY, moveX); 
             let nextX = myLocalTank.x + moveX * speed * dt, nextY = myLocalTank.y + moveY * speed * dt; 
             let isBoss = (myLocalTank.buff === 'boss');
             if (!checkCollision(nextX, myLocalTank.y, myRadius, true, false) || isBoss) myLocalTank.x = nextX; 
             if (!checkCollision(myLocalTank.x, nextY, myRadius, true, false) || isBoss) myLocalTank.y = nextY; 
         }
 
-        if (jR.a && (jR.dx !== 0 || jR.dy !== 0)) {
-            myLocalTank.turretAngle = Math.atan2(jR.dy, jR.dx);
+        // Прицілювання
+        if (joysticks.right.active) {
+            myLocalTank.turretAngle = joysticks.right.angle;
         } else if (!isMobile) {
             let wMx = mouseX + camera.x - canvas.width/2, wMy = mouseY + camera.y - canvas.height/2; 
             myLocalTank.turretAngle = Math.atan2(wMy - myLocalTank.y, wMx - myLocalTank.x);
@@ -80,20 +96,37 @@ function updatePhysics(now, dt) {
         let totalCd = 1.0; let totalRange = 1.0;
         if(myEquipped.cannon && MODULES[myEquipped.cannon]) { totalCd *= MODULES[myEquipped.cannon].stats.cd || 1; totalRange *= MODULES[myEquipped.cannon].stats.range || 1; }
 
-        // ЛОГІКА ПОСТРІЛУ
         let isMinigun = (myLocalTank.buff === 'minigun' || myLocalTank.buff === 'fast');
-        // Якщо це мініган — стріляє автоматично поки тягнеш (jR.a) або тримаєш пробіл
-        // Якщо інша зброя — стріляє тільки тоді, коли відпустив джойстик (jR.r) або натиснув пробіл
-        let wantsToShoot = keys.space || (isMinigun ? jR.a : jR.r);
+        
+        // Логіка стрільби
+        let shouldShoot = false;
+        
+        // ПК: Для мінігана - утримування пробілу, для інших - теж (але стрілятиме по КД)
+        if (!isMobile && keys.space) {
+            shouldShoot = true;
+        }
+        
+        // Мобілки
+        if (isMobile) {
+            if (isMinigun) {
+                // Мініган: стріляє поки джойстик активний (і палець хоч трохи зсунувся від центру)
+                if (joysticks.right.active && joysticks.right.hasAimed) {
+                    shouldShoot = true;
+                }
+            } else {
+                // Звичайна зброя: стріляє тільки при відпусканні
+                if (joysticks.right.released) {
+                    shouldShoot = true;
+                    joysticks.right.released = false; // Скидаємо прапорець
+                }
+            }
+        }
 
-        if (wantsToShoot && (now - lastShootTime >= fCfg.cd * totalCd)) {
-            lastShootTime = now; let bId = Date.now() + Math.random(); let bSpd = isMinigun ? BASE_BULLET_SPEED * 1.8 : BASE_BULLET_SPEED;
-            let shot = { roomId: currentRoomId, id: bId, x: myLocalTank.x + Math.cos(myLocalTank.turretAngle)*(myRadius+10), y: myLocalTank.y + Math.sin(myLocalTank.turretAngle)*(myRadius+10), vx: Math.cos(myLocalTank.turretAngle)*bSpd, vy: Math.sin(myLocalTank.turretAngle)*bSpd, type: myLocalTank.buff || 'none', lifeMult: totalRange };
-            if (myLocalTank.buff === 'samurai') { shot.x = myLocalTank.x + Math.cos(myLocalTank.turretAngle)*(myRadius+15); shot.y = myLocalTank.y + Math.sin(myLocalTank.turretAngle)*(myRadius+15); shot.vx = Math.cos(myLocalTank.turretAngle) * 100; shot.vy = Math.sin(myLocalTank.turretAngle) * 100; }
-            if (myLocalTank.buff === 'homing' && homingTargetId) shot.targetId = homingTargetId; socket.emit('shoot', shot);
-            jR.r = false; // Скидаємо клік
-        } else {
-            jR.r = false;
+        if (shouldShoot && (now - lastShootTime >= fCfg.cd * totalCd)) {
+            fireBullet(now, myRadius, fCfg, totalRange);
+        } else if (isMobile && !isMinigun && joysticks.right.released) {
+             // Якщо відпустили, але КД ще не пройшов - постріл "згорів"
+             joysticks.right.released = false;
         }
 
         for(let pid in powerups) { if (Math.hypot(powerups[pid].x - myLocalTank.x, powerups[pid].y - myLocalTank.y) < myRadius + 30) socket.emit('collectPowerup', {roomId: currentRoomId, pid: pid}); }
@@ -129,6 +162,16 @@ function updatePhysics(now, dt) {
         }
     }
     for(let i=particles.length-1; i>=0; i--){ particles[i].life -= dt; particles[i].x += particles[i].vx * dt; particles[i].y += particles[i].vy * dt; if(particles[i].life <= 0) particles.splice(i, 1); }
+}
+
+function fireBullet(now, myRadius, fCfg, totalRange) {
+    lastShootTime = now; 
+    let bId = Date.now() + Math.random(); 
+    let bSpd = (myLocalTank.buff === 'fast' || myLocalTank.buff === 'minigun') ? BASE_BULLET_SPEED * 1.8 : BASE_BULLET_SPEED;
+    let shot = { roomId: currentRoomId, id: bId, x: myLocalTank.x + Math.cos(myLocalTank.turretAngle)*(myRadius+10), y: myLocalTank.y + Math.sin(myLocalTank.turretAngle)*(myRadius+10), vx: Math.cos(myLocalTank.turretAngle)*bSpd, vy: Math.sin(myLocalTank.turretAngle)*bSpd, type: myLocalTank.buff || 'none', lifeMult: totalRange };
+    if (myLocalTank.buff === 'samurai') { shot.x = myLocalTank.x + Math.cos(myLocalTank.turretAngle)*(myRadius+15); shot.y = myLocalTank.y + Math.sin(myLocalTank.turretAngle)*(myRadius+15); shot.vx = Math.cos(myLocalTank.turretAngle) * 100; shot.vy = Math.sin(myLocalTank.turretAngle) * 100; }
+    if (myLocalTank.buff === 'homing' && homingTargetId) shot.targetId = homingTargetId; 
+    socket.emit('shoot', shot);
 }
 
 function drawTank(x, y, bodyAngle, turretAngle, colorHex, name, isMe, hp, buff, equipped) {
@@ -192,6 +235,47 @@ function drawProp(ctx, o, time) {
     ctx.restore();
 }
 
+function drawJoysticks() {
+    if(!isMobile || myLocalTank.hp <= 0) return;
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); 
+    
+    // Лівий (Рух)
+    if(joysticks.left.active) {
+        ctx.beginPath(); ctx.arc(joysticks.left.startX, joysticks.left.startY, 60, 0, Math.PI*2); ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'; ctx.fill(); ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.beginPath(); ctx.arc(joysticks.left.currentX, joysticks.left.currentY, 30, 0, Math.PI*2); ctx.fillStyle = 'rgba(59, 130, 246, 0.5)'; ctx.fill();
+    }
+    
+    // Правий (Приціл)
+    if(joysticks.right.active) {
+        ctx.beginPath(); ctx.arc(joysticks.right.startX, joysticks.right.startY, 60, 0, Math.PI*2); ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'; ctx.fill(); ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.beginPath(); ctx.arc(joysticks.right.currentX, joysticks.right.currentY, 30, 0, Math.PI*2); ctx.fillStyle = 'rgba(239, 68, 68, 0.5)'; ctx.fill();
+    }
+    
+    ctx.restore();
+}
+
+// Лінія лазерного прицілювання
+function drawAimLine() {
+    if(!isMobile || !joysticks.right.active || myLocalTank.hp <= 0) return;
+    
+    // Перевіряємо, чи гравець дійсно навівся
+    if (!joysticks.right.hasAimed) return;
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)'; ctx.lineWidth = 2; ctx.setLineDash([10, 10]);
+    ctx.beginPath();
+    ctx.moveTo(myLocalTank.x, myLocalTank.y);
+    
+    let totalRange = 1.0;
+    if(myEquipped.cannon && MODULES[myEquipped.cannon]) totalRange *= MODULES[myEquipped.cannon].stats.range || 1;
+    let bSpd = (myLocalTank.buff === 'fast' || myLocalTank.buff === 'minigun') ? BASE_BULLET_SPEED * 1.8 : BASE_BULLET_SPEED;
+    
+    let maxDist = (2.5 * totalRange) * bSpd; 
+    ctx.lineTo(myLocalTank.x + Math.cos(myLocalTank.turretAngle) * maxDist, myLocalTank.y + Math.sin(myLocalTank.turretAngle) * maxDist);
+    ctx.stroke();
+    ctx.restore();
+}
+
 function draw(now) {
     if(!currentRoomData) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.save();
@@ -223,6 +307,7 @@ function draw(now) {
     ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 15; ctx.shadowOffsetX = 8; ctx.shadowOffsetY = 12;
     MAP_DATA[cMap].solids.forEach(o => {
         if(o.type.includes('spawn') || o.type.includes('water') || o.type === 'line' || o.type === 'prop_puddle' || o.type === 'prop_crater') return;
+        
         if (o.type === 'shape_triangle') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
         else if (o.type === 'shape_rhombus') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h/2); ctx.lineTo(o.x + o.w/2, o.y + o.h); ctx.lineTo(o.x, o.y + o.h/2); ctx.fill(); }
         else if (o.type === 'shape_parallelepiped') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w*0.2, o.y); ctx.lineTo(o.x + o.w, o.y); ctx.lineTo(o.x + o.w*0.8, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
@@ -235,6 +320,7 @@ function draw(now) {
     MAP_DATA[cMap].solids.forEach(o => {
         if(o.type.includes('spawn') || o.type.includes('water') || o.type === 'line' || o.type.includes('prop_')) return;
         ctx.save();
+        
         if (o.type === 'shape_triangle') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
         else if (o.type === 'shape_rhombus') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h/2); ctx.lineTo(o.x + o.w/2, o.y + o.h); ctx.lineTo(o.x, o.y + o.h/2); ctx.fill(); }
         else if (o.type === 'shape_parallelepiped') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w*0.2, o.y); ctx.lineTo(o.x + o.w, o.y); ctx.lineTo(o.x + o.w*0.8, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
@@ -264,6 +350,9 @@ function draw(now) {
         const p = opponents[id]; const sn = currentRoomData.players[id] || { name: 'Гравець', color: 'white', equipped: {} }; 
         const cHex = sn.color==='white'?'#f8fafc':sn.color==='black'?'#1e293b':sn.color==='red'?'#ef4444':sn.color==='blue'?'#3b82f6':sn.color==='brown'?'#78350f':'#9333ea'; drawTank(p.x, p.y, p.bodyAngle, p.turretAngle, cHex, sn.name, false, p.hp, p.buff, sn.equipped); if (myLocalTank.buff === 'homing' && id === homingTargetId && p.hp > 0) { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(now/300); ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3; ctx.setLineDash([15, 10]); ctx.strokeRect(-45, -45, 90, 90); ctx.restore(); } 
     }
+    
+    drawAimLine(); // Малюємо лінію прицілу ПІД нашим танком
+    
     if (myLocalTank.hp > 0) { const myCHex = myColor==='white'?'#f8fafc':myColor==='black'?'#1e293b':myColor==='red'?'#ef4444':myColor==='blue'?'#3b82f6':myColor==='brown'?'#78350f':'#9333ea'; drawTank(myLocalTank.x, myLocalTank.y, myLocalTank.bodyAngle, myLocalTank.turretAngle, myCHex, myName, true, myLocalTank.hp, myLocalTank.buff, myEquipped); }
     
     if (currentRoomData.mode === 'survival') { 
@@ -287,14 +376,17 @@ function draw(now) {
     
     let totalCd = 1.0; if(myEquipped.cannon && MODULES[myEquipped.cannon]) totalCd *= MODULES[myEquipped.cannon].stats.cd || 1;
     let cd = (BUFFS[myLocalTank.buff] || BUFFS['none']).cd * totalCd; 
-    let bar = document.getElementById('cooldown-bar'); let barMob = document.getElementById('cooldown-bar-mob');
+    
+    // Оновлення КД барів (ПК та Мобілки)
+    let bar = document.getElementById('cooldown-bar'); 
+    let mobBar = document.getElementById('cooldown-bar-mob');
     if (now - lastShootTime < cd) { 
-        let pct = ((now - lastShootTime) / cd * 100) + '%'; 
-        bar.style.transition = 'none'; bar.style.width = pct; 
-        if(barMob) { barMob.style.transition = 'none'; barMob.style.width = pct; }
+        let pct = ((now - lastShootTime) / cd * 100) + '%';
+        if(bar) { bar.style.transition = 'none'; bar.style.width = pct; }
+        if(mobBar) { mobBar.style.transition = 'none'; mobBar.style.width = pct; }
     } else { 
-        bar.style.width = '100%'; 
-        if(barMob) barMob.style.width = '100%'; 
+        if(bar) bar.style.width = '100%'; 
+        if(mobBar) mobBar.style.width = '100%'; 
     }
     
     const timerContainer = document.getElementById('buff-timer-container'); if (myLocalTank.buff && myLocalTank.buffProgress > 0) { timerContainer.classList.remove('hidden'); document.getElementById('buff-timer-icon').innerText = PU_ICONS[myLocalTank.buff]; document.getElementById('buff-timer-name').innerText = BUFF_NAMES[myLocalTank.buff]; document.getElementById('buff-timer-name').style.color = PU_COLORS[myLocalTank.buff] || '#cbd5e1'; document.getElementById('buff-timer-bar').style.width = (myLocalTank.buffProgress * 100) + '%'; } else { timerContainer.classList.add('hidden'); }
@@ -309,27 +401,8 @@ function draw(now) {
         }
         ctx.shadowBlur = 0;
     }
-
-    // ВІЗУАЛ ДЖОЙСТИКІВ ДЛЯ МОБІЛОК
-    if (isMobile) {
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        if (jL.a) {
-            ctx.beginPath(); ctx.arc(jL.cx, jL.cy, 50, 0, Math.PI*2); ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 2; ctx.stroke();
-            ctx.beginPath(); ctx.arc(jL.cx + jL.dx, jL.cy + jL.dy, 20, 0, Math.PI*2); ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fill();
-        }
-        if (jR.a) {
-            ctx.beginPath(); ctx.arc(jR.cx, jR.cy, 50, 0, Math.PI*2); ctx.fillStyle = 'rgba(239,68,68,0.1)'; ctx.fill(); ctx.strokeStyle = 'rgba(239,68,68,0.3)'; ctx.lineWidth = 2; ctx.stroke();
-            ctx.beginPath(); ctx.arc(jR.cx + jR.dx, jR.cy + jR.dy, 20, 0, Math.PI*2); ctx.fillStyle = 'rgba(239,68,68,0.5)'; ctx.fill();
-            
-            // Лінія прицілу (як у Brawl Stars)
-            if (myLocalTank.hp > 0 && jR.dx !== 0 && jR.dy !== 0) {
-                ctx.translate(canvas.width/2, canvas.height/2);
-                ctx.rotate(Math.atan2(jR.dy, jR.dx));
-                ctx.strokeStyle = 'rgba(239,68,68,0.4)'; ctx.lineWidth = 2; ctx.setLineDash([10, 10]);
-                ctx.beginPath(); ctx.moveTo(40, 0); ctx.lineTo(250, 0); ctx.stroke(); ctx.setLineDash([]);
-            }
-        }
-    }
+    
+    drawJoysticks(); // Малюємо джойстики поверх усього
 }
 
 function updateHUD() {
@@ -341,38 +414,53 @@ function updateHUD() {
     if(myEquipped.tracks && MODULES[myEquipped.tracks]) myTotalHp *= MODULES[myEquipped.tracks].stats.hp || 1;
     let myMaxHp = Math.round(MAX_HP * myTotalHp);
 
-    document.getElementById('hp-bar').style.width = Math.max(0, (myLocalTank.hp/myMaxHp)*100) + '%'; document.getElementById('hp-text').innerText = `${Math.ceil(myLocalTank.hp)}/${myMaxHp}`;
-    let vignetteOpacity = 0; if (myLocalTank.hp < myMaxHp) vignetteOpacity = (1 - (myLocalTank.hp / myMaxHp)) * 0.85; document.getElementById('damage-vignette').style.opacity = vignetteOpacity;
-    if(myLocalTank.hp < myMaxHp * 0.3) document.getElementById('hp-bar').className = 'h-full bg-gradient-to-r from-red-600 to-red-400 w-full transition-all duration-300 shadow-[0_0_15px_rgba(239,68,68,0.8)]'; else document.getElementById('hp-bar').className = 'h-full bg-gradient-to-r from-green-500 to-emerald-400 w-full transition-all duration-300 shadow-[0_0_10px_rgba(34,197,94,0.5)]';
-    
-    // Мобільна логіка інтерфейсу
-    if (isMobile) {
-        document.getElementById('hp-text-mob').innerText = `${Math.ceil(myLocalTank.hp)}/${myMaxHp}`;
-        document.getElementById('hp-bar-mob').style.width = Math.max(0, (myLocalTank.hp/myMaxHp)*100) + '%';
-        if(myLocalTank.hp < myMaxHp * 0.3) document.getElementById('hp-bar-mob').className = 'h-full bg-gradient-to-r from-red-600 to-red-400 w-full transition-all duration-300'; else document.getElementById('hp-bar-mob').className = 'h-full bg-gradient-to-r from-green-500 to-emerald-400 w-full transition-all duration-300';
-        
-        const targetUI = document.getElementById('homing-target-ui'); const targetBtn = document.getElementById('mobile-target-btn');
-        if (myLocalTank.buff === 'homing') { targetUI.classList.remove('hidden'); targetBtn.classList.remove('hidden'); } else { targetUI.classList.add('hidden'); targetBtn.classList.add('hidden'); }
-        
-        const specPrev = document.getElementById('mobile-spec-prev'); const specNext = document.getElementById('mobile-spec-next');
-        if (myLocalTank.hp <= 0 && currentRoomData && currentRoomData.mode === 'survival') { specPrev.classList.remove('hidden'); specNext.classList.remove('hidden'); } else { specPrev.classList.add('hidden'); specNext.classList.add('hidden'); }
-    } else {
-        const targetUI = document.getElementById('homing-target-ui'); if (myLocalTank.buff === 'homing') targetUI.classList.remove('hidden'); else targetUI.classList.add('hidden');
-    }
+    let hpPct = Math.max(0, (myLocalTank.hp/myMaxHp)*100) + '%';
+    document.getElementById('hp-bar').style.width = hpPct; document.getElementById('hp-text').innerText = `${Math.ceil(myLocalTank.hp)}/${myMaxHp}`;
+    if(document.getElementById('hp-bar-mob')) { document.getElementById('hp-bar-mob').style.width = hpPct; document.getElementById('hp-text-mob').innerText = `${Math.ceil(myLocalTank.hp)}/${myMaxHp}`; }
 
+    let vignetteOpacity = 0; if (myLocalTank.hp < myMaxHp) vignetteOpacity = (1 - (myLocalTank.hp / myMaxHp)) * 0.85; document.getElementById('damage-vignette').style.opacity = vignetteOpacity;
+    
+    let barClass = myLocalTank.hp < myMaxHp * 0.3 ? 'h-full bg-gradient-to-r from-red-600 to-red-400 w-full transition-all duration-300 shadow-[0_0_15px_rgba(239,68,68,0.8)]' : 'h-full bg-gradient-to-r from-green-500 to-emerald-400 w-full transition-all duration-300 shadow-[0_0_10px_rgba(34,197,94,0.5)]';
+    document.getElementById('hp-bar').className = barClass;
+    if(document.getElementById('hp-bar-mob')) document.getElementById('hp-bar-mob').className = barClass;
+    
+    const targetUI = document.getElementById('homing-target-ui'); if (myLocalTank.buff === 'homing') targetUI.classList.remove('hidden'); else targetUI.classList.add('hidden');
+    
+    // Перемикання інтерфейсу залежно від режиму гри
     const dmHud = document.getElementById('deathmatch-score-hud');
     const survHud = document.getElementById('survival-hud');
     const slist = document.getElementById('score-list'); 
 
     if (currentRoomData.mode === 'survival') {
-        dmHud.classList.add('hidden'); survHud.classList.remove('hidden');
-        const wvNum = document.getElementById('survival-wave-number'); const wvBox = document.getElementById('survival-wave-box');
+        dmHud.classList.add('hidden');
+        survHud.classList.remove('hidden');
+        
+        const wvNum = document.getElementById('survival-wave-number');
+        const wvBox = document.getElementById('survival-wave-box');
+        
         wvNum.innerText = currentRoomData.wave;
-        if (isBossIncoming) { wvBox.className = "glass-panel px-6 md:px-10 py-1.5 md:py-2 rounded-xl md:rounded-2xl border flex flex-col items-center transition-colors duration-300 border-red-500 bg-red-900/40 shadow-[0_0_20px_rgba(239,68,68,0.5)]"; wvNum.className = "text-2xl md:text-4xl font-russo drop-shadow-md text-red-500 leading-none"; } 
-        else { wvBox.className = "glass-panel px-6 md:px-10 py-1.5 md:py-2 rounded-xl md:rounded-2xl border border-slate-600 flex flex-col items-center transition-colors duration-500 shadow-[0_0_15px_rgba(0,0,0,0.5)] bg-slate-900/80"; wvNum.className = "text-2xl md:text-4xl font-russo text-white drop-shadow-md leading-none"; }
+        
+        if (isBossIncoming) {
+            wvBox.className = "glass-panel px-4 md:px-10 py-1 md:py-2 rounded-xl md:rounded-2xl border flex flex-col items-center transition-colors duration-300 border-red-500 bg-red-900/40 shadow-[0_0_20px_rgba(239,68,68,0.5)]";
+            wvNum.className = "text-xl md:text-4xl font-russo drop-shadow-md text-red-500 leading-none";
+        } else {
+            wvBox.className = "glass-panel px-4 md:px-10 py-1 md:py-2 rounded-xl md:rounded-2xl border border-slate-600 flex flex-col items-center transition-colors duration-500 shadow-[0_0_15px_rgba(0,0,0,0.5)] bg-slate-900/80";
+            wvNum.className = "text-xl md:text-4xl font-russo text-white drop-shadow-md leading-none";
+        }
+
     } else {
-        dmHud.classList.remove('hidden'); survHud.classList.add('hidden'); slist.innerHTML = '';
-        Object.values(currentRoomData.players).sort((a,b) => b.score - a.score).forEach(p => { slist.innerHTML += `<div class="flex justify-between w-full ${p.id===myId?'text-blue-400':'text-slate-300'} border-b border-slate-700/50 pb-1 ${p.hp<=0?'opacity-30 line-through':''}"><span>${p.name}</span><span class="font-bold">${p.score}</span></div>`; });
+        dmHud.classList.remove('hidden');
+        survHud.classList.add('hidden');
+        slist.innerHTML = '';
+        Object.values(currentRoomData.players).sort((a,b) => b.score - a.score).forEach(p => { 
+            slist.innerHTML += `<div class="flex justify-between w-full ${p.id===myId?'text-blue-400':'text-slate-300'} border-b border-slate-700/50 pb-1 ${p.hp<=0?'opacity-30 line-through':''}"><span>${p.name}</span><span class="font-bold">${p.score}</span></div>`; 
+        });
+    }
+
+    // Відображення мобільних кнопок
+    if (isMobile) {
+        if (myLocalTank.buff === 'homing' && myLocalTank.hp > 0) document.getElementById('mobile-target-btn').classList.remove('hidden'); else document.getElementById('mobile-target-btn').classList.add('hidden');
+        if (myLocalTank.hp <= 0 && currentRoomData.mode === 'survival') { document.getElementById('mobile-spec-prev').classList.remove('hidden'); document.getElementById('mobile-spec-next').classList.remove('hidden'); } else { document.getElementById('mobile-spec-prev').classList.add('hidden'); document.getElementById('mobile-spec-next').classList.add('hidden'); }
     }
 }
 
@@ -387,58 +475,78 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => { if (!e || !e.key) return; const k = e.key.toLowerCase(); if(keys.hasOwnProperty(k) || k===' ') { if(k===' ') keys.space = false; else keys[k] = false; } });
 window.addEventListener('mousemove', e => { if(!isMobile) { mouseX = e.clientX; mouseY = e.clientY; } });
 
-// ЛОГІКА ДЖОЙСТИКІВ ДЛЯ МОБІЛЬНИХ ПРИСТРОЇВ
-if (isMobile) {
-    canvas.addEventListener('touchstart', e => {
-        e.preventDefault();
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            let t = e.changedTouches[i];
-            if (t.clientX < canvas.width / 2 && !jL.a) { jL.a = true; jL.id = t.identifier; jL.cx = t.clientX; jL.cy = t.clientY; jL.dx = 0; jL.dy = 0; }
-            else if (t.clientX >= canvas.width / 2 && !jR.a) { jR.a = true; jR.id = t.identifier; jR.cx = t.clientX; jR.cy = t.clientY; jR.dx = 0; jR.dy = 0; }
+// --- СЕНСОРНЕ УПРАВЛІННЯ ---
+function handleTouchStart(e) {
+    if(!isMobile || myLocalTank.hp <= 0) return;
+    for(let i=0; i<e.changedTouches.length; i++) {
+        let t = e.changedTouches[i];
+        if (t.clientX < canvas.width / 2 && !joysticks.left.active) {
+            joysticks.left.active = true; joysticks.left.id = t.identifier;
+            joysticks.left.startX = t.clientX; joysticks.left.startY = t.clientY;
+            joysticks.left.currentX = t.clientX; joysticks.left.currentY = t.clientY;
+        } else if (t.clientX >= canvas.width / 2 && !joysticks.right.active) {
+            joysticks.right.active = true; joysticks.right.id = t.identifier;
+            joysticks.right.startX = t.clientX; joysticks.right.startY = t.clientY;
+            joysticks.right.currentX = t.clientX; joysticks.right.currentY = t.clientY;
+            joysticks.right.hasAimed = false; 
+            joysticks.right.released = false;
         }
-    }, {passive: false});
-    
-    canvas.addEventListener('touchmove', e => {
-        e.preventDefault();
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            let t = e.changedTouches[i];
-            if (jL.a && t.identifier === jL.id) {
-                let maxR = 50; let dx = t.clientX - jL.cx; let dy = t.clientY - jL.cy; let dist = Math.hypot(dx, dy);
-                if (dist > maxR) { dx = (dx/dist)*maxR; dy = (dy/dist)*maxR; } jL.dx = dx; jL.dy = dy;
-            } else if (jR.a && t.identifier === jR.id) {
-                let maxR = 50; let dx = t.clientX - jR.cx; let dy = t.clientY - jR.cy; let dist = Math.hypot(dx, dy);
-                if (dist > maxR) { dx = (dx/dist)*maxR; dy = (dy/dist)*maxR; } jR.dx = dx; jR.dy = dy;
-            }
-        }
-    }, {passive: false});
-
-    canvas.addEventListener('touchend', e => {
-        e.preventDefault();
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            let t = e.changedTouches[i];
-            if (jL.a && t.identifier === jL.id) { jL.a = false; jL.dx = 0; jL.dy = 0; }
-            else if (jR.a && t.identifier === jR.id) { jR.a = false; jR.r = true; } 
-        }
-    }, {passive: false});
-    
-    canvas.addEventListener('touchcancel', e => {
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            let t = e.changedTouches[i];
-            if (jL.a && t.identifier === jL.id) { jL.a = false; jL.dx = 0; jL.dy = 0; }
-            if (jR.a && t.identifier === jR.id) { jR.a = false; jR.r = false; }
-        }
-    });
-    
-    // Мобільна кнопка наведення (Homing Missiles)
-    document.getElementById('mobile-target-btn').addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        if(myLocalTank.buff === 'homing') {
-            let visibleOps = Object.keys(opponents).filter(id => opponents[id].hp > 0 && Math.hypot(opponents[id].x - myLocalTank.x, opponents[id].y - myLocalTank.y) < 1500); 
-            if(visibleOps.length > 0) { playSound('hitmarker'); if(!homingTargetId || !visibleOps.includes(homingTargetId)) homingTargetId = visibleOps[0]; else { let idx = visibleOps.indexOf(homingTargetId); homingTargetId = visibleOps[(idx + 1) % visibleOps.length]; } } else homingTargetId = null;
-        }
-    });
-
-    // Мобільні кнопки спостерігача
-    document.getElementById('mobile-spec-prev').addEventListener('touchstart', (e) => { e.preventDefault(); findNextSpectateTarget(-1); });
-    document.getElementById('mobile-spec-next').addEventListener('touchstart', (e) => { e.preventDefault(); findNextSpectateTarget(1); });
+    }
 }
+
+function handleTouchMove(e) {
+    if(!isMobile || myLocalTank.hp <= 0) return;
+    for(let i=0; i<e.changedTouches.length; i++) {
+        let t = e.changedTouches[i];
+        if (joysticks.left.active && t.identifier === joysticks.left.id) {
+            let dx = t.clientX - joysticks.left.startX; let dy = t.clientY - joysticks.left.startY;
+            let dist = Math.hypot(dx, dy); let maxDist = 60;
+            if(dist > maxDist) { dx = (dx/dist)*maxDist; dy = (dy/dist)*maxDist; }
+            joysticks.left.currentX = joysticks.left.startX + dx; joysticks.left.currentY = joysticks.left.startY + dy;
+            joysticks.left.angle = Math.atan2(dy, dx); joysticks.left.force = Math.min(1, dist/maxDist);
+        } else if (joysticks.right.active && t.identifier === joysticks.right.id) {
+            let dx = t.clientX - joysticks.right.startX; let dy = t.clientY - joysticks.right.startY;
+            let dist = Math.hypot(dx, dy); let maxDist = 60;
+            if(dist > 10) joysticks.right.hasAimed = true; // Зараховуємо як прицілювання тільки якщо палець зрушив
+            if(dist > maxDist) { dx = (dx/dist)*maxDist; dy = (dy/dist)*maxDist; }
+            joysticks.right.currentX = joysticks.right.startX + dx; joysticks.right.currentY = joysticks.right.startY + dy;
+            joysticks.right.angle = Math.atan2(dy, dx);
+        }
+    }
+}
+
+function handleTouchEnd(e) {
+    if(!isMobile || myLocalTank.hp <= 0) return;
+    for(let i=0; i<e.changedTouches.length; i++) {
+        let t = e.changedTouches[i];
+        if (joysticks.left.active && t.identifier === joysticks.left.id) {
+            joysticks.left.active = false; joysticks.left.id = null; joysticks.left.force = 0;
+        } else if (joysticks.right.active && t.identifier === joysticks.right.id) {
+            // Відпускання джойстика = Постріл
+            if (joysticks.right.hasAimed) {
+                joysticks.right.released = true;
+            }
+            joysticks.right.active = false; joysticks.right.id = null; joysticks.right.hasAimed = false;
+        }
+    }
+}
+
+canvas.addEventListener('touchstart', handleTouchStart, {passive: false});
+canvas.addEventListener('touchmove', handleTouchMove, {passive: false});
+canvas.addEventListener('touchend', handleTouchEnd, {passive: false});
+canvas.addEventListener('touchcancel', handleTouchEnd, {passive: false});
+
+// Кнопки для мобілок
+const targetBtn = document.getElementById('mobile-target-btn');
+if(targetBtn) {
+    targetBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if(myLocalTank.buff === 'homing') { let visibleOps = Object.keys(opponents).filter(id => opponents[id].hp > 0 && Math.hypot(opponents[id].x - myLocalTank.x, opponents[id].y - myLocalTank.y) < 1500); if(visibleOps.length > 0) { playSound('hitmarker'); if(!homingTargetId || !visibleOps.includes(homingTargetId)) homingTargetId = visibleOps[0]; else { let idx = visibleOps.indexOf(homingTargetId); homingTargetId = visibleOps[(idx + 1) % visibleOps.length]; } } else homingTargetId = null; }
+    }, {passive: false});
+}
+
+const specPrev = document.getElementById('mobile-spec-prev');
+if(specPrev) { specPrev.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); findNextSpectateTarget(-1); }, {passive: false}); }
+
+const specNext = document.getElementById('mobile-spec-next');
+if(specNext) { specNext.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); findNextSpectateTarget(1); }, {passive: false}); }
