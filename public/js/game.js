@@ -35,12 +35,10 @@ function checkCollision(x, y, r, checkSolids = true, isBullet = false) {
     } return false; 
 }
 
-// Нова функція: перевірка зіткнення із замаскованими гравцями
 function checkPlayerCollision(newX, newY, radius) {
     if (!currentRoomData || currentRoomData.mode !== 'prophunt') return false;
     for (let id in opponents) {
         let op = opponents[id];
-        // Якщо опонент живий і замаскований, він стає твердим блоком 50x50
         if (op.hp > 0 && op.isDisguised) {
             let propX = op.x - 25;
             let propY = op.y - 25;
@@ -61,7 +59,7 @@ function checkPlayerCollision(newX, newY, radius) {
             let distance = Math.sqrt((distX*distX) + (distY*distY));
             
             if (distance <= radius) {
-                return true; // Є зіткнення з гравцем-пропом!
+                return true; 
             }
         }
     }
@@ -105,7 +103,6 @@ function updatePhysics(now, dt) {
         }
 
         if (moveX !== 0 || moveY !== 0) { 
-            // Якщо гравець ховається і рухається - він втрачає маскування
             if (currentRoomData.mode === 'prophunt' && myLocalTank.team === 'hider' && myLocalTank.isDisguised) {
                 myLocalTank.isDisguised = false;
                 socket.emit('updateDisguise', { roomId: currentRoomId, state: false, x: myLocalTank.x, y: myLocalTank.y });
@@ -116,7 +113,6 @@ function updatePhysics(now, dt) {
             let nextX = myLocalTank.x + moveX * speed * dt, nextY = myLocalTank.y + moveY * speed * dt; 
             let isBoss = (myLocalTank.buff === 'boss');
             
-            // Перевіряємо колізію і з картою, і з замаскованими гравцями
             let canMoveX = (!checkCollision(nextX, myLocalTank.y, myRadius, true, false) && !checkPlayerCollision(nextX, myLocalTank.y, myRadius));
             if (canMoveX || isBoss) myLocalTank.x = nextX; 
             
@@ -150,11 +146,9 @@ function updatePhysics(now, dt) {
         let isMinigun = (myLocalTank.buff === 'minigun' || myLocalTank.buff === 'fast');
         let shouldShoot = false;
         
-        // Маскування (Пробіл/ЛКМ) для тих, хто ховається
         if (currentRoomData.mode === 'prophunt' && myLocalTank.team === 'hider') {
             if (!myLocalTank.isDisguised && (keys.space || keys.lmb || joysticks.right.released)) {
                 myLocalTank.isDisguised = true;
-                // Магнітимо до центру найближчої клітинки 50x50
                 myLocalTank.x = Math.round((myLocalTank.x - 25) / 50) * 50 + 25;
                 myLocalTank.y = Math.round((myLocalTank.y - 25) / 50) * 50 + 25;
                 myLocalTank.bodyAngle = 0; myLocalTank.turretAngle = 0;
@@ -188,26 +182,102 @@ function updatePhysics(now, dt) {
         let b = bullets[i]; 
         if (b.type === 'homing' && b.targetId) { let tgt = (b.targetId === myId) ? myLocalTank : opponents[b.targetId]; if (tgt && tgt.hp > 0) { let ang = Math.atan2(tgt.y - b.y, tgt.x - b.x); let currentSpd = Math.hypot(b.vx, b.vy); b.vx = Math.cos(ang) * currentSpd; b.vy = Math.sin(ang) * currentSpd; } }
         b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
-        let hit = false; let bCfg = BUFFS[b.type] || BUFFS['none'];
         
-        if (b.type === 'samurai' || b.type === 'homing' || b.type.includes('piercing') || b.type === 'ghost_melee' || b.type === 'boss_proj' || b.type === 'hunter_gun') { hit = checkCollision(b.x, b.y, 4, false, true); } 
-        else { hit = checkCollision(b.x, b.y, 4, true, true); } 
+        let hitWall = false; 
+        let bCfg = BUFFS[b.type] || BUFFS['none'];
+        let isPiercing = (b.type === 'samurai' || b.type === 'homing' || b.type.includes('piercing') || b.type === 'ghost_melee' || b.type === 'boss_proj');
+        
+        hitWall = checkCollision(b.x, b.y, 4, !isPiercing, true); 
         
         let isSurvival = currentRoomData.mode === 'survival';
+        let hitPlayer = false;
+        let hitZombie = false;
 
-        if (!hit && b.owner === myId && !isSurvival) {
-            for (let oid in opponents) { let op = opponents[oid]; if (op.hp > 0) { let opRadius = op.buff === 'boss' ? 75 : 30; let hitDist = b.type === 'samurai' ? opRadius + 30 : opRadius + 4; if (Math.hypot(b.x - op.x, b.y - op.y) < hitDist) { hit = true; let dmgToDeal = b.dmgOverride || bCfg.dmg; socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: dmgToDeal }); if(b.type === 'incendiary') { let end = now + 5000; let int = setInterval(() => { if(Date.now() > end || !opponents[oid] || opponents[oid].hp <= 0) clearInterval(int); else { socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: 10 }); createExplosion(opponents[oid].x, opponents[oid].y, 5, '#f97316'); } }, 1000); } break; } } }
+        for (let oid in opponents) { 
+            let op = opponents[oid]; 
+            if (op.hp > 0) { 
+                let opRadius = op.buff === 'boss' ? 75 : (op.isDisguised ? 25 : 30); 
+                let hitDist = b.type === 'samurai' ? opRadius + 30 : opRadius + 4; 
+                if (Math.hypot(b.x - op.x, b.y - op.y) < hitDist) { 
+                    hitPlayer = true; 
+                    if (b.owner === myId) {
+                        let dmgToDeal = b.dmgOverride || bCfg.dmg; 
+                        socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: dmgToDeal }); 
+                        if(b.type === 'incendiary') { 
+                            let end = now + 5000; 
+                            let int = setInterval(() => { 
+                                if(Date.now() > end || !opponents[oid] || opponents[oid].hp <= 0) clearInterval(int); 
+                                else { 
+                                    socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: 10 }); 
+                                    createExplosion(opponents[oid].x, opponents[oid].y, 5, '#f97316'); 
+                                } 
+                            }, 1000); 
+                        } 
+                    }
+                    break; 
+                } 
+            } 
         }
 
-        if (!hit && isSurvival && b.owner === myId) { for(let zid in zombies) { let z = zombies[zid]; let zDist = b.type === 'samurai' ? Z_TYPES[z.type].radius + 35 : Z_TYPES[z.type].radius + 10; if (Math.hypot(b.x - z.x, b.y - z.y) < zDist) { hit = true; socket.emit('zombieHit', { roomId: currentRoomId, zid: zid, dmg: bCfg.dmg }); createExplosion(b.x, b.y, 5, Z_TYPES[z.type].color); break; } } }
-        if (!hit && b.owner === 'zombie' && myLocalTank.hp > 0) { let hitDist = myRadius + 4; if (Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < hitDist) { hit = true; let dmgToDeal = b.dmgOverride || bCfg.dmg; playSound('hurt'); shakeTime = 0.3; socket.emit('takeDamage', { roomId: currentRoomId, amt: dmgToDeal, attacker: 'zombie' }); } }
+        if (!hitPlayer && myLocalTank.hp > 0 && b.owner !== myId) {
+            let myRad = myLocalTank.buff === 'boss' ? 75 : (myLocalTank.isDisguised ? 25 : 30);
+            let hitDist = b.type === 'samurai' ? myRad + 30 : myRad + 4;
+            if (Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < hitDist) {
+                hitPlayer = true; 
+                if (currentRoomData.mode === 'prophunt' && myLocalTank.isDisguised) {
+                    myLocalTank.isDisguised = false;
+                    socket.emit('updateDisguise', { roomId: currentRoomId, state: false, x: myLocalTank.x, y: myLocalTank.y });
+                }
+            }
+        }
+
+        if (!hitPlayer && isSurvival) { 
+            for(let zid in zombies) { 
+                let z = zombies[zid]; 
+                let zDist = b.type === 'samurai' ? Z_TYPES[z.type].radius + 35 : Z_TYPES[z.type].radius + 10; 
+                if (Math.hypot(b.x - z.x, b.y - z.y) < zDist) { 
+                    hitZombie = true; 
+                    if (b.owner === myId) {
+                        socket.emit('zombieHit', { roomId: currentRoomId, zid: zid, dmg: bCfg.dmg }); 
+                        createExplosion(b.x, b.y, 5, Z_TYPES[z.type].color); 
+                    }
+                    break; 
+                } 
+            } 
+        }
         
+        if (!hitPlayer && !hitZombie && b.owner === 'zombie' && myLocalTank.hp > 0) { 
+            let myRad = myLocalTank.buff === 'boss' ? 75 : (myLocalTank.isDisguised ? 25 : 30);
+            let hitDist = myRad + 4; 
+            if (Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < hitDist) { 
+                hitPlayer = true; 
+                let dmgToDeal = b.dmgOverride || bCfg.dmg; 
+                playSound('hurt'); shakeTime = 0.3; 
+                socket.emit('takeDamage', { roomId: currentRoomId, amt: dmgToDeal, attacker: 'zombie' }); 
+            } 
+        }
+        
+        let hit = hitWall || hitPlayer || hitZombie;
+
         if (hit || b.life <= 0) { 
-            if (b.type !== 'shotgun' && b.type !== 'minigun' && b.type !== 'acid' && b.type !== 'samurai' && b.type !== 'hunter_gun') { createExplosion(b.x, b.y, bCfg.type === 'explosive' ? 30 : 10, bCfg.type === 'explosive' ? '#ea580c' : '#fcd34d'); }
+            if (b.type !== 'shotgun' && b.type !== 'minigun' && b.type !== 'acid' && b.type !== 'samurai' && b.type !== 'hunter_gun') { 
+                createExplosion(b.x, b.y, bCfg.type === 'explosive' ? 30 : 10, bCfg.type === 'explosive' ? '#ea580c' : '#fcd34d'); 
+            }
             if (b.type === 'hunter_gun') createExplosion(b.x, b.y, 10, '#dc2626');
-            if (hit && bCfg.type === 'explosive' && b.owner === myId) { let splashRad = b.type === 'boss' ? 250 : 120; for (let oid in opponents) { if (opponents[oid].hp > 0 && Math.hypot(b.x - opponents[oid].x, b.y - opponents[oid].y) < splashRad) { socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: bCfg.dmg }); } } } 
             
-            if (!hit && b.owner === myId && b.type === 'hunter_gun') { socket.emit('bulletMissed', { roomId: currentRoomId }); }
+            if (hitPlayer && bCfg.type === 'explosive' && b.owner === myId) { 
+                let splashRad = b.type === 'boss' ? 250 : 120; 
+                for (let oid in opponents) { 
+                    if (opponents[oid].hp > 0 && Math.hypot(b.x - opponents[oid].x, b.y - opponents[oid].y) < splashRad) { 
+                        socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: bCfg.dmg }); 
+                    } 
+                } 
+            } 
+            
+            if (hitWall && !hitPlayer && !hitZombie && b.owner === myId && b.type === 'hunter_gun') { 
+                socket.emit('bulletMissed', { roomId: currentRoomId }); 
+            }
+            
             bullets.splice(i, 1); 
         }
     }
@@ -250,21 +320,6 @@ function drawTank(x, y, bodyAngle, turretAngle, colorHex, name, isMe, hp, buff, 
     if(equipped && equipped.hull) { ctx.shadowColor = hCol; ctx.shadowBlur = 10; }
     ctx.fillRect(-30, -22, 60, 44); ctx.strokeRect(-30, -22, 60, 44); ctx.shadowBlur = 0;
     ctx.restore();
-    
-    ctx.save(); ctx.rotate(turretAngle); 
-    ctx.fillStyle = '#334155'; ctx.strokeStyle = cCol; ctx.lineWidth = equipped && equipped.cannon ? 3 : 1;
-    if(equipped && equipped.cannon) { ctx.shadowColor = cCol; ctx.shadowBlur = 10; }
-    let cLen = 45; if(equipped && equipped.cannon && MODULES[equipped.cannon].stats.range > 1.1) cLen = 60;
-    if(equipped && equipped.cannon && MODULES[equipped.cannon].stats.range < 1.0) cLen = 35;
-    ctx.fillRect(0, -6, cLen, 12); ctx.strokeRect(0, -6, cLen, 12); ctx.shadowBlur = 0;
-    
-    ctx.fillStyle = baseHullCol; ctx.strokeStyle = tuCol; ctx.lineWidth = equipped && equipped.turret ? 3 : 1;
-    if(equipped && equipped.turret) { ctx.shadowColor = tuCol; ctx.shadowBlur = 15; }
-    ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI*2); ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
-    ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.beginPath(); ctx.arc(-4, -4, 8, 0, Math.PI*2); ctx.fill(); 
-    ctx.restore(); ctx.restore();
-}
-
 function drawProp(ctx, o, time) {
     let x = o.x, y = o.y, w = o.w||50, h = o.h||50; ctx.save();
     switch(o.type) {
@@ -502,7 +557,6 @@ function draw(now) {
         const cHex = sn.color ? (sn.color==='white'?'#f8fafc':sn.color==='black'?'#1e293b':sn.color==='red'?'#ef4444':sn.color==='blue'?'#3b82f6':sn.color==='brown'?'#78350f':'#9333ea') : '#ef4444'; 
         
         if (p.isDisguised) {
-            // Відмальовуємо проп. Центрування: віднімаємо 25px, щоб відмалювати від верхнього лівого кута блоку 50x50
             drawProp(ctx, { type: p.propType, x: p.x - 25, y: p.y - 25, w: 50, h: 50, r: 25 }, time);
         } else {
             drawTank(p.x, p.y, p.bodyAngle, p.turretAngle, cHex, sn.name, false, p.hp, p.buff, sn.equipped, true); 
