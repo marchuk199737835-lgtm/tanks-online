@@ -345,15 +345,15 @@ io.on('connection', (socket) => {
         } 
     });
 
-    socket.on('selectProp', (type) => {
-        let room = currentRoomId ? rooms[currentRoomId] : null;
+    socket.on('selectProp', (data) => {
+        let room = rooms[data.roomId];
         if(room && room.status === 'playing' && room.mode === 'prophunt' && room.players[socket.id]) {
-            room.players[socket.id].propType = type;
+            room.players[socket.id].propType = data.type;
         }
     });
 
     socket.on('updateDisguise', (data) => {
-        let room = currentRoomId ? rooms[currentRoomId] : null;
+        let room = rooms[data.roomId];
         if(room && room.status === 'playing' && room.mode === 'prophunt' && room.players[socket.id]) {
             room.players[socket.id].isDisguised = data.state;
             if(data.state) {
@@ -368,8 +368,8 @@ io.on('connection', (socket) => {
     socket.on('move', (data) => { let room = rooms[data.roomId]; if(room && room.players[socket.id] && room.status === 'playing') { room.players[socket.id].x = data.x; room.players[socket.id].y = data.y; room.players[socket.id].bodyAngle = data.bodyAngle; room.players[socket.id].turretAngle = data.turretAngle; } });
     socket.on('shoot', (data) => { let room = rooms[data.roomId]; if(room && room.status === 'playing') io.to(data.roomId).emit('spawnBullet', { ...data, owner: socket.id }); });
 
-    socket.on('bulletMissed', () => {
-        let room = currentRoomId ? rooms[currentRoomId] : null;
+    socket.on('bulletMissed', (data) => {
+        let room = rooms[data.roomId];
         if (room && room.mode === 'prophunt' && room.status === 'playing' && room.players[socket.id]) {
             let p = room.players[socket.id];
             if (p.team === 'hunter' && p.hp > 0) {
@@ -377,7 +377,6 @@ io.on('connection', (socket) => {
                 
                 if (p.hp === 0) {
                     io.to(room.id).emit('playerDied', { id: socket.id, killer: null });
-                    // Перевірка, чи залишились мисливці
                     let huntersAlive = Object.values(room.players).filter(pl => pl.team === 'hunter' && pl.hp > 0).length;
                     if (huntersAlive === 0) {
                         endPropHuntGame(room, 'hider');
@@ -395,10 +394,10 @@ io.on('connection', (socket) => {
         let finalDmg = data.amt; let atkName = globalPlayers[attackerSocketId];
         
         if (room.mode === 'prophunt') {
-            if (room.state !== 'seeking') return; // не можна вбивати поки ховаються
+            if (room.state !== 'seeking') return; 
             let attacker = room.players[attackerSocketId];
             if (!attacker || attacker.team !== 'hunter' || victim.team === 'hunter') return;
-            finalDmg = 250; // Урон мисливця
+            finalDmg = 250; 
             victim.isDisguised = false;
         } else {
             if (atkName && dbUsers[atkName] && dbUsers[atkName].equipped && dbUsers[atkName].equipped.cannon) { 
@@ -418,7 +417,6 @@ io.on('connection', (socket) => {
             if (room.mode === 'deathmatch') {
                 setTimeout(() => { if(room && room.players[data.targetId] && room.status === 'playing') { room.players[data.targetId].hp = getMaxHp(room.players[data.targetId].equipped); let spawn = getValidSpawn(room.map, 30, 'spawn_player'); room.players[data.targetId].x = spawn.x; room.players[data.targetId].y = spawn.y; io.to(data.roomId).emit('playerRespawn', room.players[data.targetId]); } }, 3000); 
             } else if (room.mode === 'prophunt') {
-                // Перевірка, чи всі хто ховається мертві
                 let hidersAlive = Object.values(room.players).filter(pl => pl.team === 'hider' && pl.hp > 0).length;
                 if (hidersAlive === 0) {
                     endPropHuntGame(room, 'hunter');
@@ -520,7 +518,7 @@ function endPropHuntGame(room, winnerTeam) {
         let amt = isWinner ? 15 : 3; 
         rewards[p.id] = amt; 
         
-        if (isWinner && !winnerId) { winnerId = p.id; winnerName = p.name; } // Для інтерфейсу
+        if (isWinner && !winnerId) { winnerId = p.id; winnerName = p.name; }
 
         if(dbUsers[p.name]) { 
             dbUsers[p.name].bucks += amt; dbUsers[p.name].stats.earned += amt; dbUsers[p.name].stats.matches++; 
@@ -540,13 +538,12 @@ setInterval(() => {
     for(let roomId in rooms) {
         let room = rooms[roomId]; if (room.status !== 'playing') continue;
         
-        // --- ЛОГІКА ХОВАНОК (ПЕРЕВІРКА ТАЙМЕРІВ) ---
+        // --- ЛОГІКА ХОВАНОК ---
         if (room.mode === 'prophunt') {
             if (room.state === 'hiding' && now >= room.phaseEndTime) {
                 room.state = 'seeking';
                 room.phaseEndTime = now + (room.seekTime * 1000);
                 
-                // Спавн мисливців
                 Object.values(room.players).forEach(p => {
                     if (p.team === 'hunter') {
                         p.hp = getMaxHp(p.equipped);
@@ -557,7 +554,6 @@ setInterval(() => {
                 io.to(roomId).emit('phPhaseChange', { phase: 'seeking', time: room.seekTime });
             } 
             else if (room.state === 'seeking' && now >= room.phaseEndTime) {
-                // Час вийшов = Ті хто ховаються перемогли
                 endPropHuntGame(room, 'hider');
                 continue;
             }
