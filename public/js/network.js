@@ -1,5 +1,3 @@
-let myAdventClaims = [];
-
 socket.on('initMusic', (data) => { myMusicPlaylists = data; });
 
 socket.on('authSuccess', (data) => { 
@@ -47,7 +45,7 @@ socket.on('updateLobby', (roomData) => {
 socket.on('gameStarting', (roomData) => {
     currentRoomData = roomData; const pData = currentRoomData.players[myId];
     myLocalTank.x = pData.x; myLocalTank.y = pData.y; myLocalTank.hp = pData.hp; camera.x = pData.x; camera.y = pData.y;
-    homingTargetId = null; document.getElementById('damage-vignette').style.opacity = 0; spectatingId = null; // Скидаємо спостерігача
+    homingTargetId = null; document.getElementById('damage-vignette').style.opacity = 0; spectatingId = null; 
     pendingDrop = null; document.getElementById('drop-notification').classList.add('hidden'); 
     if (currentRoomData.mode === 'survival') switchMusicState('survive'); else switchMusicState('dezmatch');
     if (typeof doCountdown === 'function') doCountdown();
