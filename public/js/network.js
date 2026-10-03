@@ -80,15 +80,17 @@ socket.on('spawnBullet', (data) => {
 
 socket.on('hitConfirmed', () => { playSound('hitmarker'); const hm = document.getElementById('hitmarker'); hm.classList.remove('hidden'); hm.classList.remove('hitmarker-active'); void hm.offsetWidth; hm.classList.add('hitmarker-active'); });
 socket.on('powerupCollected', (data) => { playSound('powerup'); });
+
 socket.on('playerDied', (data) => { 
     if (typeof createExplosion === 'function' && currentRoomData && currentRoomData.players[data.id]) createExplosion(currentRoomData.players[data.id].x, currentRoomData.players[data.id].y, 60, '#ef4444'); playSound('explosion'); 
     
     // SPECTATOR АВТО-ПЕРЕХІД
     if (data.id === myId) {
         if (data.killer && data.killer !== 'zombie' && opponents[data.killer]) { spectatingId = data.killer; } 
-        else { findNextSpectateTarget(1); }
+        else { if (typeof findNextSpectateTarget === 'function') findNextSpectateTarget(1); }
     }
 });
+
 socket.on('playerRespawn', (data) => { if(data.id === myId) { myLocalTank.x = data.x; myLocalTank.y = data.y; myLocalTank.hp = data.hp; camera.x = data.x; camera.y = data.y; document.getElementById('damage-vignette').style.opacity = 0; spectatingId = null; } });
 socket.on('tokenCollected', (data) => { playSound('token'); });
 socket.on('bomberExplode', (data) => { if (typeof createExplosion === 'function') createExplosion(data.x, data.y, 40, '#dc2626'); if(Math.hypot(data.x - myLocalTank.x, data.y - myLocalTank.y) < 120) emitDamage(50, 'bomber'); });

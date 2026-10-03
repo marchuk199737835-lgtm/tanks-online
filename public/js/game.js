@@ -1,6 +1,6 @@
 const canvas = document.getElementById('game-canvas'); const ctx = canvas.getContext('2d'); window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }); canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
-let spectatingId = null;
+let spectatingId = null; // Змінна для режиму спостерігача
 
 function createExplosion(x, y, count, color) { for(let i=0; i<count; i++){ const ang = Math.random() * Math.PI * 2; const spd = Math.random() * 200 + 50; particles.push({ x, y, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd, life: Math.random() * 0.4 + 0.1, color }); } }
 
@@ -10,16 +10,25 @@ function checkCollision(x, y, r, checkSolids = true, isBullet = false) {
     if (checkSolids) { 
         const solids = MAP_DATA[cMap].solids; 
         for (let s of solids) { 
+            // Ігноруємо спавни, калюжі, воронки і намальовані лінії
             if(s.type.includes('spawn') || s.type === 'line' || s.type === 'prop_puddle' || s.type === 'prop_crater') continue;
-            // ВОДА пропускає СНАРЯДИ, але блокує танки!
+            
+            // ВОДА: Танки врізаються, СНАРЯДИ ПРОЛІТАЮТЬ НАД НЕЮ
             if(s.type.includes('water') && isBullet) continue;
 
-            if(s.type === 'tree' || s.type === 'neon_circle' || s.type === 'neon_pillar') { if(Math.hypot(x-(s.x+(s.w||0)/2), y-(s.y+(s.h||0)/2)) <= r+(s.r||s.w/2||30)) return true; } 
-            else { let testX = Math.max(s.x, Math.min(x, s.x+(s.w||30))), testY = Math.max(s.y, Math.min(y, s.y+(s.h||30))); if(Math.hypot(x-testX, y-testY) <= r) return true; } 
+            if(s.type === 'tree' || s.type === 'neon_circle' || s.type === 'neon_pillar') { 
+                let cx = s.x + (s.w ? s.w/2 : 0); let cy = s.y + (s.h ? s.h/2 : 0); let sr = s.r || (s.w ? s.w/2 : 30);
+                if(Math.hypot(x - cx, y - cy) <= r + sr) return true; 
+            } 
+            else { 
+                let testX = Math.max(s.x, Math.min(x, s.x+(s.w||30))), testY = Math.max(s.y, Math.min(y, s.y+(s.h||30))); 
+                if(Math.hypot(x-testX, y-testY) <= r) return true; 
+            } 
         } 
     } return false; 
 }
 
+// ЛОГІКА ПЕРЕМИКАННЯ СПОСТЕРІГАЧА
 function findNextSpectateTarget(dir) {
     if (!currentRoomData) return;
     let aliveOps = Object.keys(currentRoomData.players).filter(id => currentRoomData.players[id].hp > 0 && id !== myId);
@@ -36,13 +45,14 @@ function updatePhysics(now, dt) {
     if (!currentRoomData || !currentRoomId) return;
     let myRadius = myLocalTank.buff === 'boss' ? 75 : 30;
     
-    // SPECTATOR КАМЕРА АБО РУХ ТАНКА
+    // ЯКЩО ГРАВЕЦЬ МЕРТВИЙ - КАМЕРА СЛІДКУЄ ЗА ІНШИМИ (SPECTATOR MODE)
     if (myLocalTank.hp <= 0) {
         if (spectatingId && opponents[spectatingId]) {
             camera.x += (opponents[spectatingId].x - camera.x) * 5 * dt;
             camera.y += (opponents[spectatingId].y - camera.y) * 5 * dt;
         }
     } else {
+        // ЯКЩО ЖИВИЙ - ЗВИЧАЙНИЙ РУХ
         let moveX = 0, moveY = 0; let totalSpeed = 1.0;
         if(myEquipped.hull && MODULES[myEquipped.hull]) totalSpeed *= MODULES[myEquipped.hull].stats.speed || 1;
         if(myEquipped.tracks && MODULES[myEquipped.tracks]) totalSpeed *= MODULES[myEquipped.tracks].stats.speed || 1;
@@ -86,7 +96,7 @@ function updatePhysics(now, dt) {
         b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
         let hit = false; let bCfg = BUFFS[b.type] || BUFFS['none'];
         
-        // КУЛІ ЛЕТЯТЬ НАД ВОДОЮ (isBullet = true)
+        // КУЛІ ПРОЛІТАЮТЬ НАД ВОДОЮ (isBullet = true)
         if (b.type === 'samurai' || b.type === 'homing' || b.type.includes('piercing') || b.type === 'ghost_melee' || b.type === 'boss_proj') { hit = checkCollision(b.x, b.y, 4, false, true); } 
         else { hit = checkCollision(b.x, b.y, 4, true, true); } 
         
@@ -110,6 +120,7 @@ function updatePhysics(now, dt) {
 
 function drawTank(x, y, bodyAngle, turretAngle, colorHex, name, isMe, hp, buff, equipped) {
     if (hp <= 0) return; ctx.save(); ctx.translate(x, y); let scale = buff === 'boss' ? 2.5 : 1.0; ctx.scale(scale, scale); if (buff === 'invisible') ctx.globalAlpha = isMe ? 0.2 : 0.03; else ctx.globalAlpha = 1.0;
+    
     ctx.shadowColor = 'transparent'; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; 
     ctx.fillStyle = colorHex; ctx.font = '14px Russo One'; ctx.textAlign = 'center'; if(buff !== 'invisible' || isMe) ctx.fillText(name, 0, -45);
     
@@ -191,6 +202,7 @@ function draw(now) {
             for(let wy=o.y+10; wy<o.y+o.h; wy+=30) { ctx.beginPath(); ctx.moveTo(o.x, wy); ctx.lineTo(o.x+o.w, wy); ctx.stroke(); }
             ctx.setLineDash([]);
         }
+        else if (o.type === 'prop_puddle' || o.type === 'prop_crater') { drawProp(ctx, o, time); }
         ctx.restore();
     });
 
@@ -199,7 +211,7 @@ function draw(now) {
     // --- ТІНІ ДЛЯ ВИСОКИХ ОБ'ЄКТІВ (ВКЛЮЧНО З ФІГУРАМИ) ---
     ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 15; ctx.shadowOffsetX = 8; ctx.shadowOffsetY = 12;
     MAP_DATA[cMap].solids.forEach(o => {
-        if(o.type.includes('spawn') || o.type.includes('water') || o.type === 'line') return;
+        if(o.type.includes('spawn') || o.type.includes('water') || o.type === 'line' || o.type === 'prop_puddle' || o.type === 'prop_crater') return;
         
         if (o.type === 'shape_triangle') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
         else if (o.type === 'shape_rhombus') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h/2); ctx.lineTo(o.x + o.w/2, o.y + o.h); ctx.lineTo(o.x, o.y + o.h/2); ctx.fill(); }
@@ -270,7 +282,7 @@ function draw(now) {
     let bar = document.getElementById('cooldown-bar'); if (now - lastShootTime < cd) { bar.style.transition = 'none'; bar.style.width = ((now - lastShootTime) / cd * 100) + '%'; } else { bar.style.width = '100%'; }
     const timerContainer = document.getElementById('buff-timer-container'); if (myLocalTank.buff && myLocalTank.buffProgress > 0) { timerContainer.classList.remove('hidden'); document.getElementById('buff-timer-icon').innerText = PU_ICONS[myLocalTank.buff]; document.getElementById('buff-timer-name').innerText = BUFF_NAMES[myLocalTank.buff]; document.getElementById('buff-timer-name').style.color = PU_COLORS[myLocalTank.buff] || '#cbd5e1'; document.getElementById('buff-timer-bar').style.width = (myLocalTank.buffProgress * 100) + '%'; } else { timerContainer.classList.add('hidden'); }
 
-    // --- ТЕКСТ СПОСТЕРІГАЧА ---
+    // --- ТЕКСТ СПОСТЕРІГАЧА (SPECTATOR UI) ---
     if (myLocalTank.hp <= 0 && spectatingId && opponents[spectatingId]) {
         let specName = currentRoomData.players[spectatingId] ? currentRoomData.players[spectatingId].name : 'ГРАВЕЦЬ';
         ctx.fillStyle = '#fff'; ctx.font = '24px Russo One'; ctx.textAlign = 'center'; ctx.shadowColor = '#000'; ctx.shadowBlur = 10;
@@ -306,7 +318,7 @@ function gameLoop(now) { const dt = Math.min((now - lastTime) / 1000, 0.1); last
 window.addEventListener('keydown', e => { 
     if (!e || !e.key) return; const k = e.key.toLowerCase(); if(keys.hasOwnProperty(k) || k===' ') { if(k===' ') keys.space = true; else keys[k] = true; }
     
-    // SPECTATOR CONTROLS
+    // SPECTATOR CONTROLS (Керування камерою після смерті)
     if (myLocalTank.hp <= 0 && currentRoomData && currentRoomData.mode === 'survival') {
         if (k === 'a') findNextSpectateTarget(-1);
         if (k === 'd') findNextSpectateTarget(1);
