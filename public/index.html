@@ -6,8 +6,17 @@
     <title>Танкові Баталії: Сесії</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* Хелоуінські анімації */
+        .spider-thread { width: 2px; background: rgba(255,255,255,0.15); margin: 0 auto; transition: height 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
+        .spider-container:hover .spider-thread { height: 90px; }
+        .spider-container:hover .spider-emoji { transform: scale(1.2) rotate(10deg); }
+        .spider-emoji { transition: transform 0.3s; }
+        .cobweb { transition: transform 0.4s, opacity 0.4s, filter 0.4s; opacity: 0.15; filter: drop-shadow(0 0 0px #ea580c); }
+        .cobweb:hover { transform: scale(1.1); opacity: 0.6; filter: drop-shadow(0 0 10px #ea580c); }
+    </style>
 </head>
-<body class="relative text-white antialiased">
+<body class="relative text-white antialiased bg-[#020617] overflow-hidden">
 
     <!-- Глобальні налаштування -->
     <div id="settings-modal" class="modal hidden fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -36,8 +45,19 @@
     </div>
 
     <!-- Екран 2: Головне меню -->
-    <div id="main-menu-screen" class="screen-container hidden fixed inset-0 z-40 flex-col items-center justify-center">
+    <div id="main-menu-screen" class="screen-container hidden fixed inset-0 z-40 flex-col items-center justify-center relative">
         
+        <!-- Хелоуін Декор -->
+        <div class="absolute top-0 left-0 w-40 h-40 cobweb z-0 cursor-crosshair">
+            <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.5" class="text-slate-400 w-full h-full opacity-50"><path d="M0,0 L100,100 M0,0 L100,40 M0,0 L40,100 M0,20 Q20,20 20,0 M0,40 Q40,40 40,0 M0,60 Q60,60 60,0 M0,80 Q80,80 80,0 M0,100 Q100,100 100,0"/></svg>
+        </div>
+        <div class="absolute bottom-0 right-0 w-48 h-48 cobweb z-0 cursor-crosshair transform rotate-180">
+            <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.5" class="text-slate-400 w-full h-full opacity-50"><path d="M0,0 L100,100 M0,0 L100,40 M0,0 L40,100 M0,20 Q20,20 20,0 M0,40 Q40,40 40,0 M0,60 Q60,60 60,0 M0,80 Q80,80 80,0 M0,100 Q100,100 100,0"/></svg>
+        </div>
+        <div class="absolute top-0 right-48 spider-container cursor-pointer z-50 flex flex-col items-center">
+            <div class="spider-thread h-6"></div><div class="text-3xl spider-emoji">🕷️</div>
+        </div>
+
         <div class="absolute top-6 right-8 flex gap-4 z-50">
             <div class="glass-panel px-6 py-2 rounded-full border border-emerald-500/30 flex items-center gap-3 cursor-pointer hover:bg-emerald-900/40 transition" onclick="document.getElementById('promo-modal').classList.remove('hidden'); playSound('ui_click');">
                 <span class="text-emerald-400 font-russo text-xl">💵 <span class="global-bucks-display">0</span></span>
@@ -61,9 +81,9 @@
             </div>
         </div>
 
-        <h1 class="text-5xl text-white font-russo mb-12 drop-shadow-[0_0_20px_rgba(255,255,255,0.3)] tracking-widest slide-up">ОБЕРІТЬ ДІЮ</h1>
+        <h1 class="text-5xl text-white font-russo mb-12 drop-shadow-[0_0_20px_rgba(255,255,255,0.3)] tracking-widest slide-up relative z-10">ОБЕРІТЬ ДІЮ</h1>
         
-        <div class="flex gap-6 slide-up max-w-6xl w-full px-8 justify-center">
+        <div class="flex gap-6 slide-up max-w-6xl w-full px-8 justify-center relative z-10">
             <button id="nav-sessions-btn" class="flex-1 max-w-[320px] h-80 glass-panel rounded-3xl border border-blue-500/30 hover:border-blue-500 hover:shadow-[0_0_30px_rgba(37,99,235,0.4)] transition-all group flex flex-col items-center justify-center gap-4">
                 <div class="text-7xl group-hover:scale-110 transition-transform duration-300">🌍</div>
                 <h2 class="text-2xl font-russo text-white tracking-widest">СЕСІЇ</h2>
@@ -106,8 +126,13 @@
     </div>
 
     <!-- Екран 2.5: АНГАР -->
-    <div id="hangar-screen" class="screen-container hidden fixed inset-0 z-40 flex-col p-8 overflow-y-auto">
-        <div class="flex justify-between items-center mb-6 fade-in">
+    <div id="hangar-screen" class="screen-container hidden fixed inset-0 z-40 flex-col p-8 overflow-y-auto relative">
+        <!-- Хелоуін Декор -->
+        <div class="absolute top-0 right-10 w-32 h-32 cobweb z-0 cursor-crosshair transform scale-x-[-1]">
+            <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.5" class="text-slate-400 w-full h-full opacity-50"><path d="M0,0 L100,100 M0,0 L100,40 M0,0 L40,100 M0,20 Q20,20 20,0 M0,40 Q40,40 40,0 M0,60 Q60,60 60,0 M0,80 Q80,80 80,0 M0,100 Q100,100 100,0"/></svg>
+        </div>
+
+        <div class="flex justify-between items-center mb-6 fade-in relative z-10">
             <button id="hangar-back-btn" class="glass-panel px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-slate-300 hover:text-white transition">← Назад</button>
             <h2 class="text-4xl font-russo text-white tracking-widest">АНГАР</h2>
             <div class="glass-panel px-6 py-2 rounded-full border border-emerald-500/30 cursor-pointer hover:bg-emerald-900/40 transition" onclick="document.getElementById('promo-modal').classList.remove('hidden'); playSound('ui_click');">
@@ -115,7 +140,7 @@
             </div>
         </div>
 
-        <div class="flex flex-col md:flex-row gap-6 mb-6">
+        <div class="flex flex-col md:flex-row gap-6 mb-6 relative z-10">
             <div class="glass-panel p-4 rounded-3xl border border-slate-700 w-full md:w-1/3 flex flex-col items-center justify-center relative overflow-hidden" style="min-height: 350px;">
                 <h3 class="absolute top-4 left-6 text-sm font-russo text-slate-400 tracking-widest uppercase">Креслення</h3>
                 <canvas id="hangar-canvas" width="300" height="300" class="cursor-crosshair"></canvas>
@@ -152,7 +177,7 @@
             </div>
         </div>
 
-        <div class="glass-panel p-6 rounded-3xl border border-slate-700 flex-1">
+        <div class="glass-panel p-6 rounded-3xl border border-slate-700 flex-1 relative z-10">
             <div class="flex justify-between items-center mb-4">
                 <h4 class="text-sm uppercase text-slate-400 font-bold tracking-widest">Рюкзак Модулів</h4>
                 <span class="text-xs font-bold text-slate-500"><span id="inv-count">0</span> / 30</span>
@@ -174,13 +199,18 @@
     </div>
 
     <!-- Екран 3: Браузер Сесій -->
-    <div id="room-browser-screen" class="screen-container hidden fixed inset-0 z-40 flex-col p-8">
-        <div class="flex justify-between items-center mb-8 fade-in">
+    <div id="room-browser-screen" class="screen-container hidden fixed inset-0 z-40 flex-col p-8 relative">
+        <!-- Хелоуін Декор -->
+        <div class="absolute top-20 right-8 spider-container cursor-pointer z-50 flex flex-col items-center">
+            <div class="spider-thread h-4"></div><div class="text-2xl spider-emoji">🕷️</div>
+        </div>
+
+        <div class="flex justify-between items-center mb-8 fade-in relative z-10">
             <button id="back-to-menu-btn" class="glass-panel px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-slate-300 hover:text-white transition">← Назад</button>
             <h2 class="text-4xl font-russo text-white tracking-widest">АКТИВНІ СЕСІЇ</h2>
             <button id="open-create-room-btn" class="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-xl font-russo text-lg uppercase tracking-widest transition shadow-[0_0_15px_rgba(37,99,235,0.5)]">+ СТВОРИТИ</button>
         </div>
-        <div class="glass-panel flex-1 rounded-2xl border border-slate-700 overflow-hidden flex flex-col slide-up">
+        <div class="glass-panel flex-1 rounded-2xl border border-slate-700 overflow-hidden flex flex-col slide-up relative z-10">
             <div class="grid grid-cols-5 gap-4 p-4 bg-slate-900/80 border-b border-slate-700 text-xs font-bold uppercase tracking-widest text-slate-400">
                 <div class="col-span-2">Хост / ID</div><div>Режим</div><div>Мапа</div><div>Гравці</div>
             </div>
@@ -197,12 +227,11 @@
                     <div class="flex gap-2"><div class="select-btn create-mode-select p-3 rounded-xl flex-1 text-center bg-slate-800 text-xs font-bold tracking-widest selected" data-mode="deathmatch">ДЕТМАТЧ</div><div class="select-btn create-mode-select p-3 rounded-xl flex-1 text-center bg-slate-800 text-xs font-bold tracking-widest" data-mode="survival">ВИЖИВАННЯ</div></div>
                 </div>
                 <div><label class="text-xs font-bold uppercase text-slate-400 mb-2 block tracking-wider">Мапа</label>
-                    <!-- ВИБІР МАП -->
                     <div class="grid grid-cols-2 gap-2">
-                        <div class="select-btn create-map-select p-2 rounded-xl text-center bg-slate-800 text-xs font-bold tracking-widest selected" data-map="площя">🔲 ПЛОЩА</div>
-                        <div class="select-btn create-map-select p-2 rounded-xl text-center bg-slate-800 text-xs font-bold tracking-widest" data-map="epic_map">🌐 EPIC MAP</div>
-                        <div class="select-btn create-map-select p-2 rounded-xl text-center bg-slate-800 text-xs font-bold tracking-widest" data-map="Бравл_map">🌵 БРАВЛ</div>
-                        <div class="select-btn create-map-select p-2 rounded-xl text-center bg-slate-800 text-xs font-bold tracking-widest" data-map="Бій Насмерть">🔥 ДЕЗМАТЧ</div>
+                        <div class="select-btn create-map-select p-3 rounded-xl text-center bg-slate-800 text-xs font-bold tracking-widest selected" data-map="площя">🔲 ПЛОЩА</div>
+                        <div class="select-btn create-map-select p-3 rounded-xl text-center bg-slate-800 text-xs font-bold tracking-widest" data-map="epic_map">🌐 EPIC MAP</div>
+                        <div class="select-btn create-map-select p-3 rounded-xl text-center bg-slate-800 text-xs font-bold tracking-widest" data-map="Бравл_map">🌵 БРАВЛ</div>
+                        <div class="select-btn create-map-select p-3 rounded-xl text-center bg-slate-800 text-xs font-bold tracking-widest" data-map="Бій Насмерть">🔥 ДЕЗМАТЧ</div>
                     </div>
                 </div>
                 <div class="flex gap-4">
@@ -218,8 +247,13 @@
     </div>
 
     <!-- Екран 4: Крамниця -->
-    <div id="shop-screen" class="screen-container hidden fixed inset-0 z-40 flex-col p-8 overflow-y-auto">
-        <div class="flex justify-between items-center mb-8 fade-in">
+    <div id="shop-screen" class="screen-container hidden fixed inset-0 z-40 flex-col p-8 overflow-y-auto relative">
+        <!-- Хелоуін Декор -->
+        <div class="absolute top-0 left-10 w-32 h-32 cobweb z-0 cursor-crosshair">
+            <svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.5" class="text-slate-400 w-full h-full opacity-50"><path d="M0,0 L100,100 M0,0 L100,40 M0,0 L40,100 M0,20 Q20,20 20,0 M0,40 Q40,40 40,0 M0,60 Q60,60 60,0 M0,80 Q80,80 80,0 M0,100 Q100,100 100,0"/></svg>
+        </div>
+
+        <div class="flex justify-between items-center mb-8 fade-in relative z-10">
             <button id="shop-back-btn" class="glass-panel px-6 py-3 rounded-xl font-bold uppercase tracking-widest text-slate-300 hover:text-white transition">← Назад</button>
             <h2 class="text-4xl font-russo text-white tracking-widest">КРАМНИЦЯ МОДУЛІВ</h2>
             <div class="glass-panel px-6 py-2 rounded-full border border-emerald-500/30 cursor-pointer hover:bg-emerald-900/40 transition" onclick="document.getElementById('promo-modal').classList.remove('hidden'); playSound('ui_click');">
@@ -227,7 +261,7 @@
             </div>
         </div>
 
-        <div class="flex flex-col md:flex-row gap-8 justify-center items-center flex-1 slide-up pb-8">
+        <div class="flex flex-col md:flex-row gap-8 justify-center items-center flex-1 slide-up pb-8 relative z-10">
             <div class="glass-panel p-8 rounded-[3rem] border border-slate-600 flex flex-col items-center w-full max-w-sm hover:border-slate-400 transition hover:shadow-2xl relative">
                 <button onclick="openCaseInfo(1)" class="absolute top-6 right-6 w-10 h-10 bg-slate-800 text-slate-400 rounded-full hover:bg-slate-700 hover:text-white transition font-russo text-lg border border-slate-600">i</button>
                 <div class="text-8xl mb-4 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">📦</div>
@@ -372,6 +406,16 @@
     <!-- Екран Гри -->
     <div id="game-screen" class="screen-container hidden fixed inset-0 bg-black overflow-hidden z-20">
         <div id="damage-vignette" class="absolute inset-0 pointer-events-none z-10 transition-opacity duration-200" style="opacity:0; box-shadow: inset 0 0 150px 30px rgba(220, 38, 38, 1);"></div>
+        
+        <!-- ІНДИКАТОР ХВИЛІ ВИЖИВАННЯ (НОВИЙ) -->
+        <div id="survival-hud" class="hidden absolute top-6 left-1/2 -translate-x-1/2 flex-col items-center pointer-events-none z-40">
+            <div id="survival-warning" class="text-red-500 font-russo text-sm animate-pulse mb-1 hidden drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]">⚠️ БОС ВЖЕ ЗОВСІМ ПОРУЧ! ⚠️</div>
+            <div id="survival-wave-box" class="glass-panel px-10 py-2 rounded-2xl border border-slate-600 flex flex-col items-center transition-colors duration-500 shadow-lg">
+                <span class="text-[10px] uppercase font-bold text-slate-400 tracking-widest" id="survival-wave-label">Хвиля</span>
+                <span id="survival-wave-number" class="text-4xl font-russo text-white drop-shadow-md">1</span>
+            </div>
+        </div>
+
         <div id="hitmarker" class="hidden absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20">
             <svg width="40" height="40" viewBox="0 0 40 40"><path d="M12,12 L28,28 M28,12 L12,28" stroke="white" stroke-width="3" stroke-linecap="round"/></svg>
         </div>
@@ -379,7 +423,7 @@
         <div class="absolute inset-0 p-6 flex flex-col justify-between z-30 pointer-events-none">
             <div class="flex justify-between items-start">
                 <button class="settings-btn pointer-events-auto glass-panel p-4 rounded-2xl text-slate-300 hover:text-white transition">⚙️</button>
-                <div id="buff-timer-container" class="hidden absolute top-6 left-1/2 -translate-x-1/2 glass-panel px-6 py-3 rounded-2xl border border-slate-600 flex items-center gap-4 pointer-events-none z-40">
+                <div id="buff-timer-container" class="hidden absolute top-6 left-1/2 -translate-x-1/2 glass-panel px-6 py-3 rounded-2xl border border-slate-600 flex items-center gap-4 pointer-events-none z-40" style="margin-top: 80px;"> <!-- Опущено щоб не перекривати хвилі -->
                     <div id="buff-timer-icon" class="text-3xl drop-shadow-md">🔥</div>
                     <div class="flex flex-col">
                         <span id="buff-timer-name" class="text-xs font-bold uppercase tracking-widest text-slate-300 mb-1">Ефект</span>
@@ -388,11 +432,11 @@
                         </div>
                     </div>
                 </div>
-                <div id="homing-target-ui" class="hidden absolute left-1/2 top-24 -translate-x-1/2 bg-emerald-900/80 border border-emerald-500 px-6 py-2 rounded-full text-emerald-400 font-bold text-xs tracking-widest uppercase shadow-[0_0_20px_rgba(16,185,129,0.4)]">
+                <div id="homing-target-ui" class="hidden absolute left-1/2 top-48 -translate-x-1/2 bg-emerald-900/80 border border-emerald-500 px-6 py-2 rounded-full text-emerald-400 font-bold text-xs tracking-widest uppercase shadow-[0_0_20px_rgba(16,185,129,0.4)]">
                     🎯 Захоплено (TAB)
                 </div>
-                <div class="glass-panel p-5 rounded-2xl border border-slate-700 w-64 text-right pointer-events-auto flex flex-col items-end">
-                    <h3 id="score-header" class="text-xs text-slate-400 mb-3 font-bold uppercase border-b border-slate-700 pb-2 w-full flex justify-between tracking-wider">
+                <div id="deathmatch-score-hud" class="glass-panel p-5 rounded-2xl border border-slate-700 w-64 text-right pointer-events-auto flex flex-col items-end hidden">
+                    <h3 class="text-xs text-slate-400 mb-3 font-bold uppercase border-b border-slate-700 pb-2 w-full flex justify-between tracking-wider">
                         <span>ЖЕТОНИ</span><span id="target-score-display" class="text-blue-400 font-russo">50</span>
                     </h3>
                     <div id="score-list" class="space-y-2 text-lg font-russo w-full pr-1"></div>
@@ -422,9 +466,11 @@
         <div id="countdown-overlay" class="hidden fixed inset-0 z-40 flex items-center justify-center bg-black/90 pointer-events-none backdrop-blur-md">
             <div id="countdown-text" class="text-[15rem] font-russo text-white drop-shadow-[0_0_50px_rgba(37,99,235,0.8)] scale-150 transition-transform">3</div>
         </div>
-        <div id="wave-overlay" class="hidden fixed inset-0 z-40 flex items-center justify-center pointer-events-none">
-            <div id="wave-text" class="text-8xl font-russo text-red-500 drop-shadow-[0_0_40px_rgba(220,38,38,1)] tracking-widest">ХВИЛЯ 1</div>
+        <div id="wave-overlay" class="hidden fixed inset-0 z-40 flex flex-col items-center justify-center pointer-events-none">
+            <div id="wave-title-text" class="text-8xl font-russo text-red-500 drop-shadow-[0_0_40px_rgba(220,38,38,1)] tracking-widest">ХВИЛЯ 1</div>
+            <div id="wave-subtitle-text" class="text-4xl font-russo text-white mt-4 drop-shadow-[0_0_15px_rgba(255,255,255,0.8)] tracking-widest hidden"></div>
         </div>
+
         <div id="winner-modal" class="modal hidden fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="glass-panel p-12 rounded-[3rem] max-w-xl w-full text-center border border-blue-500/50 shadow-[0_0_60px_rgba(37,99,235,0.3)] slide-up relative overflow-hidden">
                 <div id="winner-emoji" class="text-9xl mb-6 drop-shadow-2xl relative z-10">🏆</div>

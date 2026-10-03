@@ -32,7 +32,6 @@ if (mongoUri) {
 function saveUser(name) { if (dbUsersCol && dbUsers[name]) { dbUsersCol.updateOne({ name: name }, { $set: dbUsers[name] }, { upsert: true }); } }
 function hashPwd(pwd) { return crypto.createHash('sha256').update(pwd).digest('hex'); }
 
-// ВАШІ 4 МАПИ
 const MAP_DATA = { 
     'площя': {
         size: 750, bg: '#4b5062', grid: '#393c47',
@@ -57,6 +56,7 @@ const MAP_DATA = {
             {"type":"wall_square","x":1250,"y":2200,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":1300,"y":2200,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":1350,"y":2200,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":1400,"y":2200,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":1300,"y":2250,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":1250,"y":2250,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":1350,"y":2250,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":1450,"y":2250,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":1400,"y":2250,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":1200,"y":2250,"w":50,"h":50,"color":"#21252c"},
             {"type":"wall_square","x":550,"y":1400,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":550,"y":1450,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":550,"y":1500,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":550,"y":1550,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":500,"y":1400,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":500,"y":1350,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":500,"y":1450,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":500,"y":1500,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":500,"y":1550,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":500,"y":1600,"w":50,"h":50,"color":"#21252c"},
             {"type":"wall_square","x":2100,"y":1400,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":2100,"y":1450,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":2100,"y":1500,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":2100,"y":1550,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":2150,"y":1350,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":2150,"y":1400,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":2150,"y":1450,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":2150,"y":1500,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":2150,"y":1550,"w":50,"h":50,"color":"#21252c"}, {"type":"wall_square","x":2150,"y":1600,"w":50,"h":50,"color":"#21252c"},
+            {"type":"line","points":[{"x":136,"y":955},{"x":130,"y":956},{"x":124,"y":956},{"x":122,"y":956},{"x":120,"y":956},{"x":115,"y":956},{"x":112,"y":956},{"x":102,"y":956},{"x":99,"y":956},{"x":98,"y":957},{"x":98,"y":959},{"x":98,"y":960},{"x":98,"y":961},{"x":98,"y":964},{"x":98,"y":966},{"x":98,"y":967},{"x":98,"y":968},{"x":98,"y":971},{"x":98,"y":973},{"x":98,"y":974},{"x":98,"y":976},{"x":98,"y":976},{"x":98,"y":978},{"x":98,"y":980},{"x":98,"y":983},{"x":98,"y":984},{"x":98,"y":985},{"x":98,"y":987},{"x":98,"y":988},{"x":99,"y":992},{"x":99,"y":993},{"x":99,"y":995},{"x":99,"y":997},{"x":99,"y":998},{"x":99,"y":1000},{"x":99,"y":1000},{"x":99,"y":1001},{"x":99,"y":1002},{"x":99,"y":1004},{"x":99,"y":1005},{"x":101,"y":1007},{"x":101,"y":1009},{"x":101,"y":1011},{"x":101,"y":1012},{"x":101,"y":1014},{"x":102,"y":1015},{"x":102,"y":1016},{"x":102,"y":1018},{"x":102,"y":1019},{"x":102,"y":1021},{"x":102,"y":1022},{"x":102,"y":1024},{"x":102,"y":1025},{"x":102,"y":1026},{"x":102,"y":1028},{"x":102,"y":1029},{"x":102,"y":1031},{"x":102,"y":1032},{"x":99,"y":1032},{"x":95,"y":1032},{"x":89,"y":1032},{"x":83,"y":1031},{"x":81,"y":1029},{"x":80,"y":1029},{"x":76,"y":1029},{"x":75,"y":1029}],"color":"#21252c","width":16},
             {"type":"prop_crate","x":3000,"y":2950,"w":50,"h":50}, {"type":"prop_crate","x":2200,"y":1000,"w":100,"h":100}, {"type":"prop_crate","x":450,"y":1100,"w":100,"h":100}, {"type":"prop_crate","x":350,"y":1850,"w":250,"h":100}, {"type":"prop_crate","x":700,"y":2500,"w":300,"h":100}, {"type":"prop_crate","x":1800,"y":2200,"w":100,"h":100},
             {"type":"spawn_powerup","x":1600,"y":1700}, {"type":"spawn_powerup","x":1100,"y":1250}, {"type":"spawn_powerup","x":850,"y":2700}, {"type":"spawn_powerup","x":150,"y":2150}, {"type":"spawn_powerup","x":800,"y":1000}, {"type":"spawn_powerup","x":750,"y":2000}, {"type":"spawn_powerup","x":1950,"y":2000}, {"type":"spawn_powerup","x":1900,"y":1000},
             {"type":"spawn_player","x":250,"y":2750}, {"type":"spawn_player","x":2850,"y":2850}, {"type":"spawn_player","x":1500,"y":2750},
@@ -131,7 +131,6 @@ const Z_TYPES = { 'normal': { hp: 25, speed: 120, dmg: 10, radius: 15, color: '#
 
 const RARITY_PRICES = { 'common': 5, 'rare': 10, 'epic': 50, 'legendary': 250 };
 const ALL_MODULES = ['can_c1','can_c2','can_c3','can_r1','can_r2','can_r3','can_e1','can_e2','can_e3','can_l1','can_l2','can_l3', 'tur_c1','tur_c2','tur_c3','tur_r1','tur_r2','tur_r3','tur_e1','tur_e2','tur_e3','tur_l1','tur_l2','tur_l3', 'hul_c1','hul_c2','hul_c3','hul_r1','hul_r2','hul_r3','hul_e1','hul_e2','hul_e3','hul_l1','hul_l2','hul_l3', 'trk_c1','trk_c2','trk_c3','trk_r1','trk_r2','trk_r3','trk_e1','trk_e2','trk_e3','trk_l1','trk_l2','trk_l3'];
-
 const MODULES = {
     'can_c1': { id: 'can_c1', type: 'cannon', rarity: 'common', name: 'Вкорочене', stats: { dmg: 1.01, range: 0.90, cd: 1.00 } }, 'can_c2': { id: 'can_c2', type: 'cannon', rarity: 'common', name: 'Труба', stats: { dmg: 1.00, range: 1.05, cd: 0.99 } }, 'can_c3': { id: 'can_c3', type: 'cannon', rarity: 'common', name: 'Самопал', stats: { dmg: 1.02, range: 1.00, cd: 0.98 } },
     'can_r1': { id: 'can_r1', type: 'cannon', rarity: 'rare', name: 'Снайпер', stats: { dmg: 1.05, range: 1.15, cd: 1.00 } }, 'can_r2': { id: 'can_r2', type: 'cannon', rarity: 'rare', name: 'Штурмове', stats: { dmg: 1.02, range: 1.00, cd: 0.90 } }, 'can_r3': { id: 'can_r3', type: 'cannon', rarity: 'rare', name: 'Важке', stats: { dmg: 1.12, range: 0.95, cd: 1.05 } },
@@ -388,13 +387,61 @@ setInterval(() => {
                 io.to(roomId).emit('gameOver', { winner: 'ZOMBIES', wave: room.wave }); io.emit('roomsList', getActiveRooms()); continue;
             }
             if (Object.keys(room.zombies).length === 0) {
-                if (room.survivalState === 'playing') { room.survivalState = 'waiting'; room.nextWaveTime = now + 5000; } 
+                if (room.survivalState === 'playing') { 
+                    room.survivalState = 'waiting'; 
+                    room.nextWaveTime = now + 5000; 
+                    
+                    // Попередження про боса за 5 секунд
+                    let nextWave = room.wave + 1;
+                    if (nextWave === 10 || nextWave === 20 || nextWave === 30 || nextWave === 40) {
+                        io.to(roomId).emit('bossWarning');
+                    }
+                } 
                 else if (room.survivalState === 'waiting' && now > room.nextWaveTime) {
-                    room.wave++; let isBossWave = (room.wave === 25 || room.wave === 50 || room.wave === 75 || room.wave === 100);
-                    if (isBossWave) { let bType = room.wave === 25 ? 'pikus' : room.wave === 50 ? 'shurik' : room.wave === 75 ? 'oneshot' : 'padlo'; let zid = `boss_${now}`; let zSpawn = getValidSpawn(room.map, 50, 'spawn_zombie'); room.zombies[zid] = { id: zid, x: zSpawn.x, y: zSpawn.y, type: bType, hp: Z_TYPES[bType].hp, nextAttack: 0 }; } 
-                    else { let spawnCount = Math.min(125, 10 + (room.wave - 1) * 5); let isTenth = (room.wave % 10 === 0); let typesList = ['normal', 'runner', 'spitter', 'tanker', 'bomber', 'ghost']; let maxIdx = Math.min(typesList.length - 1, Math.floor(room.wave / 3)); for(let i=0; i<spawnCount; i++) { let type = 'normal'; if (isTenth && i >= spawnCount/2) type = typesList[Math.floor(Math.random()*maxIdx) + 1]; else if (i === 0 && room.wave > 1) type = typesList[Math.min(typesList.length-1, Math.floor(room.wave/4))]; else type = typesList[Math.floor(Math.random() * (maxIdx + 1))]; if (type === 'boss') type = 'tanker'; let zSpawn = getValidEdgeSpawn(room.map, 20, 'spawn_zombie'); let zid = `z_${now}_${i}`; room.zombies[zid] = { id: zid, x: zSpawn.x, y: zSpawn.y, type: type, hp: Z_TYPES[type].hp, nextAttack: 0 }; } }
-                    room.survivalState = 'playing'; io.to(roomId).emit('newWave', { wave: room.wave });
-                } else if (room.survivalState === 'spawning') { room.survivalState = 'waiting'; room.nextWaveTime = now + 1000; }
+                    room.wave++; 
+                    let isBossWave = (room.wave === 10 || room.wave === 20 || room.wave === 30 || room.wave === 40);
+                    
+                    if (isBossWave) { 
+                        let bType = room.wave === 10 ? 'pikus' : room.wave === 20 ? 'shurik' : room.wave === 30 ? 'oneshot' : 'padlo'; 
+                        let zid = `boss_${now}`; 
+                        let zSpawn = getValidSpawn(room.map, 50, 'spawn_zombie'); 
+                        room.zombies[zid] = { id: zid, x: zSpawn.x, y: zSpawn.y, type: bType, hp: Z_TYPES[bType].hp, nextAttack: 0 }; 
+                        
+                        io.to(roomId).emit('newWave', { wave: room.wave, isBoss: true, bossName: Z_TYPES[bType].name });
+                    } 
+                    else { 
+                        // НОВИЙ БАЛАНС (старт з 20, потім +5)
+                        let MathCount = 20 + (room.wave - 1) * 5;
+                        let spawnCount = Math.min(150, MathCount); 
+                        
+                        // НОВІ ЗОМБІ КОЖНІ 5 ХВИЛЬ
+                        let typesList = ['normal', 'runner', 'spitter', 'tanker', 'bomber', 'ghost']; 
+                        let maxIdx = Math.min(typesList.length - 1, Math.floor(room.wave / 5));
+                        let availableTypes = typesList.slice(0, maxIdx + 1);
+
+                        for(let i=0; i<spawnCount; i++) { 
+                            let type = 'normal'; 
+                            let roll = Math.random();
+                            
+                            // 60% шанс на найкрутіших монстрів, якщо вони відкриті
+                            if (roll < 0.6 && availableTypes.length > 1) {
+                                type = availableTypes[availableTypes.length - 1]; 
+                            } else if (roll < 0.8 && availableTypes.length > 2) {
+                                type = availableTypes[availableTypes.length - 2];
+                            } else {
+                                type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+                            }
+
+                            let zSpawn = getValidEdgeSpawn(room.map, 20, 'spawn_zombie'); 
+                            let zid = `z_${now}_${i}`; 
+                            room.zombies[zid] = { id: zid, x: zSpawn.x, y: zSpawn.y, type: type, hp: Z_TYPES[type].hp, nextAttack: 0 }; 
+                        } 
+                        io.to(roomId).emit('newWave', { wave: room.wave, isBoss: false });
+                    }
+                    room.survivalState = 'playing'; 
+                } else if (room.survivalState === 'spawning') { 
+                    room.survivalState = 'waiting'; room.nextWaveTime = now + 1000; 
+                }
             } else if (room.survivalState === 'playing') {
                 for (let zid in room.zombies) {
                     let z = room.zombies[zid]; let target = null; let minDist = Infinity; alivePlayers.forEach(p => { let dist = Math.hypot(p.x - z.x, p.y - z.y); if (p.buff === 'invisible') dist *= 3; if (dist < minDist) { minDist = dist; target = p; } });
