@@ -1,3 +1,5 @@
+let myAdventClaims = [];
+
 socket.on('initMusic', (data) => { myMusicPlaylists = data; });
 
 socket.on('authSuccess', (data) => { 
@@ -47,6 +49,11 @@ socket.on('gameStarting', (roomData) => {
     myLocalTank.x = pData.x; myLocalTank.y = pData.y; myLocalTank.hp = pData.hp; camera.x = pData.x; camera.y = pData.y;
     homingTargetId = null; document.getElementById('damage-vignette').style.opacity = 0; spectatingId = null; 
     pendingDrop = null; document.getElementById('drop-notification').classList.add('hidden'); 
+    
+    // Скидання UI виживання при старті
+    isBossIncoming = false;
+    document.getElementById('survival-warning').classList.add('hidden');
+    
     if (currentRoomData.mode === 'survival') switchMusicState('survive'); else switchMusicState('dezmatch');
     if (typeof doCountdown === 'function') doCountdown();
 });
@@ -93,7 +100,38 @@ socket.on('playerRespawn', (data) => { if(data.id === myId) { myLocalTank.x = da
 socket.on('tokenCollected', (data) => { playSound('token'); });
 socket.on('bomberExplode', (data) => { if (typeof createExplosion === 'function') createExplosion(data.x, data.y, 40, '#dc2626'); if(Math.hypot(data.x - myLocalTank.x, data.y - myLocalTank.y) < 120) emitDamage(50, 'bomber'); });
 socket.on('zombieMeleeHit', (data) => { if (data.targetId === myId && myLocalTank.hp > 0) emitDamage(data.dmg, 'zombie'); });
-socket.on('newWave', (data) => { document.getElementById('wave-overlay').classList.remove('hidden'); document.getElementById('wave-text').innerText = `ХВИЛЯ ${data.wave}`; setTimeout(()=> document.getElementById('wave-overlay').classList.add('hidden'), 3000); });
+
+// --- ЛОГІКА ХВИЛЬ ТА БОСІВ ---
+socket.on('bossWarning', () => {
+    isBossIncoming = true;
+    document.getElementById('survival-warning').classList.remove('hidden');
+});
+
+socket.on('newWave', (data) => { 
+    if(currentRoomData) currentRoomData.wave = data.wave;
+    
+    isBossIncoming = false;
+    document.getElementById('survival-warning').classList.add('hidden');
+    
+    const overlay = document.getElementById('wave-overlay');
+    const title = document.getElementById('wave-title-text');
+    const subTitle = document.getElementById('wave-subtitle-text');
+    
+    overlay.classList.remove('hidden');
+    
+    if (data.isBoss) {
+        title.innerText = `БОС ${data.bossName}`;
+        title.className = "text-8xl font-russo text-red-600 drop-shadow-[0_0_50px_rgba(220,38,38,1)] tracking-widest";
+        subTitle.innerText = `Хвиля ${data.wave}`;
+        subTitle.classList.remove('hidden');
+    } else {
+        title.innerText = `ХВИЛЯ ${data.wave}`;
+        title.className = "text-8xl font-russo text-red-500 drop-shadow-[0_0_40px_rgba(220,38,38,1)] tracking-widest";
+        subTitle.classList.add('hidden');
+    }
+    
+    setTimeout(()=> overlay.classList.add('hidden'), 3500); 
+});
 
 socket.on('gameOver', (data) => {
     if(currentRoomData) currentRoomData.status = 'finished'; 

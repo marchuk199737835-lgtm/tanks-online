@@ -131,6 +131,7 @@ const Z_TYPES = { 'normal': { hp: 25, speed: 120, dmg: 10, radius: 15, color: '#
 
 const RARITY_PRICES = { 'common': 5, 'rare': 10, 'epic': 50, 'legendary': 250 };
 const ALL_MODULES = ['can_c1','can_c2','can_c3','can_r1','can_r2','can_r3','can_e1','can_e2','can_e3','can_l1','can_l2','can_l3', 'tur_c1','tur_c2','tur_c3','tur_r1','tur_r2','tur_r3','tur_e1','tur_e2','tur_e3','tur_l1','tur_l2','tur_l3', 'hul_c1','hul_c2','hul_c3','hul_r1','hul_r2','hul_r3','hul_e1','hul_e2','hul_e3','hul_l1','hul_l2','hul_l3', 'trk_c1','trk_c2','trk_c3','trk_r1','trk_r2','trk_r3','trk_e1','trk_e2','trk_e3','trk_l1','trk_l2','trk_l3'];
+
 const MODULES = {
     'can_c1': { id: 'can_c1', type: 'cannon', rarity: 'common', name: 'Вкорочене', stats: { dmg: 1.01, range: 0.90, cd: 1.00 } }, 'can_c2': { id: 'can_c2', type: 'cannon', rarity: 'common', name: 'Труба', stats: { dmg: 1.00, range: 1.05, cd: 0.99 } }, 'can_c3': { id: 'can_c3', type: 'cannon', rarity: 'common', name: 'Самопал', stats: { dmg: 1.02, range: 1.00, cd: 0.98 } },
     'can_r1': { id: 'can_r1', type: 'cannon', rarity: 'rare', name: 'Снайпер', stats: { dmg: 1.05, range: 1.15, cd: 1.00 } }, 'can_r2': { id: 'can_r2', type: 'cannon', rarity: 'rare', name: 'Штурмове', stats: { dmg: 1.02, range: 1.00, cd: 0.90 } }, 'can_r3': { id: 'can_r3', type: 'cannon', rarity: 'rare', name: 'Важке', stats: { dmg: 1.12, range: 0.95, cd: 1.05 } },
@@ -386,12 +387,12 @@ setInterval(() => {
                 Object.values(room.players).forEach(p => { let name = p.name; if(dbUsers[name]) { let reward = room.wave; dbUsers[name].bucks += reward; dbUsers[name].stats.earned += reward; dbUsers[name].stats.matches++; let dropped = rollDrop(name); saveUser(name); io.to(p.id).emit('economyUpdate', { bucks: dbUsers[name].bucks, inventory: dbUsers[name].inventory, equipped: dbUsers[name].equipped, stats: dbUsers[name].stats, adventClaims: dbUsers[name].adventClaims }); if(dropped) io.to(p.id).emit('dropReceived', dropped); } });
                 io.to(roomId).emit('gameOver', { winner: 'ZOMBIES', wave: room.wave }); io.emit('roomsList', getActiveRooms()); continue;
             }
+            
             if (Object.keys(room.zombies).length === 0) {
                 if (room.survivalState === 'playing') { 
                     room.survivalState = 'waiting'; 
                     room.nextWaveTime = now + 5000; 
                     
-                    // Попередження про боса за 5 секунд
                     let nextWave = room.wave + 1;
                     if (nextWave === 10 || nextWave === 20 || nextWave === 30 || nextWave === 40) {
                         io.to(roomId).emit('bossWarning');
@@ -410,11 +411,9 @@ setInterval(() => {
                         io.to(roomId).emit('newWave', { wave: room.wave, isBoss: true, bossName: Z_TYPES[bType].name });
                     } 
                     else { 
-                        // НОВИЙ БАЛАНС (старт з 20, потім +5)
                         let MathCount = 20 + (room.wave - 1) * 5;
-                        let spawnCount = Math.min(150, MathCount); 
+                        let spawnCount = Math.min(200, MathCount); 
                         
-                        // НОВІ ЗОМБІ КОЖНІ 5 ХВИЛЬ
                         let typesList = ['normal', 'runner', 'spitter', 'tanker', 'bomber', 'ghost']; 
                         let maxIdx = Math.min(typesList.length - 1, Math.floor(room.wave / 5));
                         let availableTypes = typesList.slice(0, maxIdx + 1);
@@ -423,7 +422,6 @@ setInterval(() => {
                             let type = 'normal'; 
                             let roll = Math.random();
                             
-                            // 60% шанс на найкрутіших монстрів, якщо вони відкриті
                             if (roll < 0.6 && availableTypes.length > 1) {
                                 type = availableTypes[availableTypes.length - 1]; 
                             } else if (roll < 0.8 && availableTypes.length > 2) {

@@ -1,6 +1,7 @@
 const canvas = document.getElementById('game-canvas'); const ctx = canvas.getContext('2d'); window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }); canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
 let spectatingId = null; // Змінна для режиму спостерігача
+let isBossIncoming = false; // Для підсвічування лічильника
 
 function createExplosion(x, y, count, color) { for(let i=0; i<count; i++){ const ang = Math.random() * Math.PI * 2; const spd = Math.random() * 200 + 50; particles.push({ x, y, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd, life: Math.random() * 0.4 + 0.1, color }); } }
 
@@ -286,10 +287,10 @@ function draw(now) {
     if (myLocalTank.hp <= 0 && spectatingId && opponents[spectatingId]) {
         let specName = currentRoomData.players[spectatingId] ? currentRoomData.players[spectatingId].name : 'ГРАВЕЦЬ';
         ctx.fillStyle = '#fff'; ctx.font = '24px Russo One'; ctx.textAlign = 'center'; ctx.shadowColor = '#000'; ctx.shadowBlur = 10;
-        ctx.fillText(`СПОСТЕРІГАННЯ: ${specName}`, canvas.width/2, 100);
+        ctx.fillText(`СПОСТЕРІГАННЯ: ${specName}`, canvas.width/2, 120);
         if (currentRoomData.mode === 'survival') {
             ctx.font = '14px Jura'; ctx.fillStyle = '#94a3b8';
-            ctx.fillText(`[A] Попередній  |  Наступний [D]`, canvas.width/2, 130);
+            ctx.fillText(`[A] Попередній  |  Наступний [D]`, canvas.width/2, 150);
         }
         ctx.shadowBlur = 0;
     }
@@ -307,9 +308,40 @@ function updateHUD() {
     document.getElementById('hp-bar').style.width = Math.max(0, (myLocalTank.hp/myMaxHp)*100) + '%'; document.getElementById('hp-text').innerText = `${Math.ceil(myLocalTank.hp)}/${myMaxHp}`;
     let vignetteOpacity = 0; if (myLocalTank.hp < myMaxHp) vignetteOpacity = (1 - (myLocalTank.hp / myMaxHp)) * 0.85; document.getElementById('damage-vignette').style.opacity = vignetteOpacity;
     if(myLocalTank.hp < myMaxHp * 0.3) document.getElementById('hp-bar').className = 'h-full bg-gradient-to-r from-red-600 to-red-400 w-full transition-all duration-300 shadow-[0_0_15px_rgba(239,68,68,0.8)]'; else document.getElementById('hp-bar').className = 'h-full bg-gradient-to-r from-green-500 to-emerald-400 w-full transition-all duration-300 shadow-[0_0_10px_rgba(34,197,94,0.5)]';
+    
     const targetUI = document.getElementById('homing-target-ui'); if (myLocalTank.buff === 'homing') targetUI.classList.remove('hidden'); else targetUI.classList.add('hidden');
-    const slist = document.getElementById('score-list'); slist.innerHTML = ''; if (currentRoomData.mode === 'survival') { document.getElementById('target-score-display').innerText = currentRoomData.wave; }
-    Object.values(currentRoomData.players).sort((a,b) => b.score - a.score).forEach(p => { slist.innerHTML += `<div class="flex justify-between w-full ${p.id===myId?'text-blue-400':'text-slate-300'} border-b border-slate-700/50 pb-1 ${p.hp<=0?'opacity-30 line-through':''}"><span>${p.name}</span><span class="font-bold">${currentRoomData.mode === 'survival' ? Math.ceil(p.hp) : p.score}</span></div>`; });
+    
+    // Перемикання інтерфейсу залежно від режиму гри
+    const dmHud = document.getElementById('deathmatch-score-hud');
+    const survHud = document.getElementById('survival-hud');
+    const slist = document.getElementById('score-list'); 
+
+    if (currentRoomData.mode === 'survival') {
+        dmHud.classList.add('hidden');
+        survHud.classList.remove('hidden');
+        
+        const wvNum = document.getElementById('survival-wave-number');
+        const wvBox = document.getElementById('survival-wave-box');
+        
+        wvNum.innerText = currentRoomData.wave;
+        
+        // Підсвічування лічильника коли скоро бос
+        if (isBossIncoming) {
+            wvBox.className = "glass-panel px-10 py-2 rounded-2xl border flex flex-col items-center transition-colors duration-300 border-red-500 bg-red-900/40 shadow-[0_0_20px_rgba(239,68,68,0.5)]";
+            wvNum.className = "text-4xl font-russo drop-shadow-md text-red-500";
+        } else {
+            wvBox.className = "glass-panel px-10 py-2 rounded-2xl border border-slate-600 flex flex-col items-center transition-colors duration-500 shadow-lg";
+            wvNum.className = "text-4xl font-russo text-white drop-shadow-md";
+        }
+
+    } else {
+        dmHud.classList.remove('hidden');
+        survHud.classList.add('hidden');
+        slist.innerHTML = '';
+        Object.values(currentRoomData.players).sort((a,b) => b.score - a.score).forEach(p => { 
+            slist.innerHTML += `<div class="flex justify-between w-full ${p.id===myId?'text-blue-400':'text-slate-300'} border-b border-slate-700/50 pb-1 ${p.hp<=0?'opacity-30 line-through':''}"><span>${p.name}</span><span class="font-bold">${p.score}</span></div>`; 
+        });
+    }
 }
 
 function startGameLoop() { if(gameLoopId) cancelAnimationFrame(gameLoopId); lastTime = performance.now(); requestAnimationFrame(gameLoop); }

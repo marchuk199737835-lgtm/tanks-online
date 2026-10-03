@@ -90,6 +90,7 @@ setInterval(() => {
     } else if (timerEl) { timerEl.innerText = "ХЕЛОУІН НАСТАВ!"; }
 }, 1000);
 
+// --- ІНФО КЕЙСІВ ---
 window.openCaseInfo = function(caseId) {
     if (typeof playSound === 'function') playSound('ui_click');
     const modal = document.getElementById('case-info-modal'); const grid = document.getElementById('case-info-grid'); const title = document.getElementById('case-info-title');
@@ -179,7 +180,7 @@ function renderHangar() {
             if(m.stats.dmg) totalDmg *= m.stats.dmg; if(m.stats.range) totalRange *= m.stats.range; if(m.stats.cd) totalCd *= m.stats.cd;
             if(m.stats.hp) totalHp *= m.stats.hp; if(m.stats.speed) totalSpeed *= m.stats.speed; if(m.stats.rotSpeed) totalRot *= m.stats.rotSpeed;
             let iconSvg = SVG_ICONS[t.k](RARITY[m.rarity].color);
-            eqHtml.push(`<div class="flex items-center gap-3 bg-slate-800/50 p-2 rounded-xl border border-slate-700 cursor-pointer hover:bg-slate-700/50 transition" draggable="true" ondragstart="dragStartEq(event, '${modId}', '${t.k}')" ondragover="allowDrop(event)" ondrop="dropEq(event, '${t.k}')" onclick="openCtxMenu(event, '${modId}', 'eq', '${t.k}')"><div class="w-10 h-10 p-2 flex items-center justify-center rounded-lg bg-slate-900 border" style="border-color:${RARITY[m.rarity].color}">${iconSvg}</div><div><p class="text-xs text-white font-bold">${m.name}</p><p class="text-[9px] uppercase font-bold" style="color:${RARITY[m.rarity].color}">${CAT_NAMES[t.k]} | ${RARITY[m.rarity].name}</p></div></div>`);
+            eqHtml.push(`<div class="flex items-center gap-3 bg-slate-800/50 p-2 rounded-xl border border-slate-700 cursor-pointer hover:bg-slate-700/50 transition relative overflow-hidden group" draggable="true" ondragstart="dragStartEq(event, '${modId}', '${t.k}')" ondragover="allowDrop(event)" ondrop="dropEq(event, '${t.k}')" onclick="openCtxMenu(event, '${modId}', 'eq', '${t.k}')"><div class="absolute -right-2 -bottom-2 text-3xl opacity-0 group-hover:opacity-10 transition pointer-events-none">🕸️</div><div class="w-10 h-10 p-2 flex items-center justify-center rounded-lg bg-slate-900 border z-10" style="border-color:${RARITY[m.rarity].color}">${iconSvg}</div><div class="z-10"><p class="text-xs text-white font-bold">${m.name}</p><p class="text-[9px] uppercase font-bold" style="color:${RARITY[m.rarity].color}">${CAT_NAMES[t.k]} | ${RARITY[m.rarity].name}</p></div></div>`);
         } else {
             eqHtml.push(`<div class="flex items-center gap-3 bg-slate-900/50 p-2 rounded-xl border border-slate-800 opacity-50" ondragover="allowDrop(event)" ondrop="dropEq(event, '${t.k}')"><div class="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-900 border border-slate-700">❌</div><div><p class="text-xs text-slate-500 font-bold">Стандарт</p><p class="text-[9px] uppercase font-bold text-slate-600">${t.n}</p></div></div>`);
         }
@@ -197,10 +198,32 @@ function renderHangar() {
         if (i < myInventory.length) {
             let modId = myInventory[i]; let mod = MODULES[modId]; if(!mod) continue;
             let iconSvg = SVG_ICONS[mod.type](RARITY[mod.rarity].color);
-            invGrid.innerHTML += `<div class="inv-slot item-${mod.rarity} p-2 cursor-grab active:cursor-grabbing" onclick="openCtxMenu(event, '${modId}', 'inv')" draggable="true" ondragstart="dragStartInv(event, '${modId}', ${i})" ondragover="allowDrop(event)" ondrop="dropInv(event, ${i})" title="${mod.name}">${iconSvg}</div>`;
+            invGrid.innerHTML += `<div class="inv-slot item-${mod.rarity} p-2 cursor-grab active:cursor-grabbing hover:scale-105 transition" onclick="openCtxMenu(event, '${modId}', 'inv')" draggable="true" ondragstart="dragStartInv(event, '${modId}', ${i})" ondragover="allowDrop(event)" ondrop="dropInv(event, ${i})" title="${mod.name}">${iconSvg}</div>`;
         } else {
-            invGrid.innerHTML += `<div class="inv-slot empty" ondragover="allowDrop(event)" ondrop="dropInv(event, ${i})"></div>`;
+            invGrid.innerHTML += `<div class="inv-slot empty border border-dashed border-slate-700 bg-slate-900/30 rounded-lg" ondragover="allowDrop(event)" ondrop="dropInv(event, ${i})"></div>`;
         }
+    }
+}
+
+// Анімація павучків при відкритті контекстного меню
+function spawnSpiders(x, y) {
+    for (let i = 0; i < 5; i++) {
+        let spider = document.createElement('div');
+        spider.innerText = '🕷️';
+        spider.className = 'scatter-spider';
+        spider.style.left = x + 'px';
+        spider.style.top = y + 'px';
+        document.body.appendChild(spider);
+        
+        let angle = Math.random() * Math.PI * 2;
+        let dist = 100 + Math.random() * 150;
+        
+        setTimeout(() => {
+            spider.style.transform = `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist}px) rotate(${Math.random() * 360}deg)`;
+            spider.style.opacity = '0';
+        }, 10);
+        
+        setTimeout(() => spider.remove(), 700);
     }
 }
 
@@ -209,6 +232,9 @@ window.openCtxMenu = function(e, modId, mode = 'inv', slot = null) {
     e.preventDefault(); if (typeof playSound === 'function') playSound('ui_click');
     selectedInvItem = modId; contextMode = mode; selectedEqSlot = slot;
     
+    // Спавн павучків
+    spawnSpiders(e.clientX, e.clientY);
+
     let mod = MODULES[modId]; document.getElementById('ctx-name').innerText = mod.name; document.getElementById('ctx-name').style.color = RARITY[mod.rarity].color;
     document.getElementById('ctx-cat').innerText = `${CAT_NAMES[mod.type]} | ${RARITY[mod.rarity].name}`; document.getElementById('ctx-cat').style.color = RARITY[mod.rarity].color;
     
@@ -321,18 +347,18 @@ function updateLobbyUI() {
         const p = currentRoomData.players[id]; if (p.color) takenColors.add(p.color); if (id === myId) { myColor = p.color; isReady = p.ready; }
         const colorHex = p.color ? (p.color==='white'?'#f8fafc':p.color==='black'?'#1e293b':p.color==='red'?'#ef4444':p.color==='blue'?'#3b82f6':p.color==='brown'?'#78350f':'#9333ea') : '#475569';
         const isLeader = (id === currentRoomData.hostSocket) ? '👑' : '';
-        list.innerHTML += `<div class="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 mb-2"><div class="flex items-center gap-3"><div class="w-6 h-6 rounded-lg border border-slate-500 shadow-inner" style="background-color: ${colorHex}"></div><span class="font-bold text-white tracking-widest uppercase">${p.name} ${isLeader}</span></div><span class="text-xs font-bold px-3 py-1.5 rounded border ${p.ready ? 'bg-emerald-900/30 text-emerald-400 border-emerald-500/30' : 'bg-slate-800 text-slate-500 border-slate-700'}">${p.ready ? 'ГОТОВИЙ' : 'ЧЕКАЄ'}</span></div>`;
+        list.innerHTML += `<div class="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 mb-2 transition transform hover:scale-[1.02]"><div class="flex items-center gap-3"><div class="w-6 h-6 rounded-lg border border-slate-500 shadow-inner" style="background-color: ${colorHex}"></div><span class="font-bold text-white tracking-widest uppercase">${p.name} ${isLeader}</span></div><span class="text-xs font-bold px-3 py-1.5 rounded border ${p.ready ? 'bg-emerald-900/30 text-emerald-400 border-emerald-500/30' : 'bg-slate-800 text-slate-500 border-slate-700'}">${p.ready ? 'ГОТОВИЙ' : 'ЧЕКАЄ'}</span></div>`;
     }
     
     document.querySelectorAll('.color-btn').forEach(btn => { const c = btn.dataset.color; btn.classList.toggle('selected', c === myColor); btn.disabled = takenColors.has(c) && c !== myColor; });
 
     const btn = document.getElementById('btn-ready'); const allReady = pKeys.every(id => currentRoomData.players[id].ready);
-    if (!myColor) { btn.innerText = "ОБЕРІТЬ КАМУФЛЯЖ"; btn.disabled = true; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-slate-800 text-slate-500 transition shadow-inner border border-slate-700"; } else {
+    if (!myColor) { btn.innerText = "ОБЕРІТЬ КАМУФЛЯЖ"; btn.disabled = true; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-slate-800 text-slate-500 transition shadow-inner border border-slate-700 relative z-10"; } else {
         btn.disabled = false;
         if (myId === currentRoomData.hostSocket) {
-            if (isReady) { if (pKeys.length >= 2 && allReady) { btn.innerText = "🚀 ЗАПУСК СЕСІЇ"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white transition shadow-[0_0_30px_rgba(37,99,235,0.6)]"; } else { btn.innerText = "ГОТОВИЙ (ЧЕКАЄМО...)"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-emerald-600 text-white transition shadow-[0_0_20px_rgba(16,185,129,0.4)]"; } } else { btn.innerText = "ПІДТВЕРДИТИ"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-slate-700 hover:bg-slate-600 text-white transition border border-slate-500"; }
+            if (isReady) { if (pKeys.length >= 2 && allReady) { btn.innerText = "🚀 ЗАПУСК СЕСІЇ"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white transition shadow-[0_0_30px_rgba(37,99,235,0.6)] relative z-10"; } else { btn.innerText = "ГОТОВИЙ (ЧЕКАЄМО...)"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-emerald-600 text-white transition shadow-[0_0_20px_rgba(16,185,129,0.4)] relative z-10"; } } else { btn.innerText = "ПІДТВЕРДИТИ"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-slate-700 hover:bg-slate-600 text-white transition border border-slate-500 relative z-10"; }
         } else {
-            if (isReady) { btn.innerText = "ВІДМІНИТИ"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-[0_0_20px_rgba(16,185,129,0.4)]"; } else { btn.innerText = "ПІДТВЕРДИТИ"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white transition shadow-[0_0_20px_rgba(37,99,235,0.4)]"; }
+            if (isReady) { btn.innerText = "ВІДМІНИТИ"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-[0_0_20px_rgba(16,185,129,0.4)] relative z-10"; } else { btn.innerText = "ПІДТВЕРДИТИ"; btn.className = "w-full py-6 rounded-2xl font-russo text-2xl uppercase tracking-widest bg-blue-600 hover:bg-blue-500 text-white transition shadow-[0_0_20px_rgba(37,99,235,0.4)] relative z-10"; }
         }
     }
 }
