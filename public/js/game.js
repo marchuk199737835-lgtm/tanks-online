@@ -1,35 +1,48 @@
 const canvas = document.getElementById('game-canvas'); const ctx = canvas.getContext('2d'); window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }); canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 
+let spectatingId = null;
+
 function createExplosion(x, y, count, color) { for(let i=0; i<count; i++){ const ang = Math.random() * Math.PI * 2; const spd = Math.random() * 200 + 50; particles.push({ x, y, vx: Math.cos(ang)*spd, vy: Math.sin(ang)*spd, life: Math.random() * 0.4 + 0.1, color }); } }
 
-function checkCollision(x, y, r, checkSolids = true) { 
+function checkCollision(x, y, r, checkSolids = true, isBullet = false) { 
     if (!currentRoomData) return true; let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'площя'; let mSize = MAP_DATA[cMap].size; 
     if (x - r < 0 || x + r > mSize || y - r < 0 || y + r > mSize) return true; 
     if (checkSolids) { 
         const solids = MAP_DATA[cMap].solids; 
         for (let s of solids) { 
-            // ІГНОРУЄМО ПІДЛОГУ (ВОДУ, ЛІНІЇ, ФІГУРИ, СПАВНИ, КАЛЮЖІ, ВОРОНКИ)
-            if(s.type.includes('spawn') || s.type.includes('water') || s.type.includes('shape') || s.type === 'line' || s.type === 'prop_puddle' || s.type === 'prop_crater') continue;
-            
-            if(s.type === 'tree' || s.type === 'neon_circle' || s.type === 'neon_pillar') { 
-                let cx = s.x + (s.w ? s.w/2 : 0);
-                let cy = s.y + (s.h ? s.h/2 : 0);
-                let sr = s.r || (s.w ? s.w/2 : 30);
-                if(Math.hypot(x - cx, y - cy) <= r + sr) return true; 
-            } 
-            else { 
-                let testX = Math.max(s.x, Math.min(x, s.x+(s.w||30))), testY = Math.max(s.y, Math.min(y, s.y+(s.h||30))); 
-                if(Math.hypot(x-testX, y-testY) <= r) return true; 
-            } 
+            if(s.type.includes('spawn') || s.type === 'line' || s.type === 'prop_puddle' || s.type === 'prop_crater') continue;
+            // ВОДА пропускає СНАРЯДИ, але блокує танки!
+            if(s.type.includes('water') && isBullet) continue;
+
+            if(s.type === 'tree' || s.type === 'neon_circle' || s.type === 'neon_pillar') { if(Math.hypot(x-(s.x+(s.w||0)/2), y-(s.y+(s.h||0)/2)) <= r+(s.r||s.w/2||30)) return true; } 
+            else { let testX = Math.max(s.x, Math.min(x, s.x+(s.w||30))), testY = Math.max(s.y, Math.min(y, s.y+(s.h||30))); if(Math.hypot(x-testX, y-testY) <= r) return true; } 
         } 
     } return false; 
+}
+
+function findNextSpectateTarget(dir) {
+    if (!currentRoomData) return;
+    let aliveOps = Object.keys(currentRoomData.players).filter(id => currentRoomData.players[id].hp > 0 && id !== myId);
+    if (aliveOps.length === 0) { spectatingId = null; return; }
+    if (!spectatingId || !aliveOps.includes(spectatingId)) { spectatingId = aliveOps[0]; } 
+    else {
+        let idx = aliveOps.indexOf(spectatingId);
+        idx = (idx + dir + aliveOps.length) % aliveOps.length;
+        spectatingId = aliveOps[idx];
+    }
 }
 
 function updatePhysics(now, dt) {
     if (!currentRoomData || !currentRoomId) return;
     let myRadius = myLocalTank.buff === 'boss' ? 75 : 30;
     
-    if (myLocalTank.hp > 0) {
+    // SPECTATOR КАМЕРА АБО РУХ ТАНКА
+    if (myLocalTank.hp <= 0) {
+        if (spectatingId && opponents[spectatingId]) {
+            camera.x += (opponents[spectatingId].x - camera.x) * 5 * dt;
+            camera.y += (opponents[spectatingId].y - camera.y) * 5 * dt;
+        }
+    } else {
         let moveX = 0, moveY = 0; let totalSpeed = 1.0;
         if(myEquipped.hull && MODULES[myEquipped.hull]) totalSpeed *= MODULES[myEquipped.hull].stats.speed || 1;
         if(myEquipped.tracks && MODULES[myEquipped.tracks]) totalSpeed *= MODULES[myEquipped.tracks].stats.speed || 1;
@@ -41,8 +54,8 @@ function updatePhysics(now, dt) {
             let len = Math.hypot(moveX, moveY); moveX /= len; moveY /= len; myLocalTank.bodyAngle = Math.atan2(moveY, moveX); 
             let nextX = myLocalTank.x + moveX * speed * dt, nextY = myLocalTank.y + moveY * speed * dt; 
             let isBoss = (myLocalTank.buff === 'boss');
-            if (!checkCollision(nextX, myLocalTank.y, myRadius) || isBoss) myLocalTank.x = nextX; 
-            if (!checkCollision(myLocalTank.x, nextY, myRadius) || isBoss) myLocalTank.y = nextY; 
+            if (!checkCollision(nextX, myLocalTank.y, myRadius, true, false) || isBoss) myLocalTank.x = nextX; 
+            if (!checkCollision(myLocalTank.x, nextY, myRadius, true, false) || isBoss) myLocalTank.y = nextY; 
         }
 
         let wMx = mouseX + camera.x - canvas.width/2, wMy = mouseY + camera.y - canvas.height/2; myLocalTank.turretAngle = Math.atan2(wMy - myLocalTank.y, wMx - myLocalTank.x);
@@ -61,9 +74,9 @@ function updatePhysics(now, dt) {
 
         for(let pid in powerups) { if (Math.hypot(powerups[pid].x - myLocalTank.x, powerups[pid].y - myLocalTank.y) < myRadius + 30) socket.emit('collectPowerup', {roomId: currentRoomId, pid: pid}); }
         for(let tid in tokens) { if (Math.hypot(tokens[tid].x - myLocalTank.x, tokens[tid].y - myLocalTank.y) < myRadius + 25) socket.emit('collectToken', {roomId: currentRoomId, tid: tid}); }
-    }
 
-    camera.x += (myLocalTank.x - camera.x) * 5 * dt; camera.y += (myLocalTank.y - camera.y) * 5 * dt;
+        camera.x += (myLocalTank.x - camera.x) * 5 * dt; camera.y += (myLocalTank.y - camera.y) * 5 * dt;
+    }
 
     for (let id in opponents) { let o = opponents[id]; if (o.targetX !== undefined) { if (Math.hypot(o.targetX - o.x, o.targetY - o.y) > 150) { o.x = o.targetX; o.y = o.targetY; } else { o.x += (o.targetX - o.x) * 15 * dt; o.y += (o.targetY - o.y) * 15 * dt; } let db = o.targetBody - o.bodyAngle; while(db > Math.PI) db-=Math.PI*2; while(db < -Math.PI) db+=Math.PI*2; o.bodyAngle += db * 15 * dt; let dtur = o.targetTurret - o.turretAngle; while(dtur > Math.PI) dtur-=Math.PI*2; while(dtur < -Math.PI) dtur+=Math.PI*2; o.turretAngle += dtur * 25 * dt; } }
 
@@ -72,7 +85,11 @@ function updatePhysics(now, dt) {
         if (b.type === 'homing' && b.targetId) { let tgt = (b.targetId === myId) ? myLocalTank : opponents[b.targetId]; if (tgt && tgt.hp > 0) { let ang = Math.atan2(tgt.y - b.y, tgt.x - b.x); let currentSpd = Math.hypot(b.vx, b.vy); b.vx = Math.cos(ang) * currentSpd; b.vy = Math.sin(ang) * currentSpd; } }
         b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
         let hit = false; let bCfg = BUFFS[b.type] || BUFFS['none'];
-        if (b.type === 'samurai' || b.type === 'homing' || b.type.includes('piercing') || b.type === 'ghost_melee' || b.type === 'boss_proj') { hit = checkCollision(b.x, b.y, 4, false); } else { hit = checkCollision(b.x, b.y, 4, true); } 
+        
+        // КУЛІ ЛЕТЯТЬ НАД ВОДОЮ (isBullet = true)
+        if (b.type === 'samurai' || b.type === 'homing' || b.type.includes('piercing') || b.type === 'ghost_melee' || b.type === 'boss_proj') { hit = checkCollision(b.x, b.y, 4, false, true); } 
+        else { hit = checkCollision(b.x, b.y, 4, true, true); } 
+        
         let isSurvival = currentRoomData.mode === 'survival';
 
         if (!hit && b.owner === myId && !isSurvival) {
@@ -93,7 +110,6 @@ function updatePhysics(now, dt) {
 
 function drawTank(x, y, bodyAngle, turretAngle, colorHex, name, isMe, hp, buff, equipped) {
     if (hp <= 0) return; ctx.save(); ctx.translate(x, y); let scale = buff === 'boss' ? 2.5 : 1.0; ctx.scale(scale, scale); if (buff === 'invisible') ctx.globalAlpha = isMe ? 0.2 : 0.03; else ctx.globalAlpha = 1.0;
-    
     ctx.shadowColor = 'transparent'; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; 
     ctx.fillStyle = colorHex; ctx.font = '14px Russo One'; ctx.textAlign = 'center'; if(buff !== 'invisible' || isMe) ctx.fillText(name, 0, -45);
     
@@ -102,8 +118,6 @@ function drawTank(x, y, bodyAngle, turretAngle, colorHex, name, isMe, hp, buff, 
     let trCol = equipped && equipped.tracks && MODULES[equipped.tracks] ? RARITY[MODULES[equipped.tracks].rarity].color : '#0f172a';
     let cCol = equipped && equipped.cannon && MODULES[equipped.cannon] ? RARITY[MODULES[equipped.cannon].rarity].color : '#0f172a';
     let tuCol = equipped && equipped.turret && MODULES[equipped.turret] ? RARITY[MODULES[equipped.turret].rarity].color : '#334155';
-
-    ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
 
     ctx.save(); ctx.rotate(bodyAngle); 
     ctx.fillStyle = trCol; ctx.shadowColor = trCol; ctx.shadowBlur = equipped && equipped.tracks ? 15 : 0;
@@ -164,7 +178,7 @@ function draw(now) {
     
     let time = Date.now() / 1000;
 
-    // --- ПІДЛОГА (ВОДА, ЛІНІЇ, БАЗОВІ ФІГУРИ) ---
+    // --- ПІДЛОГА (ВОДА, ЛІНІЇ) ---
     MAP_DATA[cMap].solids.forEach(o => {
         if(o.type.includes('spawn')) return;
         ctx.save();
@@ -177,20 +191,20 @@ function draw(now) {
             for(let wy=o.y+10; wy<o.y+o.h; wy+=30) { ctx.beginPath(); ctx.moveTo(o.x, wy); ctx.lineTo(o.x+o.w, wy); ctx.stroke(); }
             ctx.setLineDash([]);
         }
-        else if (o.type === 'shape_triangle') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
-        else if (o.type === 'shape_rhombus') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h/2); ctx.lineTo(o.x + o.w/2, o.y + o.h); ctx.lineTo(o.x, o.y + o.h/2); ctx.fill(); }
-        else if (o.type === 'shape_parallelepiped') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w*0.2, o.y); ctx.lineTo(o.x + o.w, o.y); ctx.lineTo(o.x + o.w*0.8, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
-        else if (o.type === 'wall_square') { ctx.fillStyle = o.color || '#1e293b'; ctx.fillRect(o.x, o.y, o.w, o.h); }
         ctx.restore();
     });
 
     for (let tid in tokens) { const tkn = tokens[tid]; ctx.save(); ctx.translate(tkn.x, tkn.y + Math.sin(now/200)*10); const colorHex = tkn.color==='white'?'#f8fafc':tkn.color==='black'?'#1e293b':tkn.color==='red'?'#ef4444':tkn.color==='blue'?'#3b82f6':tkn.color==='brown'?'#78350f':'#9333ea'; ctx.shadowColor = colorHex; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI*2); ctx.fillStyle = '#0f172a'; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = colorHex; ctx.stroke(); ctx.fillStyle = colorHex; ctx.font = '16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('★', 0, 1); ctx.restore(); }
     
-    // --- ТІНІ ДЛЯ ВИСОКИХ ОБ'ЄКТІВ ---
+    // --- ТІНІ ДЛЯ ВИСОКИХ ОБ'ЄКТІВ (ВКЛЮЧНО З ФІГУРАМИ) ---
     ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 15; ctx.shadowOffsetX = 8; ctx.shadowOffsetY = 12;
     MAP_DATA[cMap].solids.forEach(o => {
-        if(o.type.includes('spawn') || o.type.includes('water') || o.type.includes('shape') || o.type === 'line') return;
-        if (o.type === 'wall' || o.type === 'wall_square') { ctx.fillStyle = o.color || '#1e293b'; ctx.fillRect(o.x, o.y, o.w, o.h); }
+        if(o.type.includes('spawn') || o.type.includes('water') || o.type === 'line') return;
+        
+        if (o.type === 'shape_triangle') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
+        else if (o.type === 'shape_rhombus') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h/2); ctx.lineTo(o.x + o.w/2, o.y + o.h); ctx.lineTo(o.x, o.y + o.h/2); ctx.fill(); }
+        else if (o.type === 'shape_parallelepiped') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w*0.2, o.y); ctx.lineTo(o.x + o.w, o.y); ctx.lineTo(o.x + o.w*0.8, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
+        else if (o.type === 'wall' || o.type === 'wall_square') { ctx.fillStyle = o.color || '#1e293b'; ctx.fillRect(o.x, o.y, o.w, o.h); }
         else if (o.type === 'tree') { ctx.beginPath(); ctx.arc(o.x, o.y, o.r||30, 0, Math.PI*2); ctx.fill(); }
         else if (o.type.includes('prop_')) { drawProp(ctx, o, time); }
     });
@@ -198,13 +212,18 @@ function draw(now) {
 
     // --- ДЕТАЛІ ТА НЕОН ---
     MAP_DATA[cMap].solids.forEach(o => {
-        if(o.type.includes('spawn') || o.type.includes('water') || o.type.includes('shape') || o.type === 'line' || o.type.includes('prop_')) return;
+        if(o.type.includes('spawn') || o.type.includes('water') || o.type === 'line' || o.type.includes('prop_')) return;
         ctx.save();
-        if (o.type === 'wall' || o.type === 'wall_square') {
+        
+        if (o.type === 'shape_triangle') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
+        else if (o.type === 'shape_rhombus') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h/2); ctx.lineTo(o.x + o.w/2, o.y + o.h); ctx.lineTo(o.x, o.y + o.h/2); ctx.fill(); }
+        else if (o.type === 'shape_parallelepiped') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w*0.2, o.y); ctx.lineTo(o.x + o.w, o.y); ctx.lineTo(o.x + o.w*0.8, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
+        else if (o.type === 'wall' || o.type === 'wall_square') {
             if (o.neon) { ctx.strokeStyle = o.neon; ctx.lineWidth = 2; ctx.strokeRect(o.x, o.y, o.w, o.h); ctx.fillStyle = o.neon; ctx.globalAlpha = 0.2; ctx.fillRect(o.x, o.y, o.w, o.h); ctx.globalAlpha = 1.0; }
             if (o.stripe) { ctx.fillStyle = o.stripe; ctx.fillRect(o.x, o.y + o.h/2 - 10, o.w, 20); }
             if (!o.neon && !o.stripe) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(o.x, o.y, o.w, 5); }
-        } else if (o.type === 'tree') { ctx.fillStyle = 'rgba(22, 163, 74, 0.4)'; ctx.beginPath(); ctx.arc(o.x+5, o.y+5, Math.max(5,(o.r||30)-10), 0, Math.PI*2); ctx.fill(); }
+        } 
+        else if (o.type === 'tree') { ctx.fillStyle = 'rgba(22, 163, 74, 0.4)'; ctx.beginPath(); ctx.arc(o.x+5, o.y+5, Math.max(5,(o.r||30)-10), 0, Math.PI*2); ctx.fill(); }
         else if (o.type.includes('neon')) {
             ctx.strokeStyle = o.color || '#3b82f6'; ctx.lineWidth = 4; ctx.shadowColor = o.color || '#3b82f6'; ctx.shadowBlur = 15 + Math.sin(time*5)*5;
             if(o.type === 'neon_wall') ctx.strokeRect(o.x, o.y, o.w, o.h);
@@ -250,6 +269,18 @@ function draw(now) {
     let cd = (BUFFS[myLocalTank.buff] || BUFFS['none']).cd * totalCd; 
     let bar = document.getElementById('cooldown-bar'); if (now - lastShootTime < cd) { bar.style.transition = 'none'; bar.style.width = ((now - lastShootTime) / cd * 100) + '%'; } else { bar.style.width = '100%'; }
     const timerContainer = document.getElementById('buff-timer-container'); if (myLocalTank.buff && myLocalTank.buffProgress > 0) { timerContainer.classList.remove('hidden'); document.getElementById('buff-timer-icon').innerText = PU_ICONS[myLocalTank.buff]; document.getElementById('buff-timer-name').innerText = BUFF_NAMES[myLocalTank.buff]; document.getElementById('buff-timer-name').style.color = PU_COLORS[myLocalTank.buff] || '#cbd5e1'; document.getElementById('buff-timer-bar').style.width = (myLocalTank.buffProgress * 100) + '%'; } else { timerContainer.classList.add('hidden'); }
+
+    // --- ТЕКСТ СПОСТЕРІГАЧА ---
+    if (myLocalTank.hp <= 0 && spectatingId && opponents[spectatingId]) {
+        let specName = currentRoomData.players[spectatingId] ? currentRoomData.players[spectatingId].name : 'ГРАВЕЦЬ';
+        ctx.fillStyle = '#fff'; ctx.font = '24px Russo One'; ctx.textAlign = 'center'; ctx.shadowColor = '#000'; ctx.shadowBlur = 10;
+        ctx.fillText(`СПОСТЕРІГАННЯ: ${specName}`, canvas.width/2, 100);
+        if (currentRoomData.mode === 'survival') {
+            ctx.font = '14px Jura'; ctx.fillStyle = '#94a3b8';
+            ctx.fillText(`[A] Попередній  |  Наступний [D]`, canvas.width/2, 130);
+        }
+        ctx.shadowBlur = 0;
+    }
 }
 
 function updateHUD() {
@@ -274,6 +305,13 @@ function gameLoop(now) { const dt = Math.min((now - lastTime) / 1000, 0.1); last
 
 window.addEventListener('keydown', e => { 
     if (!e || !e.key) return; const k = e.key.toLowerCase(); if(keys.hasOwnProperty(k) || k===' ') { if(k===' ') keys.space = true; else keys[k] = true; }
+    
+    // SPECTATOR CONTROLS
+    if (myLocalTank.hp <= 0 && currentRoomData && currentRoomData.mode === 'survival') {
+        if (k === 'a') findNextSpectateTarget(-1);
+        if (k === 'd') findNextSpectateTarget(1);
+    }
+
     if(e.key === 'Tab') { e.preventDefault(); if(myLocalTank.buff === 'homing') { let visibleOps = Object.keys(opponents).filter(id => opponents[id].hp > 0 && Math.hypot(opponents[id].x - myLocalTank.x, opponents[id].y - myLocalTank.y) < 1500); if(visibleOps.length > 0) { playSound('hitmarker'); if(!homingTargetId || !visibleOps.includes(homingTargetId)) homingTargetId = visibleOps[0]; else { let idx = visibleOps.indexOf(homingTargetId); homingTargetId = visibleOps[(idx + 1) % visibleOps.length]; } } else homingTargetId = null; } }
 });
 window.addEventListener('keyup', e => { if (!e || !e.key) return; const k = e.key.toLowerCase(); if(keys.hasOwnProperty(k) || k===' ') { if(k===' ') keys.space = false; else keys[k] = false; } });

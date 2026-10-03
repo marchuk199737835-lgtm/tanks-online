@@ -1,3 +1,5 @@
+let myAdventClaims = [];
+
 socket.on('initMusic', (data) => { myMusicPlaylists = data; });
 
 socket.on('authSuccess', (data) => { 
@@ -9,18 +11,20 @@ socket.on('authError', (msg) => { alert(msg); localStorage.removeItem('tankToken
 
 socket.on('economyUpdate', (data) => { 
     myBucks = data.bucks; myInventory = data.inventory || []; myEquipped = data.equipped || { cannon: null, turret: null, hull: null, tracks: null }; myStats = data.stats || { kills: 0, matches: 0, earned: 0 };
+    myAdventClaims = data.adventClaims || [];
     if (typeof updateGlobalBucks === 'function') updateGlobalBucks(); 
     if (typeof renderHangar === 'function' && !document.getElementById('hangar-screen').classList.contains('hidden')) renderHangar(); 
+    if (typeof renderAdvent === 'function' && !document.getElementById('advent-modal').classList.contains('hidden')) renderAdvent();
 });
 
-// ПРОМОКОДИ
-socket.on('promoSuccess', (msg) => { 
-    if (typeof playSound === 'function') playSound('ui_buy'); 
-    alert(msg); 
-    document.getElementById('promo-modal').classList.add('hidden'); 
-    document.getElementById('promo-input').value = ''; 
-});
+// ПРОМОКОДИ ТА АДВЕНТ
+socket.on('promoSuccess', (msg) => { if (typeof playSound === 'function') playSound('ui_buy'); alert(msg); document.getElementById('promo-modal').classList.add('hidden'); document.getElementById('promo-input').value = ''; });
 socket.on('promoError', (msg) => { alert(msg); });
+socket.on('adventSuccess', (data) => {
+    playSound('powerup');
+    if (data.type === 'bucks') alert(`Вітаємо! Нараховано +${data.amount} 💵 за день ${data.day}.10.`);
+    else alert(`ВІТАЄМО! Твоя фінальна Легендарна нагорода вже в Інвентарі!`);
+});
 
 let pendingDrop = null;
 socket.on('dropReceived', (modId) => { pendingDrop = modId; });
@@ -43,7 +47,7 @@ socket.on('updateLobby', (roomData) => {
 socket.on('gameStarting', (roomData) => {
     currentRoomData = roomData; const pData = currentRoomData.players[myId];
     myLocalTank.x = pData.x; myLocalTank.y = pData.y; myLocalTank.hp = pData.hp; camera.x = pData.x; camera.y = pData.y;
-    homingTargetId = null; document.getElementById('damage-vignette').style.opacity = 0;
+    homingTargetId = null; document.getElementById('damage-vignette').style.opacity = 0; spectatingId = null; // Скидаємо спостерігача
     pendingDrop = null; document.getElementById('drop-notification').classList.add('hidden'); 
     if (currentRoomData.mode === 'survival') switchMusicState('survive'); else switchMusicState('dezmatch');
     if (typeof doCountdown === 'function') doCountdown();
@@ -76,8 +80,16 @@ socket.on('spawnBullet', (data) => {
 
 socket.on('hitConfirmed', () => { playSound('hitmarker'); const hm = document.getElementById('hitmarker'); hm.classList.remove('hidden'); hm.classList.remove('hitmarker-active'); void hm.offsetWidth; hm.classList.add('hitmarker-active'); });
 socket.on('powerupCollected', (data) => { playSound('powerup'); });
-socket.on('playerDied', (data) => { if (typeof createExplosion === 'function' && currentRoomData && currentRoomData.players[data.id]) createExplosion(currentRoomData.players[data.id].x, currentRoomData.players[data.id].y, 60, '#ef4444'); playSound('explosion'); });
-socket.on('playerRespawn', (data) => { if(data.id === myId) { myLocalTank.x = data.x; myLocalTank.y = data.y; myLocalTank.hp = data.hp; camera.x = data.x; camera.y = data.y; document.getElementById('damage-vignette').style.opacity = 0; } });
+socket.on('playerDied', (data) => { 
+    if (typeof createExplosion === 'function' && currentRoomData && currentRoomData.players[data.id]) createExplosion(currentRoomData.players[data.id].x, currentRoomData.players[data.id].y, 60, '#ef4444'); playSound('explosion'); 
+    
+    // SPECTATOR АВТО-ПЕРЕХІД
+    if (data.id === myId) {
+        if (data.killer && data.killer !== 'zombie' && opponents[data.killer]) { spectatingId = data.killer; } 
+        else { findNextSpectateTarget(1); }
+    }
+});
+socket.on('playerRespawn', (data) => { if(data.id === myId) { myLocalTank.x = data.x; myLocalTank.y = data.y; myLocalTank.hp = data.hp; camera.x = data.x; camera.y = data.y; document.getElementById('damage-vignette').style.opacity = 0; spectatingId = null; } });
 socket.on('tokenCollected', (data) => { playSound('token'); });
 socket.on('bomberExplode', (data) => { if (typeof createExplosion === 'function') createExplosion(data.x, data.y, 40, '#dc2626'); if(Math.hypot(data.x - myLocalTank.x, data.y - myLocalTank.y) < 120) emitDamage(50, 'bomber'); });
 socket.on('zombieMeleeHit', (data) => { if (data.targetId === myId && myLocalTank.hp > 0) emitDamage(data.dmg, 'zombie'); });
@@ -90,10 +102,8 @@ socket.on('gameOver', (data) => {
     const dropNotif = document.getElementById('drop-notification');
     if (pendingDrop && MODULES[pendingDrop]) {
         let mod = MODULES[pendingDrop]; document.getElementById('drop-name').innerText = mod.name; 
-        document.getElementById('drop-cat').innerText = `${CAT_NAMES[mod.type]} | ${RARITY[mod.rarity].name}`; 
-        document.getElementById('drop-cat').style.color = RARITY[mod.rarity].color;
-        document.getElementById('drop-icon').innerHTML = SVG_ICONS[mod.type](RARITY[mod.rarity].color); 
-        dropNotif.classList.remove('hidden');
+        document.getElementById('drop-cat').innerText = `${CAT_NAMES[mod.type]} | ${RARITY[mod.rarity].name}`; document.getElementById('drop-cat').style.color = RARITY[mod.rarity].color;
+        document.getElementById('drop-icon').innerHTML = SVG_ICONS[mod.type](RARITY[mod.rarity].color); dropNotif.classList.remove('hidden');
     } else { dropNotif.classList.add('hidden'); }
     
     if (data.winner === 'ZOMBIES') { 
@@ -122,8 +132,7 @@ socket.on('caseResult', (result) => {
     for(let i=0; i<65; i++) { if (i === 44) { items.push(result.modId); } else { items.push(allModsKeys[Math.floor(Math.random() * allModsKeys.length)]); } }
     
     items.forEach(modId => { 
-        let mod = MODULES[modId]; let rColor = RARITY[mod.rarity].color;
-        let iconSvg = SVG_ICONS[mod.type](rColor);
+        let mod = MODULES[modId]; let rColor = RARITY[mod.rarity].color; let iconSvg = SVG_ICONS[mod.type](rColor);
         tape.innerHTML += `<div class="roulette-item text-center min-w-[90px] w-[90px] border-r border-slate-700 bg-slate-800" style="border-bottom: 3px solid ${rColor}"><div class="w-10 h-10 mx-auto">${iconSvg}</div><div class="text-[8px] text-slate-300 mt-2 uppercase truncate w-full px-1">${mod.name}</div></div>`; 
     });
     
