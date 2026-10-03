@@ -61,7 +61,7 @@ socket.on('gameStarting', (roomData) => {
     
     if (typeof doCountdown === 'function') doCountdown();
 
-    // Якщо це хованки і ми ховаємося - через 3 секунди показуємо меню вибору пропу (щоб не перекрити відлік "3, 2, 1")
+    // Якщо це хованки і ми ховаємося - через 3 секунди показуємо меню вибору пропу
     if (currentRoomData.mode === 'prophunt' && myLocalTank.team === 'hider') {
         setTimeout(() => { if(typeof showPropMenu === 'function') showPropMenu(15); }, 3000);
     }
@@ -79,24 +79,30 @@ socket.on('sync', (data) => {
         const phPhaseText = document.getElementById('ph-phase-text');
         const blindOverlay = document.getElementById('hunter-blind-overlay');
         
-        phTimerEl.classList.remove('hidden');
-        let mins = Math.floor(data.phTimeLeft / 60);
-        let secs = data.phTimeLeft % 60;
-        phTimeText.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        
-        if (data.phState === 'hiding') {
-            phPhaseText.innerText = 'ХОВАНКИ';
-            phPhaseText.className = 'text-[8px] lg:text-xs text-blue-400 font-bold tracking-widest uppercase';
-            if (myLocalTank.team === 'hunter' && blindOverlay) {
-                blindOverlay.classList.remove('hidden');
-                blindOverlay.classList.add('flex');
-            }
-        } else if (data.phState === 'seeking') {
-            phPhaseText.innerText = 'ПОШУК';
-            phPhaseText.className = 'text-[8px] lg:text-xs text-red-500 font-bold tracking-widest uppercase';
-            if (blindOverlay) {
-                blindOverlay.classList.add('hidden');
-                blindOverlay.classList.remove('flex');
+        if(phTimerEl) {
+            phTimerEl.classList.remove('hidden');
+            let mins = Math.floor(data.phTimeLeft / 60);
+            let secs = data.phTimeLeft % 60;
+            if(phTimeText) phTimeText.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            
+            if (data.phState === 'hiding') {
+                if(phPhaseText) {
+                    phPhaseText.innerText = 'ХОВАНКИ';
+                    phPhaseText.className = 'text-[8px] lg:text-xs text-blue-400 font-bold tracking-widest uppercase';
+                }
+                if (myLocalTank.team === 'hunter' && blindOverlay) {
+                    blindOverlay.classList.remove('hidden');
+                    blindOverlay.classList.add('flex');
+                }
+            } else if (data.phState === 'seeking') {
+                if(phPhaseText) {
+                    phPhaseText.innerText = 'ПОШУК';
+                    phPhaseText.className = 'text-[8px] lg:text-xs text-red-500 font-bold tracking-widest uppercase';
+                }
+                if (blindOverlay) {
+                    blindOverlay.classList.add('hidden');
+                    blindOverlay.classList.remove('flex');
+                }
             }
         }
     }
@@ -105,12 +111,26 @@ socket.on('sync', (data) => {
     for (let id in data.players) {
         if (id !== myId) {
             if (!opponents[id]) activeOpponents[id] = { ...data.players[id] };
-            else { activeOpponents[id] = opponents[id]; activeOpponents[id].targetX = data.players[id].x; activeOpponents[id].targetY = data.players[id].y; activeOpponents[id].targetBody = data.players[id].bodyAngle; activeOpponents[id].targetTurret = data.players[id].turretAngle; }
-            activeOpponents[id].hp = data.players[id].hp; activeOpponents[id].buff = data.players[id].buff; activeOpponents[id].equipped = data.players[id].equipped; activeOpponents[id].color = data.players[id].color;
-            activeOpponents[id].team = data.players[id].team; activeOpponents[id].isDisguised = data.players[id].isDisguised; activeOpponents[id].propType = data.players[id].propType;
+            else { 
+                activeOpponents[id] = opponents[id]; 
+                activeOpponents[id].targetX = data.players[id].x; 
+                activeOpponents[id].targetY = data.players[id].y; 
+                activeOpponents[id].targetBody = data.players[id].bodyAngle; 
+                activeOpponents[id].targetTurret = data.players[id].turretAngle; 
+            }
+            activeOpponents[id].hp = data.players[id].hp; 
+            activeOpponents[id].buff = data.players[id].buff; 
+            activeOpponents[id].equipped = data.players[id].equipped; 
+            activeOpponents[id].color = data.players[id].color;
+            activeOpponents[id].team = data.players[id].team; 
+            // ВАЖЛИВО: Оновлюємо стан маскування для опонентів
+            activeOpponents[id].isDisguised = data.players[id].isDisguised; 
+            activeOpponents[id].propType = data.players[id].propType;
         } else {
             myLocalTank.hp = data.players[id].hp; myLocalTank.buff = data.players[id].buff; myLocalTank.buffProgress = data.players[id].buffProgress; myLocalTank.score = data.players[id].score;
-            myEquipped = data.players[id].equipped || myEquipped; myColor = data.players[id].color; myLocalTank.propType = data.players[id].propType;
+            myEquipped = data.players[id].equipped || myEquipped; myColor = data.players[id].color; 
+            // Не перезаписуємо myLocalTank.isDisguised даними з сервера, щоб уникнути сіпань, сервер довіряє клієнту в цьому плані
+            myLocalTank.propType = data.players[id].propType;
         }
     }
     opponents = activeOpponents; zombies = data.zombies || {}; powerups = data.powerups || {}; tokens = data.tokens || {};
@@ -124,7 +144,7 @@ socket.on('phPhaseChange', (data) => {
             blindOverlay.classList.add('hidden');
             blindOverlay.classList.remove('flex');
         }
-        playSound('boss_shoot'); // Звук початку полювання
+        playSound('boss_shoot'); 
     }
 });
 
@@ -169,20 +189,26 @@ socket.on('newWave', (data) => {
     const title = document.getElementById('wave-title-text');
     const subTitle = document.getElementById('wave-subtitle-text');
     
-    overlay.classList.remove('hidden');
+    if(overlay) overlay.classList.remove('hidden');
     
     if (data.isBoss) {
-        title.innerText = `БОС ${data.bossName}`;
-        title.className = "text-8xl font-russo text-red-600 drop-shadow-[0_0_50px_rgba(220,38,38,1)] tracking-widest text-center px-4";
-        subTitle.innerText = `Хвиля ${data.wave}`;
-        subTitle.classList.remove('hidden');
+        if(title) {
+            title.innerText = `БОС ${data.bossName}`;
+            title.className = "text-8xl font-russo text-red-600 drop-shadow-[0_0_50px_rgba(220,38,38,1)] tracking-widest text-center px-4";
+        }
+        if(subTitle) {
+            subTitle.innerText = `Хвиля ${data.wave}`;
+            subTitle.classList.remove('hidden');
+        }
     } else {
-        title.innerText = `ХВИЛЯ ${data.wave}`;
-        title.className = "text-8xl font-russo text-red-500 drop-shadow-[0_0_40px_rgba(220,38,38,1)] tracking-widest text-center px-4";
-        subTitle.classList.add('hidden');
+        if(title) {
+            title.innerText = `ХВИЛЯ ${data.wave}`;
+            title.className = "text-8xl font-russo text-red-500 drop-shadow-[0_0_40px_rgba(220,38,38,1)] tracking-widest text-center px-4";
+        }
+        if(subTitle) subTitle.classList.add('hidden');
     }
     
-    setTimeout(()=> overlay.classList.add('hidden'), 3500); 
+    setTimeout(()=> { if(overlay) overlay.classList.add('hidden'); }, 3500); 
 });
 
 socket.on('gameOver', (data) => {

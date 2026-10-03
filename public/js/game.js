@@ -5,6 +5,7 @@ canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 let spectatingId = null;
 let isBossIncoming = false;
 
+// Мобільне керування
 let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 let joysticks = {
     left: { active: false, startX: 0, startY: 0, currentX: 0, currentY: 0, angle: 0, force: 0, id: null },
@@ -115,9 +116,9 @@ function updatePhysics(now, dt) {
         if (currentRoomData.mode === 'prophunt' && myLocalTank.team === 'hider') {
             if (!myLocalTank.isDisguised && (keys.space || keys.lmb || joysticks.right.released)) {
                 myLocalTank.isDisguised = true;
-                // Магнітимо до сітки 50 пікселів
-                myLocalTank.x = Math.round(myLocalTank.x / 50) * 50;
-                myLocalTank.y = Math.round(myLocalTank.y / 50) * 50;
+                // Магнітимо до центру найближчої клітинки 50x50
+                myLocalTank.x = Math.round((myLocalTank.x - 25) / 50) * 50 + 25;
+                myLocalTank.y = Math.round((myLocalTank.y - 25) / 50) * 50 + 25;
                 myLocalTank.bodyAngle = 0; myLocalTank.turretAngle = 0;
                 socket.emit('updateDisguise', { state: true, x: myLocalTank.x, y: myLocalTank.y });
                 keys.space = false; keys.lmb = false; joysticks.right.released = false;
@@ -389,6 +390,7 @@ function draw(now) {
         const p = opponents[id]; const sn = currentRoomData.players[id] || { name: 'Гравець', color: 'white', equipped: {} }; 
         const cHex = sn.color ? (sn.color==='white'?'#f8fafc':sn.color==='black'?'#1e293b':sn.color==='red'?'#ef4444':sn.color==='blue'?'#3b82f6':sn.color==='brown'?'#78350f':'#9333ea') : '#ef4444'; 
         
+        // ВАЖЛИВО: Використовуємо p.propType для правильного малювання
         if (p.isDisguised) {
             drawProp(ctx, { type: p.propType, x: p.x - 25, y: p.y - 25, w: 50, h: 50, r: 25 }, time);
         } else {
@@ -458,7 +460,6 @@ function draw(now) {
         let specName = currentRoomData.players[spectatingId] ? currentRoomData.players[spectatingId].name : 'ГРАВЕЦЬ';
         let specTank = opponents[spectatingId];
         
-        // Якщо той за ким спостерігаємо захований, ми бачимо його як декор, але з текстом "СПОСТЕРІГАННЯ"
         if (specTank.isDisguised) {
             drawProp(ctx, { type: specTank.propType, x: specTank.x - 25, y: specTank.y - 25, w: 50, h: 50, r: 25 }, time);
         }
