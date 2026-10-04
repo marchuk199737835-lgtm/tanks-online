@@ -37,10 +37,15 @@ socket.on('caseResult',(result)=>{
     document.getElementById('roulette-modal').classList.remove('hidden');
     const tape=document.getElementById('roulette-tape');tape.style.transition='none';tape.style.transform='translateX(0)';tape.innerHTML='';
     let items=[];
-    let pool=Object.keys(MODULES);let cs=CASES[result.caseId];
-    if(cs&&cs.pool!=='all'){
-        if(Array.isArray(cs.pool)) pool=Object.keys(MODULES).filter(m=>cs.pool.includes(m));
-        else pool=Object.keys(MODULES).filter(m=>MODULES[m].type===cs.pool);
+    let cs=CASES[result.caseId];
+    let pool=Object.keys(MODULES);
+    if(cs){
+        if(cs.pool==='cannon') pool=Object.keys(MODULES).filter(m=>MODULES[m].type==='cannon');
+        else if(cs.pool==='turret') pool=Object.keys(MODULES).filter(m=>MODULES[m].type==='turret');
+        else if(cs.pool==='hull') pool=Object.keys(MODULES).filter(m=>MODULES[m].type==='hull');
+        else if(cs.pool==='tracks') pool=Object.keys(MODULES).filter(m=>MODULES[m].type==='tracks');
+        else if(Array.isArray(cs.pool)) pool=cs.pool;
+        else if(cs.drop.l===100) pool=Object.keys(MODULES).filter(m=>MODULES[m].rarity==='legendary');
     }
     if(pool.length===0) pool=Object.keys(MODULES);
     for(let i=0;i<65;i++){if(i===44)items.push(result.modId);else items.push(pool[Math.floor(Math.random()*pool.length)]);}
