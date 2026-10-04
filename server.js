@@ -154,7 +154,7 @@ io.on('connection',(socket)=>{
             else if(r.mode==='prophunt'){let hA=Object.values(r.players).filter(pl=>pl.team==='hider'&&pl.hp>0).length;if(hA===0)endPropHuntGame(r,'hunter');}
         }
     });
-    socket.on('takeDamage',(d)=>{let r=rooms[d.roomId];if(!r||r.status!=='playing'||!r.players[socket.id]||d.attacker!=='zombie')return;let v=r.players[socket.id];v.hp=Math.max(0,v.hp-d.amt);if(v.hp===0){v.buff=null;io.to(d.roomId).emit('playerDied',{id:socket.id,killer:'zombie'});}});
+socket.on('takeDamage',(d)=>{let r=rooms[d.roomId];if(!r||r.status!=='playing'||!r.players[socket.id]||d.attacker!=='zombie')return;let v=r.players[socket.id];v.hp=Math.max(0,v.hp-d.amt);if(v.hp===0){v.buff=null;io.to(d.roomId).emit('playerDied',{id:socket.id,killer:'zombie'});}});
     socket.on('collectToken',(d)=>{
         let r=rooms[d.roomId];if(!r||!r.tokens[d.tid]||!r.tokens[d.tid].active||!r.players[socket.id]||r.players[socket.id].hp<=0)return;
         r.tokens[d.tid].active=false;r.players[socket.id].score+=1;
@@ -231,7 +231,6 @@ setInterval(()=>{
     for(let rId in rooms){
         let r=rooms[rId];if(r.status!=='playing')continue;
 
-        // Спавн бонусів (ефектів) кожні 30 секунд рівно по 2 штуки на точках спавну виключно для Дезматчу та Виживання
         if(r.mode==='deathmatch'||r.mode==='survival'){
             if(now-r.lastPowerupSpawn>=30000){
                 r.lastPowerupSpawn=now;
