@@ -38,11 +38,14 @@ socket.on('caseResult',(result)=>{
     const tape=document.getElementById('roulette-tape');tape.style.transition='none';tape.style.transform='translateX(0)';tape.innerHTML='';
     let items=[];
     let pool=Object.keys(MODULES);let cs=CASES[result.caseId];
-    if(cs&&cs.pool!=='all'){if(Array.isArray(cs.pool))pool=pool.filter(m=>cs.pool.includes(m));else pool=pool.filter(m=>MODULES[m].type===cs.pool);}
-    if(pool.length===0)pool=Object.keys(MODULES);
+    if(cs&&cs.pool!=='all'){
+        if(Array.isArray(cs.pool)) pool=Object.keys(MODULES).filter(m=>cs.pool.includes(m));
+        else pool=Object.keys(MODULES).filter(m=>MODULES[m].type===cs.pool);
+    }
+    if(pool.length===0) pool=Object.keys(MODULES);
     for(let i=0;i<65;i++){if(i===44)items.push(result.modId);else items.push(pool[Math.floor(Math.random()*pool.length)]);}
     items.forEach(modId=>{let mod=MODULES[modId];let rColor=RARITY[mod.rarity].color;let iconSvg=SVG_ICONS[mod.type](rColor);tape.innerHTML+=`<div class="roulette-item text-center min-w-[60px] lg:min-w-[90px] w-[60px] lg:w-[90px] border-r border-slate-700 bg-slate-800" style="border-bottom: 3px solid ${rColor}"><div class="w-6 h-6 lg:w-10 lg:h-10 mx-auto">${iconSvg}</div><div class="text-[6px] lg:text-[8px] text-slate-300 mt-1 lg:mt-2 uppercase truncate w-full px-1">${mod.name}</div></div>`;});
-    setTimeout(()=>{playSound('shoot');tape.style.transition='transform 3.5s cubic-bezier(0.1, 1, 0.3, 1)';let containerWidth=tape.parentElement.offsetWidth||600;let itemWidth=window.innerWidth>1024?90:60;let targetX=(44*itemWidth+(itemWidth/2))-(containerWidth/2);tape.style.transform=`translateX(-${targetX}px)`;},100);
+    setTimeout(()=>{playSound('shoot');tape.style.transition='transform 3.5s cubic-bezier(0.1, 1, 0.3, 1)';let containerWidth=tape.parentElement.offsetWidth||600;let itemWidth=window.innerWidth>1024?90:60;let targetX=(44*itemWidth+(itemWidth/2))-(containerWidth/2);tape.style.transform=`translateX(-${targetX}px);`;},100);
     setTimeout(()=>{playSound('powerup');document.getElementById('roulette-modal').classList.add('hidden');const rw=document.getElementById('reward-modal');if(rw){let mod=MODULES[result.modId];document.getElementById('reward-title').innerText="ТРИМАЙ!";document.getElementById('reward-title').className="text-3xl lg:text-4xl font-russo mb-6 tracking-widest text-emerald-400";document.getElementById('reward-modal-panel').style.borderColor=RARITY[mod.rarity].color;document.getElementById('reward-item-name').innerText=mod.name;document.getElementById('reward-item-icon').innerHTML=SVG_ICONS[mod.type](RARITY[mod.rarity].color);document.getElementById('reward-item-cat').innerText=`${CAT_NAMES[mod.type]} | ${RARITY[mod.rarity].name}`;document.getElementById('reward-item-cat').style.color=RARITY[mod.rarity].color;rw.classList.remove('hidden');}},3600);
 });
 
