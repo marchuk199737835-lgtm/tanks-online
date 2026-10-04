@@ -47,7 +47,7 @@ io.on('connection',(socket)=>{
     socket.on('register',(data)=>{const{name,password}=data;if(!name||!password||name.length<3||password.length<4)return socket.emit('joinError','Логін від 3 символів, пароль від 4!');if(dbUsers[name])return socket.emit('joinError','Цей логін вже зайнятий!');const token=crypto.randomUUID();dbUsers[name]=validateUser({name:name,password:hashPwd(password),token:token,bucks:0});saveUser(name);globalPlayers[socket.id]=name;socket.emit('authSuccess',{name,token});sendEconomy(socket.id,name);});
     socket.on('login',(data)=>{const{name,password}=data;let u=dbUsers[name];if(!u||u.password!==hashPwd(password))return socket.emit('joinError','Невірний логін або пароль!');const token=crypto.randomUUID();u.token=token;u=validateUser(u);saveUser(name);globalPlayers[socket.id]=name;socket.emit('authSuccess',{name,token});sendEconomy(socket.id,name);});
     socket.on('authToken',(token)=>{let foundName=null;for(let n in dbUsers){if(dbUsers[n].token===token)foundName=n;}if(foundName){globalPlayers[socket.id]=foundName;dbUsers[foundName]=validateUser(dbUsers[foundName]);socket.emit('authSuccess',{name:foundName,token});sendEconomy(socket.id,foundName);}else socket.emit('joinError','Сесія закінчилась, увійдіть знову');});
-    socket.on('claimAdvent',()=>{let name=globalPlayers[socket.id];if(!name||!dbUsers[name])return;let u=dbUsers[name],d=new Date(),month=d.getMonth(),day=d.getDate();if(month!==9)return socket.emit('promoError','Івент проходить лише в жовтні!');if(day<3)return socket.emit('promoError','Івент ще не почався!');if(u.adventClaims.includes(day))return socket.emit('promoError','Сьогоднішня нагорода вже отримана!');u.adventClaims.push(day);if(day===31){if(u.adventClaims.length>=20){let modId=getRandomModuleFromCase(12);if(u.inventory.length<30)u.inventory.push(modId);socket.emit('adventSuccess',{type:'legendary',item:modId,day:day});}else{u.adventClaims.pop();return socket.emit('promoError','Недостатньо зібраних днів (мінімум 20) для фінальної нагороди фигуры!');}}else{let reward=20+(day-3)*5;u.bucks+=reward;u.stats.earned+=reward;socket.emit('adventSuccess',{type:'bucks',amount:reward,day:day});}saveUser(name);sendEconomy(socket.id,name);});
+    socket.on('claimAdvent',()=>{let name=globalPlayers[socket.id];if(!name||!dbUsers[name])return;let u=dbUsers[name],d=new Date(),month=d.getMonth(),day=d.getDate();if(month!==9)return socket.emit('promoError','Івент проходить лише в жовтні!');if(day<3)return socket.emit('promoError','Івент ще не почався!');if(u.adventClaims.includes(day))return socket.emit('promoError','Сьогоднішня нагорода вже отримана!');u.adventClaims.push(day);if(day===31){if(u.adventClaims.length>=20){let modId=getRandomModuleFromCase(12);if(u.inventory.length<30)u.inventory.push(modId);socket.emit('adventSuccess',{type:'legendary',item:modId,day:day});}else{u.adventClaims.pop();return socket.emit('promoError','Недостатньо зібраних днів (мінімум 20) для фінальної нагороди!');}}else{let reward=20+(day-3)*5;u.bucks+=reward;u.stats.earned+=reward;socket.emit('adventSuccess',{type:'bucks',amount:reward,day:day});}saveUser(name);sendEconomy(socket.id,name);});
     socket.on('usePromo',(code)=>{let name=globalPlayers[socket.id];if(!name||!dbUsers[name])return;let u=dbUsers[name],nCode=code.trim().toLowerCase();if(nCode==='alex-top1'){if(u.usedPromos.includes(nCode))return socket.emit('promoError','Промокод вже використано!');u.bucks+=200;u.stats.earned+=200;u.usedPromos.push(nCode);saveUser(name);sendEconomy(socket.id,name);socket.emit('promoSuccess','Успішно! +200 баксів.');}else socket.emit('promoError','Невірний код!');});
     
     socket.on('buyCase',(caseId)=>{
@@ -154,7 +154,23 @@ io.on('connection',(socket)=>{
         }
     });
     socket.on('takeDamage',(d)=>{let r=rooms[d.roomId];if(!r||r.status!=='playing'||!r.players[socket.id]||d.attacker!=='zombie')return;let v=r.players[socket.id];v.hp=Math.max(0,v.hp-d.amt);if(v.hp===0){v.buff=null;io.to(d.roomId).emit('playerDied',{id:socket.id,killer:'zombie'});}});
-    socket.on('collectToken',(d)=>{let r=rooms[d.roomId];if(!r||!r.tokens[d.tid]||!r.tokens[d.tid].active||!r.players[socket.id]||r.players[socket.id].hp<=0)return;r.tokens[d.tid].active=false;r.players[socket.id].score+=1;if(r.players[socket.id].score>=r.winScore&&r.mode==='deathmatch'){r.status='finished';let mt=1+Math.max(0,r.winScore-5)*0.10,bW=Math.round(10*mt),bL=Math.round(2*mt),rw={};Object.values(r.players).forEach(p=>{let a=Math.round(p.id===socket.id?bW:bL);rw[p.id]=a;if(dbUsers[p.name]){dbUsers[p.name].bucks+=a;dbUsers[p.name].stats.earned+=a;dbUsers[p.name].stats.matches++;let dr=rollDrop(p.name);saveUser(p.name);io.to(p.id).emit('economyUpdate',{bucks:dbUsers[p.name].bucks,inventory:dbUsers[p.name].inventory,equipped:dbUsers[p.name].equipped,stats:dbUsers[p.name].stats,adventClaims:dbUsers[p.name].adventClaims});if(dr)io.to(p.id).emit('dropReceived',dr);}});io.to(d.roomId).emit('tokenCollected',{tid:d.tid,playerId:socket.id,score:r.players[socket.id].score});io.to(d.roomId).emit('gameOver',{winner:socket.id,name:r.players[socket.id].name,rewards:rw});io.emit('roomsList',getActiveRooms());}else{io.to(d.roomId).emit('tokenCollected',{tid:d.tid,playerId:socket.id,score:r.players[socket.id].score});}delete r.tokens[d.tid];});
+    socket.on('collectToken',(d)=>{
+        let r=rooms[d.roomId];if(!r||!r.tokens[d.tid]||!r.tokens[d.tid].active||!r.players[socket.id]||r.players[socket.id].hp<=0)return;
+        r.tokens[d.tid].active=false;r.players[socket.id].score+=1;
+        if(r.players[socket.id].score>=r.winScore&&r.mode==='deathmatch'){
+            r.status='finished';let mt=1+Math.max(0,r.winScore-5)*0.10,bW=Math.round(10*mt),bL=Math.round(2*mt),rw={};
+            Object.values(r.players).forEach(p=>{
+                let a=Math.round(p.id===socket.id?bW:bL);rw[p.id]=a;
+                if(dbUsers[p.name]){dbUsers[p.name].bucks+=a;dbUsers[p.name].stats.earned+=a;dbUsers[p.name].stats.matches++;let dr=rollDrop(p.name);saveUser(p.name);io.to(p.id).emit('economyUpdate',{bucks:dbUsers[p.name].bucks,inventory:dbUsers[p.name].inventory,equipped:dbUsers[p.name].equipped,stats:dbUsers[p.name].stats,adventClaims:dbUsers[p.name].adventClaims});if(dr)io.to(p.id).emit('dropReceived',dr);}
+            });
+            io.to(d.roomId).emit('tokenCollected',{tid:d.tid,playerId:socket.id,score:r.players[socket.id].score});
+            io.to(d.roomId).emit('gameOver',{winner:socket.id,name:r.players[socket.id]?r.players[socket.id].name:'ГРАВЕЦЬ',rewards:rw,isTeamWin:false});
+            io.emit('roomsList',getActiveRooms());
+        }else{
+            io.to(d.roomId).emit('tokenCollected',{tid:d.tid,playerId:socket.id,score:r.players[socket.id].score});
+        }
+        delete r.tokens[d.tid];
+    });
     socket.on('collectPowerup',(d)=>{let r=rooms[d.roomId];if(r&&r.powerups[d.pid]&&r.powerups[d.pid].active&&r.players[socket.id]&&r.players[socket.id].hp>0&&r.mode!=='prophunt'){let pT=r.powerups[d.pid].type;r.players[socket.id].buff=pT;r.players[socket.id].buffEndTime=Date.now()+BUFF_DURATION;r.powerups[d.pid].active=false;if(pT==='healing')r.players[socket.id].hp=Math.min(getMaxHp(r.players[socket.id].equipped),r.players[socket.id].hp+100);io.to(d.roomId).emit('powerupCollected',{pid:d.pid,playerId:socket.id,type:pT});delete r.powerups[d.pid];}});
     socket.on('zombieHit',(d)=>{let r=rooms[d.roomId];if(r&&r.zombies[d.zid]&&r.zombies[d.zid].hp>0){let fD=d.dmg,aN=r.players[socket.id]?.name;if(aN&&dbUsers[aN]&&dbUsers[aN].equipped&&dbUsers[aN].equipped.cannon){let cId=dbUsers[aN].equipped.cannon;if(MODULES[cId]&&MODULES[cId].stats.dmg)fD*=MODULES[cId].stats.dmg;}r.zombies[d.zid].hp-=fD;if(r.zombies[d.zid].hp<=0){if(r.zombies[d.zid].type==='bomber')io.to(d.roomId).emit('bomberExplode',{x:r.zombies[d.zid].x,y:r.zombies[d.zid].y});delete r.zombies[d.zid];}}});
     socket.on('backToRoomLobby',(roomId)=>{let r=rooms[roomId];if(r&&r.status==='finished'){r.status='lobby';r.powerups={};r.tokens={};r.zombies={};r.wave=1;Object.values(r.players).forEach(p=>{p.ready=false;p.score=0;p.hp=getMaxHp(p.equipped);p.buff=null;p.isDisguised=false;});io.to(roomId).emit('updateLobby',r);io.emit('roomsList',getActiveRooms());}});
@@ -172,11 +188,35 @@ io.on('connection',(socket)=>{
 
 function endPropHuntGame(r,wT){
     r.status='finished';let rew={},wId=null;
-    Object.values(r.players).forEach(p=>{let isW=(p.team===wT),a=isW?15:3;rew[p.id]=a;if(isW&&!wId)wId=p.id;
-        if(dbUsers[p.name]){dbUsers[p.name].bucks+=a;dbUsers[p.name].stats.earned+=a;dbUsers[p.name].stats.matches++;let dr=rollDrop(p.name);saveUser(p.name);io.to(p.id).emit('economyUpdate',{bucks:dbUsers[p.name].bucks,inventory:dbUsers[p.name].inventory,equipped:dbUsers[p.name].equipped,stats:dbUsers[p.name].stats,adventClaims:dbUsers[p.name].adventClaims});if(dr)io.to(p.id).emit('dropReceived',dr);}
+    Object.values(r.players).forEach(p=>{
+        let isW=(p.team===wT),a=isW?15:3;
+        rew[p.id]=a;
+        if(isW&&!wId)wId=p.id;
+        if(dbUsers[p.name]){
+            dbUsers[p.name].bucks+=a;
+            dbUsers[p.name].stats.earned+=a;
+            dbUsers[p.name].stats.matches++;
+            let dr=rollDrop(p.name);
+            saveUser(p.name);
+            io.to(p.id).emit('economyUpdate',{
+                bucks:dbUsers[p.name].bucks,
+                inventory:dbUsers[p.name].inventory,
+                equipped:dbUsers[p.name].equipped,
+                stats:dbUsers[p.name].stats,
+                adventClaims:dbUsers[p.name].adventClaims
+            });
+            if(dr) io.to(p.id).emit('dropReceived',dr);
+        }
     });
-    io.to(r.id).emit('gameOver',{winner:wId,name:wT==='hunter'?'КОМАНДА МИСЛИВЦІВ':'ТІ, ХТО ХОВАВСЯ',rewards:rew,isTeamWin:true});io.emit('roomsList',getActiveRooms());
+    io.to(r.id).emit('gameOver',{
+        winner: wId || 'TEAM',
+        name: wT==='hunter'?'КОМАНДА МИСЛИВЦІВ':'ТІ, ХТО ХОВАВСЯ',
+        rewards: rew,
+        isTeamWin: true
+    });
+    io.emit('roomsList',getActiveRooms());
 }
+
 function endTDMGame(r,wT){
     r.status='finished';let rew={},wId=null,isD=(wT==='draw');
     Object.values(r.players).forEach(p=>{let isW=!isD&&(p.team===wT),a=isD?10:(isW?20:5);rew[p.id]=a;if(isW&&!wId)wId=p.id;
@@ -192,6 +232,36 @@ setInterval(()=>{
         if(r.mode==='prophunt'){if(r.state==='hiding'&&now>=r.phaseEndTime){r.state='seeking';r.phaseEndTime=now+(r.seekTime*1000);Object.values(r.players).forEach(p=>{if(p.team==='hunter'){p.hp=getMaxHp(p.equipped);let sp=getValidSpawn(r.map,30,'spawn_player');p.x=sp.x;p.y=sp.y;}});io.to(rId).emit('phPhaseChange',{phase:'seeking',time:r.seekTime});}else if(r.state==='seeking'&&now>=r.phaseEndTime){endPropHuntGame(r,'hider');continue;}}
         if(r.mode==='team_deathmatch'){if(now>=r.timeEndTime){let mS=-1,w=[];for(let t in r.teamScores){if(r.teamScores[t]>mS){mS=r.teamScores[t];w=[t];}else if(r.teamScores[t]===mS)w.push(t);}if(w.length===1)endTDMGame(r,w[0]);else endTDMGame(r,'draw');continue;}}
         Object.values(r.players).forEach(p=>{if(p.buff){p.buffProgress=Math.max(0,(p.buffEndTime-now)/BUFF_DURATION);if(p.buff==='healing'&&p.hp>0)p.hp=Math.min(getMaxHp(p.equipped),p.hp+10*(1/30));if(now>p.buffEndTime){if(p.buff==='boss'&&checkCollisionServer(r.map,p.x,p.y,30)){let f=false;for(let rd=50;rd<800;rd+=50){for(let a=0;a<Math.PI*2;a+=Math.PI/4){let tX=p.x+Math.cos(a)*rd,tY=p.y+Math.sin(a)*rd;if(!checkCollisionServer(r.map,tX,tY,30)){p.x=tX;p.y=tY;f=true;break;}}if(f)break;}p.buff=null;p.buffProgress=0;}p.buff=null;p.buffProgress=0;}}else p.buffProgress=0;});
+        if(r.mode==='survival'){
+            const aP=Object.values(r.players).filter(p=>p.hp>0);
+            if(aP.length===0){
+                r.status='finished';let rw={};
+                Object.values(r.players).forEach(p=>{
+                    let n=p.name;if(dbUsers[n]){let wv=r.wave;dbUsers[n].bucks+=wv;dbUsers[n].stats.earned+=wv;dbUsers[n].stats.matches++;let dr=rollDrop(n);saveUser(n);io.to(p.id).emit('economyUpdate',{bucks:dbUsers[n].bucks,inventory:dbUsers[n].inventory,equipped:dbUsers[n].equipped,stats:dbUsers[n].stats,adventClaims:dbUsers[n].adventClaims});if(dr)io.to(p.id).emit('dropReceived',dr);}
+                });
+                io.to(rId).emit('gameOver',{winner:'ZOMBIES',wave:r.wave,rewards:rw,isTeamWin:false});io.emit('roomsList',getActiveRooms());continue;
+            }
+            if(Object.keys(r.zombies).length===0){
+                if(r.state==='playing'){r.state='waiting';r.nextWaveTime=now+4000;let nW=r.wave+1;if(nW===10||nW===20||nW===30||nW===40)io.to(rId).emit('bossWarning');}
+                else if(r.state==='waiting'&&now>r.nextWaveTime){
+                    r.wave++;let isBW=(r.wave%10===0&&r.wave<=40);
+                    if(isBW){let bTypes=['pikus','shurik','oneshot','padlo'],bType=bTypes[(r.wave/10)-1],zid='boss_'+now,zS=getValidSpawn(r.map,50,'spawn_zombie');r.zombies[zid]={id:zid,x:zS.x,y:zS.y,type:bType,hp:Z_TYPES[bType].hp,nextAttack:0};io.to(rId).emit('newWave',{wave:r.wave,isBoss:true,bossName:Z_TYPES[bType].name});}
+                    else{let sC=20+(r.wave-1)*5,tL=['normal','runner','spitter','tanker','bomber','ghost'],mI=Math.min(tL.length-1,Math.floor((r.wave)/5)),aT=tL.slice(0,mI+1);for(let i=0;i<sC;i++){let t=aT[Math.floor(Math.random()*aT.length)],zS=getValidEdgeSpawn(r.map,20,'spawn_zombie'),zid='z_'+now+'_'+i;r.zombies[zid]={id:zid,x:zS.x,y:zS.y,type:t,hp:Z_TYPES[t].hp,nextAttack:0};}io.to(rId).emit('newWave',{wave:r.wave,isBoss:false});}
+                    r.state='playing';
+                }
+            }else if(r.state==='playing'){
+                for(let zid in r.zombies){
+                    let z=r.zombies[zid],t=null,mD=Infinity;aP.forEach(p=>{let d=Math.hypot(p.x-z.x,p.y-z.y);if(p.buff==='invisible')d*=3;if(d<mD){mD=d;t=p;}});
+                    if(t){
+                        let dx=t.x-z.x,dy=t.y-z.y,l=Math.hypot(dx,dy),sp=Z_TYPES[z.type].speed,nX=z.x+(dx/l)*sp*(1/30),nY=z.y+(dy/l)*sp*(1/30);
+                        if(!checkCollisionServer(r.map,nX,z.y,Z_TYPES[z.type].radius))z.x=nX;if(!checkCollisionServer(r.map,z.x,nY,Z_TYPES[z.type].radius))z.y=nY;
+                        if(Z_TYPES[z.type].isBoss&&now>z.nextAttack){z.nextAttack=now+Z_TYPES[z.type].cd;let bC=Z_TYPES[z.type].bullets,spr=Math.PI/4,sA=Math.atan2(dy,dx)-(spr/2),st=spr/Math.max(1,bC-1);if(bC===25){spr=Math.PI*2;st=spr/25;sA=0;}for(let b=0;b<bC;b++){let a=sA+(b*st);io.to(rId).emit('spawnBullet',{id:'b_'+now+b+zid,x:z.x,y:z.y,vx:Math.cos(a)*500,vy:Math.sin(a)*500,type:'boss_proj',owner:'zombie',dmgOverride:Z_TYPES[z.type].dmg});}}
+                        else if(Z_TYPES[z.type].ranged&&!Z_TYPES[z.type].isBoss&&mD<400&&now>z.nextAttack){z.nextAttack=now+2000;io.to(rId).emit('spawnBullet',{id:'ac_'+now+zid,x:z.x,y:z.y,vx:(dx/l)*400,vy:(dy/l)*400,type:'acid',owner:'zombie'});}
+                        else if(!Z_TYPES[z.type].isBoss&&mD<30+Z_TYPES[z.type].radius+5&&now>z.nextAttack){z.nextAttack=now+1000;io.to(rId).emit('zombieMeleeHit',{targetId:t.id,dmg:Z_TYPES[z.type].dmg});}
+                    }
+                }
+            }
+        }
         let syncData={players:r.players,zombies:r.zombies,powerups:r.powerups,tokens:r.tokens};
         if(r.mode==='prophunt'){syncData.phState=r.state;syncData.phTimeLeft=Math.max(0,Math.ceil((r.phaseEndTime-now)/1000));}
         if(r.mode==='team_deathmatch'){syncData.teamScores=r.teamScores;syncData.timeEndTime=r.timeEndTime;}
