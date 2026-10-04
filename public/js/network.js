@@ -1,8 +1,13 @@
 socket.on('initMusic',(data)=>{myMusicPlaylists=data;});
 socket.on('authSuccess',(data)=>{localStorage.setItem('tankToken',data.token);myName=data.name;myId=socket.id;initAudio();if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();switchMusicState('loby');showScreen('main-menu-screen');});
 socket.on('authError',(msg)=>{alert(msg);localStorage.removeItem('tankToken');showScreen('login-screen');});
-socket.on('joinError',(msg)=>{alert(msg);});
-socket.on('economyUpdate',(data)=>{myBucks=data.bucks;myInventory=data.inventory||[];myEquipped=data.equipped||{cannon:null,turret:null,hull:null,tracks:null};myStats=data.stats||{kills:0,matches:0,earned:0};myAdventClaims=data.adventClaims||[];if(typeof updateGlobalBucks==='function')updateGlobalBucks();if(typeof renderHangar==='function'&&!document.getElementById('hangar-screen').classList.contains('hidden'))renderHangar();if(typeof renderAdvent==='function'&&!document.getElementById('advent-modal').classList.contains('hidden'))renderAdvent();});
+socket.on('joinError',(msg)=>{
+    if(msg.includes('апгрейд')||msg.includes('Оберіть')||msg.includes('Недостатньо')||msg.includes('Неможливо')){
+        let em=document.getElementById('upg-error-modal'),et=document.getElementById('upg-error-txt');
+        if(em&&et){et.innerText=msg;em.classList.remove('hidden');if(typeof playSound==='function')playSound('hurt');}else alert(msg);
+    }else alert(msg);
+});
+socket.on('economyUpdate',(data)=>{myBucks=data.bucks;myInventory=data.inventory||[];myEquipped=data.equipped||{cannon:null,turret:null,hull:null,tracks:null};myStats=data.stats||{kills:0,matches:0,earned:0};myAdventClaims=data.adventClaims||[];if(typeof updateGlobalBucks==='function')updateGlobalBucks();if(typeof renderHangar==='function'&&!document.getElementById('hangar-screen').classList.contains('hidden'))renderHangar();if(typeof renderUpgrader==='function'&&!document.getElementById('upgrader-screen').classList.contains('hidden'))renderUpgrader();if(typeof renderAdvent==='function'&&!document.getElementById('advent-modal').classList.contains('hidden'))renderAdvent();});
 socket.on('promoSuccess',(msg)=>{if(typeof playSound==='function')playSound('ui_buy');alert(msg);document.getElementById('promo-modal').classList.add('hidden');document.getElementById('promo-input').value='';});
 socket.on('promoError',(msg)=>{alert(msg);});
 socket.on('adventSuccess',(data)=>{playSound('powerup');if(data.type==='bucks')alert(`Вітаємо! Нараховано +${data.amount} 💵 за день ${data.day}.10.`);else alert(`ВІТАЄМО! Твоя фінальна Легендарна нагорода вже в Інвентарі!`);});
@@ -25,6 +30,7 @@ socket.on('zombieMeleeHit',(data)=>{if(data.targetId===myId&&myLocalTank.hp>0)em
 socket.on('bossWarning',()=>{isBossIncoming=true;document.getElementById('survival-warning').classList.remove('hidden');});
 socket.on('newWave',(data)=>{if(currentRoomData)currentRoomData.wave=data.wave;isBossIncoming=false;document.getElementById('survival-warning').classList.add('hidden');const overlay=document.getElementById('wave-overlay'),title=document.getElementById('wave-title-text'),subTitle=document.getElementById('wave-subtitle-text');if(overlay)overlay.classList.remove('hidden');if(data.isBoss){if(title){title.innerText=`БОС ${data.bossName}`;title.className="text-8xl font-russo text-red-600 drop-shadow-[0_0_50px_rgba(220,38,38,1)] tracking-widest text-center px-4";}if(subTitle){subTitle.innerText=`Хвиля ${data.wave}`;subTitle.classList.remove('hidden');}}else{if(title){title.innerText=`ХВИЛЯ ${data.wave}`;title.className="text-8xl font-russo text-red-500 drop-shadow-[0_0_40px_rgba(220,38,38,1)] tracking-widest text-center px-4";}if(subTitle)subTitle.classList.add('hidden');}setTimeout(()=>{if(overlay)overlay.classList.add('hidden');},3500);});
 socket.on('gameOver',(data)=>{if(currentRoomData)currentRoomData.status='finished';document.getElementById('winner-modal').classList.remove('hidden');document.getElementById('damage-vignette').style.opacity=0;const dropNotif=document.getElementById('drop-notification');if(pendingDrop&&MODULES[pendingDrop]){let mod=MODULES[pendingDrop];document.getElementById('drop-name').innerText=mod.name;document.getElementById('drop-cat').innerText=`${CAT_NAMES[mod.type]} | ${RARITY[mod.rarity].name}`;document.getElementById('drop-cat').style.color=RARITY[mod.rarity].color;document.getElementById('drop-icon').innerHTML=SVG_ICONS[mod.type](RARITY[mod.rarity].color);dropNotif.classList.remove('hidden');}else{dropNotif.classList.add('hidden');}if(data.winner==='ZOMBIES'){document.getElementById('winner-title').innerText="ВИ НЕ ВИЖИЛИ";document.getElementById('winner-title').className="text-6xl font-russo mb-4 text-red-500 tracking-widest drop-shadow-[0_0_15px_rgba(239,68,68,0.5)] relative z-10";document.getElementById('winner-emoji').innerText="💀";document.getElementById('winner-message').innerText=`Ви протримались до ${data.wave} хвилі.`;document.getElementById('winner-reward').innerText=data.wave;}else if(data.isTeamWin){let myReward=data.rewards?(data.rewards[myId]||0):0;document.getElementById('winner-reward').innerText=myReward;if(myReward===20||myReward===15){document.getElementById('winner-title').innerText="ПЕРЕМОГА!";document.getElementById('winner-title').className="text-5xl lg:text-6xl font-russo mb-4 text-white tracking-widest drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] relative z-10";document.getElementById('winner-emoji').innerText="🏆";document.getElementById('winner-message').innerText=`${data.name} ПЕРЕМОГЛИ!`;}else if(data.winner==='DRAW'){document.getElementById('winner-title').innerText="НІЧИЯ";document.getElementById('winner-title').className="text-5xl lg:text-6xl font-russo mb-4 text-slate-300 tracking-widest relative z-10";document.getElementById('winner-emoji').innerText="🤝";document.getElementById('winner-message').innerText="Бойова нічия!";}else{document.getElementById('winner-title').innerText="ПОРАЗКА";document.getElementById('winner-title').className="text-5xl lg:text-6xl font-russo mb-4 text-slate-400 tracking-widest relative z-10";document.getElementById('winner-emoji').innerText="💔";document.getElementById('winner-message').innerText=`${data.name} ПЕРЕМОГЛИ...`;}}else{let myReward=data.rewards?(data.rewards[myId]||0):0;document.getElementById('winner-reward').innerText=myReward;if(data.winner===myId){document.getElementById('winner-title').innerText="ПЕРЕМОГА!";document.getElementById('winner-title').className="text-5xl lg:text-6xl font-russo mb-4 text-white tracking-widest drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] relative z-10";document.getElementById('winner-emoji').innerText="🏆";document.getElementById('winner-message').innerText="Ви розбили ворогів!";}else{document.getElementById('winner-title').innerText="ЕХХ...";document.getElementById('winner-title').className="text-5xl lg:text-6xl font-russo mb-4 text-slate-400 tracking-widest relative z-10";document.getElementById('winner-emoji').innerText="💔";document.getElementById('winner-message').innerText=`${data.name} здобуває перемогу.`;}}});
+
 socket.on('caseResult',(result)=>{
     myBucks=result.bucks;if(result.inventory)myInventory=result.inventory;if(result.equipped)myEquipped=result.equipped;
     if(typeof updateGlobalBucks==='function')updateGlobalBucks();
@@ -39,4 +45,40 @@ socket.on('caseResult',(result)=>{
     setTimeout(()=>{playSound('shoot');tape.style.transition='transform 3.5s cubic-bezier(0.1, 1, 0.3, 1)';let containerWidth=tape.parentElement.offsetWidth||600;let itemWidth=window.innerWidth>1024?90:60;let targetX=(44*itemWidth+(itemWidth/2))-(containerWidth/2);tape.style.transform=`translateX(-${targetX}px)`;},100);
     setTimeout(()=>{playSound('powerup');document.getElementById('roulette-modal').classList.add('hidden');const rw=document.getElementById('reward-modal');if(rw){let mod=MODULES[result.modId];document.getElementById('reward-title').innerText="ТРИМАЙ!";document.getElementById('reward-title').className="text-3xl lg:text-4xl font-russo mb-6 tracking-widest text-emerald-400";document.getElementById('reward-modal-panel').style.borderColor=RARITY[mod.rarity].color;document.getElementById('reward-item-name').innerText=mod.name;document.getElementById('reward-item-icon').innerHTML=SVG_ICONS[mod.type](RARITY[mod.rarity].color);document.getElementById('reward-item-cat').innerText=`${CAT_NAMES[mod.type]} | ${RARITY[mod.rarity].name}`;document.getElementById('reward-item-cat').style.color=RARITY[mod.rarity].color;rw.classList.remove('hidden');}},3600);
 });
+
+socket.on('upgradeResult',(res)=>{
+    myBucks=res.newBucks;myInventory=res.inv;
+    if(typeof updateGlobalBucks==='function')updateGlobalBucks();
+    const pointer=document.getElementById('upg-pointer'),actionBtn=document.getElementById('upg-action-btn');
+    if(pointer){
+        pointer.classList.remove('hidden');pointer.style.transition='none';pointer.style.left='0%';
+        setTimeout(()=>{playSound('shoot');pointer.style.transition='left 3s cubic-bezier(0.1, 1, 0.3, 1)';pointer.style.left=res.roll+'%';},50);
+        setTimeout(()=>{
+            pointer.classList.add('hidden');
+            if(actionBtn){actionBtn.disabled=false;actionBtn.innerText='ОБЕРІТЬ МОДУЛІ';}
+            upgSrcIdx=null;upgSrcId=null;upgTgtId=null;document.getElementById('upg-slot-src').innerHTML='';document.getElementById('upg-slot-tgt').innerHTML='';
+            if(typeof renderUpgrader==='function')renderUpgrader();if(typeof renderHangar==='function')renderHangar();
+            if(res.win){
+                playSound('powerup');const rw=document.getElementById('reward-modal');
+                if(rw){
+                    let mod=MODULES[res.tId];
+                    document.getElementById('reward-title').innerText="АПГРЕЙД УСПІШНИЙ!";
+                    document.getElementById('reward-title').className="text-xl lg:text-3xl font-russo mb-6 tracking-widest text-blue-400";
+                    document.getElementById('reward-modal-panel').style.borderColor=RARITY[mod.rarity].color;
+                    document.getElementById('reward-item-name').innerText=mod.name;
+                    document.getElementById('reward-item-icon').innerHTML=SVG_ICONS[mod.type](RARITY[mod.rarity].color);
+                    document.getElementById('reward-item-cat').innerText=`${CAT_NAMES[mod.type]} | ${RARITY[mod.rarity].name}`;
+                    document.getElementById('reward-item-cat').style.color=RARITY[mod.rarity].color;
+                    rw.classList.remove('hidden');
+                }
+            }else{
+                playSound('hurt');
+                let em=document.getElementById('upg-error-modal'),et=document.getElementById('upg-error-txt');
+                if(em&&et){et.innerText='Апгрейд не вдався! Модуль та бакси згоріли...';em.classList.remove('hidden');}
+                else alert('Апгрейд не вдався!');
+            }
+        },3200);
+    }
+});
+
 function emitDamage(amt,attacker){playSound('hurt');shakeTime=0.3;socket.emit('takeDamage',{roomId:currentRoomId,amt:amt,attacker:attacker});}
