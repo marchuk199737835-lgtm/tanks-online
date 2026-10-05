@@ -21,8 +21,6 @@ let BASE_RELOAD = 2000;
 let mines = {};
 let lasers = [];
 
-// Константи тепер беруться з config.js (window.BUFF_NAMES, window.BUFF_ICONS, window.BUFFS)
-
 window.getTankSpeed = function() {
     let spd = typeof BASE_SPEED !== 'undefined' ? BASE_SPEED : 200;
     if (myEquipped && myEquipped.hull && MODULES[myEquipped.hull] && MODULES[myEquipped.hull].stats.speed) spd *= MODULES[myEquipped.hull].stats.speed;
@@ -203,6 +201,11 @@ function updatePhys(now, dt) {
         
         let isS = currentRoomData.mode === 'survival', hP = false, hZ = false;
         
+        // ВАЖЛИВО: Беремо правильний базовий урон
+        let bulletBaseDmg = window.BUFFS[b.type] ? window.BUFFS[b.type].dmg : 75;
+        let actualDmg = b.dmgOverride || bulletBaseDmg;
+        if (myLocalTank.buff === 'double_dmg') actualDmg *= 2; // Підтримка бафу на подвійний урон
+        
         for (let oid in opponents) {
             let op = opponents[oid];
             if (op.hp > 0 && op.buff !== 'shield') {
@@ -211,7 +214,8 @@ function updatePhys(now, dt) {
                     hP = true;
                     if (b.owner === myId) {
                         if (currentRoomData.mode === 'team_deathmatch' && myLocalTank.team === op.team) continue;
-                        socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: b.dmgOverride || 0, type: b.type });
+                        // Відправляємо обчислений урон
+                        socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: actualDmg, type: b.type });
                     }
                     break;
                 }
@@ -238,7 +242,7 @@ function updatePhys(now, dt) {
                 if (Math.hypot(b.x - z.x, b.y - z.y) < zD) {
                     hZ = true;
                     if (b.owner === myId) {
-                        socket.emit('zombieHit', { roomId: currentRoomId, zid: zid, dmg: 0, type: b.type });
+                        socket.emit('zombieHit', { roomId: currentRoomId, zid: zid, dmg: actualDmg, type: b.type });
                         createExplosion(b.x, b.y, 5, Z_TYPES[z.type].color);
                     }
                     break;
@@ -251,7 +255,7 @@ function updatePhys(now, dt) {
             if (Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < hD) {
                 hP = true;
                 playSound('hurt'); shakeTime = 0.3;
-                socket.emit('takeDamage', { roomId: currentRoomId, amt: b.dmgOverride || 0, attacker: 'zombie' });
+                socket.emit('takeDamage', { roomId: currentRoomId, amt: actualDmg, attacker: 'zombie' });
             }
         }
         
@@ -267,7 +271,8 @@ function updatePhys(now, dt) {
                 for (let oid in opponents) {
                     if (opponents[oid].hp > 0 && opponents[oid].buff !== 'shield' && Math.hypot(b.x - opponents[oid].x, b.y - opponents[oid].y) < sR) {
                         if (currentRoomData.mode === 'team_deathmatch' && opponents[oid].team === myLocalTank.team) continue;
-                        socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: 0, type: 'explosive' });
+                        let expDmg = window.BUFFS['explosive'] ? window.BUFFS['explosive'].dmg : 250;
+                        socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: expDmg, type: 'explosive' });
                     }
                 }
             }
