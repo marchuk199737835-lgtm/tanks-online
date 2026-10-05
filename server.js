@@ -35,7 +35,8 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.ht
 
 const MAX_HP = 500, BUFF_DURATION = 15000, BASE_RELOAD = 2000;
 const mongoUri = process.env.MONGO_URI;
-let dbUsersCol = null, dbUsers = {};
+let dbUsersCol = null;
+const dbUsers = Object.create(null); // без прототипу: логіни типу __proto__ чи constructor більше не ламають логіку
 
 if (mongoUri) {
     const client = new MongoClient(mongoUri);
@@ -48,11 +49,14 @@ if (mongoUri) {
             console.log(`Завантажено акаунтів: ${users.length}`);
         });
     }).catch(err => console.error("❌ Помилка MongoDB:", err));
+} else {
+    console.warn("⚠️  MONGO_URI не задано! Акаунти зберігаються лише в пам'яті і зникнуть після перезапуску.");
 }
 
 function saveUser(name) {
     if (dbUsersCol && dbUsers[name]) {
-        dbUsersCol.updateOne({ name: name }, { $set: dbUsers[name] }, { upsert: true });
+        dbUsersCol.updateOne({ name: name }, { $set: dbUsers[name] }, { upsert: true })
+            .catch(err => console.error('❌ Не вдалося зберегти акаунт', name, err.message));
     }
 }
 
@@ -224,12 +228,23 @@ function processPlayerDeath(r, victimId, killerId) {
         if (hA === 0) endPropHuntGame(r, 'hunter');
     }
 }
+// Реєстрація: 3-12 символів (літери, цифри, _ та -). Для входу старі акаунти не обмежуємо.
+const NAME_RE = /^[A-Za-zА-Яа-яІіЇїЄєҐґ0-9_-]{3,12}$/;
+function readCreds(data) {
+    if (!data || typeof data.name !== 'string' || typeof data.password !== 'string') return null;
+    return { name: data.name.trim(), password: data.password };
+}
+// Штраф мисливцю за промах у хованках. 0 = вимкнено. Наприклад 10 = мінус 10 HP за промах (HP не опуститься нижче 1).
+const HUNTER_MISS_PENALTY = 0;
+
 io.on('connection', (socket) => {
     socket.emit('initMusic', musicData);
     
     socket.on('register', (data) => {
-        const { name, password } = data;
-        if (!name || !password || name.length < 3 || password.length < 4) return socket.emit('joinError', 'Логін від 3 символів, пароль від 4!');
+        const creds = readCreds(data);
+        if (!creds) return socket.emit('joinError', 'Некоректні дані!');
+        const { name, password } = creds;
+        if (!NAME_RE.test(name) || password.length < 4 || password.length > 128) return socket.emit('joinError', 'Логін 3-12 символів (літери, цифри, _ -), пароль від 4!');
         if (dbUsers[name]) return socket.emit('joinError', 'Цей логін вже зайнятий!');
         const token = crypto.randomUUID();
         dbUsers[name] = validateUser({ name: name, password: hashPwd(password), token: token, bucks: 0 });
@@ -240,7 +255,9 @@ io.on('connection', (socket) => {
     });
 
     socket.on('login', (data) => {
-        const { name, password } = data;
+        const creds = readCreds(data);
+        if (!creds) return socket.emit('joinError', 'Невірний логін або пароль!');
+        const { name, password } = creds;
         let u = dbUsers[name];
         if (!u || u.password !== hashPwd(password)) return socket.emit('joinError', 'Невірний логін або пароль!');
         const token = crypto.randomUUID();
@@ -253,6 +270,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('authToken', (token) => {
+        if (typeof token !== 'string' || !token) return socket.emit('authError', 'Сесія закінчилась, увійдіть знову');
         let foundName = null;
         for (let n in dbUsers) { if (dbUsers[n].token === token) foundName = n; }
         if (foundName) {
@@ -260,7 +278,7 @@ io.on('connection', (socket) => {
             dbUsers[foundName] = validateUser(dbUsers[foundName]);
             socket.emit('authSuccess', { name: foundName, token });
             sendEconomy(socket.id, foundName);
-        } else socket.emit('joinError', 'Сесія закінчилась, увійдіть знову');
+        } else socket.emit('authError', 'Сесія закінчилась, увійдіть знову');
     });
 
     socket.on('claimAdvent', () => {
@@ -293,6 +311,7 @@ io.on('connection', (socket) => {
     socket.on('usePromo', (code) => {
         let name = globalPlayers[socket.id];
         if (!name || !dbUsers[name]) return;
+        if (typeof code !== 'string') return socket.emit('promoError', 'Невірний код!');
         let u = dbUsers[name], nCode = code.trim().toLowerCase();
         if (nCode === 'alex-top1') {
             if (u.usedPromos.includes(nCode)) return socket.emit('promoError', 'Промокод вже використано!');
@@ -319,7 +338,7 @@ io.on('connection', (socket) => {
                 u.inventory.push(modId);
                 saveUser(name);
                 socket.emit('caseResult', { modId: modId, bucks: u.bucks, inventory: u.inventory, equipped: u.equipped, stats: u.stats, caseId: caseId });
-            }
+            } else { u.bucks += cs.price; } // кейс не видав предмет - повертаємо бакси
         } else socket.emit('joinError', 'Недостатньо баксів!');
     });
 
@@ -675,6 +694,13 @@ socket.on('selectProp', (data) => {
         io.to(socket.id).emit('hitConfirmed');
         
         if (v.hp === 0) processPlayerDeath(r, data.targetId, socket.id);
+    });
+
+    socket.on('bulletMissed', (d) => {
+        if (!HUNTER_MISS_PENALTY || !d) return;
+        let r = rooms[d.roomId], p = r ? r.players[socket.id] : null;
+        if (!p || r.status !== 'playing' || r.mode !== 'prophunt' || r.state !== 'seeking' || p.team !== 'hunter' || p.hp <= 0) return;
+        p.hp = Math.max(1, p.hp - HUNTER_MISS_PENALTY);
     });
 
     socket.on('takeDamage', (d) => {
