@@ -1,13 +1,13 @@
-const canvas=document.getElementById('game-canvas'),ctx=canvas.getContext('2d');
+var canvas=document.getElementById('game-canvas'),ctx=canvas.getContext('2d');
 window.addEventListener('resize',()=>{canvas.width=window.innerWidth;canvas.height=window.innerHeight;});
 canvas.width=window.innerWidth;canvas.height=window.innerHeight;
-let spectatingId=null,isBossIncoming=false,isMobile=/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-let joysticks={left:{active:false,startX:0,startY:0,currentX:0,currentY:0,angle:0,force:0,id:null},right:{active:false,startX:0,startY:0,currentX:0,currentY:0,angle:0,force:0,id:null,hasAimed:false,released:false}};
-const BASE_RELOAD=2000;
-window.BUFF_ICONS={'healing':'➕','speed':'⚡','shield':'🛡️','invisible':'👻','double_dmg':'⚔️','boss':'👹','samurai':'🗡️','minigun':'🔫','shotgun':'💥','homing':'🎯','incendiary':'🔥','explosive':'💣','piercing':'🪡','autolaser':'⚡','reaper':'☠️'};
-window.BUFF_NAMES={'healing':'ЗЦІЛЕННЯ','speed':'ШВИДКІСТЬ','shield':'ЩИТ','invisible':'НЕВИДИМІСТЬ','double_dmg':'ПОДВІЙНА ШКОДА','boss':'БОС','samurai':'САМУРАЙ','minigun':'МІНІГАН','shotgun':'ДРОБОВИК','homing':'САМОНАВЕДЕННЯ','incendiary':'ЗАПАЛЮВАЛЬНІ','explosive':'ВИБУХОВІ','piercing':'БРОНЕБІЙНІ','autolaser':'АВТО-ЛАЗЕР','reaper':'ЖНЕЦЬ'};
-const BUFFS={'none':{cd:2000},'boss':{cd:2000},'samurai':{cd:500},'minigun':{cd:150},'shotgun':{cd:2000},'homing':{cd:2000},'incendiary':{cd:2000},'explosive':{cd:2000},'piercing':{cd:2000},'healing':{cd:2000},'shield':{cd:2000},'invisible':{cd:2000},'double_dmg':{cd:2000},'autolaser':{cd:2000},'reaper':{cd:2000},'fast':{cd:150}};
-let mines={},lasers=[];
+var spectatingId=null,isBossIncoming=false,isMobile=/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+var joysticks={left:{active:false,startX:0,startY:0,currentX:0,currentY:0,angle:0,force:0,id:null},right:{active:false,startX:0,startY:0,currentX:0,currentY:0,angle:0,force:0,id:null,hasAimed:false,released:false}};
+var BASE_RELOAD=2000;
+var BUFF_ICONS={'healing':'➕','speed':'⚡','shield':'🛡️','invisible':'👻','double_dmg':'⚔️','boss':'👹','samurai':'🗡️','minigun':'🔫','shotgun':'💥','homing':'🎯','incendiary':'🔥','explosive':'💣','piercing':'🪡','autolaser':'⚡','reaper':'☠️'};
+var BUFF_NAMES={'healing':'ЗЦІЛЕННЯ','speed':'ШВИДКІСТЬ','shield':'ЩИТ','invisible':'НЕВИДИМІСТЬ','double_dmg':'ПОДВІЙНА ШКОДА','boss':'БОС','samurai':'САМУРАЙ','minigun':'МІНІГАН','shotgun':'ДРОБОВИК','homing':'САМОНАВЕДЕННЯ','incendiary':'ЗАПАЛЮВАЛЬНІ','explosive':'ВИБУХОВІ','piercing':'БРОНЕБІЙНІ','autolaser':'АВТО-ЛАЗЕР','reaper':'ЖНЕЦЬ'};
+var BUFFS={'none':{cd:2000},'boss':{cd:2000},'samurai':{cd:500},'minigun':{cd:150},'shotgun':{cd:2000},'homing':{cd:2000},'incendiary':{cd:2000},'explosive':{cd:2000},'piercing':{cd:2000},'healing':{cd:2000},'shield':{cd:2000},'invisible':{cd:2000},'double_dmg':{cd:2000},'autolaser':{cd:2000},'reaper':{cd:2000},'fast':{cd:150}};
+var mines={},lasers=[];
 window.getTankSpeed=function(){let spd=typeof BASE_SPEED!=='undefined'?BASE_SPEED:200;if(myEquipped&&myEquipped.hull&&MODULES[myEquipped.hull]&&MODULES[myEquipped.hull].stats.speed)spd*=MODULES[myEquipped.hull].stats.speed;if(myEquipped&&myEquipped.tracks&&MODULES[myEquipped.tracks]&&MODULES[myEquipped.tracks].stats.speed)spd*=MODULES[myEquipped.tracks].stats.speed;if(myLocalTank.buff==='speed')spd*=1.5;if(myLocalTank.buff==='samurai')spd*=1.6;if(myLocalTank.buff==='boss')spd*=0.6;return spd;};
 window.getReloadTime=function(){let cd=BASE_RELOAD;if(myEquipped&&myEquipped.cannon&&MODULES[myEquipped.cannon]&&MODULES[myEquipped.cannon].stats.cd)cd*=MODULES[myEquipped.cannon].stats.cd;return cd;};
 function createExplosion(x,y,count,color){for(let i=0;i<count;i++){const ang=Math.random()*Math.PI*2,spd=Math.random()*200+50;particles.push({x,y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,life:Math.random()*0.4+0.1,color});}}
