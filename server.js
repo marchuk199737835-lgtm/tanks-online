@@ -315,6 +315,23 @@ function removePlayer(rId, sockId) {
     io.to(rId).emit('updateLobby', r);
 }
 
+// ===== ADVENT: єдиний авторитетний часовий пояс івенту =====
+const ADVENT_TZ = process.env.ADVENT_TZ || 'Europe/Kiev';
+function tzParts(date) {
+    let f = new Intl.DateTimeFormat('en-GB', { timeZone: ADVENT_TZ, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' });
+    let o = {}; f.formatToParts(date).forEach(p => { if (p.type !== 'literal') o[p.type] = parseInt(p.value, 10); });
+    return { year: o.year, month: o.month - 1, day: o.day, hour: o.hour, minute: o.minute, second: o.second };
+}
+function tzOffsetMs(date) { let p = tzParts(date); return Date.UTC(p.year, p.month, p.day, p.hour, p.minute, p.second) - Math.floor(date.getTime() / 1000) * 1000; }
+function adventEndMs(year) {
+    let guess = Date.UTC(year, 9, 31, 23, 59, 59), t = guess - tzOffsetMs(new Date(guess));
+    return guess - tzOffsetMs(new Date(t));
+}
+function adventState() {
+    let now = new Date(), p = tzParts(now);
+    return { day: p.month === 9 ? p.day : 0, end: adventEndMs(p.year), now: now.getTime() };
+}
+
 io.on('connection', (socket) => {
     socket.emit('initMusic', musicData);
     socket.emit('initZombies', Z_TYPES_CLIENT);
@@ -360,24 +377,27 @@ io.on('connection', (socket) => {
         } else socket.emit('authError', 'Сесія закінчилась, увійдіть знову');
     });
 
+    socket.emit('adventState', adventState());
+    socket.on('getAdventState', () => socket.emit('adventState', adventState()));
+
     socket.on('claimAdvent', () => {
         let name = globalPlayers[socket.id];
         if (!name || !dbUsers[name]) return;
-        let u = dbUsers[name], d = new Date(), month = d.getMonth(), day = d.getDate();
-        if (month !== 9) return socket.emit('promoError', 'Івент проходить лише в жовтні!');
+        let u = dbUsers[name], st = adventState(), day = st.day;
+        socket.emit('adventState', st);
+        if (!u.adventClaims) u.adventClaims = [];
+        if (day === 0) return socket.emit('promoError', 'Івент проходить лише в жовтні!');
         if (day < 3) return socket.emit('promoError', 'Івент ще не почався!');
         if (u.adventClaims.includes(day)) return socket.emit('promoError', 'Сьогоднішня нагорода вже отримана!');
-        u.adventClaims.push(day);
         if (day === 31) {
-            if (u.adventClaims.length >= 20) {
-                let modId = getRandomModuleFromCase(12);
-                if (u.inventory.length < 30) u.inventory.push(modId);
-                socket.emit('adventSuccess', { type: 'legendary', item: modId, day: day });
-            } else {
-                u.adventClaims.pop();
-                return socket.emit('promoError', 'Недостатньо зібраних днів (мінімум 20) для фінальної нагороди!');
-            }
+            if (u.adventClaims.length + 1 < 20) return socket.emit('promoError', 'Недостатньо зібраних днів (мінімум 20) для фінальної нагороди!');
+            if (u.inventory.length >= 30) return socket.emit('promoError', 'Інвентар повний! Звільніть місце для легендарної нагороди.');
+            u.adventClaims.push(day);
+            let modId = getRandomModuleFromCase(12);
+            u.inventory.push(modId);
+            socket.emit('adventSuccess', { type: 'legendary', item: modId, day: day });
         } else {
+            u.adventClaims.push(day);
             let reward = 20 + (day - 3) * 5;
             u.bucks += reward;
             u.stats.earned += reward;
