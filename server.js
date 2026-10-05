@@ -18,8 +18,6 @@ const MODULES={'can_c1':{id:'can_c1',type:'cannon',rarity:'common',name:'Іск�
 const CASES={1:{price:50,drop:{c:60,r:30,e:9,l:1},pool:'all'},2:{price:75,drop:{c:50,r:35,e:12,l:3},pool:['can_c1','can_r1','can_e1','can_l1','tur_c1','tur_r1','tur_e1','tur_l1','hul_c3','hul_r1','hul_e1','hul_l1','trk_c1','trk_r1','trk_e1','trk_l1']},3:{price:75,drop:{c:50,r:35,e:12,l:3},pool:['tur_c2','tur_r2','tur_e2','tur_l2','hul_c1','hul_r2','hul_e2','hul_l2','trk_c2','trk_r2','trk_e2','trk_l2']},4:{price:75,drop:{c:50,r:35,e:12,l:3},pool:['can_c2','can_r2','can_e2','can_l2','can_c3','can_r3','can_e3','can_l3','tur_c3','tur_r3','tur_e3','tur_l3','hul_c2','hul_r3','hul_e3','hul_l3','trk_c3','trk_r3','trk_e3','trk_l3']},5:{price:60,drop:{c:60,r:30,e:9,l:1},pool:'cannon'},6:{price:60,drop:{c:60,r:30,e:9,l:1},pool:'turret'},7:{price:60,drop:{c:60,r:30,e:9,l:1},pool:'hull'},8:{price:60,drop:{c:60,r:30,e:9,l:1},pool:'tracks'},9:{price:100,drop:{c:0,r:75,e:22,l:3},pool:'all'},10:{price:200,drop:{c:0,r:0,e:85,l:15},pool:'all'},11:{price:150,drop:{c:30,r:40,e:25,l:5},pool:'all'},12:{price:500,drop:{c:0,r:0,e:0,l:100},pool:'all'}};
 
 function getRandomModuleFromCase(caseId) {let cs = CASES[caseId]; if(!cs) return null; let pool = Object.keys(MODULES); if(cs.pool === 'cannon') pool = Object.keys(MODULES).filter(m => MODULES[m].type === 'cannon'); else if(cs.pool === 'turret') pool = Object.keys(MODULES).filter(m => MODULES[m].type === 'turret'); else if(cs.pool === 'hull') pool = Object.keys(MODULES).filter(m => MODULES[m].type === 'hull'); else if(cs.pool === 'tracks') pool = Object.keys(MODULES).filter(m => MODULES[m].type === 'tracks'); else if(Array.isArray(cs.pool)) pool = cs.pool; else if(cs.drop && cs.drop.l === 100) pool = Object.keys(MODULES).filter(m => MODULES[m].rarity === 'legendary'); let r = Math.random()*100, rar = 'common'; let d = cs.drop; if(r <= d.c) rar = 'common'; else if(r <= d.c + d.r) rar = 'rare'; else if(r <= d.c + d.r + d.e) rar = 'epic'; else rar = 'legendary'; let rarPool = pool.filter(m => MODULES[m].rarity === rar); if(rarPool.length === 0) rarPool = pool; return rarPool[Math.floor(Math.random()*rarPool.length)];}
-
-// Оновлена функція колізії, яка ігнорує перешкоди, з яких виходить Бос
 function checkCollisionServer(mapName,x,y,r,ignoreList=[]){let cM=MAP_DATA[mapName]?mapName:'epic_map',mS=MAP_DATA[cM].size;if(x-r<0||x+r>mS||y-r<0||y+r>mS)return true;let arr=MAP_DATA[cM].solids;for(let i=0;i<arr.length;i++){if(ignoreList.includes(i))continue;let s=arr[i];if(s.type.includes('spawn')||s.type==='line'||s.type==='prop_puddle'||s.type==='prop_crater')continue;if(s.type==='tree'||s.type==='neon_circle'||s.type==='neon_pillar'){let cx=s.x+(s.w?s.w/2:0),cy=s.y+(s.h?s.h/2:0),sr=s.r||(s.w?s.w/2:30);if(Math.hypot(x-cx,y-cy)<=r+sr)return true;}else{let tX=Math.max(s.x,Math.min(x,s.x+(s.w||30))),tY=Math.max(s.y,Math.min(y,s.y+(s.h||30)));if(Math.hypot(x-tX,y-tY)<=r)return true;}}return false;}
 function getValidSpawn(m,r,t='spawn_player'){let cM=MAP_DATA[m]?m:'epic_map',mS=MAP_DATA[cM].size,sP=MAP_DATA[cM].solids.filter(s=>s.type===t);if(sP.length>0){let a=0;while(a<50){let sp=sP[Math.floor(Math.random()*sP.length)],sx=sp.x+(Math.random()*20-10),sy=sp.y+(Math.random()*20-10);if(!checkCollisionServer(cM,sx,sy,r))return{x:sx,y:sy};a++;}let sp=sP[Math.floor(Math.random()*sP.length)];return{x:sp.x,y:sp.y};}for(let i=0;i<100;i++){let x=Math.random()*(mS-200)+100,y=Math.random()*(mS-200)+100;if(!checkCollisionServer(cM,x,y,r+20))return{x,y};}return{x:mS/2,y:mS/2};}
 function getValidEdgeSpawn(m,r,t='spawn_zombie'){let cM=MAP_DATA[m]?m:'epic_map',mS=MAP_DATA[cM].size,sP=MAP_DATA[cM].solids.filter(s=>s.type===t);if(sP.length>0)return getValidSpawn(m,r,t);for(let i=0;i<100;i++){let x=Math.random()<0.5?50:mS-50,y=Math.random()*(mS-100)+50;if(!checkCollisionServer(cM,x,y,r+20))return{x,y};}return getValidSpawn(m,r);}
@@ -58,6 +56,7 @@ io.on('connection',(socket)=>{
     socket.on('selectProp',(data)=>{if(!data||!data.roomId)return;let r=rooms[data.roomId];if(r&&r.status==='playing'&&r.mode==='prophunt'&&r.players[socket.id])r.players[socket.id].propType=data.type;});
     socket.on('updateDisguise',(data)=>{if(!data||!data.roomId)return;let r=rooms[data.roomId];if(r&&r.status==='playing'&&r.mode==='prophunt'&&r.players[socket.id]){r.players[socket.id].isDisguised=data.state;if(data.state){r.players[socket.id].x=data.x;r.players[socket.id].y=data.y;r.players[socket.id].bodyAngle=0;r.players[socket.id].turretAngle=0;}}});
     socket.on('setLaserTarget',(data)=>{let r=rooms[data.roomId],p=r?r.players[socket.id]:null;if(p&&p.buff==='autolaser')p.laserTarget=data.targetId;});
+    
     socket.on('move',(data)=>{let r=rooms[data.roomId];if(r&&r.players[socket.id]&&r.status==='playing'){let p=r.players[socket.id];p.x=data.x;p.y=data.y;p.bodyAngle=data.bodyAngle;p.turretAngle=data.turretAngle;if(p.stuckIn.length>0){let cM=MAP_DATA[r.map]?r.map:'epic_map',arr=MAP_DATA[cM].solids,sI=[];p.stuckIn.forEach(i=>{let s=arr[i],rad=24;let cx=s.x+(s.w?s.w/2:0),cy=s.y+(s.h?s.h/2:0),sr=s.r||(s.w?s.w/2:30),h=Math.hypot(p.x-cx,p.y-cy)<=rad+sr;let tX=Math.max(s.x,Math.min(p.x,s.x+(s.w||30))),tY=Math.max(s.y,Math.min(p.y,s.y+(s.h||30))),h2=Math.hypot(p.x-tX,p.y-tY)<=rad;if(s.type==='tree'||s.type.includes('neon')){if(h)sI.push(i);}else{if(h2)sI.push(i);}});p.stuckIn=sI;}}});
     
     socket.on('shoot',(data)=>{let r=rooms[data.roomId];if(r&&r.status==='playing'){
@@ -74,15 +73,11 @@ io.on('connection',(socket)=>{
         let fD=data.amt;
         if(r.mode==='prophunt'){if(r.state!=='seeking'||!atk||atk.team!=='hunter'||v.team==='hunter')return;fD=250;v.isDisguised=false;}
         else{if(atkName&&dbUsers[atkName]&&dbUsers[atkName].equipped&&dbUsers[atkName].equipped.cannon){let c=dbUsers[atkName].equipped.cannon;if(MODULES[c]&&MODULES[c].stats.dmg)fD*=MODULES[c].stats.dmg;}}
-        
         if(data.type==='incendiary') v.onFire={end:Date.now()+5000,nextTick:Date.now()+1000,owner:socket.id};
         v.hp=Math.max(0,v.hp-fD);io.to(socket.id).emit('hitConfirmed');
         if(v.hp===0){
             v.buff=null;v.onFire=null;io.to(data.roomId).emit('playerDied',{id:data.targetId,killer:socket.id});if(atkName&&dbUsers[atkName]&&r.mode!=='prophunt'){dbUsers[atkName].stats.kills++;saveUser(atkName);}
-            if(r.mode==='team_deathmatch'){
-                r.teamScores[atk.team]++;if(r.teamScores[atk.team]>=r.tdmScore)endTDMGame(r,atk.team);
-                else setTimeout(()=>{if(r&&r.players[data.targetId]&&r.status==='playing'){v.hp=getMaxHp(v.equipped);let sp=getValidSpawn(r.map,24,'spawn_player');v.x=sp.x;v.y=sp.y;io.to(data.roomId).emit('playerRespawn',v);}},3000);
-            }
+            if(r.mode==='team_deathmatch'){r.teamScores[atk.team]++;if(r.teamScores[atk.team]>=r.tdmScore)endTDMGame(r,atk.team);else setTimeout(()=>{if(r&&r.players[data.targetId]&&r.status==='playing'){v.hp=getMaxHp(v.equipped);let sp=getValidSpawn(r.map,24,'spawn_player');v.x=sp.x;v.y=sp.y;io.to(data.roomId).emit('playerRespawn',v);}},3000);}
             else if(r.mode==='deathmatch'){const tid='tkn_'+Date.now()+Math.random();r.tokens[tid]={id:tid,x:v.x,y:v.y,color:v.color,active:true};setTimeout(()=>{if(r&&r.players[data.targetId]&&r.status==='playing'){v.hp=getMaxHp(v.equipped);let sp=getValidSpawn(r.map,24,'spawn_player');v.x=sp.x;v.y=sp.y;io.to(data.roomId).emit('playerRespawn',v);}},3000);}
             else if(r.mode==='prophunt'){let hA=Object.values(r.players).filter(pl=>pl.team==='hider'&&pl.hp>0).length;if(hA===0)endPropHuntGame(r,'hunter');}
         }
@@ -98,26 +93,170 @@ socket.on('takeDamage',(d)=>{let r=rooms[d.roomId];if(!r||r.status!=='playing'||
 function endPropHuntGame(r,wT){r.status='finished';let rew={},wId=null;Object.values(r.players).forEach(p=>{let isW=(p.team===wT),a=isW?15:3;rew[p.id]=a;if(isW&&!wId)wId=p.id;if(dbUsers[p.name]){dbUsers[p.name].bucks+=a;dbUsers[p.name].stats.earned+=a;dbUsers[p.name].stats.matches++;let dr=rollDrop(p.name);saveUser(p.name);io.to(p.id).emit('economyUpdate',{bucks:dbUsers[p.name].bucks,inventory:dbUsers[p.name].inventory,equipped:dbUsers[p.name].equipped,stats:dbUsers[p.name].stats,adventClaims:dbUsers[p.name].adventClaims});if(dr)io.to(p.id).emit('dropReceived',dr);}});io.to(r.id).emit('gameOver',{winner:wId||'TEAM',name:wT==='hunter'?'КОМАНДА МИСЛИВЦІВ':'ТІ, ХТО ХОВАВСЯ',rewards:rew,isTeamWin:true});io.emit('roomsList',getActiveRooms());}
 function endTDMGame(r,wT){r.status='finished';let rew={},wId=null,isD=(wT==='draw');Object.values(r.players).forEach(p=>{let isW=!isD&&(p.team===wT),a=isD?10:(isW?20:5);rew[p.id]=a;if(isW&&!wId)wId=p.id;if(dbUsers[p.name]){dbUsers[p.name].bucks+=a;dbUsers[p.name].stats.earned+=a;dbUsers[p.name].stats.matches++;let dr=rollDrop(p.name);saveUser(p.name);io.to(p.id).emit('economyUpdate',{bucks:dbUsers[p.name].bucks,inventory:dbUsers[p.name].inventory,equipped:dbUsers[p.name].equipped,stats:dbUsers[p.name].stats,adventClaims:dbUsers[p.name].adventClaims});if(dr)io.to(p.id).emit('dropReceived',dr);}});io.to(r.id).emit('gameOver',{winner:isD?'DRAW':(wT||'TEAM'),name:isD?'НІЧИЯ':`КОМАНДА ${typeof wT==='string'?wT.toUpperCase():'ПОБЕДИТЕЛЬ'}`,rewards:rew,isTeamWin:!isD});io.emit('roomsList',getActiveRooms());}
 
-setInterval(()=>{const now=Date.now();for(let rId in rooms){let r=rooms[rId];if(r.status!=='playing')continue;
-    if(r.mode==='deathmatch'||r.mode==='survival'){
-        let pKeys=Object.keys(r.powerups);pKeys.forEach(k=>{if(now-r.powerups[k].spawnTime>60000)delete r.powerups[k];});
-        pKeys=Object.keys(r.powerups);
-        if(now-r.lastPowerupSpawn>=30000){r.lastPowerupSpawn=now;const cM=MAP_DATA[r.map]?r.map:'epic_map',sPts=MAP_DATA[cM].solids.filter(s=>s.type==='spawn_powerup');if(sPts.length>0&&pKeys.length<4){let cnt=Math.min(2,4-pKeys.length),shuffled=[...sPts].sort(()=>0.5-Math.random()).slice(0,cnt);const pTypes=['boss','samurai','minigun','shotgun','homing','incendiary','explosive','piercing','healing','shield','autolaser','reaper'];shuffled.forEach((pt,i)=>{let pid='p_up_'+now+'_'+i,pType=pTypes[Math.floor(Math.random()*pTypes.length)];r.powerups[pid]={id:pid,x:pt.x,y:pt.y,type:pType,active:true,spawnTime:now};});}}
-    }else r.powerups={};
-    if(r.mode==='prophunt'){if(r.state==='hiding'&&now>=r.phaseEndTime){r.state='seeking';r.phaseEndTime=now+(r.seekTime*1000);Object.values(r.players).forEach(p=>{if(p.team==='hunter'){p.hp=getMaxHp(p.equipped);let sp=getValidSpawn(r.map,30,'spawn_player');p.x=sp.x;p.y=sp.y;}});io.to(rId).emit('phPhaseChange',{phase:'seeking',time:r.seekTime});}else if(r.state==='seeking'&&now>=r.phaseEndTime){endPropHuntGame(r,'hider');continue;}}
-    if(r.mode==='team_deathmatch'){if(now>=r.timeEndTime){let mS=-1,w=[];for(let t in r.teamScores){if(r.teamScores[t]>mS){mS=r.teamScores[t];w=[t];}else if(r.teamScores[t]===mS)w.push(t);}if(w.length===1)endTDMGame(r,w[0]);else endTDMGame(r,'draw');continue;}}
-    
-    for(let mid in r.mines){let m=r.mines[mid];Object.values(r.players).forEach(p=>{if(p.hp>0&&p.id!==m.owner&&Math.hypot(p.x-m.x,p.y-m.y)<35&&p.buff!=='shield'){p.hp=Math.max(0,p.hp-125);io.to(rId).emit('mineExploded',{x:m.x,y:m.y});if(p.hp===0){io.to(rId).emit('playerDied',{id:p.id,killer:m.owner});if(r.mode==='team_deathmatch'&&r.players[m.owner]){r.teamScores[r.players[m.owner].team]++;if(r.teamScores[r.players[m.owner].team]>=r.tdmScore)endTDMGame(r,r.players[m.owner].team);else setTimeout(()=>{p.hp=getMaxHp(p.equipped);let sp=getValidSpawn(r.map,24,'spawn_player');p.x=sp.x;p.y=sp.y;io.to(rId).emit('playerRespawn',p);},3000);}else if(r.mode==='deathmatch'){const tid='tkn_'+Date.now()+Math.random();r.tokens[tid]={id:tid,x:p.x,y:p.y,color:p.color,active:true};setTimeout(()=>{p.hp=getMaxHp(p.equipped);let sp=getValidSpawn(r.map,24,'spawn_player');p.x=sp.x;p.y=sp.y;io.to(rId).emit('playerRespawn',p);},3000);}}delete r.mines[mid];}});}
-    
-    Object.values(r.players).forEach(p=>{
-        if(p.onFire){if(now>=p.onFire.end)p.onFire=null;else if(now>=p.onFire.nextTick&&p.hp>0){p.onFire.nextTick=now+1000;if(p.buff!=='shield')p.hp=Math.max(0,p.hp-20);io.to(rId).emit('burnTick',{x:p.x,y:p.y});if(p.hp===0){p.onFire=null;io.to(rId).emit('playerDied',{id:p.id,killer:p.onFire?p.onFire.owner:null});}}}
-        if(p.buff){p.buffProgress=Math.max(0,(p.buffEndTime-now)/BUFF_DURATION);
-            if(p.buff==='healing'&&p.hp>0&&now>=p.nextHeal){p.hp=Math.min(getMaxHp(p.equipped),p.hp+10);p.nextHeal=now+1000;}
-            if(p.buff==='autolaser'&&p.laserTarget&&r.players[p.laserTarget]&&r.players[p.laserTarget].hp>0&&(!p.nextLaser||now>=p.nextLaser)){if(Math.hypot(p.x-r.players[p.laserTarget].x,p.y-r.players[p.laserTarget].y)<400){p.nextLaser=now+100;io.to(rId).emit('laserHit',{src:p.id,tgt:p.laserTarget});if(r.players[p.laserTarget].buff!=='shield'){r.players[p.laserTarget].hp=Math.max(0,r.players[p.laserTarget].hp-20);if(r.players[p.laserTarget].hp===0)io.to(rId).emit('playerDied',{id:p.laserTarget,killer:p.id});}}}
-            if(now>p.buffEndTime){if(p.buff==='boss'){p.stuckIn=[];let cM=MAP_DATA[r.map]?r.map:'epic_map',arr=MAP_DATA[cM].solids;for(let i=0;i<arr.length;i++){let s=arr[i];if(s.type.includes('spawn')||s.type==='line')continue;let cx=s.x+(s.w?s.w/2:0),cy=s.y+(s.h?s.h/2:0),sr=s.r||(s.w?s.w/2:30),h=Math.hypot(p.x-cx,p.y-cy)<=24+sr;let tX=Math.max(s.x,Math.min(p.x,s.x+(s.w||30))),tY=Math.max(s.y,Math.min(p.y,s.y+(s.h||30))),h2=Math.hypot(p.x-tX,p.y-tY)<=24;if(s.type==='tree'||s.type.includes('neon')){if(h)p.stuckIn.push(i);}else{if(h2)p.stuckIn.push(i);}}}p.buff=null;p.buffProgress=0;}else p.buffProgress=0;}
-        if(r.mode==='survival'){const aP=Object.values(r.players).filter(pl=>pl.hp>0);if(aP.length===0){r.status='finished';let rw={};Object.values(r.players).forEach(pl=>{let n=pl.name;if(dbUsers[n]){let wv=r.wave;dbUsers[n].bucks+=wv;dbUsers[n].stats.earned+=wv;dbUsers[n].stats.matches++;let dr=rollDrop(n);saveUser(n);io.to(pl.id).emit('economyUpdate',{bucks:dbUsers[n].bucks,inventory:dbUsers[n].inventory,equipped:dbUsers[n].equipped,stats:dbUsers[n].stats,adventClaims:dbUsers[n].adventClaims});if(dr)io.to(pl.id).emit('dropReceived',dr);}});io.to(rId).emit('gameOver',{winner:'ZOMBIES',wave:r.wave,rewards:rw,isTeamWin:false});io.emit('roomsList',getActiveRooms());continue;}if(Object.keys(r.zombies).length===0){if(r.state==='playing'){r.state='waiting';r.nextWaveTime=now+4000;let nW=r.wave+1;if(nW===10||nW===20||nW===30||nW===40)io.to(rId).emit('bossWarning');}else if(r.state==='waiting'&&now>r.nextWaveTime){r.wave++;let isBW=(r.wave%10===0&&r.wave<=40);if(isBW){let bTypes=['pikus','shurik','oneshot','padlo'],bType=bTypes[(r.wave/10)-1],zid='boss_'+now,zS=getValidSpawn(r.map,50,'spawn_zombie');r.zombies[zid]={id:zid,x:zS.x,y:zS.y,type:bType,hp:Z_TYPES[bType].hp,nextAttack:0,onFire:null};io.to(rId).emit('newWave',{wave:r.wave,isBoss:true,bossName:Z_TYPES[bType].name});}else{let sC=20+(r.wave-1)*5,tL=['normal','runner','spitter','tanker','bomber','ghost'],mI=Math.min(tL.length-1,Math.floor((r.wave)/5)),aT=tL.slice(0,mI+1);for(let i=0;i<sC;i++){let t=aT[Math.floor(Math.random()*aT.length)],zS=getValidEdgeSpawn(r.map,20,'spawn_zombie'),zid='z_'+now+'_'+i;r.zombies[zid]={id:zid,x:zS.x,y:zS.y,type:t,hp:Z_TYPES[t].hp,nextAttack:0,onFire:null};}io.to(rId).emit('newWave',{wave:r.wave,isBoss:false});}r.state='playing';}}else if(r.state==='playing'){for(let zid in r.zombies){let z=r.zombies[zid],t=null,mD=Infinity;if(z.onFire){if(now>=z.onFire.end)z.onFire=null;else if(now>=z.onFire.nextTick&&z.hp>0){z.onFire.nextTick=now+1000;z.hp-=20;io.to(rId).emit('burnTick',{x:z.x,y:z.y});if(z.hp<=0){if(z.type==='bomber')io.to(rId).emit('bomberExplode',{x:z.x,y:z.y});delete r.zombies[zid];continue;}}}aP.forEach(pl=>{let d=Math.hypot(pl.x-z.x,pl.y-z.y);if(pl.buff==='invisible')d*=3;if(d<mD){mD=d;t=pl;}});if(t){let dx=t.x-z.x,dy=t.y-z.y,l=Math.hypot(dx,dy),sp=Z_TYPES[z.type].speed,nX=z.x+(dx/l)*sp*(1/30),nY=z.y+(dy/l)*sp*(1/30);if(!checkCollisionServer(r.map,nX,z.y,Z_TYPES[z.type].radius))z.x=nX;if(!checkCollisionServer(r.map,z.x,nY,Z_TYPES[z.type].radius))z.y=nY;if(Z_TYPES[z.type].isBoss&&now>z.nextAttack){z.nextAttack=now+Z_TYPES[z.type].cd;let bC=Z_TYPES[z.type].bullets,spr=Math.PI/4,sA=Math.atan2(dy,dx)-(spr/2),st=spr/Math.max(1,bC-1);if(bC===25){spr=Math.PI*2;st=spr/25;sA=0;}for(let b=0;b<bC;b++){let a=sA+(b*st);io.to(rId).emit('spawnBullet',{id:'b_'+now+b+zid,x:z.x,y:z.y,vx:Math.cos(a)*500,vy:Math.sin(a)*500,type:'boss_proj',owner:'zombie',dmgOverride:Z_TYPES[z.type].dmg});}}else if(Z_TYPES[z.type].ranged&&!Z_TYPES[z.type].isBoss&&mD<400&&now>z.nextAttack){z.nextAttack=now+2000;io.to(rId).emit('spawnBullet',{id:'ac_'+now+zid,x:z.x,y:z.y,vx:(dx/l)*400,vy:(dy/l)*400,type:'acid',owner:'zombie'});}else if(!Z_TYPES[z.type].isBoss&&mD<30+Z_TYPES[z.type].radius+5&&now>z.nextAttack){z.nextAttack=now+1000;io.to(rId).emit('zombieMeleeHit',{targetId:t.id,dmg:Z_TYPES[z.type].dmg});}}}}}
+setInterval(()=>{
+    const now=Date.now();
+    for(let rId in rooms){
+        let r=rooms[rId];
+        if(r.status!=='playing')continue;
+
+        if(r.mode==='deathmatch'||r.mode==='survival'){
+            let pKeys=Object.keys(r.powerups);
+            pKeys.forEach(k=>{if(now-r.powerups[k].spawnTime>60000)delete r.powerups[k];});
+            pKeys=Object.keys(r.powerups);
+            if(now-r.lastPowerupSpawn>=30000){
+                r.lastPowerupSpawn=now;
+                const cM=MAP_DATA[r.map]?r.map:'epic_map',sPts=MAP_DATA[cM].solids.filter(s=>s.type==='spawn_powerup');
+                if(sPts.length>0&&pKeys.length<4){
+                    let cnt=Math.min(2,4-pKeys.length),shuffled=[...sPts].sort(()=>0.5-Math.random()).slice(0,cnt);
+                    const pTypes=['boss','samurai','minigun','shotgun','homing','incendiary','explosive','piercing','healing','shield','autolaser','reaper'];
+                    shuffled.forEach((pt,i)=>{
+                        let pid='p_up_'+now+'_'+i,pType=pTypes[Math.floor(Math.random()*pTypes.length)];
+                        r.powerups[pid]={id:pid,x:pt.x,y:pt.y,type:pType,active:true,spawnTime:now};
+                    });
+                }
+            }
+        }else r.powerups={};
+
+        if(r.mode==='prophunt'){
+            if(r.state==='hiding'&&now>=r.phaseEndTime){
+                r.state='seeking';r.phaseEndTime=now+(r.seekTime*1000);
+                Object.values(r.players).forEach(p=>{if(p.team==='hunter'){p.hp=getMaxHp(p.equipped);let sp=getValidSpawn(r.map,30,'spawn_player');p.x=sp.x;p.y=sp.y;}});
+                io.to(rId).emit('phPhaseChange',{phase:'seeking',time:r.seekTime});
+            }else if(r.state==='seeking'&&now>=r.phaseEndTime){
+                endPropHuntGame(r,'hider');
+                continue;
+            }
+        }
+        
+        if(r.mode==='team_deathmatch'){
+            if(now>=r.timeEndTime){
+                let mS=-1,w=[];
+                for(let t in r.teamScores){
+                    if(r.teamScores[t]>mS){mS=r.teamScores[t];w=[t];}else if(r.teamScores[t]===mS)w.push(t);
+                }
+                if(w.length===1)endTDMGame(r,w[0]);else endTDMGame(r,'draw');
+                continue;
+            }
+        }
+
+        for(let mid in r.mines){
+            let m=r.mines[mid];
+            Object.values(r.players).forEach(p=>{
+                if(p.hp>0&&p.id!==m.owner&&Math.hypot(p.x-m.x,p.y-m.y)<35&&p.buff!=='shield'){
+                    p.hp=Math.max(0,p.hp-125);
+                    io.to(rId).emit('mineExploded',{x:m.x,y:m.y});
+                    if(p.hp===0){
+                        io.to(rId).emit('playerDied',{id:p.id,killer:m.owner});
+                        if(r.mode==='team_deathmatch'&&r.players[m.owner]){
+                            r.teamScores[r.players[m.owner].team]++;
+                            if(r.teamScores[r.players[m.owner].team]>=r.tdmScore)endTDMGame(r,r.players[m.owner].team);
+                            else setTimeout(()=>{p.hp=getMaxHp(p.equipped);let sp=getValidSpawn(r.map,24,'spawn_player');p.x=sp.x;p.y=sp.y;io.to(rId).emit('playerRespawn',p);},3000);
+                        }else if(r.mode==='deathmatch'){
+                            const tid='tkn_'+Date.now()+Math.random();r.tokens[tid]={id:tid,x:p.x,y:p.y,color:p.color,active:true};
+                            setTimeout(()=>{p.hp=getMaxHp(p.equipped);let sp=getValidSpawn(r.map,24,'spawn_player');p.x=sp.x;p.y=sp.y;io.to(rId).emit('playerRespawn',p);},3000);
+                        }
+                    }
+                    delete r.mines[mid];
+                }
+            });
+        }
+
+        Object.values(r.players).forEach(p=>{
+            if(p.onFire){
+                if(now>=p.onFire.end)p.onFire=null;
+                else if(now>=p.onFire.nextTick&&p.hp>0){
+                    p.onFire.nextTick=now+1000;
+                    if(p.buff!=='shield')p.hp=Math.max(0,p.hp-20);
+                    io.to(rId).emit('burnTick',{x:p.x,y:p.y});
+                    if(p.hp===0){p.onFire=null;io.to(rId).emit('playerDied',{id:p.id,killer:p.onFire?p.onFire.owner:null});}
+                }
+            }
+            if(p.buff){
+                p.buffProgress=Math.max(0,(p.buffEndTime-now)/BUFF_DURATION);
+                if(p.buff==='healing'&&p.hp>0&&now>=p.nextHeal){
+                    p.hp=Math.min(getMaxHp(p.equipped),p.hp+10);p.nextHeal=now+1000;
+                }
+                if(p.buff==='autolaser'&&p.laserTarget&&r.players[p.laserTarget]&&r.players[p.laserTarget].hp>0&&(!p.nextLaser||now>=p.nextLaser)){
+                    if(Math.hypot(p.x-r.players[p.laserTarget].x,p.y-r.players[p.laserTarget].y)<400){
+                        p.nextLaser=now+100;
+                        io.to(rId).emit('laserHit',{src:p.id,tgt:p.laserTarget});
+                        if(r.players[p.laserTarget].buff!=='shield'){
+                            r.players[p.laserTarget].hp=Math.max(0,r.players[p.laserTarget].hp-20);
+                            if(r.players[p.laserTarget].hp===0)io.to(rId).emit('playerDied',{id:p.laserTarget,killer:p.id});
+                        }
+                    }
+                }
+                if(now>p.buffEndTime){
+                    if(p.buff==='boss'){
+                        p.stuckIn=[];let cM=MAP_DATA[r.map]?r.map:'epic_map',arr=MAP_DATA[cM].solids;
+                        for(let i=0;i<arr.length;i++){
+                            let s=arr[i];if(s.type.includes('spawn')||s.type==='line')continue;
+                            let cx=s.x+(s.w?s.w/2:0),cy=s.y+(s.h?s.h/2:0),sr=s.r||(s.w?s.w/2:30),h=Math.hypot(p.x-cx,p.y-cy)<=24+sr;
+                            let tX=Math.max(s.x,Math.min(p.x,s.x+(s.w||30))),tY=Math.max(s.y,Math.min(p.y,s.y+(s.h||30))),h2=Math.hypot(p.x-tX,p.y-tY)<=24;
+                            if(s.type==='tree'||s.type.includes('neon')){if(h)p.stuckIn.push(i);}else{if(h2)p.stuckIn.push(i);}
+                        }
+                    }
+                    p.buff=null;p.buffProgress=0;
+                }
+            }else p.buffProgress=0;
+        });
+
+        if(r.mode==='survival'){
+            const aP=Object.values(r.players).filter(pl=>pl.hp>0);
+            if(aP.length===0){
+                r.status='finished';let rw={};
+                Object.values(r.players).forEach(pl=>{
+                    let n=pl.name;if(dbUsers[n]){let wv=r.wave;dbUsers[n].bucks+=wv;dbUsers[n].stats.earned+=wv;dbUsers[n].stats.matches++;let dr=rollDrop(n);saveUser(n);io.to(pl.id).emit('economyUpdate',{bucks:dbUsers[n].bucks,inventory:dbUsers[n].inventory,equipped:dbUsers[n].equipped,stats:dbUsers[n].stats,adventClaims:dbUsers[n].adventClaims});if(dr)io.to(pl.id).emit('dropReceived',dr);}
+                });
+                io.to(rId).emit('gameOver',{winner:'ZOMBIES',wave:r.wave,rewards:rw,isTeamWin:false});io.emit('roomsList',getActiveRooms());
+                continue;
+            }
+            if(Object.keys(r.zombies).length===0){
+                if(r.state==='playing'){r.state='waiting';r.nextWaveTime=now+4000;let nW=r.wave+1;if(nW===10||nW===20||nW===30||nW===40)io.to(rId).emit('bossWarning');}
+                else if(r.state==='waiting'&&now>r.nextWaveTime){
+                    r.wave++;let isBW=(r.wave%10===0&&r.wave<=40);
+                    if(isBW){
+                        let bTypes=['pikus','shurik','oneshot','padlo'],bType=bTypes[(r.wave/10)-1],zid='boss_'+now,zS=getValidSpawn(r.map,50,'spawn_zombie');
+                        r.zombies[zid]={id:zid,x:zS.x,y:zS.y,type:bType,hp:Z_TYPES[bType].hp,nextAttack:0,onFire:null};
+                        io.to(rId).emit('newWave',{wave:r.wave,isBoss:true,bossName:Z_TYPES[bType].name});
+                    }else{
+                        let sC=20+(r.wave-1)*5,tL=['normal','runner','spitter','tanker','bomber','ghost'],mI=Math.min(tL.length-1,Math.floor((r.wave)/5)),aT=tL.slice(0,mI+1);
+                        for(let i=0;i<sC;i++){let t=aT[Math.floor(Math.random()*aT.length)],zS=getValidEdgeSpawn(r.map,20,'spawn_zombie'),zid='z_'+now+'_'+i;r.zombies[zid]={id:zid,x:zS.x,y:zS.y,type:t,hp:Z_TYPES[t].hp,nextAttack:0,onFire:null};}
+                        io.to(rId).emit('newWave',{wave:r.wave,isBoss:false});
+                    }
+                    r.state='playing';
+                }
+            }else if(r.state==='playing'){
+                for(let zid in r.zombies){
+                    let z=r.zombies[zid],t=null,mD=Infinity;
+                    if(z.onFire){
+                        if(now>=z.onFire.end)z.onFire=null;
+                        else if(now>=z.onFire.nextTick&&z.hp>0){
+                            z.onFire.nextTick=now+1000;z.hp-=20;io.to(rId).emit('burnTick',{x:z.x,y:z.y});
+                            if(z.hp<=0){if(z.type==='bomber')io.to(rId).emit('bomberExplode',{x:z.x,y:z.y});delete r.zombies[zid];continue;}
+                        }
+                    }
+                    aP.forEach(pl=>{let d=Math.hypot(pl.x-z.x,pl.y-z.y);if(pl.buff==='invisible')d*=3;if(d<mD){mD=d;t=pl;}});
+                    if(t){
+                        let dx=t.x-z.x,dy=t.y-z.y,l=Math.hypot(dx,dy),sp=Z_TYPES[z.type].speed,nX=z.x+(dx/l)*sp*(1/30),nY=z.y+(dy/l)*sp*(1/30);
+                        if(!checkCollisionServer(r.map,nX,z.y,Z_TYPES[z.type].radius))z.x=nX;
+                        if(!checkCollisionServer(r.map,z.x,nY,Z_TYPES[z.type].radius))z.y=nY;
+                        if(Z_TYPES[z.type].isBoss&&now>z.nextAttack){
+                            z.nextAttack=now+Z_TYPES[z.type].cd;let bC=Z_TYPES[z.type].bullets,spr=Math.PI/4,sA=Math.atan2(dy,dx)-(spr/2),st=spr/Math.max(1,bC-1);if(bC===25){spr=Math.PI*2;st=spr/25;sA=0;}
+                            for(let b=0;b<bC;b++){let a=sA+(b*st);io.to(rId).emit('spawnBullet',{id:'b_'+now+b+zid,x:z.x,y:z.y,vx:Math.cos(a)*500,vy:Math.sin(a)*500,type:'boss_proj',owner:'zombie',dmgOverride:Z_TYPES[z.type].dmg});}
+                        }else if(Z_TYPES[z.type].ranged&&!Z_TYPES[z.type].isBoss&&mD<400&&now>z.nextAttack){
+                            z.nextAttack=now+2000;io.to(rId).emit('spawnBullet',{id:'ac_'+now+zid,x:z.x,y:z.y,vx:(dx/l)*400,vy:(dy/l)*400,type:'acid',owner:'zombie'});
+                        }else if(!Z_TYPES[z.type].isBoss&&mD<30+Z_TYPES[z.type].radius+5&&now>z.nextAttack){
+                            z.nextAttack=now+1000;io.to(rId).emit('zombieMeleeHit',{targetId:t.id,dmg:Z_TYPES[z.type].dmg});
+                        }
+                    }
+                }
+            }
+        }
+        
         let syncData={players:r.players,zombies:r.zombies,powerups:r.powerups,tokens:r.tokens,mines:r.mines};
-        if(r.mode==='prophunt'){syncData.phState=r.state;syncData.phTimeLeft=Math.max(0,Math.ceil((r.phaseEndTime-now)/1000));}if(r.mode==='team_deathmatch'){syncData.teamScores=r.teamScores;syncData.timeEndTime=r.timeEndTime;}
+        if(r.mode==='prophunt'){syncData.phState=r.state;syncData.phTimeLeft=Math.max(0,Math.ceil((r.phaseEndTime-now)/1000));}
+        if(r.mode==='team_deathmatch'){syncData.teamScores=r.teamScores;syncData.timeEndTime=r.timeEndTime;}
         io.to(rId).emit('sync',syncData);
     }
 },1000/30);
