@@ -8,7 +8,7 @@ let myStats = { kills: 0, matches: 0, earned: 0 };
 let myAdventClaims = [];
 
 const MAX_HP = 500;
-const TANK_SPEED = 280;
+const BASE_SPEED = 200; // базова швидкість танка (множники корпусу, гусениць і бафів застосовуються в getTankSpeed)
 const BASE_BULLET_SPEED = 700;
 
 let currentRoomId = null;

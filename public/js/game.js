@@ -22,7 +22,7 @@ let mines = {};
 let lasers = [];
 
 window.getTankSpeed = function() {
-    let spd = typeof BASE_SPEED !== 'undefined' ? BASE_SPEED : 200;
+    let spd = BASE_SPEED;
     if (myEquipped && myEquipped.hull && MODULES[myEquipped.hull] && MODULES[myEquipped.hull].stats.speed) spd *= MODULES[myEquipped.hull].stats.speed;
     if (myEquipped && myEquipped.tracks && MODULES[myEquipped.tracks] && MODULES[myEquipped.tracks].stats.speed) spd *= MODULES[myEquipped.tracks].stats.speed;
     if (myLocalTank.buff === 'speed') spd *= 1.5;
@@ -542,6 +542,7 @@ socket.on('sync', (data) => {
     if (currentRoomData.mode === 'team_deathmatch') {
         currentRoomData.teamScores = data.teamScores;
         currentRoomData.timeEndTime = data.timeEndTime;
+        currentRoomData.tdmEndLocal = Date.now() + (data.tdmMsLeft || 0); // залишок від сервера, не залежить від годинника клієнта
     }
     let aO = {};
     for (let id in data.players) {
@@ -641,7 +642,7 @@ socket.on('tokenCollected', () => playSound('token'));
 
 socket.on('bomberExplode', (data) => {
     if (typeof createExplosion === 'function') createExplosion(data.x, data.y, 40, '#dc2626');
-    if (Math.hypot(data.x - myLocalTank.x, data.y - myLocalTank.y) < 120) emitDamage(50, 'bomber');
+    if (Math.hypot(data.x - myLocalTank.x, data.y - myLocalTank.y) < 120) emitDamage(data.dmg || 50, 'bomber');
 });
 
 socket.on('zombieMeleeHit', (data) => { if (data.targetId === myId && myLocalTank.hp > 0) emitDamage(data.dmg, 'zombie'); });
@@ -983,7 +984,7 @@ window.updateHUD = function() {
         }
         let tT = document.getElementById('tdm-timer');
         if (tT && currentRoomData.timeEndTime) {
-            let tl = Math.max(0, Math.ceil((currentRoomData.timeEndTime - Date.now()) / 1000)), m = Math.floor(tl / 60), s = tl % 60;
+            let tl = Math.max(0, Math.ceil(((currentRoomData.tdmEndLocal || currentRoomData.timeEndTime) - Date.now()) / 1000)), m = Math.floor(tl / 60), s = tl % 60;
             tT.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
         }
     } else {
