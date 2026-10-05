@@ -238,12 +238,12 @@ function updatePhys(now, dt) {
         
         if (!hP && isS) {
             for (let zid in zombies) {
-                let z = zombies[zid], zD = b.type === 'samurai' ? Z_TYPES[z.type].radius + 35 : Z_TYPES[z.type].radius + 10;
+                let z = zombies[zid], zD = b.type === 'samurai' ? zType(z.type).radius + 35 : zType(z.type).radius + 10;
                 if (Math.hypot(b.x - z.x, b.y - z.y) < zD) {
                     hZ = true;
                     if (b.owner === myId) {
                         socket.emit('zombieHit', { roomId: currentRoomId, zid: zid, dmg: actualDmg, type: b.type });
-                        createExplosion(b.x, b.y, 5, Z_TYPES[z.type].color);
+                        createExplosion(b.x, b.y, 5, zType(z.type).color);
                     }
                     break;
                 }
@@ -846,7 +846,7 @@ function draw(now) {
     
     if (currentRoomData.mode === 'survival') {
         for (let zid in zombies) {
-            let z = zombies[zid], zC = Z_TYPES[z.type]; ctx.save(); ctx.translate(z.x, z.y);
+            let z = zombies[zid], zC = zType(z.type); ctx.save(); ctx.translate(z.x, z.y);
             if (zC.ghost) ctx.globalAlpha = 0.5;
             ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 5; ctx.fillStyle = zC.color; ctx.beginPath(); ctx.arc(0, 0, zC.radius, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(-zC.radius * 0.3, -zC.radius * 0.2, zC.radius * 0.2, 0, Math.PI * 2); ctx.fill();
@@ -854,9 +854,9 @@ function draw(now) {
             ctx.fillRect(-zC.radius * 0.4, zC.radius * 0.3, zC.radius * 0.8, zC.radius * 0.2);
             if (zC.isBoss) {
                 ctx.fillStyle = '#fff'; ctx.font = '24px Russo One'; ctx.textAlign = 'center'; ctx.fillText(zC.name, 0, -zC.radius - 20);
-                ctx.fillStyle = '#ef4444'; ctx.fillRect(-40, -zC.radius - 10, 80, 8); ctx.fillStyle = '#22c55e'; ctx.fillRect(-40, -zC.radius - 10, 80 * (z.hp / zC.hp), 8);
+                ctx.fillStyle = '#ef4444'; ctx.fillRect(-40, -zC.radius - 10, 80, 8); ctx.fillStyle = '#22c55e'; ctx.fillRect(-40, -zC.radius - 10, 80 * Math.max(0, Math.min(1, z.hp / (z.maxHp || zC.hp))), 8);
             } else {
-                ctx.fillStyle = '#ef4444'; ctx.fillRect(-15, -zC.radius - 10, 30, 4); ctx.fillStyle = '#22c55e'; ctx.fillRect(-15, -zC.radius - 10, 30 * (z.hp / zC.hp), 4);
+                ctx.fillStyle = '#ef4444'; ctx.fillRect(-15, -zC.radius - 10, 30, 4); ctx.fillStyle = '#22c55e'; ctx.fillRect(-15, -zC.radius - 10, 30 * Math.max(0, Math.min(1, z.hp / (z.maxHp || zC.hp))), 4);
             }
             ctx.restore();
         }
@@ -1016,7 +1016,14 @@ function startGameLoop() {
 function gameLoop(now) {
     const dt = Math.min((now - lastTime) / 1000, 0.1);
     lastTime = now;
-    if (currentRoomData && currentRoomData.status === 'playing') { updatePhys(now, dt); draw(now); }
+    if (currentRoomData && currentRoomData.status === 'playing') {
+        // Помилка в одному кадрі більше не вбиває цикл: інакше картинка зависає, а звуки з сокетів продовжують грати
+        try { updatePhys(now, dt); draw(now); }
+        catch (err) {
+            if (now - (window.__loopErrAt || 0) > 2000) { window.__loopErrAt = now; console.error('Помилка ігрового циклу (цикл продовжує працювати):', err); }
+            try { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.shadowColor = 'transparent'; } catch (e) {}
+        }
+    }
     gameLoopId = requestAnimationFrame(gameLoop);
 }
 

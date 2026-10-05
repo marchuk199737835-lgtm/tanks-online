@@ -77,14 +77,12 @@ window.BUFF_NAMES = {
     'piercing': 'БРОНЕБІЙНІ', 'autolaser': 'АВТО-ЛАЗЕР', 'reaper': 'ЖНЕЦЬ', 'hunter_gun': 'МИСЛИВЕЦЬ'
 };
 
-const Z_TYPES = {
-    'normal':{radius:15,color:'#22c55e'},
-    'runner':{radius:12,color:'#84cc16'},
-    'tanker':{radius:25,color:'#15803d'},
-    'spitter':{radius:15,color:'#a3e635'},
-    'bomber':{radius:18,color:'#dc2626'},
-    'ghost':{radius:15,color:'#cbd5e1',ghost:true}
-};
+// Типи зомбі та босів приходять із сервера (подія 'initZombies', джерело - Z_TYPES у server.js).
+// Тут їх більше не дублюємо: додавайте нових зомбі лише в server.js.
+const Z_TYPES = {};
+const Z_FALLBACK = { hp: 25, radius: 15, color: '#22c55e' };
+// Безпечний доступ: невідомий тип (або дані ще не прийшли) не валить гру
+function zType(t){return Z_TYPES[t]||Z_FALLBACK;}
 
 const RARITY = {
     'common':{name:'Звичайний',color:'#94a3b8'},

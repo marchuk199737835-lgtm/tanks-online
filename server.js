@@ -68,6 +68,33 @@ const Z_TYPES={normal:{hp:25,speed:120,dmg:10,radius:15,color:'#22c55e'},runner:
 const MODULES={'can_c1':{id:'can_c1',type:'cannon',rarity:'common',name:'Іскра',price:15,stats:{cd:0.96,dmg:0.98,range:1.00}},'can_c2':{id:'can_c2',type:'cannon',rarity:'common',name:'Чавун',price:25,stats:{dmg:1.05,cd:1.03,range:0.98}},'can_c3':{id:'can_c3',type:'cannon',rarity:'common',name:'Подовжене',price:40,stats:{range:1.05,dmg:1.02,cd:1.02}},'can_r1':{id:'can_r1',type:'cannon',rarity:'rare',name:'Блискавка',price:60,stats:{cd:0.90,dmg:0.95,range:1.00}},'can_r2':{id:'can_r2',type:'cannon',rarity:'rare',name:'Молот',price:90,stats:{dmg:1.12,cd:1.06,range:0.95}},'can_r3':{id:'can_r3',type:'cannon',rarity:'rare',name:'Снайпер',price:130,stats:{range:1.12,dmg:1.06,cd:1.04}},'can_e1':{id:'can_e1',type:'cannon',rarity:'epic',name:'Квазар',price:170,stats:{cd:0.84,dmg:0.90,range:1.00}},'can_e2':{id:'can_e2',type:'cannon',rarity:'epic',name:'Титан',price:220,stats:{dmg:1.20,cd:1.10,range:0.92}},'can_e3':{id:'can_e3',type:'cannon',rarity:'epic',name:'Каратель',price:280,stats:{range:1.22,dmg:1.15,cd:1.06}},'can_l1':{id:'can_l1',type:'cannon',rarity:'legendary',name:'Пульсар',price:350,stats:{cd:0.78,dmg:0.85,range:1.00}},'can_l2':{id:'can_l2',type:'cannon',rarity:'legendary',name:'Колос',price:450,stats:{dmg:1.30,cd:1.15,range:0.90}},'can_l3':{id:'can_l3',type:'cannon',rarity:'legendary',name:'Армагеддон',price:550,stats:{range:1.35,dmg:1.25,cd:1.08}},'tur_c1':{id:'tur_c1',type:'turret',rarity:'common',name:'Легка',price:15,stats:{rotSpeed:1.04,hp:0.98}},'tur_c2':{id:'tur_c2',type:'turret',rarity:'common',name:'Клепана',price:25,stats:{hp:1.05,rotSpeed:0.98}},'tur_c3':{id:'tur_c3',type:'turret',rarity:'common',name:'Оптика',price:40,stats:{rotSpeed:1.02,hp:0.99}},'tur_r1':{id:'tur_r1',type:'turret',rarity:'rare',name:'Спритна',price:60,stats:{rotSpeed:1.10,hp:0.95}},'tur_r2':{id:'tur_r2',type:'turret',rarity:'rare',name:'Щит',price:90,stats:{hp:1.12,rotSpeed:0.95}},'tur_r3':{id:'tur_r3',type:'turret',rarity:'rare',name:'Скаут',price:130,stats:{rotSpeed:1.05,hp:0.97}},'tur_e1':{id:'tur_e1',type:'turret',rarity:'epic',name:'Віраж',price:170,stats:{rotSpeed:1.20,hp:0.90}},'tur_e2':{id:'tur_e2',type:'turret',rarity:'epic',name:'Фортеця',price:220,stats:{hp:1.25,rotSpeed:0.90}},'tur_e3':{id:'tur_e3',type:'turret',rarity:'epic',name:'Вартовий',price:280,stats:{rotSpeed:1.12,hp:0.94}},'tur_l1':{id:'tur_l1',type:'turret',rarity:'legendary',name:'Міраж',price:350,stats:{rotSpeed:1.35,hp:0.85}},'tur_l2':{id:'tur_l2',type:'turret',rarity:'legendary',name:'Бастіон',price:450,stats:{hp:1.40,rotSpeed:0.85}},'tur_l3':{id:'tur_l3',type:'turret',rarity:'legendary',name:'Яструб',price:550,stats:{rotSpeed:1.20,hp:0.90}},'hul_c1':{id:'hul_c1',type:'hull',rarity:'common',name:'Каркас',price:15,stats:{speed:1.04,hp:0.98}},'hul_c2':{id:'hul_c2',type:'hull',rarity:'common',name:'Панцер',price:25,stats:{hp:1.05,speed:0.98}},'hul_c3':{id:'hul_c3',type:'hull',rarity:'common',name:'Розвідник',price:40,stats:{speed:1.02,hp:0.99}},'hul_r1':{id:'hul_r1',type:'hull',rarity:'rare',name:'Болід',price:60,stats:{speed:1.10,hp:0.95}},'hul_r2':{id:'hul_r2',type:'hull',rarity:'rare',name:'Броньовик',price:90,stats:{hp:1.12,speed:0.95}},'hul_r3':{id:'hul_r3',type:'hull',rarity:'rare',name:'Авангард',price:130,stats:{speed:1.05,hp:0.97}},'hul_e1':{id:'hul_e1',type:'hull',rarity:'epic',name:'Фантом',price:170,stats:{speed:1.20,hp:0.90}},'hul_e2':{id:'hul_e2',type:'hull',rarity:'epic',name:'Моноліт',price:220,stats:{hp:1.25,speed:0.90}},'hul_e3':{id:'hul_e3',type:'hull',rarity:'epic',name:'Хижак',price:280,stats:{speed:1.10,hp:0.94}},'hul_l1':{id:'hul_l1',type:'hull',rarity:'legendary',name:'Тінь',price:350,stats:{speed:1.35,hp:0.85}},'hul_l2':{id:'hul_l2',type:'hull',rarity:'legendary',name:'Егіда',price:450,stats:{hp:1.40,speed:0.85}},'hul_l3':{id:'hul_l3',type:'hull',rarity:'legendary',name:'Ассасін',price:550,stats:{speed:1.15,hp:0.90}},'trk_c1':{id:'trk_c1',type:'tracks',rarity:'common',name:'Тонкі',price:15,stats:{speed:1.04,hp:0.98}},'trk_c2':{id:'trk_c2',type:'tracks',rarity:'common',name:'Важкі',price:25,stats:{hp:1.05,speed:0.98}},'trk_c3':{id:'trk_c3',type:'tracks',rarity:'common',name:'Гібрид',price:40,stats:{speed:1.02,hp:0.99}},'trk_r1':{id:'trk_r1',type:'tracks',rarity:'rare',name:'Ралійні',price:60,stats:{speed:1.10,hp:0.95}},'trk_r2':{id:'trk_r2',type:'tracks',rarity:'rare',name:'Всюдихід',price:90,stats:{hp:1.12,speed:0.95}},'trk_r3':{id:'trk_r3',type:'tracks',rarity:'rare',name:'Посилені',price:130,stats:{speed:1.05,hp:0.97}},'trk_e1':{id:'trk_e1',type:'tracks',rarity:'epic',name:'Граві',price:170,stats:{speed:1.20,hp:0.90}},'trk_e2':{id:'trk_e2',type:'tracks',rarity:'epic',name:'Гусеничні',price:220,stats:{hp:1.25,speed:0.90}},'trk_e3':{id:'trk_e3',type:'tracks',rarity:'epic',name:'Адаптивні',price:280,stats:{speed:1.10,hp:0.94}},'trk_l1':{id:'trk_l1',type:'tracks',rarity:'legendary',name:'Струм',price:350,stats:{speed:1.35,hp:0.85}},'trk_l2':{id:'trk_l2',type:'tracks',rarity:'legendary',name:'Скала',price:450,stats:{hp:1.40,speed:0.85}},'trk_l3':{id:'trk_l3',type:'tracks',rarity:'legendary',name:'Кіготь',price:550,stats:{speed:1.15,hp:0.90}}};
 const CASES={1:{price:110,drop:{c:60,r:30,e:9,l:1},pool:'all'},2:{price:100,drop:{c:50,r:35,e:12,l:3},pool:['can_c1','can_r1','can_e1','can_l1','tur_c1','tur_r1','tur_e1','tur_l1','hul_c3','hul_r1','hul_e1','hul_l1','trk_c1','trk_r1','trk_e1','trk_l1']},3:{price:130,drop:{c:50,r:35,e:12,l:3},pool:['tur_c2','tur_r2','tur_e2','tur_l2','hul_c1','hul_r2','hul_e2','hul_l2','trk_c2','trk_r2','trk_e2','trk_l2']},4:{price:175,drop:{c:50,r:35,e:12,l:3},pool:['can_c2','can_r2','can_e2','can_l2','can_c3','can_r3','can_e3','can_l3','tur_c3','tur_r3','tur_e3','tur_l3','hul_c2','hul_r3','hul_e3','hul_l3','trk_c3','trk_r3','trk_e3','trk_l3']},5:{price:110,drop:{c:60,r:30,e:9,l:1},pool:'cannon'},6:{price:110,drop:{c:60,r:30,e:9,l:1},pool:'turret'},7:{price:110,drop:{c:60,r:30,e:9,l:1},pool:'hull'},8:{price:110,drop:{c:60,r:30,e:9,l:1},pool:'tracks'},9:{price:210,drop:{c:0,r:75,e:22,l:3},pool:'all'},10:{price:410,drop:{c:0,r:0,e:85,l:15},pool:'all'},11:{price:200,drop:{c:30,r:40,e:25,l:5},pool:'all'},12:{price:720,drop:{c:0,r:0,e:0,l:100},pool:'all'}};
 
+// --- ЗОМБІ: ліміт кількості та масштабування складності ---
+const ZOMBIE_CAP = 100;          // максимум зомбі на хвилі
+const ZOMBIE_SPAWN_BASE = 20;    // зомбі на 1-й хвилі
+const ZOMBIE_SPAWN_STEP = 5;     // приріст зомбі за хвилю (до ліміту)
+const HP_SCALE_PER_WAVE = 0.05;  // після ліміту: +5% живучості за кожну наступну хвилю
+const DMG_SCALE_PER_WAVE = 0.03; // після ліміту: +3% урону за кожну наступну хвилю
+// Хвиля, на якій кількість зомбі вперше досягає ліміту (зараз 17)
+const ZOMBIE_CAP_WAVE = Math.ceil((ZOMBIE_CAP - ZOMBIE_SPAWN_BASE) / ZOMBIE_SPAWN_STEP) + 1;
+function waveScale(wave) {
+    const extra = Math.max(0, wave - ZOMBIE_CAP_WAVE);
+    return { hp: 1 + extra * HP_SCALE_PER_WAVE, dmg: 1 + extra * DMG_SCALE_PER_WAVE };
+}
+// Єдине джерело правди: ці дані (без серверних полів) віддаються клієнту при підключенні
+const Z_TYPES_CLIENT = {};
+for (const k in Z_TYPES) {
+    const z = Z_TYPES[k];
+    Z_TYPES_CLIENT[k] = { hp: z.hp, radius: z.radius, color: z.color };
+    if (z.ghost) Z_TYPES_CLIENT[k].ghost = true;
+    if (z.isBoss) { Z_TYPES_CLIENT[k].isBoss = true; Z_TYPES_CLIENT[k].name = z.name; }
+}
+// Компактний вигляд зомбі для sync (менше трафіку при 100 зомбі * 30 разів/с)
+function compactZombies(zs) {
+    const out = {};
+    for (const id in zs) { const z = zs[id]; out[id] = { id: z.id, x: Math.round(z.x), y: Math.round(z.y), type: z.type, hp: Math.round(z.hp), maxHp: z.maxHp }; }
+    return out;
+}
+
 function getRandomModuleFromCase(caseId) {
     let cs = CASES[caseId]; if (!cs) return null;
     let pool = Object.keys(MODULES);
@@ -239,6 +266,7 @@ const HUNTER_MISS_PENALTY = 0;
 
 io.on('connection', (socket) => {
     socket.emit('initMusic', musicData);
+    socket.emit('initZombies', Z_TYPES_CLIENT);
     
     socket.on('register', (data) => {
         const creds = readCreds(data);
@@ -760,7 +788,7 @@ socket.on('selectProp', (data) => {
             if (d.type === 'incendiary') r.zombies[d.zid].onFire = { end: Date.now() + 5000, nextTick: Date.now() + 1000, owner: socket.id };
             r.zombies[d.zid].hp -= fD;
             if (r.zombies[d.zid].hp <= 0) {
-                if (r.zombies[d.zid].type === 'bomber') io.to(d.roomId).emit('bomberExplode', { x: r.zombies[d.zid].x, y: r.zombies[d.zid].y });
+                if (r.zombies[d.zid].type === 'bomber') io.to(d.roomId).emit('bomberExplode', { x: r.zombies[d.zid].x, y: r.zombies[d.zid].y, dmg: Math.round(50 * (r.zombies[d.zid].dmgMult || 1)) });
                 delete r.zombies[d.zid];
             }
         }
@@ -948,11 +976,12 @@ setInterval(() => {
                     r.wave++; let isBW = (r.wave % 10 === 0 && r.wave <= 40);
                     if (isBW) {
                         let bTypes = ['pikus', 'shurik', 'oneshot', 'padlo'], bType = bTypes[(r.wave / 10) - 1], zid = 'boss_' + now, zS = getValidSpawn(r.map, 50, 'spawn_zombie');
-                        r.zombies[zid] = { id: zid, x: zS.x, y: zS.y, type: bType, hp: Z_TYPES[bType].hp, nextAttack: 0, onFire: null };
+                        let bsc = waveScale(r.wave), bHp = Math.round(Z_TYPES[bType].hp * bsc.hp);
+                        r.zombies[zid] = { id: zid, x: zS.x, y: zS.y, type: bType, hp: bHp, maxHp: bHp, dmgMult: bsc.dmg, nextAttack: 0, onFire: null };
                         io.to(rId).emit('newWave', { wave: r.wave, isBoss: true, bossName: Z_TYPES[bType].name });
                     } else {
-                        let sC = 20 + (r.wave - 1) * 5, tL = ['normal', 'runner', 'spitter', 'tanker', 'bomber', 'ghost'], mI = Math.min(tL.length - 1, Math.floor((r.wave) / 5)), aT = tL.slice(0, mI + 1);
-                        for (let i = 0; i < sC; i++) { let t = aT[Math.floor(Math.random() * aT.length)], zS = getValidEdgeSpawn(r.map, 20, 'spawn_zombie'), zid = 'z_' + now + '_' + i; r.zombies[zid] = { id: zid, x: zS.x, y: zS.y, type: t, hp: Z_TYPES[t].hp, nextAttack: 0, onFire: null }; }
+                        let sC = Math.min(ZOMBIE_CAP, ZOMBIE_SPAWN_BASE + (r.wave - 1) * ZOMBIE_SPAWN_STEP), sc = waveScale(r.wave), tL = ['normal', 'runner', 'spitter', 'tanker', 'bomber', 'ghost'], mI = Math.min(tL.length - 1, Math.floor((r.wave) / 5)), aT = tL.slice(0, mI + 1);
+                        for (let i = 0; i < sC; i++) { let t = aT[Math.floor(Math.random() * aT.length)], zS = getValidEdgeSpawn(r.map, 20, 'spawn_zombie'), zid = 'z_' + now + '_' + i; let zHp = Math.round(Z_TYPES[t].hp * sc.hp); r.zombies[zid] = { id: zid, x: zS.x, y: zS.y, type: t, hp: zHp, maxHp: zHp, dmgMult: sc.dmg, nextAttack: 0, onFire: null }; }
                         io.to(rId).emit('newWave', { wave: r.wave, isBoss: false });
                     }
                     r.state = 'playing';
@@ -964,7 +993,7 @@ setInterval(() => {
                         if (now >= z.onFire.end) z.onFire = null;
                         else if (now >= z.onFire.nextTick && z.hp > 0) {
                             z.onFire.nextTick = now + 1000; z.hp -= 20; io.to(rId).emit('burnTick', { x: z.x, y: z.y });
-                            if (z.hp <= 0) { if (z.type === 'bomber') io.to(rId).emit('bomberExplode', { x: z.x, y: z.y }); delete r.zombies[zid]; continue; }
+                            if (z.hp <= 0) { if (z.type === 'bomber') io.to(rId).emit('bomberExplode', { x: z.x, y: z.y, dmg: Math.round(50 * (z.dmgMult || 1)) }); delete r.zombies[zid]; continue; }
                         }
                     }
                     aP.forEach(pl => { let d = Math.hypot(pl.x - z.x, pl.y - z.y); if (pl.buff === 'invisible') d *= 3; if (d < mD) { mD = d; t = pl; } });
@@ -974,18 +1003,18 @@ setInterval(() => {
                         if (!checkCollisionServer(r.map, z.x, nY, Z_TYPES[z.type].radius)) z.y = nY;
                         if (Z_TYPES[z.type].isBoss && now > z.nextAttack) {
                             z.nextAttack = now + Z_TYPES[z.type].cd; let bC = Z_TYPES[z.type].bullets, spr = Math.PI / 4, sA = Math.atan2(dy, dx) - (spr / 2), st = spr / Math.max(1, bC - 1); if (bC === 25) { spr = Math.PI * 2; st = spr / 25; sA = 0; }
-                            for (let b = 0; b < bC; b++) { let a = sA + (b * st); io.to(rId).emit('spawnBullet', { id: 'b_' + now + b + zid, x: z.x, y: z.y, vx: Math.cos(a) * 500, vy: Math.sin(a) * 500, type: 'boss_proj', owner: 'zombie', dmgOverride: Z_TYPES[z.type].dmg }); }
+                            for (let b = 0; b < bC; b++) { let a = sA + (b * st); io.to(rId).emit('spawnBullet', { id: 'b_' + now + b + zid, x: z.x, y: z.y, vx: Math.cos(a) * 500, vy: Math.sin(a) * 500, type: 'boss_proj', owner: 'zombie', dmgOverride: Math.round(Z_TYPES[z.type].dmg * (z.dmgMult || 1)) }); }
                         } else if (Z_TYPES[z.type].ranged && !Z_TYPES[z.type].isBoss && mD < 400 && now > z.nextAttack) {
-                            z.nextAttack = now + 2000; io.to(rId).emit('spawnBullet', { id: 'ac_' + now + zid, x: z.x, y: z.y, vx: (dx / l) * 400, vy: (dy / l) * 400, type: 'acid', owner: 'zombie' });
+                            z.nextAttack = now + 2000; io.to(rId).emit('spawnBullet', { id: 'ac_' + now + zid, x: z.x, y: z.y, vx: (dx / l) * 400, vy: (dy / l) * 400, type: 'acid', owner: 'zombie', dmgOverride: Math.round(75 * (z.dmgMult || 1)) });
                         } else if (!Z_TYPES[z.type].isBoss && mD < 30 + Z_TYPES[z.type].radius + 5 && now > z.nextAttack) {
-                            z.nextAttack = now + 1000; io.to(rId).emit('zombieMeleeHit', { targetId: t.id, dmg: Z_TYPES[z.type].dmg });
+                            z.nextAttack = now + 1000; io.to(rId).emit('zombieMeleeHit', { targetId: t.id, dmg: Math.round(Z_TYPES[z.type].dmg * (z.dmgMult || 1)) });
                         }
                     }
                 }
             }
         }
         
-        let syncData = { players: r.players, zombies: r.zombies, powerups: r.powerups, tokens: r.tokens, mines: r.mines };
+        let syncData = { players: r.players, zombies: compactZombies(r.zombies), powerups: r.powerups, tokens: r.tokens, mines: r.mines };
         if (r.mode === 'prophunt') { syncData.phState = r.state; syncData.phTimeLeft = Math.max(0, Math.ceil((r.phaseEndTime - now) / 1000)); }
         if (r.mode === 'team_deathmatch') { syncData.teamScores = r.teamScores; syncData.timeEndTime = r.timeEndTime; }
         io.to(rId).emit('sync', syncData);
