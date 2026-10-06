@@ -97,7 +97,7 @@ function syncSettingsInputs() {
 }
 function refreshMapsInfo() {
     const n = $('map-select').value, i = ED.serverInfo[n]; if (!i) { $('maps-info').textContent = ''; return; }
-    $('maps-info').textContent = (i.builtin ? 'Вбудована' : 'Власна') + (i.saved ? ' · змінена в редакторі' : '') + (i.pending ? ' · ⏳ чекає перезапуску сервера' : ' · застосована');
+    $('maps-info').textContent = (i.builtin ? (i.hidden ? 'Вбудована (прихована в грі — шаблон)' : 'Вбудована') : 'Власна') + (i.saved ? ' · змінена в редакторі' : '') + (i.pending ? ' · ⏳ чекає перезапуску сервера' : ' · застосована');
 }
 function fillMapSelect(selectName) {
     const sel = $('map-select'); sel.innerHTML = '';

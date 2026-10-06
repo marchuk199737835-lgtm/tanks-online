@@ -22,6 +22,19 @@ module.exports = function mountEditor(app, ctx) {
     const BUILTIN = JSON.parse(JSON.stringify(MAP_DATA));              // знімок вбудованих мап до накладання змін
     const dataDir = ctx.dataDir || path.join(__dirname, 'data'), filePath = path.join(dataDir, 'custom_maps.json');
     const PASSWORD_HASH = sha(process.env.EDITOR_PASSWORD || '20062007');
+    // Вбудовані мапи прибрано з гри: вони лишаються в редакторі як шаблони, а гравцям показуються лише мапи, збережені в редакторі.
+    // Якщо жодної збереженої мапи ще немає — вбудовані лишаються, щоб гра не залишилась без мап.
+    // Змінна середовища SHOW_BUILTIN_MAPS=1 повертає їх у гру.
+    const HIDDEN_BUILTIN = ['epic_map', 'Бій Насмерть'];
+    let hidden = [];
+    function hideBuiltin() {
+        hidden = [];
+        if (process.env.SHOW_BUILTIN_MAPS === '1') return;
+        const playable = Object.keys(MAP_DATA).filter(k => !HIDDEN_BUILTIN.includes(k) || saved[k]);
+        if (!playable.length) { console.warn('⚠️  У редакторі ще немає збережених мап — вбудовані мапи лишаються в грі. Створіть мапу в /editor.html'); return; }
+        HIDDEN_BUILTIN.forEach(n => { if (MAP_DATA[n] && !saved[n]) { delete MAP_DATA[n]; hidden.push(n); } });
+        console.log('🗺️  Вбудовані мапи прибрано з гри: ' + hidden.join(', '));
+    }
     let saved = Object.create(null);          // що збережено (в БД/файлі)
     let applied = Object.create(null);        // що застосоване при старті (те, що бачать гравці)
     const attempts = Object.create(null);     // ip -> {n, until}
@@ -57,6 +70,7 @@ module.exports = function mountEditor(app, ctx) {
             } catch (e) { console.error('⚠️  Мапа "' + name + '" пропущена:', e.message); }
         });
         if (n) console.log('🗺️  Завантажено мап з редактора: ' + n);
+        hideBuiltin();
     }
 
     // ---------- допоміжне ----------
@@ -78,7 +92,7 @@ module.exports = function mountEditor(app, ctx) {
 
     // ---------- /mapdata.js для клієнтів ----------
     app.get('/mapdata.js', (req, res) => {
-        send(res, 200, '(function(){var d=' + JSON.stringify(applied).replace(/</g, '\\u003c') + ';for(var k in d){MAP_DATA[k]=d[k];}if(window.onMapDataLoaded)window.onMapDataLoaded();})();', 'application/javascript; charset=utf-8');
+        send(res, 200, '(function(){var d=' + JSON.stringify(applied).replace(/</g, '\\u003c') + ';var h=' + JSON.stringify(hidden) + ';for(var k in d){MAP_DATA[k]=d[k];}h.forEach(function(k){delete MAP_DATA[k];});if(window.onMapDataLoaded)window.onMapDataLoaded();})();', 'application/javascript; charset=utf-8');
     });
 
     // ---------- API редактора ----------
@@ -100,7 +114,7 @@ module.exports = function mountEditor(app, ctx) {
                 Object.keys(BUILTIN).concat(Object.keys(saved)).forEach(n => {
                     if (maps[n]) return;
                     maps[n] = saved[n] || BUILTIN[n];
-                    info[n] = { builtin: !!BUILTIN[n], saved: !!saved[n], pending: JSON.stringify(saved[n] || null) !== JSON.stringify(applied[n] || null) };
+                    info[n] = { builtin: !!BUILTIN[n], hidden: hidden.includes(n), saved: !!saved[n], pending: JSON.stringify(saved[n] || null) !== JSON.stringify(applied[n] || null) };
                 });
                 return send(res, 200, { maps: maps, info: info });
             }

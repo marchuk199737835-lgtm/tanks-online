@@ -297,8 +297,7 @@ const VALID_MODES = ['deathmatch', 'survival', 'prophunt', 'team_deathmatch'];
 // мапа для режиму: бажана, якщо вона дозволена в цьому режимі (поле modes з редактора), інакше перша дозволена
 function pickMap(want, mode) {
     if (MAP_DATA[want] && MapObj.mapAllows(MAP_DATA[want], mode)) return want;
-    if (MAP_DATA.epic_map && MapObj.mapAllows(MAP_DATA.epic_map, mode)) return 'epic_map';
-    return Object.keys(MAP_DATA).find(k => MapObj.mapAllows(MAP_DATA[k], mode)) || 'epic_map';
+    return Object.keys(MAP_DATA).find(k => MapObj.mapAllows(MAP_DATA[k], mode)) || Object.keys(MAP_DATA)[0] || 'epic_map';
 }
 const VALID_COLORS = ['white', 'black', 'red', 'blue', 'brown', 'purple'];
 const TDM_TEAMS = ['red', 'blue', 'green', 'yellow']; // порядок як у кнопках лобі
