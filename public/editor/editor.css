@@ -1,0 +1,53 @@
+/* Стилі редактора мап */
+body { font-family: 'Jura', sans-serif; background-color: #020617; color: white; margin: 0; overflow: hidden; }
+.font-russo { font-family: 'Russo One', sans-serif; }
+#canvas-wrapper { width: calc(100vw - 360px); height: 100vh; overflow: auto; background: #000; position: absolute; right: 0; top: 0; }
+#map-canvas { display: block; cursor: crosshair; box-shadow: 0 0 100px rgba(0,0,0,0.8); margin: 70px auto 40px; }
+.tab-btn { transition: all 0.2s; border-bottom: 2px solid transparent; position: relative; }
+.tab-btn.active { color: #3b82f6; border-color: #3b82f6; }
+.tab-btn .tab-key { display: block; font-size: 8px; opacity: .55; line-height: 1; margin-bottom: 2px; }
+.tool-btn { transition: all 0.2s; border: 2px solid transparent; }
+.tool-btn.active { border-color: #3b82f6; background-color: rgba(59, 130, 246, 0.2); box-shadow: 0 0 15px rgba(59, 130, 246, 0.4); }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #020617; }
+::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
+
+/* верхня панель інструментів над полотном */
+#topbar { position: absolute; top: 10px; left: 370px; right: 10px; z-index: 20; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; pointer-events: none; }
+#topbar > * { pointer-events: auto; }
+.top-btn { background: rgba(15,23,42,.92); border: 1px solid #334155; color: #cbd5e1; padding: 6px 10px; border-radius: 10px; font-weight: 700; font-size: 12px; cursor: pointer; transition: all .15s; }
+.top-btn:hover { background: #1e293b; color: #fff; border-color: #3b82f6; }
+.top-btn.active { border-color: #3b82f6; background: rgba(59,130,246,.25); color: #fff; }
+.top-btn:disabled { opacity: .35; cursor: default; }
+.top-sep { width: 1px; height: 22px; background: #334155; margin: 0 4px; }
+#status-line { background: rgba(15,23,42,.92); border: 1px solid #334155; border-radius: 10px; padding: 6px 12px; font-size: 12px; color: #94a3b8; margin-left: auto; max-width: 46%; }
+#status-line.ok { color: #34d399; border-color: #065f46; } #status-line.err { color: #f87171; border-color: #7f1d1d; }
+
+/* контекстне меню об'єкта */
+#obj-menu { position: fixed; z-index: 60; width: 232px; background: rgba(15,23,42,.97); border: 1px solid #3b82f6; border-radius: 14px; padding: 10px; box-shadow: 0 10px 40px rgba(0,0,0,.7); font-size: 12px; }
+#obj-menu .m-title { font-family: 'Russo One', sans-serif; color: #60a5fa; margin-bottom: 8px; font-size: 13px; display: flex; justify-content: space-between; gap: 8px; }
+#obj-menu .m-row { display: flex; gap: 4px; margin-bottom: 6px; align-items: center; }
+#obj-menu .m-row > label { color: #94a3b8; font-size: 10px; min-width: 52px; }
+#obj-menu button { flex: 1; background: #1e293b; border: 1px solid #334155; color: #e2e8f0; border-radius: 8px; padding: 5px 2px; font-weight: 700; font-size: 11px; cursor: pointer; }
+#obj-menu button:hover { background: #2563eb; border-color: #60a5fa; }
+#obj-menu button.danger:hover { background: #dc2626; border-color: #f87171; }
+#obj-menu input[type=number] { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #fff; padding: 3px 5px; font-size: 12px; }
+#obj-menu input[type=color] { width: 100%; height: 24px; background: transparent; border: none; cursor: pointer; }
+
+/* вхід за паролем */
+#login-overlay { position: fixed; inset: 0; z-index: 100; background: radial-gradient(circle at 50% 30%, #0f172a, #020617 70%); display: flex; align-items: center; justify-content: center; }
+#login-box { width: 340px; background: rgba(15,23,42,.95); border: 1px solid #334155; border-radius: 22px; padding: 28px; box-shadow: 0 0 60px rgba(37,99,235,.25); text-align: center; }
+#login-box input { width: 100%; background: #020617; border: 1px solid #334155; border-radius: 12px; padding: 12px; color: #fff; text-align: center; letter-spacing: 4px; font-size: 18px; outline: none; margin: 14px 0 10px; box-sizing: border-box; }
+#login-box input:focus { border-color: #3b82f6; }
+#login-err { color: #f87171; font-size: 12px; min-height: 16px; margin-bottom: 8px; }
+
+.side-input { width: 100%; padding: 8px; background: #1e293b; border-radius: 8px; margin-bottom: 10px; color: #fff; border: 1px solid #334155; font-size: 13px; box-sizing: border-box; }
+.side-label { font-size: 11px; color: #94a3b8; margin-bottom: 4px; display: block; }
+.side-btn { width: 100%; padding: 8px; border-radius: 10px; font-weight: 700; font-size: 12px; background: #1e293b; border: 1px solid #334155; color: #e2e8f0; cursor: pointer; margin-bottom: 6px; transition: all .15s; text-align: center; }
+.side-btn:hover { border-color: #3b82f6; background: #1d4ed8; }
+.side-btn.green { background: #047857; border-color: #10b981; } .side-btn.green:hover { background: #059669; }
+.side-btn.red:hover { background: #b91c1c; border-color: #f87171; }
+.hint { font-size: 11px; color: #64748b; line-height: 1.4; margin-bottom: 10px; }
+.kbd { background: #1e293b; border: 1px solid #334155; border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font-size: 10px; color: #cbd5e1; }
+#maps-info { font-size: 11px; color: #94a3b8; margin: -4px 0 10px; min-height: 14px; }

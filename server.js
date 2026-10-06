@@ -6,6 +6,8 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const { MongoClient } = require('mongodb');
+const MapObj = require('./public/js/mapobjects.js');     // спільний модуль: об'єкти мап, зіткнення, двері
+const mountEditor = require('./editor-server.js');       // серверна частина редактора мап
 
 process.on('uncaughtException', err => console.error('Crash prevented:', err));
 process.on('unhandledRejection', err => console.error('Promise rejection prevented:', err));
@@ -35,7 +37,7 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.ht
 
 const MAX_HP = 500, BUFF_DURATION = 15000, BASE_RELOAD = 2000;
 const mongoUri = process.env.MONGO_URI;
-let dbUsersCol = null;
+let dbUsersCol = null, dbMapsCol = null, editorApi = null;
 const dbUsers = Object.create(null); // без прототипу: логіни типу __proto__ чи constructor більше не ламають логіку
 
 if (mongoUri) {
@@ -44,6 +46,8 @@ if (mongoUri) {
         console.log("✅ Підключено до MongoDB!");
         const db = client.db("tanks_db");
         dbUsersCol = db.collection("users");
+        dbMapsCol = db.collection("maps");
+        if (editorApi) editorApi.loadSaved().catch(e => console.error('❌ Не вдалося завантажити мапи з БД:', e.message));
         dbUsersCol.find({}).toArray().then(users => {
             users.forEach(u => dbUsers[u.name] = u);
             console.log(`Завантажено акаунтів: ${users.length}`);
@@ -64,6 +68,8 @@ function hashPwd(pwd) { return crypto.createHash('sha256').update(pwd).digest('h
 
 // --- КОНСТАНТИ ---
 const MAP_DATA={"epic_map":{size:3000,bg:"#565a6c",grid:"#494d55",solids:[{type:"wall_square",x:850,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1150,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1150,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1800,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:1700,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:1850,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1800,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1950,w:50,h:50,color:"#353940"},{type:"wall_square",x:1700,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:1700,y:1950,w:50,h:50,color:"#353940"},{type:"wall_square",x:1850,y:1800,w:50,h:50,color:"#353940"},{type:"wall_square",x:1850,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1000,w:50,h:50,color:"#353940"},{type:"wall_square",x:1850,y:1150,w:50,h:50,color:"#353940"},{type:"wall_square",x:1700,y:1000,w:50,h:50,color:"#353940"},{type:"wall_square",x:800,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:800,y:1150,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1000,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1000,w:50,h:50,color:"#353940"},{type:"wall_square",x:800,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1950,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1950,w:50,h:50,color:"#353940"},{type:"wall_square",x:800,y:1800,w:50,h:50,color:"#353940"},{type:"shape_rhombus",x:1150,y:1300,w:400,h:400,color:"#353940"},{type:"shape_rhombus",x:1250,y:1350,w:200,h:300,color:"#22252a"},{type:"tree",x:0,y:700,r:424.26},{type:"tree",x:2650,y:2550,r:180.27},{type:"tree",x:300,y:2400,r:158.11},{type:"tree",x:2850,y:750,r:364.00},{type:"neon_circle",x:850,y:1100,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:900,y:1050,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:1750,y:1050,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:1800,y:1100,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:1800,y:1850,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:1750,y:1900,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:850,y:1850,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:900,y:1900,w:50,h:50,color:"#21252c"},{type:"prop_crate",x:3000,y:2950,w:50,h:50},{type:"spawn_player",x:250,y:2750},{type:"spawn_player",x:2850,y:2850},{type:"spawn_player",x:1500,y:2750},{type:"spawn_powerup",x:1500,y:1500},{type:"spawn_powerup",x:800,y:800},{type:"spawn_powerup",x:2200,y:800},{type:"spawn_powerup",x:1500,y:2200}]},'Бій Насмерть':{size:2500,bg:'#3e2604',grid:'#1e293b',solids:[{type:"spawn_player",x:1400,y:1450},{type:"spawn_player",x:100,y:1350},{type:"spawn_player",x:1400,y:750},{type:"spawn_player",x:100,y:700},{type:"spawn_powerup",x:700,y:700},{type:"spawn_powerup",x:1800,y:700},{type:"spawn_powerup",x:700,y:1800},{type:"spawn_powerup",x:1800,y:1800}]}};
+editorApi = mountEditor(app, { MAP_DATA: MAP_DATA, getMapsCol: () => dbMapsCol });
+if (!mongoUri) editorApi.loadSaved().catch(e => console.error('❌ Не вдалося завантажити мапи:', e.message));
 const Z_TYPES={normal:{hp:25,speed:120,dmg:10,radius:15,color:'#22c55e'},runner:{hp:15,speed:250,dmg:5,radius:12,color:'#84cc16'},tanker:{hp:100,speed:60,dmg:25,radius:25,color:'#15803d'},spitter:{hp:40,speed:90,dmg:15,radius:15,color:'#a3e635',ranged:true},bomber:{hp:30,speed:140,dmg:50,radius:18,color:'#dc2626',explode:true},ghost:{hp:20,speed:100,dmg:10,radius:15,color:'#cbd5e1',ghost:true},pikus:{isBoss:true,name:'ПІКУС',hp:1000,speed:294,dmg:100,radius:30,color:'#9333ea',bullets:3,cd:3000},shurik:{isBoss:true,name:'ШУРІК',hp:2000,speed:280,dmg:100,radius:22.5,color:'#f43f5e',bullets:10,cd:3000},oneshot:{isBoss:true,name:'ВАНШОТУС',hp:3000,speed:294,dmg:1000,radius:30,color:'#fbbf24',bullets:2,cd:2000},padlo:{isBoss:true,name:'ПАДЛО',hp:5000,speed:280,dmg:75,radius:15,color:'#10b981',bullets:25,cd:1500}};
 const MODULES={'can_c1':{id:'can_c1',type:'cannon',rarity:'common',name:'Іскра',price:15,stats:{cd:0.96,dmg:0.98,range:1.00}},'can_c2':{id:'can_c2',type:'cannon',rarity:'common',name:'Чавун',price:25,stats:{dmg:1.05,cd:1.03,range:0.98}},'can_c3':{id:'can_c3',type:'cannon',rarity:'common',name:'Подовжене',price:40,stats:{range:1.05,dmg:1.02,cd:1.02}},'can_r1':{id:'can_r1',type:'cannon',rarity:'rare',name:'Блискавка',price:60,stats:{cd:0.9,dmg:0.93,range:1.00}},'can_r2':{id:'can_r2',type:'cannon',rarity:'rare',name:'Молот',price:90,stats:{dmg:1.1,cd:1.06,range:0.95}},'can_r3':{id:'can_r3',type:'cannon',rarity:'rare',name:'Снайпер',price:130,stats:{range:1.12,dmg:1.06,cd:1.06}},'can_e1':{id:'can_e1',type:'cannon',rarity:'epic',name:'Квазар',price:170,stats:{cd:0.84,dmg:0.88,range:1.00}},'can_e2':{id:'can_e2',type:'cannon',rarity:'epic',name:'Титан',price:220,stats:{dmg:1.18,cd:1.12,range:0.92}},'can_e3':{id:'can_e3',type:'cannon',rarity:'epic',name:'Каратель',price:280,stats:{range:1.22,dmg:1.12,cd:1.1}},'can_l1':{id:'can_l1',type:'cannon',rarity:'legendary',name:'Пульсар',price:350,stats:{cd:0.78,dmg:0.82,range:1.00}},'can_l2':{id:'can_l2',type:'cannon',rarity:'legendary',name:'Колос',price:450,stats:{dmg:1.28,cd:1.2,range:0.88}},'can_l3':{id:'can_l3',type:'cannon',rarity:'legendary',name:'Армагеддон',price:550,stats:{range:1.35,dmg:1.22,cd:1.18}},'tur_c1':{id:'tur_c1',type:'turret',rarity:'common',name:'Легка',price:15,stats:{rotSpeed:1.04,hp:0.98}},'tur_c2':{id:'tur_c2',type:'turret',rarity:'common',name:'Клепана',price:25,stats:{hp:1.03,rotSpeed:0.98}},'tur_c3':{id:'tur_c3',type:'turret',rarity:'common',name:'Оптика',price:40,stats:{rotSpeed:1.02,hp:0.99}},'tur_r1':{id:'tur_r1',type:'turret',rarity:'rare',name:'Спритна',price:60,stats:{rotSpeed:1.10,hp:0.95}},'tur_r2':{id:'tur_r2',type:'turret',rarity:'rare',name:'Щит',price:90,stats:{hp:1.08,rotSpeed:0.95}},'tur_r3':{id:'tur_r3',type:'turret',rarity:'rare',name:'Скаут',price:130,stats:{rotSpeed:1.05,hp:0.97}},'tur_e1':{id:'tur_e1',type:'turret',rarity:'epic',name:'Віраж',price:170,stats:{rotSpeed:1.20,hp:0.90}},'tur_e2':{id:'tur_e2',type:'turret',rarity:'epic',name:'Фортеця',price:220,stats:{hp:1.15,rotSpeed:0.9}},'tur_e3':{id:'tur_e3',type:'turret',rarity:'epic',name:'Вартовий',price:280,stats:{rotSpeed:1.12,hp:0.94}},'tur_l1':{id:'tur_l1',type:'turret',rarity:'legendary',name:'Міраж',price:350,stats:{rotSpeed:1.35,hp:0.9}},'tur_l2':{id:'tur_l2',type:'turret',rarity:'legendary',name:'Бастіон',price:450,stats:{hp:1.2,rotSpeed:0.85}},'tur_l3':{id:'tur_l3',type:'turret',rarity:'legendary',name:'Яструб',price:550,stats:{rotSpeed:1.20,hp:0.90}},'hul_c1':{id:'hul_c1',type:'hull',rarity:'common',name:'Каркас',price:15,stats:{speed:1.04,hp:0.98}},'hul_c2':{id:'hul_c2',type:'hull',rarity:'common',name:'Панцер',price:25,stats:{hp:1.04,speed:0.98}},'hul_c3':{id:'hul_c3',type:'hull',rarity:'common',name:'Розвідник',price:40,stats:{speed:1.02,hp:0.99}},'hul_r1':{id:'hul_r1',type:'hull',rarity:'rare',name:'Болід',price:60,stats:{speed:1.10,hp:0.95}},'hul_r2':{id:'hul_r2',type:'hull',rarity:'rare',name:'Броньовик',price:90,stats:{hp:1.1,speed:0.95}},'hul_r3':{id:'hul_r3',type:'hull',rarity:'rare',name:'Авангард',price:130,stats:{speed:1.05,hp:0.97}},'hul_e1':{id:'hul_e1',type:'hull',rarity:'epic',name:'Фантом',price:170,stats:{speed:1.20,hp:0.90}},'hul_e2':{id:'hul_e2',type:'hull',rarity:'epic',name:'Моноліт',price:220,stats:{hp:1.18,speed:0.9}},'hul_e3':{id:'hul_e3',type:'hull',rarity:'epic',name:'Хижак',price:280,stats:{speed:1.10,hp:0.94}},'hul_l1':{id:'hul_l1',type:'hull',rarity:'legendary',name:'Тінь',price:350,stats:{speed:1.35,hp:0.85}},'hul_l2':{id:'hul_l2',type:'hull',rarity:'legendary',name:'Егіда',price:450,stats:{hp:1.28,speed:0.85}},'hul_l3':{id:'hul_l3',type:'hull',rarity:'legendary',name:'Ассасін',price:550,stats:{speed:1.15,hp:0.90}},'trk_c1':{id:'trk_c1',type:'tracks',rarity:'common',name:'Тонкі',price:15,stats:{speed:1.04,hp:0.98}},'trk_c2':{id:'trk_c2',type:'tracks',rarity:'common',name:'Важкі',price:25,stats:{hp:1.04,speed:0.98}},'trk_c3':{id:'trk_c3',type:'tracks',rarity:'common',name:'Гібрид',price:40,stats:{speed:1.02,hp:0.99}},'trk_r1':{id:'trk_r1',type:'tracks',rarity:'rare',name:'Ралійні',price:60,stats:{speed:1.10,hp:0.95}},'trk_r2':{id:'trk_r2',type:'tracks',rarity:'rare',name:'Всюдихід',price:90,stats:{hp:1.1,speed:0.95}},'trk_r3':{id:'trk_r3',type:'tracks',rarity:'rare',name:'Посилені',price:130,stats:{speed:1.05,hp:0.97}},'trk_e1':{id:'trk_e1',type:'tracks',rarity:'epic',name:'Граві',price:170,stats:{speed:1.20,hp:0.90}},'trk_e2':{id:'trk_e2',type:'tracks',rarity:'epic',name:'Гусеничні',price:220,stats:{hp:1.18,speed:0.9}},'trk_e3':{id:'trk_e3',type:'tracks',rarity:'epic',name:'Адаптивні',price:280,stats:{speed:1.10,hp:0.94}},'trk_l1':{id:'trk_l1',type:'tracks',rarity:'legendary',name:'Струм',price:350,stats:{speed:1.35,hp:0.85}},'trk_l2':{id:'trk_l2',type:'tracks',rarity:'legendary',name:'Скала',price:450,stats:{hp:1.28,speed:0.85}},'trk_l3':{id:'trk_l3',type:'tracks',rarity:'legendary',name:'Кіготь',price:550,stats:{speed:1.15,hp:0.90}}};
 const CASES={1:{price:110,drop:{c:60,r:30,e:9,l:1},pool:'all'},2:{price:100,drop:{c:50,r:35,e:12,l:3},pool:['can_c1','can_r1','can_e1','can_l1','tur_c1','tur_r1','tur_e1','tur_l1','hul_c3','hul_r1','hul_e1','hul_l1','trk_c1','trk_r1','trk_e1','trk_l1']},3:{price:130,drop:{c:50,r:35,e:12,l:3},pool:['tur_c2','tur_r2','tur_e2','tur_l2','hul_c1','hul_r2','hul_e2','hul_l2','trk_c2','trk_r2','trk_e2','trk_l2']},4:{price:175,drop:{c:50,r:35,e:12,l:3},pool:['can_c2','can_r2','can_e2','can_l2','can_c3','can_r3','can_e3','can_l3','tur_c3','tur_r3','tur_e3','tur_l3','hul_c2','hul_r3','hul_e3','hul_l3','trk_c3','trk_r3','trk_e3','trk_l3']},5:{price:110,drop:{c:60,r:30,e:9,l:1},pool:'cannon'},6:{price:110,drop:{c:60,r:30,e:9,l:1},pool:'turret'},7:{price:110,drop:{c:60,r:30,e:9,l:1},pool:'hull'},8:{price:110,drop:{c:60,r:30,e:9,l:1},pool:'tracks'},9:{price:210,drop:{c:0,r:75,e:22,l:3},pool:'all'},10:{price:410,drop:{c:0,r:0,e:85,l:15},pool:'all'},11:{price:200,drop:{c:30,r:40,e:25,l:5},pool:'all'},12:{price:720,drop:{c:0,r:0,e:0,l:100},pool:'all'}};
@@ -115,23 +121,19 @@ function getRandomModuleFromCase(caseId) {
     return rarPool[Math.floor(Math.random() * rarPool.length)];
 }
 
-function checkCollisionServer(mapName, x, y, r, ignoreList = []) {
-    let cM = MAP_DATA[mapName] ? mapName : 'epic_map', mS = MAP_DATA[cM].size;
-    if (x - r < 0 || x + r > mS || y - r < 0 || y + r > mS) return true;
-    let arr = MAP_DATA[cM].solids;
-    for (let i = 0; i < arr.length; i++) {
-        if (ignoreList.includes(i)) continue;
-        let s = arr[i];
-        if (s.type.includes('spawn') || s.type === 'line' || s.type === 'prop_puddle' || s.type === 'prop_crater') continue;
-        if (s.type === 'tree' || s.type === 'neon_circle' || s.type === 'neon_pillar') {
-            let cx = s.x + (s.w ? s.w / 2 : 0), cy = s.y + (s.h ? s.h / 2 : 0), sr = s.r || (s.w ? s.w / 2 : 30);
-            if (Math.hypot(x - cx, y - cy) <= r + sr) return true;
-        } else {
-            let tX = Math.max(s.x, Math.min(x, s.x + (s.w || 30))), tY = Math.max(s.y, Math.min(y, s.y + (s.h || 30)));
-            if (Math.hypot(x - tX, y - tY) <= r) return true;
-        }
+// Гравці кімнати, що відкривають авто-двері (кеш на кадр)
+function roomActors(room) {
+    const now = Date.now();
+    if (!room._actCache || now - room._actT > 25) {
+        room._actCache = Object.values(room.players).filter(p => p.hp > 0 && !p.spectator).map(p => ({ x: p.x, y: p.y, r: 24 }));
+        room._actT = now;
     }
-    return false;
+    return room._actCache;
+}
+
+function checkCollisionServer(mapName, x, y, r, ignoreList = [], room = null) {
+    let cM = MAP_DATA[mapName] ? mapName : 'epic_map';
+    return MapObj.collides(MAP_DATA[cM], x, y, r, { ignore: ignoreList, doorOpen: room ? (o => MapObj.doorNear(o, roomActors(room))) : (() => false) });
 }
 
 function getValidSpawn(m, r, t = 'spawn_player') {
@@ -146,16 +148,28 @@ function getValidSpawn(m, r, t = 'spawn_player') {
         let sp = sP[Math.floor(Math.random() * sP.length)];
         return { x: sp.x, y: sp.y };
     }
-    for (let i = 0; i < 100; i++) {
-        let x = Math.random() * (mS - 200) + 100, y = Math.random() * (mS - 200) + 100;
+    const shp = MapObj.hasShape(MAP_DATA[cM]) ? MapObj.shapeBounds(MAP_DATA[cM].shape) : null;
+    for (let i = 0; i < 200; i++) {
+        let x = shp ? shp.x0 + Math.random() * (shp.x1 - shp.x0) : Math.random() * (mS - 200) + 100, y = shp ? shp.y0 + Math.random() * (shp.y1 - shp.y0) : Math.random() * (mS - 200) + 100;
         if (!checkCollisionServer(cM, x, y, r + 20)) return { x, y };
     }
+    if (shp) return { x: (shp.x0 + shp.x1) / 2, y: (shp.y0 + shp.y1) / 2 };
     return { x: mS / 2, y: mS / 2 };
 }
 
 function getValidEdgeSpawn(m, r, t = 'spawn_zombie') {
     let cM = MAP_DATA[m] ? m : 'epic_map', mS = MAP_DATA[cM].size, sP = MAP_DATA[cM].solids.filter(s => s.type === t);
     if (sP.length > 0) return getValidSpawn(m, r, t);
+    if (MapObj.hasShape(MAP_DATA[cM])) { // фігурна мапа: беремо точку на контурі й трохи зсуваємо всередину
+        const poly = MAP_DATA[cM].shape, bb = MapObj.shapeBounds(poly), mx = (bb.x0 + bb.x1) / 2, my = (bb.y0 + bb.y1) / 2;
+        for (let i = 0; i < 200; i++) {
+            const a = poly[Math.floor(Math.random() * poly.length)], b = poly[(poly.indexOf(a) + 1) % poly.length], t = Math.random();
+            const px = a.x + (b.x - a.x) * t, py = a.y + (b.y - a.y) * t, dx = mx - px, dy = my - py, l = Math.max(Math.hypot(dx, dy), 1);
+            const x = px + dx / l * (r + 40), y = py + dy / l * (r + 40);
+            if (!checkCollisionServer(cM, x, y, r + 20)) return { x, y };
+        }
+        return getValidSpawn(m, r);
+    }
     for (let i = 0; i < 100; i++) {
         let x = Math.random() < 0.5 ? 50 : mS - 50, y = Math.random() * (mS - 100) + 50;
         if (!checkCollisionServer(cM, x, y, r + 20)) return { x, y };
@@ -1069,8 +1083,8 @@ setInterval(() => {
                     aP.forEach(pl => { let d = Math.hypot(pl.x - z.x, pl.y - z.y); if (pl.buff === 'invisible') d *= 3; if (d < mD) { mD = d; t = pl; } });
                     if (t) {
                         let dx = t.x - z.x, dy = t.y - z.y, l = Math.max(Math.hypot(dx, dy), 0.001), sp = Z_TYPES[z.type].speed, nX = z.x + (dx / l) * sp * (1 / 30), nY = z.y + (dy / l) * sp * (1 / 30);
-                        if (!checkCollisionServer(r.map, nX, z.y, Z_TYPES[z.type].radius)) z.x = nX;
-                        if (!checkCollisionServer(r.map, z.x, nY, Z_TYPES[z.type].radius)) z.y = nY;
+                        if (!checkCollisionServer(r.map, nX, z.y, Z_TYPES[z.type].radius, [], r)) z.x = nX;
+                        if (!checkCollisionServer(r.map, z.x, nY, Z_TYPES[z.type].radius, [], r)) z.y = nY;
                         // Анти-застрягання: зомбі, що 3с не рухається далеко від гравця, переноситься на край мапи
                         if (!z.stuckRef) z.stuckRef = { x: z.x, y: z.y, t: now };
                         else if (now - z.stuckRef.t >= 3000) {

@@ -6,303 +6,73 @@
     <title>Ultimate Map Editor - Tanks</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Jura:wght@400;700;900&family=Russo+One&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Jura', sans-serif; background-color: #020617; color: white; margin: 0; overflow: hidden; }
-        .font-russo { font-family: 'Russo One', sans-serif; }
-        #canvas-wrapper { width: calc(100vw - 360px); height: 100vh; overflow: auto; background: #000; position: absolute; right: 0; top: 0; }
-        canvas { display: block; cursor: crosshair; box-shadow: 0 0 100px rgba(0,0,0,0.8); margin: 40px auto; }
-        .tab-btn { transition: all 0.2s; border-bottom: 2px solid transparent; }
-        .tab-btn.active { color: #3b82f6; border-color: #3b82f6; }
-        .tool-btn { transition: all 0.2s; border: 2px solid transparent; }
-        .tool-btn.active { border-color: #3b82f6; background-color: rgba(59, 130, 246, 0.2); box-shadow: 0 0 15px rgba(59, 130, 246, 0.4); }
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #020617; }
-        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
-    </style>
+    <link href="editor/editor.css" rel="stylesheet">
 </head>
 <body>
-    <div class="w-[360px] h-screen bg-slate-900 border-r border-slate-700 flex flex-col absolute left-0 top-0 z-10 shadow-2xl">
-        <div class="p-6 pb-0">
-            <h1 class="text-3xl font-russo text-blue-400 mb-4 tracking-widest text-center">ULTIMATE EDITOR</h1>
-            <div class="flex border-b border-slate-700 mb-4 overflow-x-auto" id="tabs-container"></div>
-        </div>
-
-        <div class="flex-1 overflow-y-auto px-6 pb-6" id="tools-container"></div>
-
-        <div class="p-4 border-t border-slate-700 bg-slate-900">
-            <button id="clear-btn" class="w-full py-2 rounded-xl font-bold uppercase tracking-widest text-slate-400 border border-slate-700 hover:bg-slate-800 hover:text-red-400 mb-2 transition text-xs">Очистити все</button>
-            <button id="export-btn" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl text-lg font-russo uppercase tracking-widest shadow-[0_0_20px_rgba(37,99,235,0.4)] transition text-white">ЕКСПОРТ КОДУ</button>
+    <!-- Вхід за паролем адміна -->
+    <div id="login-overlay">
+        <div id="login-box">
+            <h1 class="text-2xl font-russo text-blue-400 tracking-widest">ULTIMATE EDITOR</h1>
+            <p class="text-xs text-slate-400 mt-1">Введіть пароль адміністратора</p>
+            <input type="password" id="login-pass" autocomplete="off" autofocus>
+            <div id="login-err"></div>
+            <button id="login-btn" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-russo uppercase tracking-widest text-white">УВІЙТИ</button>
         </div>
     </div>
 
+    <div class="w-[360px] h-screen bg-slate-900 border-r border-slate-700 flex flex-col absolute left-0 top-0 z-10 shadow-2xl">
+        <div class="p-4 pb-0">
+            <h1 class="text-2xl font-russo text-blue-400 mb-3 tracking-widest text-center">ULTIMATE EDITOR</h1>
+            <div class="flex border-b border-slate-700 mb-3 overflow-x-auto" id="tabs-container"></div>
+        </div>
+        <div class="flex-1 overflow-y-auto px-4 pb-4" id="tools-container"></div>
+        <div class="p-3 border-t border-slate-700 bg-slate-900">
+            <button id="save-btn" class="w-full bg-emerald-600 hover:bg-emerald-500 py-3 rounded-xl text-base font-russo uppercase tracking-widest transition text-white mb-2">💾 ЗБЕРЕГТИ НА СЕРВЕР</button>
+            <div class="flex gap-2">
+                <button id="clear-btn" class="flex-1 py-2 rounded-xl font-bold uppercase tracking-widest text-slate-400 border border-slate-700 hover:bg-slate-800 hover:text-red-400 transition text-[10px]">Очистити все</button>
+                <button id="export-btn" class="flex-1 py-2 rounded-xl font-bold uppercase tracking-widest text-blue-300 border border-blue-900 hover:bg-blue-900/40 transition text-[10px]">Експорт коду</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="topbar">
+        <button class="top-btn" id="tb-select" title="Вибір / переміщення (V)">🖱 Вибір <span class="kbd">V</span></button>
+        <button class="top-btn" id="tb-eraser" title="Гумка (E)">🧽 Гумка <span class="kbd">E</span></button>
+        <div class="top-sep"></div>
+        <button class="top-btn" id="tb-undo" title="Відмінити (Ctrl+Z)">↶ <span class="kbd">Ctrl+Z</span></button>
+        <button class="top-btn" id="tb-redo" title="Повернути (Ctrl+Y)">↷ <span class="kbd">Ctrl+Y</span></button>
+        <div class="top-sep"></div>
+        <button class="top-btn" id="tb-zoom-out" title="Зменшити (-)">−</button>
+        <span class="top-btn" id="tb-zoom-val" style="cursor:default">100%</span>
+        <button class="top-btn" id="tb-zoom-in" title="Збільшити (+)">+</button>
+        <button class="top-btn" id="tb-fit" title="Вмістити (F)">Вмістити <span class="kbd">F</span></button>
+        <div id="status-line">Готово</div>
+    </div>
+
     <div id="canvas-wrapper"><canvas id="map-canvas"></canvas></div>
+
+    <!-- Міні-меню об'єкта -->
+    <div id="obj-menu" class="hidden"></div>
 
     <div id="export-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-8">
         <div class="bg-slate-900 p-8 rounded-3xl w-full max-w-4xl border border-blue-500/50 flex flex-col h-[85vh]">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-3xl font-russo text-blue-400 tracking-widest">КОД МАПИ</h2>
-                <button onclick="document.getElementById('export-modal').classList.add('hidden')" class="text-slate-400 hover:text-white font-bold text-2xl">✖</button>
+                <button id="export-close" class="text-slate-400 hover:text-white font-bold text-2xl">✖</button>
             </div>
             <textarea id="export-textarea" class="w-full flex-1 bg-[#020617] text-emerald-400 p-5 rounded-xl font-mono text-sm border border-slate-700 focus:outline-none focus:border-blue-500 mb-6 resize-none" readonly></textarea>
-            <button onclick="copyCode()" class="w-full bg-emerald-600 py-5 rounded-xl text-2xl font-russo text-white">СКОПІЮВАТИ ДО БУФЕРУ</button>
+            <button id="export-copy" class="w-full bg-emerald-600 py-5 rounded-xl text-2xl font-russo text-white">СКОПІЮВАТИ ДО БУФЕРУ</button>
         </div>
     </div>
 
-    <script>
-        const canvas = document.getElementById('map-canvas');
-        const ctx = canvas.getContext('2d');
-        const GRID_SIZE = 50; 
-        
-        let mapSettings = { name: 'epic_map', size: 3000, bg: '#020617', grid: '#1e293b' };
-        let objects = [];
-        let currentTool = 'wall_square';
-        let isDrawing = false; let startX = 0, startY = 0; let currentLine = null;
-        let drawColor = '#3b82f6', drawWidth = 10;
-
-        const TABS = [
-            { id: 'settings', name: 'Налашт.' }, { id: 'shapes', name: 'Фігури' }, 
-            { id: 'props', name: 'Декор(20)' }, { id: 'neon', name: 'Неон(6)' }, 
-            { id: 'water', name: 'Вода' }, { id: 'spawns', name: 'Спавни' }
-        ];
-
-        const TOOLS = {
-            'settings': [
-                { type: 'html', html: `<label class="text-xs text-slate-400 mb-1 block">Назва</label><input type="text" id="set-name" value="${mapSettings.name}" class="w-full p-2 bg-slate-800 rounded mb-3 text-white border border-slate-700">` },
-                { type: 'html', html: `<label class="text-xs text-slate-400 mb-1 block">Розмір</label><input type="number" id="set-size" value="${mapSettings.size}" step="500" class="w-full p-2 bg-slate-800 rounded mb-3 text-white border border-slate-700">` },
-                { type: 'html', html: `<label class="text-xs text-slate-400 mb-1 block">Підлога</label><input type="color" id="set-bg" value="${mapSettings.bg}" class="w-full h-8 mb-3 bg-transparent cursor-pointer">` },
-                { type: 'html', html: `<label class="text-xs text-slate-400 mb-1 block">Сітка</label><input type="color" id="set-grid" value="${mapSettings.grid}" class="w-full h-8 bg-transparent cursor-pointer">` }
-            ],
-            'shapes': [
-                { type: 'html', html: `<div class="mb-4 p-3 bg-slate-800 rounded-xl"><label class="text-[10px] text-slate-400 block mb-1">Колір об'єктів/ліній</label><input type="color" id="shape-color" value="#3b82f6" class="w-full h-8 mb-2"><label class="text-[10px] text-slate-400 block mb-1">Товщина лінії</label><input type="range" id="line-width" min="2" max="40" value="10" class="w-full"></div>` },
-                { id: 'shape_line', name: 'Крива Лінія (Пензель)' }, { id: 'wall_square', name: 'Квадрат/Прямокутник' },
-                { id: 'shape_triangle', name: 'Трикутник' }, { id: 'shape_rhombus', name: 'Ромб' }, { id: 'shape_parallelepiped', name: 'Паралелепіпед' }, { id: 'eraser', name: 'Гумка' }
-            ],
-            'water': [ { id: 'water_square', name: 'Куб Води' }, { id: 'water_curve', name: 'Заокруглена Вода' }, { id: 'eraser', name: 'Гумка' } ],
-            'neon': [ { id: 'neon_wall', name: 'Неонова Стіна' }, { id: 'neon_circle', name: 'Неонове Кільце' }, { id: 'neon_triangle', name: 'Неоновий Трикутник' }, { id: 'neon_cross', name: 'Неоновий Хрест' }, { id: 'neon_arch', name: 'Неонова Арка' }, { id: 'neon_pillar', name: 'Неонова Колона' }, { id: 'neon_diamond', name: 'Неоновий Ромб' }, { id: 'eraser', name: 'Гумка' } ],
-            'props': [
-                { id: 'prop_crate', name: 'Ящик' }, { id: 'prop_barrel', name: 'Бочка' }, { id: 'prop_sandbag', name: 'Мішки з піском' },
-                { id: 'prop_rock', name: 'Камінь' }, { id: 'prop_bush', name: 'Кущ' }, { id: 'tree', name: 'Дерево' },
-                { id: 'prop_cone', name: 'Конус' }, { id: 'prop_concrete', name: 'Бетонний блок' }, { id: 'prop_hedgehog', name: 'Протитанк. Їжак' },
-                { id: 'prop_radar', name: 'Радар' }, { id: 'prop_tent', name: 'Намет' }, { id: 'prop_cont_red', name: 'Контейнер Ч' },
-                { id: 'prop_cont_blue', name: 'Контейнер С' }, { id: 'prop_fence_wood', name: 'Дерев. паркан' }, { id: 'prop_fence_metal', name: 'Метал. паркан' },
-                { id: 'prop_wreck', name: 'Знищений танк' }, { id: 'prop_tires', name: 'Шини' }, { id: 'prop_generator', name: 'Генератор' },
-                { id: 'prop_spotlight', name: 'Прожектор' }, { id: 'prop_puddle', name: 'Калюжа бруду' }, { id: 'prop_crater', name: 'Воронка' },
-                { id: 'eraser', name: 'Гумка' }
-            ],
-            'spawns': [ { id: 'spawn_player', name: 'Спавн: Гравець (Невидимий у грі)' }, { id: 'spawn_zombie', name: 'Спавн: Зомбі (Невидимий)' }, { id: 'spawn_powerup', name: 'Спавн: Лут (Невидимий)' }, { id: 'eraser', name: 'Гумка' } ]
-        };
-
-        const tabsContainer = document.getElementById('tabs-container'); const toolsContainer = document.getElementById('tools-container');
-        TABS.forEach((tab, index) => {
-            tabsContainer.innerHTML += `<button class="tab-btn flex-1 pb-2 px-2 text-[10px] font-bold uppercase whitespace-nowrap ${index===0?'active':''} text-slate-400" data-target="tab-${tab.id}">${tab.name}</button>`;
-            let html = `<div id="tab-${tab.id}" class="tab-content ${index===0?'block':'hidden'} space-y-2">`;
-            TOOLS[tab.id].forEach(tool => {
-                if (tool.type === 'html') html += tool.html;
-                else { let colorCls = tool.id === 'eraser' ? 'border-red-500/50 hover:bg-red-500/20 text-red-400' : 'bg-slate-800 text-white'; html += `<button class="tool-btn w-full p-2 rounded-lg text-left font-bold text-xs ${colorCls} ${tool.id==='wall_square'?'active':''}" data-type="${tool.id}">${tool.name}</button>`; }
-            });
-            html += `</div>`; toolsContainer.innerHTML += html;
-        });
-
-        document.querySelectorAll('.tab-btn').forEach(btn => { btn.onclick = () => { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden')); btn.classList.add('active'); document.getElementById(btn.dataset.target).classList.remove('hidden'); } });
-        document.querySelectorAll('.tool-btn').forEach(btn => { btn.onclick = () => { document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); currentTool = btn.dataset.type; } });
-
-        document.getElementById('set-name').oninput = e => mapSettings.name = e.target.value;
-        document.getElementById('set-size').onchange = e => { mapSettings.size = parseInt(e.target.value); canvas.width = mapSettings.size; canvas.height = mapSettings.size; };
-        document.getElementById('set-bg').oninput = e => mapSettings.bg = e.target.value;
-        document.getElementById('set-grid').oninput = e => mapSettings.grid = e.target.value;
-        const shapeColorEl = document.getElementById('shape-color'); if(shapeColorEl) shapeColorEl.oninput = e => drawColor = e.target.value;
-        const lineWidthEl = document.getElementById('line-width'); if(lineWidthEl) lineWidthEl.oninput = e => drawWidth = parseInt(e.target.value);
-        document.getElementById('clear-btn').onclick = () => { if(confirm("Видалити все?")) objects = []; };
-
-        function snap(val) { return Math.round(val / GRID_SIZE) * GRID_SIZE; }
-        canvas.width = mapSettings.size; canvas.height = mapSettings.size;
-
-        canvas.addEventListener('mousedown', e => {
-            const rect = canvas.getBoundingClientRect(); let rawX = e.clientX - rect.left; let rawY = e.clientY - rect.top;
-            if (currentTool === 'eraser') {
-                for (let i = objects.length - 1; i >= 0; i--) {
-                    let o = objects[i];
-                    let minX=o.x, maxX=o.x+(o.w||o.r*2||30), minY=o.y, maxY=o.y+(o.h||o.r*2||30);
-                    if(o.type === 'line') { minX = Math.min(...o.points.map(p=>p.x))-20; maxX = Math.max(...o.points.map(p=>p.x))+20; minY = Math.min(...o.points.map(p=>p.y))-20; maxY = Math.max(...o.points.map(p=>p.y))+20; }
-                    else if(o.type === 'tree' || o.type.includes('spawn')) { minX = o.x-20; maxX = o.x+20; minY = o.y-20; maxY = o.y+20; }
-                    if (rawX >= minX && rawX <= maxX && rawY >= minY && rawY <= maxY) { objects.splice(i, 1); break; }
-                } return;
-            }
-            if (currentTool.includes('spawn')) { objects.push({ type: currentTool, x: snap(rawX), y: snap(rawY) }); return; }
-            isDrawing = true; startX = snap(rawX); startY = snap(rawY);
-            if (currentTool === 'shape_line') { currentLine = { type: 'line', points: [{x: rawX, y: rawY}], color: drawColor, width: drawWidth }; objects.push(currentLine); }
-        });
-
-        canvas.addEventListener('mousemove', e => {
-            if (!isDrawing) return;
-            const rect = canvas.getBoundingClientRect(); let rawX = e.clientX - rect.left; let rawY = e.clientY - rect.top;
-            if (currentTool === 'shape_line' && currentLine) { currentLine.points.push({x: rawX, y: rawY}); } 
-            else { window.mouseX = snap(rawX); window.mouseY = snap(rawY); }
-        });
-
-        canvas.addEventListener('mouseup', e => {
-            if (!isDrawing) return; isDrawing = false;
-            if (currentTool === 'shape_line') { currentLine = null; return; }
-            const rect = canvas.getBoundingClientRect(); let endX = snap(e.clientX - rect.left); let endY = snap(e.clientY - rect.top);
-            let x = Math.min(startX, endX); let y = Math.min(startY, endY);
-            let w = Math.abs(endX - startX); let h = Math.abs(endY - startY);
-            if(w===0) w=GRID_SIZE; if(h===0) h=GRID_SIZE;
-
-            if (currentTool === 'tree') { objects.push({ type: 'tree', x: startX, y: startY, r: Math.max(20, Math.hypot(endX-startX, endY-startY)) }); }
-            else if (currentTool.includes('water')) { objects.push({ type: currentTool, x, y, w, h }); }
-            else if (currentTool.includes('neon')) { objects.push({ type: currentTool, x, y, w, h, color: drawColor }); }
-            else if (currentTool.includes('prop_')) { objects.push({ type: currentTool, x, y, w, h }); }
-            else { objects.push({ type: currentTool, x, y, w, h, color: drawColor }); }
-        });
-
-        // 🎨 ВЕКТОРНИЙ РЕНДЕР ДЕКОРАЦІЙ ТА ФІГУР
-        function drawProp(ctx, o, time) {
-            let x = o.x, y = o.y, w = o.w, h = o.h;
-            ctx.save();
-            switch(o.type) {
-                case 'prop_crate':
-                    ctx.fillStyle = '#b45309'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = '#78350f'; ctx.lineWidth = 3; ctx.strokeRect(x, y, w, h);
-                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x+w, y+h); ctx.moveTo(x+w, y); ctx.lineTo(x, y+h); ctx.stroke(); break;
-                case 'prop_barrel':
-                    ctx.fillStyle = '#dc2626'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, Math.min(w,h)/2, 0, Math.PI*2); ctx.fill();
-                    ctx.fillStyle = '#991b1b'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, Math.min(w,h)/2 - 4, 0, Math.PI*2); ctx.fill(); break;
-                case 'prop_sandbag':
-                    ctx.fillStyle = '#d4a373'; ctx.strokeStyle = '#a68a64'; ctx.lineWidth = 2;
-                    ctx.beginPath(); ctx.roundRect(x, y, w, h/2, 10); ctx.fill(); ctx.stroke();
-                    ctx.beginPath(); ctx.roundRect(x+5, y+h/2, w-10, h/2, 10); ctx.fill(); ctx.stroke(); break;
-                case 'prop_rock':
-                    ctx.fillStyle = '#52525b'; ctx.beginPath(); ctx.moveTo(x+w/2, y); ctx.lineTo(x+w, y+h/3); ctx.lineTo(x+w*0.8, y+h); ctx.lineTo(x+w*0.2, y+h); ctx.lineTo(x, y+h/2); ctx.fill(); break;
-                case 'prop_bush':
-                    ctx.fillStyle = '#15803d'; ctx.beginPath(); ctx.arc(x+w/3, y+h/3, w/2, 0, Math.PI*2); ctx.fill();
-                    ctx.beginPath(); ctx.arc(x+w*0.7, y+h/3, w/2, 0, Math.PI*2); ctx.fill();
-                    ctx.beginPath(); ctx.arc(x+w/2, y+h*0.7, w/2.5, 0, Math.PI*2); ctx.fill(); break;
-                case 'prop_cone':
-                    ctx.fillStyle = '#ea580c'; ctx.beginPath(); ctx.moveTo(x+w/2, y); ctx.lineTo(x+w, y+h); ctx.lineTo(x, y+h); ctx.fill();
-                    ctx.fillStyle = '#fff'; ctx.fillRect(x+w*0.3, y+h*0.5, w*0.4, h*0.2); break;
-                case 'prop_concrete':
-                    ctx.fillStyle = '#a1a1aa'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = '#71717a'; ctx.lineWidth = 2; ctx.strokeRect(x+2, y+2, w-4, h-4); break;
-                case 'prop_hedgehog':
-                    ctx.strokeStyle = '#71717a'; ctx.lineWidth = 4; ctx.lineCap = 'round';
-                    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x+w, y+h); ctx.moveTo(x+w, y); ctx.lineTo(x, y+h); ctx.stroke();
-                    ctx.beginPath(); ctx.moveTo(x+w/2, y); ctx.lineTo(x+w/2, y+h); ctx.moveTo(x, y+h/2); ctx.lineTo(x+w, y+h/2); ctx.stroke(); break;
-                case 'prop_radar':
-                    ctx.fillStyle = '#334155'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, w/2, 0, Math.PI*2); ctx.fill();
-                    ctx.translate(x+w/2, y+h/2); ctx.rotate(time * 2);
-                    ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(w/2, 0); ctx.stroke(); break;
-                case 'prop_tent':
-                    ctx.fillStyle = '#4d7c0f'; ctx.fillRect(x, y, w, h); ctx.fillStyle = '#1a2e05'; ctx.beginPath(); ctx.moveTo(x+w/2, y+h); ctx.lineTo(x+w/2 - 15, y+h - 20); ctx.lineTo(x+w/2 + 15, y+h - 20); ctx.fill(); break;
-                case 'prop_cont_red':
-                case 'prop_cont_blue':
-                    ctx.fillStyle = o.type === 'prop_cont_red' ? '#dc2626' : '#2563eb'; ctx.fillRect(x, y, w, h);
-                    ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 2;
-                    for(let l=x+10; l<x+w; l+=15) { ctx.beginPath(); ctx.moveTo(l, y); ctx.lineTo(l, y+h); ctx.stroke(); } break;
-                case 'prop_fence_wood':
-                    ctx.fillStyle = '#78350f'; ctx.fillRect(x, y+h/2-2, w, 4);
-                    for(let fx=x; fx<=x+w; fx+=20) { ctx.beginPath(); ctx.arc(fx, y+h/2, 4, 0, Math.PI*2); ctx.fill(); } break;
-                case 'prop_fence_metal':
-                    ctx.fillStyle = '#94a3b8'; ctx.fillRect(x, y+h/2-1, w, 2); ctx.setLineDash([5, 5]); ctx.strokeStyle='#94a3b8'; ctx.beginPath(); ctx.moveTo(x, y+h/2-5); ctx.lineTo(x+w, y+h/2-5); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x, y+h/2+5); ctx.lineTo(x+w, y+h/2+5); ctx.stroke(); break;
-                case 'prop_wreck':
-                    ctx.fillStyle = '#1c1917'; ctx.fillRect(x+5, y+10, w-10, h-20);
-                    ctx.fillStyle = '#09090b'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, 15, 0, Math.PI*2); ctx.fill();
-                    ctx.strokeStyle = '#09090b'; ctx.lineWidth=6; ctx.beginPath(); ctx.moveTo(x+w/2, y+h/2); ctx.lineTo(x+w, y+h); ctx.stroke(); break;
-                case 'prop_tires':
-                    ctx.fillStyle = '#171717'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, w/2, 0, Math.PI*2); ctx.fill();
-                    ctx.fillStyle = '#27272a'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, w/3, 0, Math.PI*2); ctx.fill(); break;
-                case 'prop_generator':
-                    ctx.fillStyle = '#eab308'; ctx.fillRect(x, y, w, h); ctx.fillStyle = '#171717'; ctx.fillRect(x+5, y+5, w-10, h/2); break;
-                case 'prop_spotlight':
-                    ctx.fillStyle = '#d4d4d8'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, 10, 0, Math.PI*2); ctx.fill();
-                    ctx.translate(x+w/2, y+h/2); ctx.rotate(Math.sin(time)*0.5);
-                    ctx.fillStyle = 'rgba(253, 224, 71, 0.2)'; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(150, -40); ctx.lineTo(150, 40); ctx.fill(); break;
-                case 'prop_puddle':
-                    ctx.fillStyle = '#451a03'; ctx.beginPath(); ctx.ellipse(x+w/2, y+h/2, w/2, h/3, Math.PI/4, 0, Math.PI*2); ctx.fill(); break;
-                case 'prop_crater':
-                    ctx.fillStyle = '#27272a'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, w/2, 0, Math.PI*2); ctx.fill();
-                    ctx.fillStyle = '#09090b'; ctx.beginPath(); ctx.arc(x+w/2, y+h/2, w/3, 0, Math.PI*2); ctx.fill(); break;
-            }
-            ctx.restore();
-        }
-
-        function renderLoop() {
-            ctx.clearRect(0, 0, mapSettings.size, mapSettings.size);
-            ctx.fillStyle = mapSettings.bg; ctx.fillRect(0, 0, mapSettings.size, mapSettings.size);
-            ctx.strokeStyle = mapSettings.grid; ctx.lineWidth = 1;
-            for(let i=0; i<=mapSettings.size; i+=50) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, mapSettings.size); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(mapSettings.size, i); ctx.stroke(); }
-
-            let time = Date.now() / 1000; 
-
-            // Малюємо всі об'єкти
-            let renderList = [...objects];
-            if (isDrawing && currentTool !== 'shape_line' && !currentTool.includes('spawn')) {
-                let mw = Math.max(GRID_SIZE, Math.abs((window.mouseX||startX)-startX));
-                let mh = Math.max(GRID_SIZE, Math.abs((window.mouseY||startY)-startY));
-                renderList.push({type: currentTool, x: Math.min(startX, window.mouseX||startX), y: Math.min(startY, window.mouseY||startY), w: mw, h: mh, r: Math.hypot((window.mouseX||startX)-startX, (window.mouseY||startY)-startY), color: drawColor, preview: true});
-            }
-
-            renderList.forEach(o => {
-                ctx.save();
-                if(o.preview) ctx.globalAlpha = 0.5;
-
-                if (o.type === 'line') {
-                    ctx.strokeStyle = o.color; ctx.lineWidth = o.width; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-                    ctx.beginPath(); ctx.moveTo(o.points[0].x, o.points[0].y); for(let i=1; i<o.points.length; i++) ctx.lineTo(o.points[i].x, o.points[i].y); ctx.stroke();
-                } 
-                else if (o.type.includes('water')) {
-                    ctx.fillStyle = '#0369a1'; ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 2;
-                    if(o.type === 'water_curve') { ctx.beginPath(); ctx.roundRect(o.x, o.y, o.w, o.h, Math.min(o.w,o.h)/2); ctx.fill(); ctx.clip(); } 
-                    else { ctx.fillRect(o.x, o.y, o.w, o.h); ctx.beginPath(); ctx.rect(o.x, o.y, o.w, o.h); ctx.clip(); }
-                    
-                    ctx.setLineDash([20, 20]); ctx.lineDashOffset = -time * 20;
-                    for(let wy=o.y+10; wy<o.y+o.h; wy+=30) { ctx.beginPath(); ctx.moveTo(o.x, wy); ctx.lineTo(o.x+o.w, wy); ctx.stroke(); }
-                    ctx.setLineDash([]);
-                }
-                else if (o.type === 'shape_triangle') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
-                else if (o.type === 'shape_rhombus') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w/2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h/2); ctx.lineTo(o.x + o.w/2, o.y + o.h); ctx.lineTo(o.x, o.y + o.h/2); ctx.fill(); }
-                else if (o.type === 'shape_parallelepiped') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w*0.2, o.y); ctx.lineTo(o.x + o.w, o.y); ctx.lineTo(o.x + o.w*0.8, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
-                else if (o.type === 'wall_square') { ctx.fillStyle = o.color || '#1e293b'; ctx.fillRect(o.x, o.y, o.w, o.h); }
-                else if (o.type.includes('neon')) {
-                    ctx.strokeStyle = o.color || '#3b82f6'; ctx.lineWidth = 4; ctx.shadowColor = o.color || '#3b82f6'; ctx.shadowBlur = 15 + Math.sin(time*5)*5;
-                    if(o.type === 'neon_wall') ctx.strokeRect(o.x, o.y, o.w, o.h);
-                    else if(o.type === 'neon_circle') { ctx.beginPath(); ctx.arc(o.x+o.w/2, o.y+o.h/2, Math.min(o.w,o.h)/2, 0, Math.PI*2); ctx.stroke(); }
-                    else if(o.type === 'neon_cross') { ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(o.x+o.w, o.y+o.h); ctx.moveTo(o.x+o.w, o.y); ctx.lineTo(o.x, o.y+o.h); ctx.stroke(); }
-                    else if(o.type === 'neon_triangle') { ctx.beginPath(); ctx.moveTo(o.x+o.w/2, o.y); ctx.lineTo(o.x+o.w, o.y+o.h); ctx.lineTo(o.x, o.y+o.h); ctx.closePath(); ctx.stroke(); }
-                    else if(o.type === 'neon_diamond') { ctx.beginPath(); ctx.moveTo(o.x+o.w/2, o.y); ctx.lineTo(o.x+o.w, o.y+o.h/2); ctx.lineTo(o.x+o.w/2, o.y+o.h); ctx.lineTo(o.x, o.y+o.h/2); ctx.closePath(); ctx.stroke(); }
-                    else if(o.type === 'neon_arch') { ctx.beginPath(); ctx.moveTo(o.x, o.y+o.h); ctx.lineTo(o.x, o.y+o.h/2); ctx.arc(o.x+o.w/2, o.y+o.h/2, o.w/2, Math.PI, 0); ctx.lineTo(o.x+o.w, o.y+o.h); ctx.stroke(); }
-                    else if(o.type === 'neon_pillar') { ctx.beginPath(); ctx.ellipse(o.x+o.w/2, o.y+o.h/2, o.w/2, o.h/2, 0, 0, Math.PI*2); ctx.stroke(); }
-                    ctx.fillStyle = o.color || '#3b82f6'; ctx.globalAlpha = 0.2; ctx.fillRect(o.x, o.y, o.w, o.h); ctx.globalAlpha = 1.0;
-                }
-                else if (o.type === 'tree') { ctx.fillStyle = '#0c0a09'; ctx.beginPath(); ctx.arc(o.x, o.y, o.r||30, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = 'rgba(22, 163, 74, 0.4)'; ctx.beginPath(); ctx.arc(o.x+5, o.y+5, Math.max(5, (o.r||30)-10), 0, Math.PI*2); ctx.fill(); }
-                else if (o.type.includes('spawn')) {
-                    // Точки спавну: Вони видимі тільки тут, у редакторі
-                    ctx.beginPath(); ctx.arc(o.x, o.y, 20, 0, Math.PI*2); 
-                    ctx.fillStyle = o.type==='spawn_player'?'#3b82f6':o.type==='spawn_zombie'?'#22c55e':'#eab308'; ctx.fill();
-                    ctx.fillStyle = '#fff'; ctx.font = '16px Russo One'; ctx.textAlign='center'; ctx.textBaseline='middle';
-                    ctx.fillText(o.type==='spawn_player'?'P':o.type==='spawn_zombie'?'Z':'*', o.x, o.y);
-                }
-                else if (o.type.includes('prop_')) {
-                    // Малювання кастомних 2D текстур
-                    drawProp(ctx, o, time);
-                }
-                ctx.restore();
-            });
-
-            requestAnimationFrame(renderLoop);
-        }
-        renderLoop();
-
-        // --- ЕКСПОРТ КОДУ ---
-        document.getElementById('export-btn').onclick = () => {
-            let code = `MAP_DATA['${mapSettings.name}'] = {\n    size: ${mapSettings.size},\n    bg: '${mapSettings.bg}',\n    grid: '${mapSettings.grid}',\n    solids: [\n`;
-            objects.forEach(o => { code += `        ${JSON.stringify(o)},\n`; });
-            code += `    ]\n};\n`;
-            document.getElementById('export-textarea').value = code; document.getElementById('export-modal').classList.remove('hidden');
-        };
-
-        window.copyCode = function() {
-            const ta = document.getElementById('export-textarea'); ta.select(); document.execCommand('copy');
-            alert('Код успішно скопійовано! Вставте його у MAP_DATA (config.js та server.js).');
-        };
-    </script>
+    <!-- Спільний модуль гри та редактора -->
+    <script src="js/mapobjects.js"></script>
+    <!-- Файли редактора -->
+    <script src="editor/editor-data.js"></script>
+    <script src="editor/editor-api.js"></script>
+    <script src="editor/editor-history.js"></script>
+    <script src="editor/editor-render.js"></script>
+    <script src="editor/editor-tools.js"></script>
+    <script src="editor/editor-app.js"></script>
 </body>
 </html>

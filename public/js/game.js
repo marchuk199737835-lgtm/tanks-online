@@ -47,24 +47,12 @@ function createExplosion(x, y, count, color) {
 
 function checkCollision(x, y, r, checkS = true, isB = false) {
     if (!currentRoomData) return true;
-    let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'epic_map';
-    let mS = MAP_DATA[cMap].size;
-    if (x - r < 0 || x + r > mS || y - r < 0 || y + r > mS) return true;
-    
-    if (checkS) {
-        for (let s of MAP_DATA[cMap].solids) {
-            if (s.type.includes('spawn') || s.type === 'line' || s.type === 'prop_puddle' || s.type === 'prop_crater') continue;
-            if (s.type.includes('water') && isB) continue;
-            if (s.type === 'tree' || s.type === 'neon_circle' || s.type === 'neon_pillar') {
-                let cx = s.x + (s.w ? s.w / 2 : 0), cy = s.y + (s.h ? s.h / 2 : 0), sr = s.r || (s.w ? s.w / 2 : 30);
-                if (Math.hypot(x - cx, y - cy) <= r + sr) return true;
-            } else {
-                let tX = Math.max(s.x, Math.min(x, s.x + (s.w || 30))), tY = Math.max(s.y, Math.min(y, s.y + (s.h || 30)));
-                if (Math.hypot(x - tX, y - tY) <= r) return true;
-            }
-        }
+    let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'epic_map', m = MAP_DATA[cMap];
+    if (!checkS) { // лише межі мапи та фігурний контур
+        if (x - r < 0 || x + r > m.size || y - r < 0 || y + r > m.size) return true;
+        return MapObj.hasShape(m) && !MapObj.circleInPoly(m.shape, x, y, r);
     }
-    return false;
+    return MapObj.collides(m, x, y, r, { skipWater: isB });
 }
 
 function checkPCollision(nX, nY, rad) {
@@ -92,6 +80,13 @@ function findNextSpec(dir) {
 function updatePhys(now, dt) {
     if (!currentRoomData || !currentRoomId) return;
     let myRad = myLocalTank.buff === 'boss' ? 75 : 24;
+    {   // авто-двері: відкриваються, коли поруч танк
+        const _dm = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'epic_map';
+        if (window._doorMapName !== currentRoomId + _dm) { window._doorMapName = currentRoomId + _dm; MapObj.resetDoors(MAP_DATA[_dm]); }
+        const _act = []; if (myLocalTank.hp > 0) _act.push({ x: myLocalTank.x, y: myLocalTank.y, r: myRad });
+        for (let _id in opponents) { const _o = opponents[_id]; if (_o.hp > 0) _act.push({ x: _o.x, y: _o.y, r: 24 }); }
+        MapObj.updateDoors(MAP_DATA[_dm], _act, dt);
+    }
     
     if (myLocalTank.hp <= 0) {
         if (spectatingId && opponents[spectatingId]) {
@@ -377,70 +372,7 @@ function drTnk(x, y, bA, tA, cH, nm, iM, hp, bf, eq, dN = true) {
     ctx.restore();
 }
 
-function drPrp(c, o, t) {
-    let x = o.x, y = o.y, w = o.w || 50, h = o.h || 50;
-    c.save();
-    switch (o.type) {
-        case 'prop_crate':
-            c.fillStyle = '#b45309'; c.fillRect(x, y, w, h); c.strokeStyle = '#78350f'; c.lineWidth = 3; c.strokeRect(x, y, w, h);
-            c.beginPath(); c.moveTo(x, y); c.lineTo(x + w, y + h); c.moveTo(x + w, y); c.lineTo(x, y + h); c.stroke(); break;
-        case 'prop_barrel':
-            c.fillStyle = '#dc2626'; c.beginPath(); c.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2, 0, Math.PI * 2); c.fill();
-            c.fillStyle = '#991b1b'; c.beginPath(); c.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2 - 4, 0, Math.PI * 2); c.fill(); break;
-        case 'prop_sandbag':
-            c.fillStyle = '#d4a373'; c.strokeStyle = '#a68a64'; c.lineWidth = 2;
-            c.beginPath(); c.roundRect(x, y, w, h / 2, 10); c.fill(); c.stroke();
-            c.beginPath(); c.roundRect(x + 5, y + h / 2, w - 10, h / 2, 10); c.fill(); c.stroke(); break;
-        case 'prop_rock':
-            c.fillStyle = '#52525b'; c.beginPath(); c.moveTo(x + w / 2, y); c.lineTo(x + w, y + h / 3); c.lineTo(x + w * 0.8, y + h); c.lineTo(x + w * 0.2, y + h); c.lineTo(x, y + h / 2); c.fill(); break;
-        case 'prop_bush':
-            c.fillStyle = '#15803d'; c.beginPath(); c.arc(x + w / 3, y + h / 3, w / 2, 0, Math.PI * 2); c.fill();
-            c.beginPath(); c.arc(x + w * 0.7, y + h / 3, w / 2, 0, Math.PI * 2); c.fill();
-            c.beginPath(); c.arc(x + w / 2, y + h * 0.7, w / 2.5, 0, Math.PI * 2); c.fill(); break;
-        case 'prop_cone':
-            c.fillStyle = '#ea580c'; c.beginPath(); c.moveTo(x + w / 2, y); c.lineTo(x + w, y + h); c.lineTo(x, y + h); c.fill();
-            c.fillStyle = '#fff'; c.fillRect(x + w * 0.3, y + h * 0.5, w * 0.4, h * 0.2); break;
-        case 'prop_concrete':
-            c.fillStyle = '#a1a1aa'; c.fillRect(x, y, w, h); c.strokeStyle = '#71717a'; c.lineWidth = 2; c.strokeRect(x + 2, y + 2, w - 4, h - 4); break;
-        case 'prop_hedgehog':
-            c.strokeStyle = '#71717a'; c.lineWidth = 4; c.lineCap = 'round';
-            c.beginPath(); c.moveTo(x, y); c.lineTo(x + w, y + h); c.moveTo(x + w, y); c.lineTo(x, y + h); c.stroke();
-            c.beginPath(); c.moveTo(x + w / 2, y); c.lineTo(x + w / 2, y + h); c.moveTo(x, y + h / 2); c.lineTo(x + w, y + h / 2); c.stroke(); break;
-        case 'prop_radar':
-            c.fillStyle = '#334155'; c.beginPath(); c.arc(x + w / 2, y + h / 2, w / 2, 0, Math.PI * 2); c.fill();
-            c.translate(x + w / 2, y + h / 2); c.rotate(t * 2); c.strokeStyle = '#10b981'; c.lineWidth = 3; c.beginPath(); c.moveTo(0, 0); c.lineTo(w / 2, 0); c.stroke(); break;
-        case 'prop_tent':
-            c.fillStyle = '#4d7c0f'; c.fillRect(x, y, w, h); c.fillStyle = '#1a2e05'; c.beginPath(); c.moveTo(x + w / 2, y + h); c.lineTo(x + w / 2 - 15, y + h - 20); c.lineTo(x + w / 2 + 15, y + h - 20); c.fill(); break;
-        case 'prop_cont_red':
-        case 'prop_cont_blue':
-            c.fillStyle = o.type === 'prop_cont_red' ? '#dc2626' : '#2563eb'; c.fillRect(x, y, w, h); c.strokeStyle = 'rgba(0,0,0,0.3)'; c.lineWidth = 2;
-            for (let l = x + 10; l < x + w; l += 15) { c.beginPath(); c.moveTo(l, y); c.lineTo(l, y + h); c.stroke(); } break;
-        case 'prop_fence_wood':
-            c.fillStyle = '#78350f'; c.fillRect(x, y + h / 2 - 2, w, 4);
-            for (let f = x; f <= x + w; f += 20) { c.beginPath(); c.arc(f, y + h / 2, 4, 0, Math.PI * 2); c.fill(); } break;
-        case 'prop_fence_metal':
-            c.fillStyle = '#94a3b8'; c.fillRect(x, y + h / 2 - 1, w, 2); c.setLineDash([5, 5]); c.strokeStyle = '#94a3b8';
-            c.beginPath(); c.moveTo(x, y + h / 2 - 5); c.lineTo(x + w, y + h / 2 - 5); c.stroke();
-            c.beginPath(); c.moveTo(x, y + h / 2 + 5); c.lineTo(x + w, y + h / 2 + 5); c.stroke(); break;
-        case 'prop_wreck':
-            c.fillStyle = '#1c1917'; c.fillRect(x + 5, y + 10, w - 10, h - 20);
-            c.fillStyle = '#09090b'; c.beginPath(); c.arc(x + w / 2, y + h / 2, 15, 0, Math.PI * 2); c.fill();
-            c.strokeStyle = '#09090b'; c.lineWidth = 6; c.beginPath(); c.moveTo(x + w / 2, y + h / 2); c.lineTo(x + w, y + h); c.stroke(); break;
-        case 'prop_tires':
-            c.fillStyle = '#171717'; c.beginPath(); c.arc(x + w / 2, y + h / 2, w / 2, 0, Math.PI * 2); c.fill();
-            c.fillStyle = '#27272a'; c.beginPath(); c.arc(x + w / 2, y + h / 2, w / 3, 0, Math.PI * 2); c.fill(); break;
-        case 'prop_generator':
-            c.fillStyle = '#eab308'; c.fillRect(x, y, w, h); c.fillStyle = '#171717'; c.fillRect(x + 5, y + 5, w - 10, h / 2); break;
-        case 'prop_spotlight':
-            c.fillStyle = '#d4d4d8'; c.beginPath(); c.arc(x + w / 2, y + h / 2, 10, 0, Math.PI * 2); c.fill();
-            c.translate(x + w / 2, y + h / 2); c.rotate(Math.sin(t) * 0.5);
-            c.fillStyle = 'rgba(253, 224, 71, 0.2)'; c.beginPath(); c.moveTo(0, 0); c.lineTo(150, -40); c.lineTo(150, 40); c.fill(); break;
-        case 'tree':
-            c.beginPath(); c.arc(x + w / 2, y + h / 2, o.r || 30, 0, Math.PI * 2); c.fillStyle = '#0c0a09'; c.fill();
-            c.fillStyle = 'rgba(22, 163, 74, 0.4)'; c.beginPath(); c.arc(x + w / 2 + 5, y + h / 2 + 5, Math.max(5, (o.r || 30) - 10), 0, Math.PI * 2); c.fill(); break;
-    }
-    c.restore();
-}
+function drPrp(c, o, t) { MapObj.drawProp(c, o, t); }
 
 function drJ() {
     if (!isMobile || myLocalTank.hp <= 0) return;
@@ -698,6 +630,11 @@ function draw(now) {
     ctx.translate(canvas.width / 2 - camera.x + shX, canvas.height / 2 - camera.y + shY);
     
     let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'epic_map', mS = MAP_DATA[cMap].size;
+    const _mp = MAP_DATA[cMap], _sh = MapObj.hasShape(_mp);
+    if (_sh) { // фігурна мапа: все поза контуром — порожнеча
+        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, mS, mS);
+        ctx.save(); ctx.beginPath(); _mp.shape.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); ctx.clip();
+    }
     ctx.fillStyle = MAP_DATA[cMap].bg || '#020617'; ctx.fillRect(0, 0, mS, mS);
     ctx.strokeStyle = MAP_DATA[cMap].grid || '#1e293b'; ctx.lineWidth = 1;
     
@@ -705,12 +642,18 @@ function draw(now) {
         ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, mS); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(mS, i); ctx.stroke();
     }
+    if (_sh) {
+        ctx.restore();
+        ctx.save(); ctx.beginPath(); _mp.shape.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath();
+        ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 6; ctx.lineJoin = 'round'; ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 18; ctx.stroke(); ctx.restore();
+    }
     
     let tm = Date.now() / 1000;
     
     MAP_DATA[cMap].solids.forEach(o => {
         if (o.type.includes('spawn')) return;
         ctx.save();
+        MapObj.applyRot(ctx, o);
         if (o.type === 'line') {
             ctx.strokeStyle = o.color; ctx.lineWidth = o.width; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
             ctx.beginPath(); ctx.moveTo(o.points[0].x, o.points[0].y);
@@ -742,18 +685,20 @@ function draw(now) {
     ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 15; ctx.shadowOffsetX = 8; ctx.shadowOffsetY = 12;
     MAP_DATA[cMap].solids.forEach(o => {
         if (o.type.includes('spawn') || o.type.includes('water') || o.type === 'line' || o.type === 'prop_puddle' || o.type === 'prop_crater') return;
+        ctx.save(); MapObj.applyRot(ctx, o);
         if (o.type === 'shape_triangle') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w / 2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
         else if (o.type === 'shape_rhombus') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w / 2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h / 2); ctx.lineTo(o.x + o.w / 2, o.y + o.h); ctx.lineTo(o.x, o.y + o.h / 2); ctx.fill(); }
         else if (o.type === 'shape_parallelepiped') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w * 0.2, o.y); ctx.lineTo(o.x + o.w, o.y); ctx.lineTo(o.x + o.w * 0.8, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
         else if (o.type === 'wall' || o.type === 'wall_square') { ctx.fillStyle = o.color || '#1e293b'; ctx.fillRect(o.x, o.y, o.w, o.h); }
         else if (o.type === 'tree') { ctx.beginPath(); ctx.arc(o.x, o.y, o.r || 30, 0, Math.PI * 2); ctx.fill(); }
         else if (o.type.includes('prop_')) drPrp(ctx, o, tm);
+        ctx.restore();
     });
     ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
     
     MAP_DATA[cMap].solids.forEach(o => {
         if (o.type.includes('spawn') || o.type.includes('water') || o.type === 'line' || o.type.includes('prop_')) return;
-        ctx.save();
+        ctx.save(); MapObj.applyRot(ctx, o);
         if (o.type === 'shape_triangle') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w / 2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
         else if (o.type === 'shape_rhombus') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w / 2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h / 2); ctx.lineTo(o.x + o.w / 2, o.y + o.h); ctx.lineTo(o.x, o.y + o.h / 2); ctx.fill(); }
         else if (o.type === 'shape_parallelepiped') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w * 0.2, o.y); ctx.lineTo(o.x + o.w, o.y); ctx.lineTo(o.x + o.w * 0.8, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
