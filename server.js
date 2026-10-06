@@ -464,7 +464,7 @@ io.on('connection', (socket) => {
         if (b < 0 || u.bucks < b) return socket.emit('joinError', 'Недостатньо баксів!');
         u.bucks -= b;
         u.inventory.splice(d.idx, 1);
-        let ch = Math.min(90, ((pIn + b) / pOut) * 100), roll = Math.random() * 100, win = d.rollUnder ? (roll <= ch) : (roll >= (100 - ch));
+        let ch = GameData.upgradeChance(pIn, b, tMod), roll = Math.random() * 100, win = d.rollUnder ? (roll <= ch) : (roll >= (100 - ch));
         if (win) u.inventory.push(d.target);
         saveUser(n);
         sendEconomy(socket.id, n);

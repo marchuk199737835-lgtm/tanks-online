@@ -176,6 +176,13 @@ function statMult(equipped, stat) {
   const lim = STAT_LIMITS[stat];
   return lim ? Math.max(lim[0], Math.min(lim[1], m)) : m;
 }
+// Шанс апгрейду (%): справедливий шанс (вхід+бакси)/ціна цілі зі «зборами казино»: -15% (на міфічні -25%) і стеля 75% (на міфічні 50%).
+// Ланцюжок дрібних апгрейдів тому не безпечний: кожен крок множить очікувану цінність на 0.85.
+function upgradeChance(pIn, bucks, target) {
+  const myth = target && target.rarity === 'mythic', pOut = (target && target.price) || 5;
+  const edge = myth ? 0.75 : 0.85, cap = myth ? 50 : 75;
+  return Math.max(1, Math.min(cap, ((pIn + (bucks || 0)) / pOut) * 100 * edge));
+}
 function legendCaseId() { for (const k in CASES) if (CASES[k].legend) return +k; return null; }
-return { RARITY: RARITY, RARITY_ORDER: RARITY_ORDER, MODULES: MODULES, CASES: CASES, casePool: casePool, caseTable: caseTable, rollCase: rollCase, statMult: statMult, legendCaseId: legendCaseId };
+return { RARITY: RARITY, RARITY_ORDER: RARITY_ORDER, MODULES: MODULES, CASES: CASES, casePool: casePool, caseTable: caseTable, rollCase: rollCase, statMult: statMult, upgradeChance: upgradeChance, legendCaseId: legendCaseId };
 });
