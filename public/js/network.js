@@ -2,7 +2,7 @@ socket.on('initMusic',(data)=>{myMusicPlaylists=data;});
 socket.on('initZombies',(data)=>{for(const k in Z_TYPES)delete Z_TYPES[k];Object.assign(Z_TYPES,data);});
 socket.on('authSuccess',(data)=>{localStorage.setItem('tankToken',data.token);myName=data.name;myId=socket.id;initAudio();if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();switchMusicState('loby');showScreen('main-menu-screen');});
 socket.on('authError',(msg)=>{alert(msg);localStorage.removeItem('tankToken');showScreen('login-screen');});
-socket.on('joinError',(msg)=>{
+socket.on('joinError',(msg)=>{if(typeof upgBusy!=='undefined'&&upgBusy){upgFinish();if(typeof updateUpgChance==='function')updateUpgChance();}
     if(msg.includes('апгрейд')||msg.includes('Оберіть')||msg.includes('Недостатньо')||msg.includes('Неможливо')){
         let em=document.getElementById('upg-error-modal'),et=document.getElementById('upg-error-txt');
         if(em&&et){et.innerText=msg;em.classList.remove('hidden');if(typeof playSound==='function')playSound('hurt');}else alert(msg);
@@ -93,7 +93,7 @@ socket.on('upgradeResult',(res)=>{
         setTimeout(()=>{playSound('shoot');pointer.style.transition='left 3s cubic-bezier(0.1, 1, 0.3, 1)';pointer.style.left=res.roll+'%';},50);
         setTimeout(()=>{
             pointer.classList.add('hidden');
-            if(actionBtn){actionBtn.disabled=false;actionBtn.innerText='ОБЕРІТЬ МОДУЛІ';}
+            if(typeof upgFinish==='function')upgFinish();
             upgSrcIdx=null;upgSrcId=null;upgTgtId=null;document.getElementById('upg-slot-src').innerHTML='';document.getElementById('upg-slot-tgt').innerHTML='';
             if(typeof renderUpgrader==='function')renderUpgrader();if(typeof renderHangar==='function')renderHangar();
             if(res.win){

@@ -128,7 +128,7 @@ function modStatRows(mod) {
     if (st.range) add('Дальність стрільби', st.range);
     if (st.hp) add('Броня / Здоров\'я', st.hp);
     if (st.speed) add('Швидкість руху', st.speed);
-    if (st.rotSpeed) add('Швидкість башти', st.rotSpeed);
+    if (st.rotSpeed) add('Поворот башти', st.rotSpeed);
     return rows;
 }
 function modStatsHtml(mod, sep) {
