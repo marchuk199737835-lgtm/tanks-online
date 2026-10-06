@@ -37,12 +37,8 @@ socket.on('caseResult',(result)=>{
     let cs=CASES[result.caseId];
     let pool=Object.keys(MODULES);
     if(cs){
-        if(cs.pool==='cannon') pool=pool.filter(m=>MODULES[m].type==='cannon');
-        else if(cs.pool==='turret') pool=pool.filter(m=>MODULES[m].type==='turret');
-        else if(cs.pool==='hull') pool=pool.filter(m=>MODULES[m].type==='hull');
-        else if(cs.pool==='tracks') pool=pool.filter(m=>MODULES[m].type==='tracks');
-        else if(Array.isArray(cs.pool)) pool=cs.pool.filter(m=>MODULES[m]);
-        else if(cs.drop.l===100) pool=pool.filter(m=>MODULES[m].rarity==='legendary');
+        // для рулетки беремо всі модулі, що можуть випасти з цього кейса
+        pool=GameData.caseTable(cs).reduce((acc,row)=>acc.concat(row.ids),[]);
     }
     if(pool.length===0) pool=Object.keys(MODULES);
 

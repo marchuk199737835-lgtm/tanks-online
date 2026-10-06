@@ -71,8 +71,8 @@ const MAP_DATA={"epic_map":{size:3000,bg:"#565a6c",grid:"#494d55",solids:[{type:
 editorApi = mountEditor(app, { MAP_DATA: MAP_DATA, getMapsCol: () => dbMapsCol });
 if (!mongoUri) editorApi.loadSaved().catch(e => console.error('❌ Не вдалося завантажити мапи:', e.message));
 const Z_TYPES={normal:{hp:25,speed:120,dmg:10,radius:15,color:'#22c55e'},runner:{hp:15,speed:250,dmg:5,radius:12,color:'#84cc16'},tanker:{hp:100,speed:60,dmg:25,radius:25,color:'#15803d'},spitter:{hp:40,speed:90,dmg:15,radius:15,color:'#a3e635',ranged:true},bomber:{hp:30,speed:140,dmg:50,radius:18,color:'#dc2626',explode:true},ghost:{hp:20,speed:100,dmg:10,radius:15,color:'#cbd5e1',ghost:true},pikus:{isBoss:true,name:'ПІКУС',hp:1000,speed:294,dmg:100,radius:30,color:'#9333ea',bullets:3,cd:3000},shurik:{isBoss:true,name:'ШУРІК',hp:2000,speed:280,dmg:100,radius:22.5,color:'#f43f5e',bullets:10,cd:3000},oneshot:{isBoss:true,name:'ВАНШОТУС',hp:3000,speed:294,dmg:1000,radius:30,color:'#fbbf24',bullets:2,cd:2000},padlo:{isBoss:true,name:'ПАДЛО',hp:5000,speed:280,dmg:75,radius:15,color:'#10b981',bullets:25,cd:1500}};
-const MODULES={'can_c1':{id:'can_c1',type:'cannon',rarity:'common',name:'Іскра',price:15,stats:{cd:0.96,dmg:0.98,range:1.00}},'can_c2':{id:'can_c2',type:'cannon',rarity:'common',name:'Чавун',price:25,stats:{dmg:1.05,cd:1.03,range:0.98}},'can_c3':{id:'can_c3',type:'cannon',rarity:'common',name:'Подовжене',price:40,stats:{range:1.05,dmg:1.02,cd:1.02}},'can_r1':{id:'can_r1',type:'cannon',rarity:'rare',name:'Блискавка',price:60,stats:{cd:0.9,dmg:0.93,range:1.00}},'can_r2':{id:'can_r2',type:'cannon',rarity:'rare',name:'Молот',price:90,stats:{dmg:1.1,cd:1.06,range:0.95}},'can_r3':{id:'can_r3',type:'cannon',rarity:'rare',name:'Снайпер',price:130,stats:{range:1.12,dmg:1.06,cd:1.06}},'can_e1':{id:'can_e1',type:'cannon',rarity:'epic',name:'Квазар',price:170,stats:{cd:0.84,dmg:0.88,range:1.00}},'can_e2':{id:'can_e2',type:'cannon',rarity:'epic',name:'Титан',price:220,stats:{dmg:1.18,cd:1.12,range:0.92}},'can_e3':{id:'can_e3',type:'cannon',rarity:'epic',name:'Каратель',price:280,stats:{range:1.22,dmg:1.12,cd:1.1}},'can_l1':{id:'can_l1',type:'cannon',rarity:'legendary',name:'Пульсар',price:350,stats:{cd:0.78,dmg:0.82,range:1.00}},'can_l2':{id:'can_l2',type:'cannon',rarity:'legendary',name:'Колос',price:450,stats:{dmg:1.28,cd:1.2,range:0.88}},'can_l3':{id:'can_l3',type:'cannon',rarity:'legendary',name:'Армагеддон',price:550,stats:{range:1.35,dmg:1.22,cd:1.18}},'tur_c1':{id:'tur_c1',type:'turret',rarity:'common',name:'Легка',price:15,stats:{rotSpeed:1.04,hp:0.98}},'tur_c2':{id:'tur_c2',type:'turret',rarity:'common',name:'Клепана',price:25,stats:{hp:1.03,rotSpeed:0.98}},'tur_c3':{id:'tur_c3',type:'turret',rarity:'common',name:'Оптика',price:40,stats:{rotSpeed:1.02,hp:0.99}},'tur_r1':{id:'tur_r1',type:'turret',rarity:'rare',name:'Спритна',price:60,stats:{rotSpeed:1.10,hp:0.95}},'tur_r2':{id:'tur_r2',type:'turret',rarity:'rare',name:'Щит',price:90,stats:{hp:1.08,rotSpeed:0.95}},'tur_r3':{id:'tur_r3',type:'turret',rarity:'rare',name:'Скаут',price:130,stats:{rotSpeed:1.05,hp:0.97}},'tur_e1':{id:'tur_e1',type:'turret',rarity:'epic',name:'Віраж',price:170,stats:{rotSpeed:1.20,hp:0.90}},'tur_e2':{id:'tur_e2',type:'turret',rarity:'epic',name:'Фортеця',price:220,stats:{hp:1.15,rotSpeed:0.9}},'tur_e3':{id:'tur_e3',type:'turret',rarity:'epic',name:'Вартовий',price:280,stats:{rotSpeed:1.12,hp:0.94}},'tur_l1':{id:'tur_l1',type:'turret',rarity:'legendary',name:'Міраж',price:350,stats:{rotSpeed:1.35,hp:0.9}},'tur_l2':{id:'tur_l2',type:'turret',rarity:'legendary',name:'Бастіон',price:450,stats:{hp:1.2,rotSpeed:0.85}},'tur_l3':{id:'tur_l3',type:'turret',rarity:'legendary',name:'Яструб',price:550,stats:{rotSpeed:1.20,hp:0.90}},'hul_c1':{id:'hul_c1',type:'hull',rarity:'common',name:'Каркас',price:15,stats:{speed:1.04,hp:0.98}},'hul_c2':{id:'hul_c2',type:'hull',rarity:'common',name:'Панцер',price:25,stats:{hp:1.04,speed:0.98}},'hul_c3':{id:'hul_c3',type:'hull',rarity:'common',name:'Розвідник',price:40,stats:{speed:1.02,hp:0.99}},'hul_r1':{id:'hul_r1',type:'hull',rarity:'rare',name:'Болід',price:60,stats:{speed:1.10,hp:0.95}},'hul_r2':{id:'hul_r2',type:'hull',rarity:'rare',name:'Броньовик',price:90,stats:{hp:1.1,speed:0.95}},'hul_r3':{id:'hul_r3',type:'hull',rarity:'rare',name:'Авангард',price:130,stats:{speed:1.05,hp:0.97}},'hul_e1':{id:'hul_e1',type:'hull',rarity:'epic',name:'Фантом',price:170,stats:{speed:1.20,hp:0.90}},'hul_e2':{id:'hul_e2',type:'hull',rarity:'epic',name:'Моноліт',price:220,stats:{hp:1.18,speed:0.9}},'hul_e3':{id:'hul_e3',type:'hull',rarity:'epic',name:'Хижак',price:280,stats:{speed:1.10,hp:0.94}},'hul_l1':{id:'hul_l1',type:'hull',rarity:'legendary',name:'Тінь',price:350,stats:{speed:1.35,hp:0.85}},'hul_l2':{id:'hul_l2',type:'hull',rarity:'legendary',name:'Егіда',price:450,stats:{hp:1.28,speed:0.85}},'hul_l3':{id:'hul_l3',type:'hull',rarity:'legendary',name:'Ассасін',price:550,stats:{speed:1.15,hp:0.90}},'trk_c1':{id:'trk_c1',type:'tracks',rarity:'common',name:'Тонкі',price:15,stats:{speed:1.04,hp:0.98}},'trk_c2':{id:'trk_c2',type:'tracks',rarity:'common',name:'Важкі',price:25,stats:{hp:1.04,speed:0.98}},'trk_c3':{id:'trk_c3',type:'tracks',rarity:'common',name:'Гібрид',price:40,stats:{speed:1.02,hp:0.99}},'trk_r1':{id:'trk_r1',type:'tracks',rarity:'rare',name:'Ралійні',price:60,stats:{speed:1.10,hp:0.95}},'trk_r2':{id:'trk_r2',type:'tracks',rarity:'rare',name:'Всюдихід',price:90,stats:{hp:1.1,speed:0.95}},'trk_r3':{id:'trk_r3',type:'tracks',rarity:'rare',name:'Посилені',price:130,stats:{speed:1.05,hp:0.97}},'trk_e1':{id:'trk_e1',type:'tracks',rarity:'epic',name:'Граві',price:170,stats:{speed:1.20,hp:0.90}},'trk_e2':{id:'trk_e2',type:'tracks',rarity:'epic',name:'Гусеничні',price:220,stats:{hp:1.18,speed:0.9}},'trk_e3':{id:'trk_e3',type:'tracks',rarity:'epic',name:'Адаптивні',price:280,stats:{speed:1.10,hp:0.94}},'trk_l1':{id:'trk_l1',type:'tracks',rarity:'legendary',name:'Струм',price:350,stats:{speed:1.35,hp:0.85}},'trk_l2':{id:'trk_l2',type:'tracks',rarity:'legendary',name:'Скала',price:450,stats:{hp:1.28,speed:0.85}},'trk_l3':{id:'trk_l3',type:'tracks',rarity:'legendary',name:'Кіготь',price:550,stats:{speed:1.15,hp:0.90}}};
-const CASES={1:{price:110,drop:{c:60,r:30,e:9,l:1},pool:'all'},2:{price:100,drop:{c:50,r:35,e:12,l:3},pool:['can_c1','can_r1','can_e1','can_l1','tur_c1','tur_r1','tur_e1','tur_l1','hul_c3','hul_r1','hul_e1','hul_l1','trk_c1','trk_r1','trk_e1','trk_l1']},3:{price:130,drop:{c:50,r:35,e:12,l:3},pool:['tur_c2','tur_r2','tur_e2','tur_l2','hul_c1','hul_r2','hul_e2','hul_l2','trk_c2','trk_r2','trk_e2','trk_l2']},4:{price:175,drop:{c:50,r:35,e:12,l:3},pool:['can_c2','can_r2','can_e2','can_l2','can_c3','can_r3','can_e3','can_l3','tur_c3','tur_r3','tur_e3','tur_l3','hul_c2','hul_r3','hul_e3','hul_l3','trk_c3','trk_r3','trk_e3','trk_l3']},5:{price:110,drop:{c:60,r:30,e:9,l:1},pool:'cannon'},6:{price:110,drop:{c:60,r:30,e:9,l:1},pool:'turret'},7:{price:110,drop:{c:60,r:30,e:9,l:1},pool:'hull'},8:{price:110,drop:{c:60,r:30,e:9,l:1},pool:'tracks'},9:{price:210,drop:{c:0,r:75,e:22,l:3},pool:'all'},10:{price:410,drop:{c:0,r:0,e:85,l:15},pool:'all'},11:{price:200,drop:{c:30,r:40,e:25,l:5},pool:'all'},12:{price:720,drop:{c:0,r:0,e:0,l:100},pool:'all'}};
+const GameData = require('./public/js/gamedata.js'); // єдине джерело модулів і кейсів (спільне з клієнтом)
+const MODULES = GameData.MODULES, CASES = GameData.CASES;
 
 // --- ЗОМБІ: ліміт кількості та масштабування складності ---
 const ZOMBIE_CAP = 100;          // максимум зомбі на хвилі
@@ -102,23 +102,8 @@ function compactZombies(zs) {
 }
 
 function getRandomModuleFromCase(caseId) {
-    let cs = CASES[caseId]; if (!cs) return null;
-    let pool = Object.keys(MODULES);
-    if (cs.pool === 'cannon') pool = Object.keys(MODULES).filter(m => MODULES[m].type === 'cannon');
-    else if (cs.pool === 'turret') pool = Object.keys(MODULES).filter(m => MODULES[m].type === 'turret');
-    else if (cs.pool === 'hull') pool = Object.keys(MODULES).filter(m => MODULES[m].type === 'hull');
-    else if (cs.pool === 'tracks') pool = Object.keys(MODULES).filter(m => MODULES[m].type === 'tracks');
-    else if (Array.isArray(cs.pool)) pool = cs.pool;
-    else if (cs.drop && cs.drop.l === 100) pool = Object.keys(MODULES).filter(m => MODULES[m].rarity === 'legendary');
-    let r = Math.random() * 100, rar = 'common';
-    let d = cs.drop;
-    if (r <= d.c) rar = 'common';
-    else if (r <= d.c + d.r) rar = 'rare';
-    else if (r <= d.c + d.r + d.e) rar = 'epic';
-    else rar = 'legendary';
-    let rarPool = pool.filter(m => MODULES[m].rarity === rar);
-    if (rarPool.length === 0) rarPool = pool;
-    return rarPool[Math.floor(Math.random() * rarPool.length)];
+    const cs = CASES[caseId]; if (!cs) return null;
+    return GameData.rollCase(cs);
 }
 
 // Гравці кімнати, що відкривають авто-двері (кеш на кадр)
@@ -188,13 +173,7 @@ function getActiveRooms() {
 }
 
 function getMaxHp(equipped) {
-    let hpMult = 1.0;
-    if (equipped) {
-        if (equipped.hull && MODULES[equipped.hull] && MODULES[equipped.hull].stats.hp) hpMult *= MODULES[equipped.hull].stats.hp;
-        if (equipped.turret && MODULES[equipped.turret] && MODULES[equipped.turret].stats.hp) hpMult *= MODULES[equipped.turret].stats.hp;
-        if (equipped.tracks && MODULES[equipped.tracks] && MODULES[equipped.tracks].stats.hp) hpMult *= MODULES[equipped.tracks].stats.hp;
-    }
-    return Math.round(MAX_HP * hpMult);
+    return Math.round(MAX_HP * GameData.statMult(equipped, 'hp'));
 }
 
 // мови інтерфейсу (мова зберігається в акаунті; тексти перекладає клієнт — public/js/i18n.js та public/js/lang/*.js)
@@ -424,7 +403,7 @@ io.on('connection', (socket) => {
             if (u.adventClaims.length + 1 < 20) return socket.emit('promoError', 'Недостатньо зібраних днів (мінімум 20) для фінальної нагороди!');
             if (u.inventory.length >= 30) return socket.emit('promoError', 'Інвентар повний! Звільніть місце для легендарної нагороди.');
             u.adventClaims.push(day);
-            let modId = getRandomModuleFromCase(12);
+            let modId = getRandomModuleFromCase(GameData.legendCaseId());
             u.inventory.push(modId);
             socket.emit('adventSuccess', { type: 'legendary', item: modId, day: day });
         } else {
@@ -832,10 +811,7 @@ socket.on('selectProp', (data) => {
             if (r.state !== 'seeking' || !atk || atk.team !== 'hunter' || v.team === 'hunter') return;
             fD = 250; v.isDisguised = false;
         } else {
-            if (atkName && dbUsers[atkName] && dbUsers[atkName].equipped && dbUsers[atkName].equipped.cannon) {
-                let c = dbUsers[atkName].equipped.cannon;
-                if (MODULES[c] && MODULES[c].stats.dmg) fD *= MODULES[c].stats.dmg;
-            }
+            if (atkName && dbUsers[atkName]) fD *= GameData.statMult(dbUsers[atkName].equipped, 'dmg');
         }
         
         if (data.type === 'incendiary') v.onFire = { end: Date.now() + 5000, nextTick: Date.now() + 1000, owner: socket.id };
@@ -903,10 +879,7 @@ socket.on('selectProp', (data) => {
         let r = rooms[d.roomId];
         if (r && r.status === 'playing' && r.zombies[d.zid] && r.zombies[d.zid].hp > 0) {
             let fD = d.dmg, aN = r.players[socket.id]?.name;
-            if (aN && dbUsers[aN] && dbUsers[aN].equipped && dbUsers[aN].equipped.cannon) {
-                let cId = dbUsers[aN].equipped.cannon;
-                if (MODULES[cId] && MODULES[cId].stats.dmg) fD *= MODULES[cId].stats.dmg;
-            }
+            if (aN && dbUsers[aN]) fD *= GameData.statMult(dbUsers[aN].equipped, 'dmg');
             if (d.type === 'incendiary') r.zombies[d.zid].onFire = { end: Date.now() + 5000, nextTick: Date.now() + 1000, owner: socket.id };
             r.zombies[d.zid].hp -= fD;
             if (r.zombies[d.zid].hp <= 0) {

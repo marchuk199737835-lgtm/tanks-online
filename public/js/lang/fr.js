@@ -283,5 +283,7 @@ I18N.add("fr", {
  "ВЕТЕРАН": "VÉTÉRAN",
  "ЕЛІТА": "ÉLITE",
  "БІЗНЕС": "AFFAIRES",
- "ПОБЕДИТЕЛЬ": "VAINQUEUR"
+ "ПОБЕДИТЕЛЬ": "VAINQUEUR",
+ "Міфічний": "Mythique",
+ "Міф:": "Myth.:"
 }, [["Ви протримались до (\\d+) хвилі", "Vous avez tenu jusqu'à la vague $1"], ["(\\d+)Д", "$1j"]]);

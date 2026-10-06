@@ -23,8 +23,7 @@ let lasers = [];
 
 window.getTankSpeed = function() {
     let spd = BASE_SPEED;
-    if (myEquipped && myEquipped.hull && MODULES[myEquipped.hull] && MODULES[myEquipped.hull].stats.speed) spd *= MODULES[myEquipped.hull].stats.speed;
-    if (myEquipped && myEquipped.tracks && MODULES[myEquipped.tracks] && MODULES[myEquipped.tracks].stats.speed) spd *= MODULES[myEquipped.tracks].stats.speed;
+    spd *= GameData.statMult(myEquipped, 'speed');
     if (myLocalTank.buff === 'speed') spd *= 1.5;
     if (myLocalTank.buff === 'samurai') spd *= 1.6;
     if (myLocalTank.buff === 'boss') spd *= 0.6;
@@ -33,7 +32,7 @@ window.getTankSpeed = function() {
 
 window.getReloadTime = function() {
     let cd = BASE_RELOAD;
-    if (myEquipped && myEquipped.cannon && MODULES[myEquipped.cannon] && MODULES[myEquipped.cannon].stats.cd) cd *= MODULES[myEquipped.cannon].stats.cd;
+    cd *= GameData.statMult(myEquipped, 'cd');
     return cd;
 };
 
@@ -122,7 +121,7 @@ function updatePhys(now, dt) {
             else if (!isMobile && !myLocalTank.isDisguised) tgtA = Math.atan2(mouseY - (canvas.height / 2), mouseX - (canvas.width / 2));
             if (tgtA !== null) {
                 let rotMul = 1;
-                if (myEquipped && myEquipped.turret && MODULES[myEquipped.turret] && MODULES[myEquipped.turret].stats.rotSpeed) rotMul = MODULES[myEquipped.turret].stats.rotSpeed;
+                rotMul = GameData.statMult(myEquipped, 'rotSpeed');
                 let maxStep = BASE_TURRET_ROT * rotMul * dt, diff = Math.atan2(Math.sin(tgtA - myLocalTank.turretAngle), Math.cos(tgtA - myLocalTank.turretAngle));
                 myLocalTank.turretAngle = Math.abs(diff) <= maxStep ? tgtA : myLocalTank.turretAngle + Math.sign(diff) * maxStep;
             }
@@ -137,7 +136,7 @@ function updatePhys(now, dt) {
             if (myLocalTank.team === 'hunter') { fCfg = { cd: 1000, type: 'hunter_gun' }; tR = 1; } 
             else fCfg = { cd: 9999999, type: 'none' };
         } else {
-            if (myEquipped.cannon && MODULES[myEquipped.cannon]) { tR *= MODULES[myEquipped.cannon].stats.range || 1; }
+            tR *= GameData.statMult(myEquipped, 'range');
         }
         
         let isMg = (myLocalTank.buff === 'minigun' || myLocalTank.buff === 'fast' || myLocalTank.buff === 'autolaser'), sh = false;
@@ -401,7 +400,7 @@ function drAL() {
     ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)'; ctx.lineWidth = 2; ctx.setLineDash([10, 10]);
     ctx.beginPath(); ctx.moveTo(myLocalTank.x, myLocalTank.y);
     let tR = 1.0;
-    if (myEquipped.cannon && MODULES[myEquipped.cannon]) tR *= MODULES[myEquipped.cannon].stats.range || 1;
+    tR *= GameData.statMult(myEquipped, 'range');
     let bS = (myLocalTank.buff === 'fast' || myLocalTank.buff === 'minigun') ? BASE_BULLET_SPEED * 1.8 : BASE_BULLET_SPEED, mD = (2.5 * tR) * bS;
     ctx.lineTo(myLocalTank.x + Math.cos(myLocalTank.turretAngle) * mD, myLocalTank.y + Math.sin(myLocalTank.turretAngle) * mD);
     ctx.stroke();
@@ -412,7 +411,7 @@ function drPCA() {
     if (isMobile || myLocalTank.hp <= 0 || (currentRoomData.mode === 'prophunt' && myLocalTank.team === 'hider')) return;
     ctx.save();
     let tR = 1.0;
-    if (myEquipped.cannon && MODULES[myEquipped.cannon]) tR = MODULES[myEquipped.cannon].stats.range || 1;
+    tR = GameData.statMult(myEquipped, 'range');
     let d = 60 * tR, ax = myLocalTank.x + Math.cos(myLocalTank.turretAngle) * d, ay = myLocalTank.y + Math.sin(myLocalTank.turretAngle) * d;
     ctx.translate(ax, ay); ctx.rotate(myLocalTank.turretAngle);
     ctx.globalCompositeOperation = 'difference'; ctx.fillStyle = '#ffffff';
@@ -801,7 +800,7 @@ function draw(now) {
     if (currentRoomData.mode === 'prophunt') {
         if (myLocalTank.team === 'hunter') cd = 1000; else cd = 9999999;
     } else {
-        if (myEquipped.cannon && MODULES[myEquipped.cannon]) tCd *= MODULES[myEquipped.cannon].stats.cd || 1;
+        tCd *= GameData.statMult(myEquipped, 'cd');
         let fC = window.BUFFS[myLocalTank.buff] || window.BUFFS['none'];
         cd = (fC.cd < 500 ? fC.cd : window.getReloadTime());
     }
@@ -839,9 +838,7 @@ function draw(now) {
 window.updateHUD = function() {
     if (!currentRoomData || currentRoomData.status !== 'playing') return;
     let mHp = typeof MAX_HP !== 'undefined' ? MAX_HP : 500;
-    if (myEquipped && myEquipped.hull && MODULES[myEquipped.hull] && MODULES[myEquipped.hull].stats.hp) mHp *= MODULES[myEquipped.hull].stats.hp;
-    if (myEquipped && myEquipped.turret && MODULES[myEquipped.turret] && MODULES[myEquipped.turret].stats.hp) mHp *= MODULES[myEquipped.turret].stats.hp;
-    if (myEquipped && myEquipped.tracks && MODULES[myEquipped.tracks] && MODULES[myEquipped.tracks].stats.hp) mHp *= MODULES[myEquipped.tracks].stats.hp;
+    mHp *= GameData.statMult(myEquipped, 'hp');
     mHp = Math.round(mHp);
     let pct = Math.max(0, Math.min(100, (myLocalTank.hp / mHp) * 100)), bC = myLocalTank.hp < mHp * 0.3 ? 'h-full bg-gradient-to-r from-red-600 to-red-400 w-full transition-all duration-300 shadow-[0_0_15px_rgba(239,68,68,0.8)]' : 'h-full bg-gradient-to-r from-green-500 to-emerald-400 w-full transition-all duration-300 shadow-[0_0_10px_rgba(34,197,94,0.5)]', hpB = document.getElementById('hp-bar'), hpT = document.getElementById('hp-text');
     if (hpB) { hpB.style.width = pct + '%'; hpB.className = bC; }

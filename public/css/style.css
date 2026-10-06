@@ -43,6 +43,8 @@ canvas { display: block; cursor: crosshair; }
 .item-common { border-color: #94a3b8; box-shadow: inset 0 0 10px rgba(148,163,184,0.2); }
 .item-rare { border-color: #3b82f6; box-shadow: inset 0 0 15px rgba(59,130,246,0.3), 0 0 10px rgba(59,130,246,0.2); }
 .item-epic { border-color: #a855f7; box-shadow: inset 0 0 20px rgba(168,85,247,0.4), 0 0 15px rgba(168,85,247,0.3); }
+.item-mythic { border-color: #ff3b6b; box-shadow: inset 0 0 28px rgba(255,59,107,0.55), 0 0 24px rgba(255,59,107,0.55); animation: mythicPulse 2.2s ease-in-out infinite; }
+@keyframes mythicPulse { 0%,100% { box-shadow: inset 0 0 22px rgba(255,59,107,0.45), 0 0 14px rgba(255,59,107,0.4); } 50% { box-shadow: inset 0 0 34px rgba(255,59,107,0.7), 0 0 30px rgba(255,59,107,0.75); } }
 .item-legendary { border-color: #eab308; box-shadow: inset 0 0 25px rgba(234,179,8,0.5), 0 0 20px rgba(234,179,8,0.4); }
 
 ::-webkit-scrollbar { width: 6px; }
