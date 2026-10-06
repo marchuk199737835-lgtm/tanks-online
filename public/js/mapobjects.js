@@ -52,6 +52,32 @@ var MapObj = (function () {
     const ALL_TYPES = new Set(BASE_TYPES);
     [PROPS_BASE, PROPS_WOOD, PROPS_EXTRA, DOORS].forEach(l => l.forEach(p => ALL_TYPES.add(p.id)));
 
+    // Об'єкти, якими можуть маскуватись хованці: весь декор, дерево, «Інше» та фігури (без дверей, води й об'єктів без колізії)
+    const DISGUISE_SHAPES = [
+        { id: 'wall_square', name: 'Квадрат', color: '#64748b' }, { id: 'shape_triangle', name: 'Трикутник', color: '#78716c' },
+        { id: 'shape_rhombus', name: 'Ромб', color: '#6b7280' }, { id: 'shape_parallelepiped', name: 'Паралелепіпед', color: '#71717a' }
+    ];
+    const DISGUISE_GROUPS = [
+        { name: 'Декор', ids: PROPS_BASE.filter(p => !NONSOLID.has(p.id)).map(p => p.id) },
+        { name: 'Дерево', ids: PROPS_WOOD.map(p => p.id) },
+        { name: 'Інше', ids: PROPS_EXTRA.filter(p => !NONSOLID.has(p.id)).map(p => p.id) },
+        { name: 'Фігури', ids: DISGUISE_SHAPES.map(p => p.id) }
+    ];
+    const DISGUISE_IDS = new Set(); DISGUISE_GROUPS.forEach(g => g.ids.forEach(id => DISGUISE_IDS.add(id)));
+    // Малює маскування (декор або фігуру) у прямокутнику x,y,w,h
+    function drawDisguise(c, o, t) {
+        const sh = DISGUISE_SHAPES.filter(q => q.id === o.type)[0];
+        if (!sh) return o.type === 'tree' ? drawTreeProp(c, o) : drawProp(c, o, t);
+        const q = polyOf({ type: o.type, x: o.x, y: o.y, w: o.w, h: o.h }) || [[o.x, o.y], [o.x + o.w, o.y], [o.x + o.w, o.y + o.h], [o.x, o.y + o.h]];
+        c.save(); c.fillStyle = sh.color; c.strokeStyle = 'rgba(0,0,0,0.35)'; c.lineWidth = 2; c.lineJoin = 'round';
+        c.beginPath(); q.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); c.fill(); c.stroke(); c.restore();
+        return true;
+    }
+    function drawTreeProp(c, o) {
+        const cx = o.x + (o.w || 50) / 2, cy = o.y + (o.h || 50) / 2;
+        c.save(); c.fillStyle = '#166534'; c.beginPath(); c.arc(cx, cy, 25, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#15803d'; c.beginPath(); c.arc(cx - 6, cy - 6, 12, 0, Math.PI * 2); c.fill(); c.restore(); return true;
+    }
     const isDoor = o => typeof o.type === 'string' && o.type.indexOf('prop_door_') === 0;
     const isCircular = o => o.type === 'tree' || o.type === 'neon_circle' || o.type === 'neon_pillar';
     const isSolidType = o => !(o.type.indexOf('spawn') >= 0 || o.type === 'line' || NONSOLID.has(o.type));
@@ -93,6 +119,26 @@ var MapObj = (function () {
         }
         return true;
     }
+    // Контур фігур у локальних координатах (без повороту): колізія йде точно по формі, а не по прямокутнику
+    function polyOf(o) {
+        const x = o.x, y = o.y, w = o.w || 30, h = o.h || 30;
+        switch (o.type) {
+            case 'shape_triangle': case 'neon_triangle': return [[x + w / 2, y], [x + w, y + h], [x, y + h]];
+            case 'shape_rhombus': case 'neon_diamond': return [[x + w / 2, y], [x + w, y + h / 2], [x + w / 2, y + h], [x, y + h / 2]];
+            case 'shape_parallelepiped': return [[x + w * 0.2, y], [x + w, y], [x + w * 0.8, y + h], [x, y + h]];
+        }
+        return null;
+    }
+    // коло (px,py,r) перетинає багатокутник
+    function circleHitsPoly(poly, px, py, r) {
+        let inside = false;
+        for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+            const a = poly[i], b = poly[j];
+            if (((a[1] > py) !== (b[1] > py)) && (px < (b[0] - a[0]) * (py - a[1]) / (b[1] - a[1]) + a[0])) inside = !inside;
+            if (distToSeg(px, py, a[0], a[1], b[0], b[1]) <= r) return true;
+        }
+        return inside;
+    }
     const hasShape = m => m && Array.isArray(m.shape) && m.shape.length >= 3;
 
     // Чи потрапляє точка в об'єкт (для редактора: вибір/гумка)
@@ -126,6 +172,9 @@ var MapObj = (function () {
             if (isCircular(s)) {
                 const cx = s.x + (s.w ? s.w / 2 : 0), cy = s.y + (s.h ? s.h / 2 : 0), sr = s.r || (s.w ? s.w / 2 : 30);
                 if (Math.hypot(x - cx, y - cy) <= r + sr) return true;
+            } else if (polyOf(s)) {
+                const l = s.rot ? toLocal(s, x, y) : { x: x, y: y };
+                if (circleHitsPoly(polyOf(s), l.x, l.y, r)) return true;
             } else {
                 const l = s.rot ? toLocal(s, x, y) : { x: x, y: y };
                 const tX = Math.max(s.x, Math.min(l.x, s.x + (s.w || 30))), tY = Math.max(s.y, Math.min(l.y, s.y + (s.h || 30)));
@@ -456,7 +505,7 @@ var MapObj = (function () {
     const api = {
         D2R, DOOR_TRIGGER, DOOR_PASS, PROPS_BASE, PROPS_WOOD, PROPS_EXTRA, DOORS, DOOR_BY_ID, NONSOLID, ALL_TYPES,
         isDoor, isCircular, isSolidType, center, applyRot, toLocal, distToSeg, pointInPoly, circleInPoly, hasShape, pointInObject,
-        collides, doorNear, updateDoors, resetDoors, shapeBounds, drawProp, sanitizeMap, MODES, mapAllows
+        collides, polyOf, circleHitsPoly, DISGUISE_GROUPS, DISGUISE_IDS, DISGUISE_SHAPES, drawDisguise, doorNear, updateDoors, resetDoors, shapeBounds, drawProp, sanitizeMap, MODES, mapAllows
     };
     return api;
 })();

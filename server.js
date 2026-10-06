@@ -7,6 +7,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { MongoClient } = require('mongodb');
 const MapObj = require('./public/js/mapobjects.js');     // спільний модуль: об'єкти мап, зіткнення, двері
+const Nav = require('./navgrid.js');                     // пошук шляху для зомбі (обхід перешкод)
 const mountEditor = require('./editor-server.js');       // серверна частина редактора мап
 
 process.on('uncaughtException', err => console.error('Crash prevented:', err));
@@ -726,7 +727,7 @@ io.on('connection', (socket) => {
                     r.wave = 0; r.state = 'waiting'; r.nextWaveTime = Date.now() + 4000; r.zombies = {};
                 } else if (r.mode === 'prophunt') {
                     r.state = 'hiding'; r.phaseEndTime = Date.now() + 4000 + (r.hideTime * 1000);
-                    const prps = ['prop_crate', 'prop_barrel', 'prop_sandbag', 'prop_rock', 'prop_bush', 'tree', 'prop_cone', 'prop_concrete', 'prop_tent', 'prop_generator', 'prop_tires'];
+                    const prps = Array.from(MapObj.DISGUISE_IDS);
                     pK.forEach(id => {
                         if (r.players[id].team === 'hider') {
                             r.players[id].propType = prps[Math.floor(Math.random() * prps.length)];
@@ -742,7 +743,7 @@ io.on('connection', (socket) => {
 socket.on('selectProp', (data) => {
         if (!data || !data.roomId) return;
         let r = rooms[data.roomId];
-        if (r && r.status === 'playing' && r.mode === 'prophunt' && r.players[socket.id]) r.players[socket.id].propType = data.type;
+        if (r && r.status === 'playing' && r.mode === 'prophunt' && r.players[socket.id]) { if (typeof data.type === 'string' && MapObj.DISGUISE_IDS.has(data.type)) r.players[socket.id].propType = data.type; }
     });
 
     socket.on('updateDisguise', (data) => {
@@ -1073,7 +1074,10 @@ setInterval(() => {
                     }
                     aP.forEach(pl => { let d = Math.hypot(pl.x - z.x, pl.y - z.y); if (pl.buff === 'invisible') d *= 3; if (d < mD) { mD = d; t = pl; } });
                     if (t) {
-                        let dx = t.x - z.x, dy = t.y - z.y, l = Math.max(Math.hypot(dx, dy), 0.001), sp = Z_TYPES[z.type].speed, nX = z.x + (dx / l) * sp * (1 / 30), nY = z.y + (dy / l) * sp * (1 / 30);
+                        let dx = t.x - z.x, dy = t.y - z.y, l = Math.max(Math.hypot(dx, dy), 0.001), sp = Z_TYPES[z.type].speed;
+                        // шлях в обхід перешкод (барикади, стіни, вода): зомбі йде до наступної точки маршруту, а не тупо в гравця
+                        const wp = Nav.steer(MAP_DATA[r.map] || MAP_DATA['epic_map'], r, t.id, t.x, t.y, z.x, z.y, Z_TYPES[z.type].radius, now), wdx = wp.x - z.x, wdy = wp.y - z.y, wl = Math.max(Math.hypot(wdx, wdy), 0.001);
+                        let nX = z.x + (wdx / wl) * sp * (1 / 30), nY = z.y + (wdy / wl) * sp * (1 / 30);
                         if (!checkCollisionServer(r.map, nX, z.y, Z_TYPES[z.type].radius, [], r)) z.x = nX;
                         if (!checkCollisionServer(r.map, z.x, nY, Z_TYPES[z.type].radius, [], r)) z.y = nY;
                         // Анти-застрягання: зомбі, що 3с не рухається далеко від гравця, переноситься на край мапи
