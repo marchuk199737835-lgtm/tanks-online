@@ -412,6 +412,10 @@ var MapObj = (function () {
     // ---------- ПЕРЕВІРКА МАПИ (сервер) ----------
     const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
     const num = (v, lo, hi, d) => { v = Number(v); if (!isFinite(v)) return d; return Math.max(lo, Math.min(hi, v)); };
+    const MODES = ['deathmatch', 'team_deathmatch', 'survival', 'prophunt'];
+    // чи дозволена мапа в режимі (без поля modes — доступна в усіх)
+    function mapAllows(m, mode) { return !m || !Array.isArray(m.modes) || !m.modes.length || m.modes.indexOf(mode) >= 0; }
+
     function sanitizeMap(raw) {
         if (!raw || typeof raw !== 'object') throw new Error('Порожні дані мапи');
         const size = Math.round(num(raw.size, 1000, 8000, 3000));
@@ -420,6 +424,11 @@ var MapObj = (function () {
         if (Array.isArray(raw.shape) && raw.shape.length >= 3) {
             if (raw.shape.length > 300) throw new Error('Занадто багато вершин контуру (макс. 300)');
             out.shape = raw.shape.map(p => ({ x: Math.round(num(p && p.x, 0, size, 0)), y: Math.round(num(p && p.y, 0, size, 0)) }));
+        }
+        if (Array.isArray(raw.modes)) {
+            const mm = MODES.filter(m => raw.modes.indexOf(m) >= 0);
+            if (!mm.length) throw new Error('Оберіть хоча б один режим для мапи');
+            if (mm.length < MODES.length) out.modes = mm;       // усі режими = поле не потрібне
         }
         if (!Array.isArray(raw.solids)) throw new Error('Немає списку об\'єктів');
         if (raw.solids.length > 4000) throw new Error('Занадто багато об\'єктів (макс. 4000)');
@@ -447,7 +456,7 @@ var MapObj = (function () {
     const api = {
         D2R, DOOR_TRIGGER, DOOR_PASS, PROPS_BASE, PROPS_WOOD, PROPS_EXTRA, DOORS, DOOR_BY_ID, NONSOLID, ALL_TYPES,
         isDoor, isCircular, isSolidType, center, applyRot, toLocal, distToSeg, pointInPoly, circleInPoly, hasShape, pointInObject,
-        collides, doorNear, updateDoors, resetDoors, shapeBounds, drawProp, sanitizeMap
+        collides, doorNear, updateDoors, resetDoors, shapeBounds, drawProp, sanitizeMap, MODES, mapAllows
     };
     return api;
 })();

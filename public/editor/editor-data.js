@@ -2,7 +2,7 @@
 const GRID_SIZE = 50;
 
 const ED = {
-    settings: { name: 'нова_мапа', title: '', size: 3000, bg: '#020617', grid: '#1e293b' },
+    settings: { name: 'нова_мапа', title: '', modes: ['deathmatch', 'team_deathmatch', 'survival', 'prophunt'], size: 3000, bg: '#020617', grid: '#1e293b' },
     objects: [],            // об'єкти мапи (solids)
     shape: null,            // фігурний контур: [{x,y},...] або null (прямокутна мапа)
     tool: 'select',

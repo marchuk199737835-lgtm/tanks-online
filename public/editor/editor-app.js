@@ -61,6 +61,13 @@ function buildSettingsPanel() {
         <hr class="border-slate-700 my-3">
         <label class="side-label">Назва (ключ мапи)</label><input type="text" id="set-name" class="side-input" maxlength="32">
         <label class="side-label">Назва в меню (необов'язково)</label><input type="text" id="set-title" class="side-input" maxlength="40" placeholder="напр. Місячна база">
+        <label class="side-label">Режими, де доступна мапа</label>
+        <div id="set-modes" class="mb-3">
+            <label class="mode-row"><input type="checkbox" data-mode="deathmatch"> ⚔️ Детматч</label>
+            <label class="mode-row"><input type="checkbox" data-mode="team_deathmatch"> 🤝 Командний</label>
+            <label class="mode-row"><input type="checkbox" data-mode="survival"> 🧟 Виживання</label>
+            <label class="mode-row"><input type="checkbox" data-mode="prophunt"> 📦 Хованки</label>
+        </div>
         <label class="side-label">Розмір (квадрат, px)</label><input type="number" id="set-size" class="side-input" min="1000" max="8000" step="500">
         <label class="side-label">Підлога</label><input type="color" id="set-bg" class="w-full h-8 mb-3 bg-transparent cursor-pointer">
         <label class="side-label">Сітка</label><input type="color" id="set-grid" class="w-full h-8 mb-3 bg-transparent cursor-pointer">
@@ -70,6 +77,11 @@ function buildSettingsPanel() {
     $('set-name').onchange = () => HIST.commit();
     $('set-title').oninput = e => { ED.settings.title = e.target.value; };
     $('set-title').onchange = () => HIST.commit();
+    document.querySelectorAll('#set-modes input').forEach(cb => cb.onchange = () => {
+        const sel = [...document.querySelectorAll('#set-modes input:checked')].map(x => x.dataset.mode);
+        if (!sel.length) { cb.checked = true; return setStatus('Потрібен хоча б один режим', 'err'); }
+        ED.settings.modes = sel; HIST.commit();
+    });
     $('set-size').onchange = e => { ED.settings.size = Math.max(1000, Math.min(8000, parseInt(e.target.value) || 3000)); applyZoom(); HIST.commit(); };
     $('set-bg').oninput = e => { ED.settings.bg = e.target.value; }; $('set-bg').onchange = () => HIST.commit();
     $('set-grid').oninput = e => { ED.settings.grid = e.target.value; }; $('set-grid').onchange = () => HIST.commit();
@@ -80,6 +92,7 @@ function buildSettingsPanel() {
 }
 function syncSettingsInputs() {
     $('set-name').value = ED.settings.name; $('set-title').value = ED.settings.title || ''; $('set-size').value = ED.settings.size;
+    document.querySelectorAll('#set-modes input').forEach(cb => { cb.checked = (ED.settings.modes || []).indexOf(cb.dataset.mode) >= 0; });
     $('set-bg').value = ED.settings.bg; $('set-grid').value = ED.settings.grid;
 }
 function refreshMapsInfo() {
@@ -125,7 +138,7 @@ canvas.addEventListener('contextmenu', e => {
 // ---------- завантаження / нова мапа ----------
 function onHistoryRestored() { applyZoom(); syncSettingsInputs(); refreshContourPanel(); closeMenu(); updateTopbar(); }
 function loadMapIntoEditor(name, m) {
-    ED.settings = { name: name, title: m.title || '', size: m.size, bg: m.bg || '#020617', grid: m.grid || '#1e293b' };
+    ED.settings = { name: name, title: m.title || '', modes: (m.modes && m.modes.length) ? m.modes.slice() : MapObj.MODES.slice(), size: m.size, bg: m.bg || '#020617', grid: m.grid || '#1e293b' };
     ED.objects = clone(m.solids).map(o => { if (o.type === 'shape_line') o.type = 'line'; delete o._open; return o; });
     ED.shape = m.shape && m.shape.length >= 3 ? clone(m.shape) : null; ED.selected = null; ED.draftShape = null;
     HIST.reset(); ED.dirty = false; applyZoom(); syncSettingsInputs(); refreshContourPanel(); fitZoom();
@@ -145,6 +158,7 @@ function currentMapData() {
     const m = { size: ED.settings.size, bg: ED.settings.bg, grid: ED.settings.grid, solids: clone(ED.objects).map(o => { delete o._open; delete o.preview; return o; }) };
     if (ED.settings.title && ED.settings.title.trim()) m.title = ED.settings.title.trim();
     if (ED.shape && ED.shape.length >= 3) m.shape = clone(ED.shape);
+    if (ED.settings.modes && ED.settings.modes.length && ED.settings.modes.length < MapObj.MODES.length) m.modes = ED.settings.modes.slice();
     return m;
 }
 async function saveToServer() {

@@ -290,6 +290,12 @@ function clampInt(v, min, max, def) {
     return Math.max(min, Math.min(max, n));
 }
 const VALID_MODES = ['deathmatch', 'survival', 'prophunt', 'team_deathmatch'];
+// мапа для режиму: бажана, якщо вона дозволена в цьому режимі (поле modes з редактора), інакше перша дозволена
+function pickMap(want, mode) {
+    if (MAP_DATA[want] && MapObj.mapAllows(MAP_DATA[want], mode)) return want;
+    if (MAP_DATA.epic_map && MapObj.mapAllows(MAP_DATA.epic_map, mode)) return 'epic_map';
+    return Object.keys(MAP_DATA).find(k => MapObj.mapAllows(MAP_DATA[k], mode)) || 'epic_map';
+}
 const VALID_COLORS = ['white', 'black', 'red', 'blue', 'brown', 'purple'];
 const TDM_TEAMS = ['red', 'blue', 'green', 'yellow']; // порядок як у кнопках лобі
 
@@ -561,7 +567,7 @@ io.on('connection', (socket) => {
         let rId = 'room_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
         rooms[rId] = {
             id: rId, hostName: n, hostSocket: socket.id, mode: VALID_MODES.includes(c.mode) ? c.mode : 'deathmatch',
-            map: MAP_DATA[c.map] ? c.map : 'epic_map',
+            map: pickMap(c.map, VALID_MODES.includes(c.mode) ? c.mode : 'deathmatch'),
             maxPlayers: Math.max(2, Math.min(10, parseInt(c.maxPlayers) || 6)),
             winScore: clampInt(c.winScore, 5, 1000, 50),
             hideTime: clampInt(c.hideTime, 30, 200, 30), seekTime: clampInt(c.seekTime, 120, 600, 120),
@@ -616,8 +622,9 @@ io.on('connection', (socket) => {
             if (d.mode && VALID_MODES.includes(d.mode)) {
                 r.mode = d.mode;
                 Object.values(r.players).forEach(p => { p.ready = false; p.team = null; p.color = null; });
+                r.map = pickMap(r.map, r.mode);                     // якщо мапа не підходить режиму — перемикаємо на дозволену
             }
-            if (d.map) r.map = MAP_DATA[d.map] ? d.map : 'epic_map';
+            if (d.map) r.map = pickMap(d.map, r.mode);
             if (d.maxPlayers) r.maxPlayers = Math.max(2, Math.min(10, parseInt(d.maxPlayers) || 6));
             if (d.winScore) r.winScore = clampInt(d.winScore, 5, 1000, 50);
             if (d.hunterCount) {
