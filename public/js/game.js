@@ -121,8 +121,17 @@ function updatePhys(now, dt) {
             if (!checkCollision(myLocalTank.x, nY, myRad, true, isB) && !checkPCollision(myLocalTank.x, nY, myRad) || isB) myLocalTank.y = nY;
         }
         
-        if (joysticks.right.active) myLocalTank.turretAngle = joysticks.right.angle;
-        else if (!isMobile && !myLocalTank.isDisguised) myLocalTank.turretAngle = Math.atan2(mouseY - (canvas.height / 2), mouseX - (canvas.width / 2));
+        {
+            let tgtA = null;
+            if (joysticks.right.active) tgtA = joysticks.right.angle;
+            else if (!isMobile && !myLocalTank.isDisguised) tgtA = Math.atan2(mouseY - (canvas.height / 2), mouseX - (canvas.width / 2));
+            if (tgtA !== null) {
+                let rotMul = 1;
+                if (myEquipped && myEquipped.turret && MODULES[myEquipped.turret] && MODULES[myEquipped.turret].stats.rotSpeed) rotMul = MODULES[myEquipped.turret].stats.rotSpeed;
+                let maxStep = BASE_TURRET_ROT * rotMul * dt, diff = Math.atan2(Math.sin(tgtA - myLocalTank.turretAngle), Math.cos(tgtA - myLocalTank.turretAngle));
+                myLocalTank.turretAngle = Math.abs(diff) <= maxStep ? tgtA : myLocalTank.turretAngle + Math.sign(diff) * maxStep;
+            }
+        }
         
         socket.emit('move', { roomId: currentRoomId, x: myLocalTank.x, y: myLocalTank.y, bodyAngle: myLocalTank.bodyAngle, turretAngle: myLocalTank.turretAngle });
         
