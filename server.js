@@ -197,6 +197,10 @@ function getMaxHp(equipped) {
     return Math.round(MAX_HP * hpMult);
 }
 
+// мови інтерфейсу (мова зберігається в акаунті; тексти перекладає клієнт — public/js/i18n.js та public/js/lang/*.js)
+const LANGS = ['uk', 'en', 'es', 'de', 'fr', 'pt', 'pl', 'tr'];
+function cleanLang(l) { return typeof l === 'string' && LANGS.includes(l) ? l : null; }
+
 function validateUser(u) {
     if (!u.inventory) u.inventory = [];
     if (!u.equipped) u.equipped = { cannon: null, turret: null, hull: null, tracks: null };
@@ -363,10 +367,10 @@ io.on('connection', (socket) => {
         if (!NAME_RE.test(name) || password.length < 4 || password.length > 128) return socket.emit('joinError', 'Логін 3-12 символів (літери, цифри, _ -), пароль від 4!');
         if (dbUsers[name]) return socket.emit('joinError', 'Цей логін вже зайнятий!');
         const token = crypto.randomUUID();
-        dbUsers[name] = validateUser({ name: name, password: hashPwd(password), token: token, bucks: 0 });
+        dbUsers[name] = validateUser({ name: name, password: hashPwd(password), token: token, bucks: 0, lang: cleanLang(data && data.lang) });
         saveUser(name);
         globalPlayers[socket.id] = name;
-        socket.emit('authSuccess', { name, token });
+        socket.emit('authSuccess', { name, token, lang: dbUsers[name].lang });
         sendEconomy(socket.id, name);
     });
 
@@ -381,8 +385,16 @@ io.on('connection', (socket) => {
         u = validateUser(u);
         saveUser(name);
         globalPlayers[socket.id] = name;
-        socket.emit('authSuccess', { name, token });
+        socket.emit('authSuccess', { name, token, lang: cleanLang(u.lang) });
         sendEconomy(socket.id, name);
+    });
+
+    // зміна мови інтерфейсу — зберігається за акаунтом
+    socket.on('setLang', (lang) => {
+        const n = globalPlayers[socket.id], l = cleanLang(lang);
+        if (!n || !dbUsers[n] || !l || dbUsers[n].lang === l) return;
+        dbUsers[n].lang = l;
+        saveUser(n);
     });
 
     socket.on('authToken', (token) => {
@@ -392,7 +404,7 @@ io.on('connection', (socket) => {
         if (foundName) {
             globalPlayers[socket.id] = foundName;
             dbUsers[foundName] = validateUser(dbUsers[foundName]);
-            socket.emit('authSuccess', { name: foundName, token });
+            socket.emit('authSuccess', { name: foundName, token, lang: cleanLang(dbUsers[foundName].lang) });
             sendEconomy(socket.id, foundName);
         } else socket.emit('authError', 'Сесія закінчилась, увійдіть знову');
     });

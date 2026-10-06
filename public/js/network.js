@@ -1,6 +1,6 @@
 socket.on('initMusic',(data)=>{myMusicPlaylists=data;});
 socket.on('initZombies',(data)=>{for(const k in Z_TYPES)delete Z_TYPES[k];Object.assign(Z_TYPES,data);});
-socket.on('authSuccess',(data)=>{localStorage.setItem('tankToken',data.token);myName=data.name;myId=socket.id;initAudio();if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();switchMusicState('loby');showScreen('main-menu-screen');});
+socket.on('authSuccess',(data)=>{localStorage.setItem('tankToken',data.token);if(window.I18N){if(data.lang)I18N.setLanguage(data.lang);else socket.emit('setLang',I18N.lang);}myName=data.name;myId=socket.id;initAudio();if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();switchMusicState('loby');showScreen('main-menu-screen');});
 socket.on('authError',(msg)=>{alert(msg);localStorage.removeItem('tankToken');showScreen('login-screen');});
 socket.on('joinError',(msg)=>{if(typeof upgBusy!=='undefined'&&upgBusy){upgFinish();if(typeof updateUpgChance==='function')updateUpgChance();}
     if(msg.includes('апгрейд')||msg.includes('Оберіть')||msg.includes('Недостатньо')||msg.includes('Неможливо')){

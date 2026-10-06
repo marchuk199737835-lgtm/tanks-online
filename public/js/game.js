@@ -829,8 +829,8 @@ function draw(now) {
         let sN = currentRoomData.players[spectatingId] ? currentRoomData.players[spectatingId].name : 'ГРАВЕЦЬ', sT = opponents[spectatingId];
         if (sT.isDisguised) drPrp(ctx, { type: sT.propType, x: sT.x - 25, y: sT.y - 25, w: 50, h: 50, r: 25 }, tm);
         ctx.fillStyle = '#fff'; ctx.font = '24px Russo One'; ctx.textAlign = 'center'; ctx.shadowColor = '#000'; ctx.shadowBlur = 10;
-        ctx.fillText(`СПОСТЕРІГАННЯ: ${sN}`, canvas.width / 2, 120);
-        if (!isMobile) { ctx.font = '14px Jura'; ctx.fillStyle = '#94a3b8'; ctx.fillText(`[A] Попередній  |  Наступний [D]`, canvas.width / 2, 150); }
+        ctx.fillText(`${I18N.t('СПОСТЕРІГАННЯ:')} ${sN}`, canvas.width / 2, 120);
+        if (!isMobile) { ctx.font = '14px Jura'; ctx.fillStyle = '#94a3b8'; ctx.fillText(`[A] ${I18N.t('Попередній')}  |  ${I18N.t('Наступний')} [D]`, canvas.width / 2, 150); }
         ctx.shadowBlur = 0;
     }
     drJ();
