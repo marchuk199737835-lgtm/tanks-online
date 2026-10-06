@@ -50,7 +50,7 @@ socket.on('caseResult',(result)=>{
     for(let i=0;i<ROULETTE_LEN;i++){
         const modId=(i===WIN_INDEX)?result.modId:pool[Math.floor(Math.random()*pool.length)];
         const mod=MODULES[modId],rColor=RARITY[mod.rarity].color;
-        html+=`<div class="roulette-item text-center min-w-[60px] lg:min-w-[90px] w-[60px] lg:w-[90px] border-r border-slate-700 bg-slate-800" style="border-bottom: 3px solid ${rColor}"><div class="w-6 h-6 lg:w-10 lg:h-10 mx-auto">${SVG_ICONS[mod.type](rColor)}</div><div class="text-[6px] lg:text-[8px] text-slate-300 mt-1 lg:mt-2 uppercase truncate w-full px-1">${mod.name}</div></div>`;
+        html+=`<div class="roulette-item text-center min-w-[60px] lg:min-w-[90px] w-[60px] lg:w-[90px] border-r border-slate-700 bg-slate-800" style="border-bottom: 3px solid ${rColor}"><div class="w-6 h-6 lg:w-10 lg:h-10 mx-auto">${modIcon(mod)}</div><div class="text-[6px] lg:text-[8px] text-slate-300 mt-1 lg:mt-2 uppercase truncate w-full px-1">${mod.name}</div></div>`;
     }
     tape.innerHTML=html;
     void tape.offsetWidth; // примусовий reflow: стрічка гарантовано стоїть на 0 перед стартом анімації
@@ -76,7 +76,7 @@ socket.on('caseResult',(result)=>{
             document.getElementById('reward-title').className="text-3xl lg:text-4xl font-russo mb-6 tracking-widest text-emerald-400";
             document.getElementById('reward-modal-panel').style.borderColor=RARITY[mod.rarity].color;
             document.getElementById('reward-item-name').innerText=mod.name;
-            document.getElementById('reward-item-icon').innerHTML=SVG_ICONS[mod.type](RARITY[mod.rarity].color);
+            document.getElementById('reward-item-icon').innerHTML=modIcon(mod);
             document.getElementById('reward-item-cat').innerText=`${CAT_NAMES[mod.type]} | ${RARITY[mod.rarity].name}`;
             document.getElementById('reward-item-cat').style.color=RARITY[mod.rarity].color;
             rw.classList.remove('hidden');
@@ -104,7 +104,7 @@ socket.on('upgradeResult',(res)=>{
                     document.getElementById('reward-title').className="text-xl lg:text-3xl font-russo mb-6 tracking-widest text-blue-400";
                     document.getElementById('reward-modal-panel').style.borderColor=RARITY[mod.rarity].color;
                     document.getElementById('reward-item-name').innerText=mod.name;
-                    document.getElementById('reward-item-icon').innerHTML=SVG_ICONS[mod.type](RARITY[mod.rarity].color);
+                    document.getElementById('reward-item-icon').innerHTML=modIcon(mod);
                     document.getElementById('reward-item-cat').innerText=`${CAT_NAMES[mod.type]} | ${RARITY[mod.rarity].name}`;
                     document.getElementById('reward-item-cat').style.color=RARITY[mod.rarity].color;
                     rw.classList.remove('hidden');

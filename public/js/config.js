@@ -119,6 +119,7 @@ const CASES = {
 };
 
 // Рядки характеристик модуля для UI: {name, pct (зі знаком), good}. Перезарядка показується як скорострільність (1/cd).
+function fmtDelta(ratio) { const p = Math.round((ratio - 1) * 100); return (p > 0 ? '+' : '') + p + '%'; }
 function modStatRows(mod) {
     const st = mod.stats || {}, rows = [];
     const add = (name, ratio) => { const p = Math.round((ratio - 1) * 100); if (p !== 0) rows.push({ name: name, pct: p, good: p > 0 }); };
@@ -132,4 +133,157 @@ function modStatRows(mod) {
 }
 function modStatsHtml(mod, sep) {
     return modStatRows(mod).map(r => `<span style="color:${r.good ? '#34d399' : '#f87171'}">${r.name}: ${r.pct > 0 ? '+' : ''}${r.pct}%</span>`).join(sep || '<br>');
+}
+
+// ===== ВІЗУАЛ МОДУЛІВ (єдине джерело форм для танка на канвасі та для SVG-іконок) =====
+// Правило: звичайні модулі — прості й матові, рідкісні — з кольоровим контуром,
+// епічні — з деталями та слабким світінням, легендарні — м'яке неонове світіння, що пульсує.
+// Форма залежить від архетипу (цифра в id: 1 = швидкість/скорострільність, 2 = броня/урон, 3 = універсал/дальність) та рівня рідкості.
+const MOD_TIER = { common: 0, rare: 1, epic: 2, legendary: 3 };
+function modArch(mod) { const m = /_[a-z](\d)$/.exec(mod.id); return m ? parseInt(m[1], 10) : 1; }
+
+function modPalette(rarity) {
+    if (!rarity) return { acc: '#475569', tier: 0, m: '#1e293b', d: '#0f172a', l: '#334155', line: '#334155' };
+    const tier = MOD_TIER[rarity], acc = RARITY[rarity].color;
+    return { acc: acc, tier: tier, m: ['#56627a', '#4a5875', '#3f4a6b', '#2b3254'][tier], d: '#161c2b', l: ['#7c889c', '#93a8cc', '#c3b0ea', '#f6e3a0'][tier], line: tier === 0 ? '#8793a8' : acc };
+}
+
+const _R = (x, y, w, h, f, s, o) => Object.assign({ k: 'r', x: x, y: y, w: w, h: h, f: f, s: s }, o || {});
+const _P = (p, f, s, o) => Object.assign({ k: 'p', p: p, f: f, s: s }, o || {});
+const _C = (x, y, r, f, s, o) => Object.assign({ k: 'c', x: x, y: y, r: r, f: f, s: s }, o || {});
+const _L = (x1, y1, x2, y2, s, o) => Object.assign({ k: 'l', x1: x1, y1: y1, x2: x2, y2: y2, s: s }, o || {});
+const _G = { g: true };
+const _mir = (pts) => pts.map(p => [p[0], -p[1]]);
+const _oct = (r) => { const a = []; for (let i = 0; i < 8; i++) { const t = Math.PI / 8 + i * Math.PI / 4; a.push([+(Math.cos(t) * r).toFixed(2), +(Math.sin(t) * r).toFixed(2)]); } return a; };
+
+function buildModShapes(type, a, t, st) {
+    const S = [];
+    if (type === 'cannon') {
+        const L = Math.round(46 * ((st && st.range) || 1));
+        if (a === 0) { S.push(_R(0, -6, 45, 12, 'm', 'line')); }
+        else if (a === 1) { // скорострільна: тонка, з перфорацією; легендарна — здвоєна
+            if (t < 3) {
+                S.push(_R(0, -5, L, 10, 'm', 'line'));
+                if (t >= 1) { S.push(_C(L * 0.45, 0, 1.7, 'd'), _C(L * 0.65, 0, 1.7, 'd'), _R(5, -6, 3, 12, 'l')); }
+                if (t >= 2) { S.push(_C(L * 0.85, 0, 1.7, 'd'), _R(L * 0.25, -7, 3, 14, 'l'), _R(L - 4, -6, 4, 12, 'a', null, _G)); }
+            } else {
+                S.push(_R(0, -9, L, 6, 'm', 'line', _G), _R(0, 3, L, 6, 'm', 'line', _G), _R(2, -3, L - 4, 6, 'd'), _L(4, 0, L - 4, 0, 'a', _G), _R(L - 3, -9, 3, 6, 'a', null, _G), _R(L - 3, 3, 3, 6, 'a', null, _G));
+            }
+        } else if (a === 2) { // важка: коротка й товста, дульне гальмо
+            if (t === 0) S.push(_R(0, -7, L, 14, 'm', 'line'));
+            else if (t === 1) S.push(_R(0, -7, L, 14, 'm', 'line'), _R(L - 8, -9, 8, 18, 'l', 'line'));
+            else if (t === 2) S.push(_R(0, -8, L, 16, 'm', 'line'), _R(L * 0.35, -10, 4, 20, 'l'), _R(L - 10, -10, 10, 20, 'l', 'line', _G), _L(L - 7, -10, L - 7, 10, 'd'), _L(L - 3, -10, L - 3, 10, 'd'));
+            else S.push(_P([[0, -8], [L - 12, -8], [L, -14], [L, 14], [L - 12, 8], [0, 8]], 'm', 'a', _G), _R(L - 3, -7, 3, 14, 'd'), _L(6, 0, L - 14, 0, 'a', _G), _R(L * 0.3, -10, 3, 20, 'a', null, _G), _R(L * 0.55, -10, 3, 20, 'a', null, _G));
+        } else { // дальнобійна: довга й тонка, приціл
+            if (t === 0) S.push(_R(0, -4, L, 8, 'm', 'line'));
+            else if (t === 1) S.push(_R(0, -4, L, 8, 'm', 'line'), _R(L * 0.3, -9, 12, 4, 'l', 'line'));
+            else if (t === 2) S.push(_P([[0, -5], [L, -3], [L, 3], [0, 5]], 'm', 'line'), _R(L * 0.28, -10, 14, 5, 'd', 'a', _G), _R(L - 5, -4, 5, 8, 'l', 'line'));
+            else S.push(_P([[0, -5], [L, -3], [L, 3], [0, 5]], 'm', 'a', _G), _R(L * 0.28, -10, 14, 5, 'd', 'a'), _C(L * 0.28 + 14, -7.5, 2.2, 'a', null, _G), _L(4, 0, L - 3, 0, 'a', _G), _R(L - 5, -4, 5, 8, 'a', null, _G));
+        }
+    } else if (type === 'turret') {
+        const gloss = _C(-4, -4, 7, 'rgba(255,255,255,0.13)');
+        if (a === 0) { S.push(_C(0, 0, 20, 'm', 'line'), gloss); }
+        else if (a === 1) { // швидка башта: низька, з антеною-радаром і крилами
+            S.push(_C(0, 0, 17, 'm', 'line', t === 3 ? _G : null));
+            if (t >= 1) S.push(_R(-13, -15, 9, 3, 'l', 'line'));
+            if (t >= 2) { S.push(_P([[-4, -17], [6, -27], [11, -17]], 'l', 'line'), _P(_mir([[-4, -17], [6, -27], [11, -17]]), 'l', 'line')); }
+            if (t === 3) S.push(_C(0, 0, 10, null, 'a', _G), _C(7, 0, 2, 'a', null, _G));
+            S.push(gloss);
+        } else if (a === 2) { // броньована башта: восьмикутник із заклепками
+            S.push(_P(_oct(23), 'm', 'line', t === 3 ? _G : null));
+            if (t >= 1) [[-12, -12], [12, -12], [-12, 12], [12, 12]].forEach(q => S.push(_C(q[0], q[1], 1.9, 'l')));
+            if (t >= 2) S.push(_P(_oct(15), 'd', 'l'), _R(11, -9, 9, 18, 'l', 'line'));
+            if (t === 3) S.push(_P(_oct(15), null, 'a', _G), _R(12, -8, 8, 16, 'm', 'a', _G));
+            S.push(gloss);
+        } else { // універсальна: люк, перископ, смуга огляду
+            S.push(_C(0, 0, 20, 'm', 'line', t === 3 ? _G : null));
+            if (t >= 1) S.push(_C(-5, 0, 6, 'd', t === 3 ? 'a' : 'l', t === 3 ? _G : null));
+            if (t >= 2) S.push(_R(-2, -15, 7, 4, 'l', 'line'), t === 3 ? _R(11, -7, 3, 14, 'a', null, _G) : _L(11, -6, 11, 6, 'l'));
+            S.push(gloss);
+        }
+    } else if (type === 'hull') {
+        if (a === 0) { S.push(_R(-30, -22, 60, 44, 'm', 'line')); }
+        else if (a === 1) { // швидкий: клиноподібний, гострий ніс
+            S.push(_P([[-30, -18], [12, -22], [32, 0], [12, 22], [-30, 18]], 'm', t === 0 ? 'line' : 'line', t === 3 ? _G : null));
+            if (t >= 1) S.push(_R(-26, -2, 46, 4, t === 3 ? 'a' : 'l', null, t === 3 ? _G : null));
+            if (t >= 2) S.push(_R(-18, -17, 12, 4, 'd'), _R(-18, 13, 12, 4, 'd'));
+            if (t === 3) S.push(_R(-31, -9, 3, 5, 'a', null, _G), _R(-31, 4, 3, 5, 'a', null, _G));
+        } else if (a === 2) { // броньований: коробка зі скошеними кутами та плитами
+            S.push(_P([[-30, -18], [-26, -22], [26, -22], [30, -18], [30, 18], [26, 22], [-26, 22], [-30, 18]], 'm', 'line', t === 3 ? _G : null));
+            if (t >= 1) S.push(_R(19, -18, 9, 36, 'l', 'line'));
+            if (t >= 2) { S.push(_R(-22, -21, 30, 4, 'l'), _R(-22, 17, 30, 4, 'l')); [-20, -8, 4].forEach(x => S.push(_C(x, 0, 1.8, 'l'))); }
+            if (t === 3) S.push(_R(-20, -12, 36, 24, 'd', 'a', _G), _L(0, -22, 0, 22, 'a', _G), _R(19, -18, 9, 36, null, 'a', _G));
+        } else { // універсальний: зрізаний ніс, люк, вентиляція
+            S.push(_P([[-30, -22], [18, -22], [30, -10], [30, 10], [18, 22], [-30, 22]], 'm', 'line', t === 3 ? _G : null));
+            if (t >= 1) S.push(_C(-8, 0, 8, 'd', t === 3 ? 'a' : 'l', t === 3 ? _G : null));
+            if (t >= 2) S.push(_R(-27, -12, 3, 24, t === 3 ? 'a' : 'd', null, t === 3 ? _G : null), _R(8, -4, 12, 8, 'd'));
+        }
+    } else if (type === 'tracks') {
+        [-32, 18].forEach((y0, side) => {
+            const outerTop = side === 0;
+            if (a === 0) { S.push(_R(-36, y0, 72, 14, 'm', 'line')); }
+            else if (a === 1) { // швидкі: вузькі, з круглими колесами
+                S.push(_R(-36, y0 + 2, 72, 10, 'm', 'line', t === 3 ? _G : null));
+                for (let x = -30; x <= 30; x += 10) S.push(_L(x, y0 + 4, x, y0 + 10, 'd'));
+                if (t >= 1) S.push(_C(-33, y0 + 7, 5, 'l', 'line'), _C(33, y0 + 7, 5, 'l', 'line'));
+                if (t === 3) S.push(_L(-28, y0 + 7, 28, y0 + 7, 'a', _G));
+            } else if (a === 2) { // броньовані: широкі, зі щитками-спідницями
+                S.push(_R(-36, y0, 72, 14, 'm', 'line'));
+                for (let x = -30; x <= 30; x += 10) S.push(_L(x, y0 + 4, x, y0 + 10, 'd'));
+                if (t >= 1) S.push(_R(-30, outerTop ? y0 - 1 : y0 + 11, 60, 4, t === 3 ? 'd' : 'l', t === 3 ? 'a' : 'line', t === 3 ? _G : null));
+                if (t >= 2) [-22, -8, 8, 22].forEach(x => S.push(_C(x, outerTop ? y0 + 1 : y0 + 13, 1.4, t === 3 ? 'a' : 'd')));
+            } else { // універсальні: шипована гума
+                S.push(_R(-36, y0, 72, 14, 'm', 'line', t === 3 ? _G : null));
+                if (t >= 1) for (let x = -30; x <= 30; x += 8) S.push(_C(x, y0 + 7, 1.7, t === 3 ? 'a' : 'l', null, t === 3 ? _G : null));
+                if (t >= 2) S.push(_C(-34, y0 + 7, 4, 'd', 'l'), _C(34, y0 + 7, 4, 'd', 'l'));
+            }
+        });
+    }
+    return S;
+}
+
+const _modShapeCache = {};
+function modShapes(type, mod) {
+    const key = mod ? mod.id : type + '_default';
+    if (!_modShapeCache[key]) _modShapeCache[key] = buildModShapes(type, mod ? modArch(mod) : 0, mod ? MOD_TIER[mod.rarity] : 0, mod ? mod.stats : null);
+    return _modShapeCache[key];
+}
+function _tok(tk, pal) { if (!tk) return null; return tk === 'line' ? pal.line : (tk === 'm' || tk === 'd' || tk === 'l') ? pal[tk] : tk === 'a' ? pal.acc : tk; }
+
+// Малювання на канвасі (контекст уже повернутий на кут корпуса/башти)
+function drawModVis(c, type, modOrId, T) {
+    const mod = typeof modOrId === 'string' ? MODULES[modOrId] : modOrId, pal = modPalette(mod ? mod.rarity : null), shapes = modShapes(type, mod || null);
+    c.lineJoin = 'round';
+    for (const s of shapes) {
+        const f = _tok(s.f, pal), st = _tok(s.s, pal);
+        if (s.g && pal.tier >= 2) { c.shadowColor = pal.acc; c.shadowBlur = pal.tier === 3 ? 8 + 3 * Math.sin((T || 0) * 2.2) : 4; } else c.shadowBlur = 0;
+        c.lineWidth = s.k === 'l' ? 1.6 : 1.5;
+        if (s.k === 'r') { if (f) { c.fillStyle = f; c.fillRect(s.x, s.y, s.w, s.h); } if (st) { c.strokeStyle = st; c.strokeRect(s.x, s.y, s.w, s.h); } }
+        else if (s.k === 'p') { c.beginPath(); s.p.forEach((q, i) => i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1])); c.closePath(); if (f) { c.fillStyle = f; c.fill(); } if (st) { c.strokeStyle = st; c.stroke(); } }
+        else if (s.k === 'c') { c.beginPath(); c.arc(s.x, s.y, s.r, 0, Math.PI * 2); if (f) { c.fillStyle = f; c.fill(); } if (st) { c.strokeStyle = st; c.stroke(); } }
+        else if (s.k === 'l') { c.beginPath(); c.moveTo(s.x1, s.y1); c.lineTo(s.x2, s.y2); c.strokeStyle = st; c.stroke(); }
+    }
+    c.shadowBlur = 0;
+}
+
+// SVG-іконка модуля (інвентар, магазин, апгрейдер, рулетка)
+const _modIconCache = {};
+function modIcon(mod) {
+    if (!mod) return '';
+    if (_modIconCache[mod.id]) return _modIconCache[mod.id];
+    const pal = modPalette(mod.rarity), shapes = modShapes(mod.type, mod), W = 1.5 * 1.35;
+    const el = (s) => {
+        const f = _tok(s.f, pal), st = _tok(s.s, pal), at = `fill="${f || 'none'}" stroke="${st || 'none'}" stroke-width="${W}" stroke-linejoin="round"`;
+        if (s.k === 'r') return `<rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" ${at}/>`;
+        if (s.k === 'p') return `<polygon points="${s.p.map(q => q.join(',')).join(' ')}" ${at}/>`;
+        if (s.k === 'c') return `<circle cx="${s.x}" cy="${s.y}" r="${s.r}" ${at}/>`;
+        return `<line x1="${s.x1}" y1="${s.y1}" x2="${s.x2}" y2="${s.y2}" stroke="${st}" stroke-width="${W}"/>`;
+    };
+    // світяться лише відмічені деталі (g); порядок малювання зберігається
+    const glowPx = pal.tier === 3 ? 3 : pal.tier === 2 ? 1.6 : 0, gst = glowPx ? ` style="filter:drop-shadow(0 0 ${glowPx}px ${pal.acc})"` : '';
+    const body = shapes.map(s => { const e = el(s); return (s.g && glowPx) ? e.replace('/>', gst + '/>') : e; }).join('');
+    const vb = mod.type === 'cannon' ? '-26 -67 52 70' : mod.type === 'turret' ? '-28 -28 56 56' : mod.type === 'hull' ? '-37 -37 74 74' : '-38 -38 76 76';
+    const rot = mod.type === 'turret' ? '' : ' transform="rotate(-90)"';
+    const svg = `<svg viewBox="${vb}" style="width:100%;height:100%;overflow:visible"><g${rot}>${body}</g></svg>`;
+    return (_modIconCache[mod.id] = svg);
 }

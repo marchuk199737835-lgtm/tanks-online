@@ -362,58 +362,17 @@ function drTnk(x, y, bA, tA, cH, nm, iM, hp, bf, eq, dN = true) {
         ctx.stroke();
     }
     
-    let bHC = '#1e293b', hC = eq && eq.hull && MODULES[eq.hull] ? RARITY[MODULES[eq.hull].rarity].color : '#0f172a',
-        trC = eq && eq.tracks && MODULES[eq.tracks] ? RARITY[MODULES[eq.tracks].rarity].color : '#0f172a',
-        cC = eq && eq.cannon && MODULES[eq.cannon] ? RARITY[MODULES[eq.cannon].rarity].color : '#0f172a',
-        tuC = eq && eq.turret && MODULES[eq.turret] ? RARITY[MODULES[eq.turret].rarity].color : '#334155';
-        
+    let T = performance.now() / 1000;
     ctx.save();
     ctx.rotate(bA);
-    ctx.fillStyle = trC;
-    ctx.shadowColor = trC;
-    ctx.shadowBlur = eq && eq.tracks ? 15 : 0;
-    ctx.fillRect(-36, -32, 72, 14);
-    ctx.fillRect(-36, 18, 72, 14);
-    ctx.shadowBlur = 0;
-    
-    ctx.fillStyle = bHC;
-    ctx.strokeStyle = hC;
-    ctx.lineWidth = eq && eq.hull ? 3 : 1;
-    if (eq && eq.hull) { ctx.shadowColor = hC; ctx.shadowBlur = 10; }
-    ctx.fillRect(-30, -22, 60, 44);
-    ctx.strokeRect(-30, -22, 60, 44);
-    ctx.shadowBlur = 0;
+    drawModVis(ctx, 'tracks', eq && eq.tracks, T);
+    drawModVis(ctx, 'hull', eq && eq.hull, T);
     ctx.restore();
-    
+
     ctx.save();
     ctx.rotate(tA);
-    ctx.fillStyle = '#334155';
-    ctx.strokeStyle = cC;
-    ctx.lineWidth = eq && eq.cannon ? 3 : 1;
-    if (eq && eq.cannon) { ctx.shadowColor = cC; ctx.shadowBlur = 10; }
-    
-    let cL = 45;
-    if (eq && eq.cannon && MODULES[eq.cannon].stats.range > 1.1) cL = 60;
-    if (eq && eq.cannon && MODULES[eq.cannon].stats.range < 1.0) cL = 35;
-    
-    ctx.fillRect(0, -6, cL, 12);
-    ctx.strokeRect(0, -6, cL, 12);
-    ctx.shadowBlur = 0;
-    
-    ctx.fillStyle = bHC;
-    ctx.strokeStyle = tuC;
-    ctx.lineWidth = eq && eq.turret ? 3 : 1;
-    if (eq && eq.turret) { ctx.shadowColor = tuC; ctx.shadowBlur = 15; }
-    ctx.beginPath();
-    ctx.arc(0, 0, 20, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.beginPath();
-    ctx.arc(-4, -4, 8, 0, Math.PI * 2);
-    ctx.fill();
+    drawModVis(ctx, 'cannon', eq && eq.cannon, T);
+    drawModVis(ctx, 'turret', eq && eq.turret, T);
     ctx.restore();
     ctx.restore();
 }
@@ -682,7 +641,7 @@ socket.on('gameOver', (data) => {
         document.getElementById('drop-name').innerText = m.name;
         document.getElementById('drop-cat').innerText = `${CAT_NAMES[m.type]} | ${RARITY[m.rarity].name}`;
         document.getElementById('drop-cat').style.color = RARITY[m.rarity].color;
-        document.getElementById('drop-icon').innerHTML = SVG_ICONS[m.type](RARITY[m.rarity].color);
+        document.getElementById('drop-icon').innerHTML = modIcon(m);
         dN.classList.remove('hidden');
     } else if (dN) dN.classList.add('hidden');
     
