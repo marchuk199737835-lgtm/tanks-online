@@ -272,7 +272,7 @@ function updatePhys(now, dt) {
             }
         }
         
-        if (!hP && myLocalTank.hp > 0 && myLocalTank.buff !== 'shield' && b.owner !== myId) {
+        if (!hP && myLocalTank.hp > 0 && myLocalTank.buff !== 'shield' && b.owner !== myId && b.owner !== 'zombie') {
             let mR = myLocalTank.buff === 'boss' ? 75 : 24, hD = b.type === 'samurai' ? mR + 30 : mR + 4;
             if (Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < hD) {
                 if (isTeamM(currentRoomData.mode) && opponents[b.owner] && opponents[b.owner].team === myLocalTank.team) { } 
@@ -286,7 +286,7 @@ function updatePhys(now, dt) {
             }
         }
         
-        if (!hP && isS) {
+        if (!hP && isS && b.owner !== 'zombie') {      // снаряди зомбі/босів не б'ють самих зомбі
             for (let zid in zombies) {
                 let z = zombies[zid], zD = b.type === 'samurai' ? zType(z.type).radius + 35 : zType(z.type).radius + 10;
                 if (Math.hypot(b.x - z.x, b.y - z.y) < zD) {
@@ -838,20 +838,9 @@ function draw(now) {
     
     if (window.ModesFX) ModesFX.world(ctx, now, tm);
     if (isPveM(currentRoomData.mode)) {
-        for (let zid in zombies) {
-            let z = zombies[zid], zC = zType(z.type); ctx.save(); ctx.translate(z.x, z.y);
-            if (zC.ghost) ctx.globalAlpha = 0.5;
-            ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 5; ctx.fillStyle = zC.color; ctx.beginPath(); ctx.arc(0, 0, zC.radius, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(-zC.radius * 0.3, -zC.radius * 0.2, zC.radius * 0.2, 0, Math.PI * 2); ctx.fill();
-            ctx.beginPath(); ctx.arc(zC.radius * 0.3, -zC.radius * 0.2, zC.radius * 0.2, 0, Math.PI * 2); ctx.fill();
-            ctx.fillRect(-zC.radius * 0.4, zC.radius * 0.3, zC.radius * 0.8, zC.radius * 0.2);
-            if (zC.isBoss) {
-                ctx.fillStyle = '#fff'; ctx.font = '24px Russo One'; ctx.textAlign = 'center'; ctx.fillText(zC.name, 0, -zC.radius - 20);
-                ctx.fillStyle = '#ef4444'; ctx.fillRect(-40, -zC.radius - 10, 80, 8); ctx.fillStyle = '#22c55e'; ctx.fillRect(-40, -zC.radius - 10, 80 * Math.max(0, Math.min(1, z.hp / (z.maxHp || zC.hp))), 8);
-            } else {
-                ctx.fillStyle = '#ef4444'; ctx.fillRect(-15, -zC.radius - 10, 30, 4); ctx.fillStyle = '#22c55e'; ctx.fillRect(-15, -zC.radius - 10, 30 * Math.max(0, Math.min(1, z.hp / (z.maxHp || zC.hp))), 4);
-            }
-            ctx.restore();
+        if (window.ZombieFX) ZombieFX.draw(ctx, zombies, now, { x0: VX0, x1: VX1, y0: VY0, y1: VY1 });
+        else for (let zid in zombies) {
+            let z = zombies[zid], zC = zType(z.type); ctx.fillStyle = zC.color; ctx.beginPath(); ctx.arc(z.x, z.y, zC.radius, 0, Math.PI * 2); ctx.fill();
         }
     }
     

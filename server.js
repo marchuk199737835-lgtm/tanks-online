@@ -924,10 +924,10 @@ socket.on('selectProp', (data) => {
 
     socket.on('takeDamage', (d) => {
         let r = rooms[d.roomId];
-        if (!r || r.status !== 'playing' || !r.players[socket.id] || d.attacker !== 'zombie') return;
+        if (!r || r.status !== 'playing' || !r.players[socket.id] || (d.attacker !== 'zombie' && d.attacker !== 'bomber')) return;
         let v = r.players[socket.id];
         if (v.buff === 'shield' || v.hp <= 0 || !ModeInfo.isPve(r.mode)) return;
-        v.hp = Math.max(0, v.hp - Modes.dmgTaken(r, socket.id, +d.amt || 0));
+        v.hp = Math.max(0, v.hp - Modes.dmgTaken(r, socket.id, Math.min(400, Math.max(0, +d.amt || 0))));
         if (v.hp === 0) processPlayerDeath(r, socket.id, 'zombie');
     });
 
