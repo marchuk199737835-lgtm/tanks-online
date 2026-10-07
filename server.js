@@ -71,7 +71,7 @@ function hashPwd(pwd) { return crypto.createHash('sha256').update(pwd).digest('h
 const MAP_DATA={"epic_map":{size:3000,bg:"#565a6c",grid:"#494d55",solids:[{type:"wall_square",x:850,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1150,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1150,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1800,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:1700,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:1850,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1800,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1950,w:50,h:50,color:"#353940"},{type:"wall_square",x:1700,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:1700,y:1950,w:50,h:50,color:"#353940"},{type:"wall_square",x:1850,y:1800,w:50,h:50,color:"#353940"},{type:"wall_square",x:1850,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1000,w:50,h:50,color:"#353940"},{type:"wall_square",x:1850,y:1150,w:50,h:50,color:"#353940"},{type:"wall_square",x:1700,y:1000,w:50,h:50,color:"#353940"},{type:"wall_square",x:800,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:800,y:1150,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1000,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1000,w:50,h:50,color:"#353940"},{type:"wall_square",x:800,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1950,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1950,w:50,h:50,color:"#353940"},{type:"wall_square",x:800,y:1800,w:50,h:50,color:"#353940"},{type:"shape_rhombus",x:1150,y:1300,w:400,h:400,color:"#353940"},{type:"shape_rhombus",x:1250,y:1350,w:200,h:300,color:"#22252a"},{type:"tree",x:0,y:700,r:424.26},{type:"tree",x:2650,y:2550,r:180.27},{type:"tree",x:300,y:2400,r:158.11},{type:"tree",x:2850,y:750,r:364.00},{type:"neon_circle",x:850,y:1100,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:900,y:1050,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:1750,y:1050,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:1800,y:1100,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:1800,y:1850,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:1750,y:1900,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:850,y:1850,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:900,y:1900,w:50,h:50,color:"#21252c"},{type:"prop_crate",x:3000,y:2950,w:50,h:50},{type:"spawn_player",x:250,y:2750},{type:"spawn_player",x:2850,y:2850},{type:"spawn_player",x:1500,y:2750},{type:"spawn_powerup",x:1500,y:1500},{type:"spawn_powerup",x:800,y:800},{type:"spawn_powerup",x:2200,y:800},{type:"spawn_powerup",x:1500,y:2200}]},'Бій Насмерть':{size:2500,bg:'#3e2604',grid:'#1e293b',solids:[{type:"spawn_player",x:1400,y:1450},{type:"spawn_player",x:100,y:1350},{type:"spawn_player",x:1400,y:750},{type:"spawn_player",x:100,y:700},{type:"spawn_powerup",x:700,y:700},{type:"spawn_powerup",x:1800,y:700},{type:"spawn_powerup",x:700,y:1800},{type:"spawn_powerup",x:1800,y:1800}]}};
 editorApi = mountEditor(app, { MAP_DATA: MAP_DATA, getMapsCol: () => dbMapsCol });
 if (!mongoUri) editorApi.loadSaved().catch(e => console.error('❌ Не вдалося завантажити мапи:', e.message));
-const Z_TYPES={normal:{hp:25,speed:120,dmg:10,radius:15,color:'#22c55e'},runner:{hp:15,speed:250,dmg:5,radius:12,color:'#84cc16'},tanker:{hp:100,speed:60,dmg:25,radius:25,color:'#15803d'},spitter:{hp:40,speed:90,dmg:15,radius:15,color:'#a3e635',ranged:true},bomber:{hp:30,speed:140,dmg:50,radius:18,color:'#dc2626',explode:true},ghost:{hp:20,speed:100,dmg:10,radius:15,color:'#cbd5e1',ghost:true},pikus:{isBoss:true,name:'ПІКУС',hp:1000,speed:294,dmg:100,radius:30,color:'#9333ea',bullets:3,cd:3000},shurik:{isBoss:true,name:'ШУРІК',hp:2000,speed:280,dmg:100,radius:22.5,color:'#f43f5e',bullets:10,cd:3000},oneshot:{isBoss:true,name:'ВАНШОТУС',hp:3000,speed:294,dmg:1000,radius:30,color:'#fbbf24',bullets:2,cd:2000},padlo:{isBoss:true,name:'ПАДЛО',hp:5000,speed:280,dmg:75,radius:15,color:'#10b981',bullets:25,cd:1500}};
+const Z_TYPES={normal:{hp:25,speed:120,dmg:10,radius:15,color:'#22c55e'},runner:{hp:15,speed:250,dmg:5,radius:12,color:'#84cc16'},tanker:{hp:100,speed:60,dmg:25,radius:25,color:'#15803d'},spitter:{hp:40,speed:90,dmg:15,radius:15,color:'#a3e635',ranged:true},bomber:{hp:30,speed:140,dmg:50,radius:18,color:'#dc2626',explode:true},ghost:{hp:20,speed:100,dmg:10,radius:15,color:'#cbd5e1',ghost:true},pikus:{isBoss:true,name:'ПІКУС',hp:1000,speed:294,dmg:100,radius:30,color:'#9333ea',bullets:3,cd:3000},shurik:{isBoss:true,name:'ШУРІК',hp:2000,speed:280,dmg:100,radius:22.5,color:'#f43f5e',bullets:10,cd:3000},oneshot:{isBoss:true,name:'ВАНШОТУС',hp:3000,speed:294,dmg:1000,radius:30,color:'#fbbf24',bullets:2,cd:2000},padlo:{isBoss:true,name:'ПАДЛО',hp:5000,speed:280,dmg:75,radius:15,color:'#10b981',bullets:25,cd:1500,ring:true},titan:{isBoss:true,name:'ТИТАН',hp:8000,speed:270,dmg:120,radius:36,color:'#38bdf8',bullets:18,cd:1400,ring:true}};
 const GameData = require('./public/js/gamedata.js'); // єдине джерело модулів і кейсів (спільне з клієнтом)
 const MODULES = GameData.MODULES, CASES = GameData.CASES;
 
@@ -178,7 +178,7 @@ function sendEconomy(socketId, name) {
 // outcome: 'win' | 'loss' | 'draw'. Повертає дані для анімації у вікні результату.
 function grantXp(name, outcome) {
     const u = dbUsers[name]; if (!u) return null;
-    const before = u.xp || 0, gain = GameData.rollXp(outcome === 'win' ? 'win' : 'loss');
+    const before = u.xp || 0, gain = GameData.rollXp(outcome === 'win' ? 'win' : outcome === 'draw' ? 'draw' : 'loss');
     u.xp = before + gain;
     const lb = GameData.levelFromXp(before), la = GameData.levelFromXp(u.xp);
     return { gain, outcome, before, after: u.xp, lvlBefore: lb, lvlAfter: la };
@@ -243,6 +243,7 @@ function processPlayerDeath(r, victimId, killerId) {
         saveUser(atk.name);
     }
 
+    if (Modes.has(r.mode)) { Modes.onDeath(r, v, killerId); return; }
     if (r.mode === 'team_deathmatch') {
         if (atk && atk.team && atk.team !== v.team) {
             r.teamScores[atk.team]++;
@@ -295,7 +296,13 @@ function clampInt(v, min, max, def) {
     if (!Number.isFinite(n)) return def;
     return Math.max(min, Math.min(max, n));
 }
-const VALID_MODES = ['deathmatch', 'survival', 'prophunt', 'team_deathmatch'];
+const ModeInfo = require('./public/js/modeinfo.js');   // спільне з клієнтом: режими, параметри, нагороди
+const VALID_MODES = ModeInfo.ORDER.slice();
+const Modes = require('./modes.js')({ io, rooms, dbUsers, MAP_DATA, MapObj, Nav, Z_TYPES, waveScale, getValidSpawn, getValidEdgeSpawn, checkCollisionServer, getMaxHp,
+    grantXp, rollDrop, saveUser, ecoPayload, pushRooms, zombieTick, processPlayerDeath, ZOMBIE_CAP, ZOMBIE_SPAWN_BASE, ZOMBIE_SPAWN_STEP });
+const teamsOf = r => r.mode === 'capture_points' ? Math.max(2, Math.min(4, r.cpTeams || 2)) : Math.max(2, Math.min(4, r.tdmTeams || 2));
+const isTeamPvp = m => m === 'team_deathmatch' || m === 'capture_points';
+const powerupsOn = m => m !== 'prophunt' && m !== 'team_deathmatch';
 // мапа для режиму: бажана, якщо вона дозволена в цьому режимі (поле modes з редактора), інакше перша дозволена
 function pickMap(want, mode) {
     if (MAP_DATA[want] && MapObj.mapAllows(MAP_DATA[want], mode)) return want;
@@ -307,9 +314,9 @@ const TDM_TEAMS = ['red', 'blue', 'green', 'yellow']; // порядок як у 
 // Повернути кімнату в лобі (кінець гри, скасування гри) з повним очищенням ігрового стану
 function resetRoomToLobby(r) {
     r.status = 'lobby'; r.state = 'waiting';
-    r.powerups = {}; r.tokens = {}; r.zombies = {}; r.mines = {}; r.wave = 1;
+    r.powerups = {}; r.tokens = {}; r.zombies = {}; r.mines = {}; r.wave = 1; Modes.cleanup(r.id);
     Object.values(r.players).forEach(p => {
-        p.ready = false; p.score = 0; p.hp = getMaxHp(p.equipped); p.buff = null;
+        p.ready = false; p.score = 0; p.hp = getMaxHp(p.equipped); p.buff = null; p.out = false; p.lives = 0; p.perk = null; p.caps = 0;
         p.stuckIn = []; p.onFire = null; p.isDisguised = false; p.level = playerLevel(p.name);
     });
     io.to(r.id).emit('updateLobby', r);
@@ -323,14 +330,16 @@ function removePlayer(rId, sockId) {
     const left = r.players[sockId];
     delete r.players[sockId];
     const ids = Object.keys(r.players);
-    if (ids.length === 0) { delete rooms[rId]; if (typeof SYNCS !== "undefined") SYNCS.delete(rId); BANS.delete(rId); return; }
+    if (ids.length === 0) { delete rooms[rId]; if (typeof SYNCS !== "undefined") SYNCS.delete(rId); BANS.delete(rId); Modes.cleanup(rId); return; }
     if (r.hostSocket === sockId) { r.hostSocket = ids[0]; r.hostName = r.players[ids[0]].name; }
     if (r.status === 'playing') {
         let abort = false;
         // Виживання - кооператив: гра триває, поки лишається хоч один гравець. Інші режими потребують мінімум 2.
-        if (r.mode !== 'survival' && ids.length < 2) abort = true;
-        else if (r.mode === 'team_deathmatch' && new Set(ids.map(id => r.players[id].team)).size < 2) abort = true;
+        // нові кооп-режими теж тривають, поки лишається хоч один гравець; королівський бій при одному гравцеві визначає переможця
+        if (!ModeInfo.isPve(r.mode) && r.mode !== 'battle_royale' && ids.length < 2) abort = true;
+        else if (isTeamPvp(r.mode) && new Set(ids.map(id => r.players[id].team)).size < 2) abort = true;
         if (abort) { resetRoomToLobby(r); return; }
+        if (Modes.has(r.mode)) { Modes.afterLeave(r, left); if (r.status !== 'playing') return; }
         if (r.mode === 'prophunt') {
             if (left.team === 'hider' && !ids.some(id => r.players[id].team === 'hider' && r.players[id].hp > 0)) endPropHuntGame(r, 'hunter');
             else if (left.team === 'hunter' && !ids.some(id => r.players[id].team === 'hunter' && r.players[id].hp > 0)) endPropHuntGame(r, 'hider');
@@ -613,6 +622,7 @@ io.on('connection', (socket) => {
             players: {}, powerups: {}, tokens: {}, zombies: {}, mines: {},
             wave: 1, nextWaveTime: 0, lastPowerupSpawn: Date.now()
         };
+        { const nr = rooms[rId]; nr.mpPref = nr.maxPlayers; Modes.readSettings(nr, c); if (ModeInfo.isSolo(nr.mode)) nr.maxPlayers = 1; }   // соло-режими: у сесії лише один гравець
         socket.emit('roomCreated', rId);
         pushRooms();
     });
@@ -656,12 +666,13 @@ io.on('connection', (socket) => {
         let r = rooms[d.roomId];
         if (r && r.hostSocket === socket.id && r.status === 'lobby') {
             if (d.mode && VALID_MODES.includes(d.mode)) {
-                r.mode = d.mode;
+                if (ModeInfo.isSolo(d.mode) && Object.keys(r.players).length > 1) { socket.emit('joinError', 'Соло-режим для одного гравця: спершу приберіть інших гравців із сесії'); return; }
+                r.mode = d.mode; r.maxPlayers = ModeInfo.isSolo(r.mode) ? 1 : Math.max(2, r.mpPref || 6);
                 Object.values(r.players).forEach(p => { p.ready = false; p.team = null; p.color = null; });
                 r.map = pickMap(r.map, r.mode);                     // якщо мапа не підходить режиму — перемикаємо на дозволену
             }
             if (d.map) r.map = pickMap(d.map, r.mode);
-            if (d.maxPlayers) r.maxPlayers = Math.max(2, Math.min(10, parseInt(d.maxPlayers) || 6));
+            if (d.maxPlayers) { r.mpPref = Math.max(2, Math.min(10, parseInt(d.maxPlayers) || 6)); if (!ModeInfo.isSolo(r.mode)) r.maxPlayers = r.mpPref; }
             if (d.winScore) r.winScore = clampInt(d.winScore, 5, 1000, 50);
             if (d.hunterCount) {
                 r.hunterCount = Math.max(1, Math.min(9, Object.keys(r.players).length - 1, clampInt(d.hunterCount, 1, 9, 1)));
@@ -678,6 +689,7 @@ io.on('connection', (socket) => {
             if (d.tdmTime) r.tdmTime = clampInt(d.tdmTime, 60, 300, 180);
             if (d.tdmScore) r.tdmScore = clampInt(d.tdmScore, 5, 50, 20);
             if (d.tdmAutoBalance !== undefined) r.tdmAutoBalance = !!d.tdmAutoBalance;
+            Modes.applyUpdate(r, d);
             io.to(d.roomId).emit('updateLobby', r);
             pushRooms();
         }
@@ -718,7 +730,7 @@ io.on('connection', (socket) => {
 
     socket.on('setColor', (d) => {
         let r = d ? rooms[d.roomId] : null;
-        if (r && r.status === 'lobby' && r.players[socket.id] && (r.mode === 'deathmatch' || r.mode === 'survival')
+        if (r && r.status === 'lobby' && r.players[socket.id] && ModeInfo.usesColor(r.mode)
             && VALID_COLORS.includes(d.color) && !Object.values(r.players).some(p => p.id !== socket.id && p.color === d.color)) {
             r.players[socket.id].color = d.color;
             r.players[socket.id].ready = false;
@@ -729,7 +741,7 @@ io.on('connection', (socket) => {
     socket.on('setTeam', (d) => {
         let r = d ? rooms[d.roomId] : null;
         if (r && r.status === 'lobby' && r.players[socket.id]) {
-            const allowedTeams = r.mode === 'prophunt' ? ['hunter', 'hider'] : (r.mode === 'team_deathmatch' ? TDM_TEAMS.slice(0, r.tdmTeams) : []);
+            const allowedTeams = r.mode === 'prophunt' ? ['hunter', 'hider'] : (isTeamPvp(r.mode) ? TDM_TEAMS.slice(0, teamsOf(r)) : []);
             if (!allowedTeams.includes(d.team)) return;
             if (r.mode === 'prophunt') {
                 let cH = 0;
@@ -745,8 +757,8 @@ io.on('connection', (socket) => {
     socket.on('toggleReady', (roomId) => {
         let r = rooms[roomId];
         if (r && r.status === 'lobby' && r.players[socket.id]) {
-            if ((r.mode === 'prophunt' || r.mode === 'team_deathmatch') && !r.players[socket.id].team) return;
-            if ((r.mode === 'deathmatch' || r.mode === 'survival') && !r.players[socket.id].color) return;
+            if (!ModeInfo.usesColor(r.mode) && !r.players[socket.id].team) return;
+            if (ModeInfo.usesColor(r.mode) && !r.players[socket.id].color) return;
             r.players[socket.id].ready = !r.players[socket.id].ready;
             io.to(roomId).emit('updateLobby', r);
         }
@@ -756,13 +768,13 @@ io.on('connection', (socket) => {
         let r = rooms[roomId];
         if (r && r.hostSocket === socket.id && r.status === 'lobby') {
             const pK = Object.keys(r.players);
-            if (pK.length >= 2 && pK.every(id => r.players[id].ready)) {
+            if (pK.length >= ModeInfo.minPlayers(r.mode) && pK.every(id => r.players[id].ready)) {
                 if (r.mode === 'prophunt') {
                     const nHunt = pK.filter(id => r.players[id].team === 'hunter').length, nHide = pK.filter(id => r.players[id].team === 'hider').length;
                     if (nHunt < 1 || nHide < 1) return socket.emit('joinError', 'Для Хованок потрібен хоча б один мисливець і один, хто ховається!');
                     if (nHunt > r.hunterCount) return socket.emit('joinError', `Забагато мисливців (максимум ${r.hunterCount})!`);
                 }
-                if (r.mode === 'team_deathmatch') {
+                if (isTeamPvp(r.mode)) {
                     let c = {};
                     pK.forEach(id => { let t = r.players[id].team; if (t) c[t] = (c[t] || 0) + 1; });
                     let aT = Object.keys(c);
@@ -776,7 +788,7 @@ io.on('connection', (socket) => {
                     if (sPts.length < aT.length) return socket.emit('joinError', `На мапі недостатньо точок спавну (${sPts.length}) для ${aT.length} команд!`);
                     r.teamScores = {};
                     aT.forEach(t => r.teamScores[t] = 0);
-                    r.timeEndTime = Date.now() + 4000 + (r.tdmTime * 1000);
+                    if (r.mode === 'team_deathmatch') r.timeEndTime = Date.now() + 4000 + (r.tdmTime * 1000);
                     let tS = {};
                     aT.forEach((t, i) => tS[t] = sPts[i % sPts.length]);
                     r.teamSpawns = {}; aT.forEach(t => r.teamSpawns[t] = { x: tS[t].x, y: tS[t].y });
@@ -800,6 +812,7 @@ io.on('connection', (socket) => {
                 }
                 r.status = 'playing';
                 r.powerups = {}; r.mines = {}; r.tokens = {}; r.zombies = {}; r.lastPowerupSpawn = Date.now();
+                if (Modes.has(r.mode)) { SYNCS.delete(roomId); Modes.start(r, pK, Date.now()); }
                 
                 if (r.mode === 'survival') {
                     r.wave = 0; r.state = 'waiting'; r.nextWaveTime = Date.now() + 4000; r.zombies = {};
@@ -881,8 +894,9 @@ socket.on('selectProp', (data) => {
         if (!r || r.status !== 'playing' || !r.players[data.targetId]) return;
         let v = r.players[data.targetId], atk = r.players[socket.id], atkName = globalPlayers[socket.id];
         
-        if (r.mode === 'survival' || v.hp <= 0 || v.buff === 'shield') return;
-        if (r.mode === 'team_deathmatch' && atk && atk.team === v.team) return;
+        if (ModeInfo.isPve(r.mode) || v.hp <= 0 || v.buff === 'shield') return;
+        if (isTeamPvp(r.mode) && atk && atk.team === v.team) return;
+        if (Modes.has(r.mode) && atk && (atk.hp <= 0 || atk.out)) return;
         
         let fD = data.amt;
         
@@ -912,8 +926,8 @@ socket.on('selectProp', (data) => {
         let r = rooms[d.roomId];
         if (!r || r.status !== 'playing' || !r.players[socket.id] || d.attacker !== 'zombie') return;
         let v = r.players[socket.id];
-        if (v.buff === 'shield' || v.hp <= 0) return;
-        v.hp = Math.max(0, v.hp - d.amt);
+        if (v.buff === 'shield' || v.hp <= 0 || !ModeInfo.isPve(r.mode)) return;
+        v.hp = Math.max(0, v.hp - Modes.dmgTaken(r, socket.id, +d.amt || 0));
         if (v.hp === 0) processPlayerDeath(r, socket.id, 'zombie');
     });
 
@@ -946,7 +960,7 @@ socket.on('selectProp', (data) => {
 
     socket.on('collectPowerup', (d) => {
         let r = rooms[d.roomId];
-        if (r && r.status === 'playing' && r.powerups[d.pid] && r.powerups[d.pid].active && r.players[socket.id] && r.players[socket.id].hp > 0 && (r.mode === 'deathmatch' || r.mode === 'survival')) {
+        if (r && r.status === 'playing' && r.powerups[d.pid] && r.powerups[d.pid].active && r.players[socket.id] && r.players[socket.id].hp > 0 && powerupsOn(r.mode)) {
             let pT = r.powerups[d.pid].type, p = r.players[socket.id];
             p.buff = pT; p.buffEndTime = Date.now() + BUFF_DURATION; r.powerups[d.pid].active = false;
             if (pT === 'healing') { p.hp = Math.min(getMaxHp(p.equipped), p.hp + 150); p.nextHeal = Date.now() + 1000; }
@@ -960,14 +974,18 @@ socket.on('selectProp', (data) => {
         if (r && r.status === 'playing' && r.zombies[d.zid] && r.zombies[d.zid].hp > 0) {
             let fD = d.dmg, aN = r.players[socket.id]?.name;
             if (aN && dbUsers[aN]) fD *= GameData.statMult(dbUsers[aN].equipped, 'dmg');
+            if (Modes.has(r.mode)) fD *= Modes.dmgMult(r, socket.id);
             if (d.type === 'incendiary') r.zombies[d.zid].onFire = { end: Date.now() + 5000, nextTick: Date.now() + 1000, owner: socket.id };
             r.zombies[d.zid].hp -= fD;
             if (r.zombies[d.zid].hp <= 0) {
                 if (r.zombies[d.zid].type === 'bomber') io.to(d.roomId).emit('bomberExplode', { x: r.zombies[d.zid].x, y: r.zombies[d.zid].y, dmg: Math.round(50 * (r.zombies[d.zid].dmgMult || 1)) });
+                if (Modes.has(r.mode)) Modes.onZombieKill(r, socket.id, r.zombies[d.zid]);
                 delete r.zombies[d.zid];
             }
         }
     });
+
+    socket.on('pickPerk', (d) => { if (d && rooms[d.roomId]) Modes.pickPerk(rooms[d.roomId], socket.id, d.id); });
 
     socket.on('backToRoomLobby', (roomId) => {
         let r = rooms[roomId];
@@ -1016,6 +1034,56 @@ function endTDMGame(r, wT) {
 }
 
 
+
+// ===== Поведінка зомбі (спільна для «Виживання» й нових режимів) =====
+// X (необов'язково): { targets:[{id,x,y,r,hit(dmg)}] } — споруди, які зомбі атакують (ядро бази, конвой); enrage — боси скаженіють при <50% здоров'я
+function zombieTick(r, rId, now, dt, aP, X) {
+    for (let zid in r.zombies) {
+        let z = r.zombies[zid], t = null, mD = Infinity, st = null; const ZT = Z_TYPES[z.type];
+        if (z.onFire) {
+            if (now >= z.onFire.end) z.onFire = null;
+            else if (now >= z.onFire.nextTick && z.hp > 0) {
+                z.onFire.nextTick = now + 1000; z.hp -= 20; io.to(rId).emit('burnTick', { x: z.x, y: z.y });
+                if (z.hp <= 0) { if (z.type === 'bomber') io.to(rId).emit('bomberExplode', { x: z.x, y: z.y, dmg: Math.round(50 * (z.dmgMult || 1)) }); delete r.zombies[zid]; continue; }
+            }
+        }
+        aP.forEach(pl => { let d = Math.hypot(pl.x - z.x, pl.y - z.y); if (pl.buff === 'invisible') d *= 3; if (d < mD) { mD = d; t = pl; } });
+        if (X && X.targets) for (const T of X.targets) { const d = Math.hypot(T.x - z.x, T.y - z.y) - T.r; if (d < mD) { mD = d; t = T; st = T; } }
+        if (t) {
+            let dx = t.x - z.x, dy = t.y - z.y, l = Math.max(Math.hypot(dx, dy), 0.001), sp = ZT.speed, cdM = 1;
+            if (X && X.enrage && ZT.isBoss && z.hp < z.maxHp * 0.5) { sp *= 1.3; cdM = 0.7; }
+            // шлях в обхід перешкод (барикади, стіни, вода): зомбі йде до наступної точки маршруту, а не тупо в гравця
+            const wp = Nav.steer(MAP_DATA[r.map] || MAP_DATA['epic_map'], r, t.id, t.x, t.y, z.x, z.y, ZT.radius, now), wdx = wp.x - z.x, wdy = wp.y - z.y, wl = Math.max(Math.hypot(wdx, wdy), 0.001);
+            let nX = z.x + (wdx / wl) * sp * dt, nY = z.y + (wdy / wl) * sp * dt;
+            if (!st || mD > 4) {      // до споруди підходимо впритул, але не заходимо всередину неї
+                if (!checkCollisionServer(r.map, nX, z.y, ZT.radius, [], r)) z.x = nX;
+                if (!checkCollisionServer(r.map, z.x, nY, ZT.radius, [], r)) z.y = nY;
+            }
+            // Анти-застрягання: зомбі, що 3с не рухається далеко від гравця, переноситься на край мапи
+            if (!z.stuckRef) z.stuckRef = { x: z.x, y: z.y, t: now };
+            else if (now - z.stuckRef.t >= 3000) {
+                if (Math.hypot(z.x - z.stuckRef.x, z.y - z.stuckRef.y) < 10 && mD > 80) {
+                    let zs = getValidEdgeSpawn(r.map, ZT.radius + 5, 'spawn_zombie');
+                    z.x = zs.x; z.y = zs.y;
+                }
+                z.stuckRef = { x: z.x, y: z.y, t: now };
+            }
+            const dmgV = Math.round(ZT.dmg * (z.dmgMult || 1));
+            if (ZT.isBoss && now > z.nextAttack) {
+                z.nextAttack = now + ZT.cd * cdM; let bC = ZT.bullets, spr = Math.PI / 4, sA = Math.atan2(dy, dx) - (spr / 2), stp = spr / Math.max(1, bC - 1); if (ZT.ring) { spr = Math.PI * 2; stp = spr / bC; sA = 0; }
+                for (let b = 0; b < bC; b++) { let a = sA + (b * stp); io.to(rId).emit('spawnBullet', { id: 'b_' + now + b + zid, x: z.x, y: z.y, vx: Math.cos(a) * 500, vy: Math.sin(a) * 500, type: 'boss_proj', owner: 'zombie', dmgOverride: dmgV }); }
+                if (st && mD < 600) st.hit(Math.round(dmgV * 0.6));      // снаряди боса не бачать споруд — шкода споруді нараховується напряму
+            } else if (ZT.ranged && !ZT.isBoss && mD < 400 && now > z.nextAttack) {
+                z.nextAttack = now + 2000; io.to(rId).emit('spawnBullet', { id: 'ac_' + now + zid, x: z.x, y: z.y, vx: (dx / l) * 400, vy: (dy / l) * 400, type: 'acid', owner: 'zombie', dmgOverride: Math.round(75 * (z.dmgMult || 1)) });
+                if (st) st.hit(Math.round(40 * (z.dmgMult || 1)));
+            } else if (!ZT.isBoss && mD < (st ? ZT.radius + 12 : 30 + ZT.radius + 5) && now > z.nextAttack) {
+                z.nextAttack = now + 1000;
+                if (st) st.hit(dmgV); else io.to(rId).emit('zombieMeleeHit', { targetId: t.id, dmg: dmgV });
+            }
+        }
+    }
+}
+
 // ===== Дельта-синхронізація стану бою =====
 // Раніше щотіку (30 Гц) всім летів ПОВНИЙ стан: усі гравці з усіма полями, зомбі, жетони, бонуси, міни.
 // Тепер: рухомі поля — масивом і лише для тих, що змінились; статичні (ім'я, колір, екіпірування…) — лише при зміні;
@@ -1058,6 +1126,7 @@ function buildSync(r, now) {
     }
     const chg = (key, val, name) => { const j = JSON.stringify(val); if (full || S[key] !== j) { S[key] = j; out[name] = val; any = true; } };
     chg('pu', r.powerups || {}, 'pu'); chg('tk', r.tokens || {}, 'tk'); chg('mn', r.mines || {}, 'mn');
+    if (Modes.has(r.mode)) { const md = Modes.md(r, now); if (md) chg('md', md, 'md'); }
     if (r.mode === 'prophunt') { const t = Math.max(0, Math.ceil((r.phaseEndTime - now) / 1000)), j = r.state + ':' + t; if (full || S.ph !== j) { S.ph = j; out.phState = r.state; out.phTimeLeft = t; any = true; } }
     if (r.mode === 'team_deathmatch') {
         chg('tdm', { teamScores: r.teamScores, timeEndTime: r.timeEndTime }, 'tdm');
@@ -1076,11 +1145,12 @@ setInterval(() => {
         let r = rooms[rId];
         if (r.status !== 'playing') { if (SYNCS.has(rId)) SYNCS.delete(rId); continue; }
 
-        if (r.mode === 'deathmatch' || r.mode === 'survival') {
+        const PWR = Modes.has(r.mode) ? Modes.powerupRule(r) : null;
+        if (powerupsOn(r.mode)) {
             let pKeys = Object.keys(r.powerups);
             pKeys.forEach(k => { if (now - r.powerups[k].spawnTime > 60000) delete r.powerups[k]; });
             pKeys = Object.keys(r.powerups);
-            if (now - r.lastPowerupSpawn >= 30000) {
+            if (!(PWR && PWR.own) && now - r.lastPowerupSpawn >= 30000) {
                 r.lastPowerupSpawn = now;
                 const cM = MAP_DATA[r.map] ? r.map : 'epic_map', sPts = MAP_DATA[cM].solids.filter(s => s.type === 'spawn_powerup');
                 if (sPts.length > 0 && pKeys.length < 4) {
@@ -1172,6 +1242,8 @@ setInterval(() => {
             } else p.buffProgress = 0;
         });
 
+        if (Modes.has(r.mode)) { if (Modes.tick(r, now, dt)) continue; }
+
         if (r.mode === 'survival') {
             const aP = Object.values(r.players).filter(pl => pl.hp > 0);
             if (aP.length === 0) {
@@ -1199,45 +1271,9 @@ setInterval(() => {
                     r.state = 'playing';
                 }
             } else if (r.state === 'playing') {
-                for (let zid in r.zombies) {
-                    let z = r.zombies[zid], t = null, mD = Infinity;
-                    if (z.onFire) {
-                        if (now >= z.onFire.end) z.onFire = null;
-                        else if (now >= z.onFire.nextTick && z.hp > 0) {
-                            z.onFire.nextTick = now + 1000; z.hp -= 20; io.to(rId).emit('burnTick', { x: z.x, y: z.y });
-                            if (z.hp <= 0) { if (z.type === 'bomber') io.to(rId).emit('bomberExplode', { x: z.x, y: z.y, dmg: Math.round(50 * (z.dmgMult || 1)) }); delete r.zombies[zid]; continue; }
-                        }
-                    }
-                    aP.forEach(pl => { let d = Math.hypot(pl.x - z.x, pl.y - z.y); if (pl.buff === 'invisible') d *= 3; if (d < mD) { mD = d; t = pl; } });
-                    if (t) {
-                        let dx = t.x - z.x, dy = t.y - z.y, l = Math.max(Math.hypot(dx, dy), 0.001), sp = Z_TYPES[z.type].speed;
-                        // шлях в обхід перешкод (барикади, стіни, вода): зомбі йде до наступної точки маршруту, а не тупо в гравця
-                        const wp = Nav.steer(MAP_DATA[r.map] || MAP_DATA['epic_map'], r, t.id, t.x, t.y, z.x, z.y, Z_TYPES[z.type].radius, now), wdx = wp.x - z.x, wdy = wp.y - z.y, wl = Math.max(Math.hypot(wdx, wdy), 0.001);
-                        let nX = z.x + (wdx / wl) * sp * dt, nY = z.y + (wdy / wl) * sp * dt;
-                        if (!checkCollisionServer(r.map, nX, z.y, Z_TYPES[z.type].radius, [], r)) z.x = nX;
-                        if (!checkCollisionServer(r.map, z.x, nY, Z_TYPES[z.type].radius, [], r)) z.y = nY;
-                        // Анти-застрягання: зомбі, що 3с не рухається далеко від гравця, переноситься на край мапи
-                        if (!z.stuckRef) z.stuckRef = { x: z.x, y: z.y, t: now };
-                        else if (now - z.stuckRef.t >= 3000) {
-                            if (Math.hypot(z.x - z.stuckRef.x, z.y - z.stuckRef.y) < 10 && mD > 80) {
-                                let zs = getValidEdgeSpawn(r.map, Z_TYPES[z.type].radius + 5, 'spawn_zombie');
-                                z.x = zs.x; z.y = zs.y;
-                            }
-                            z.stuckRef = { x: z.x, y: z.y, t: now };
-                        }
-                        if (Z_TYPES[z.type].isBoss && now > z.nextAttack) {
-                            z.nextAttack = now + Z_TYPES[z.type].cd; let bC = Z_TYPES[z.type].bullets, spr = Math.PI / 4, sA = Math.atan2(dy, dx) - (spr / 2), st = spr / Math.max(1, bC - 1); if (bC === 25) { spr = Math.PI * 2; st = spr / 25; sA = 0; }
-                            for (let b = 0; b < bC; b++) { let a = sA + (b * st); io.to(rId).emit('spawnBullet', { id: 'b_' + now + b + zid, x: z.x, y: z.y, vx: Math.cos(a) * 500, vy: Math.sin(a) * 500, type: 'boss_proj', owner: 'zombie', dmgOverride: Math.round(Z_TYPES[z.type].dmg * (z.dmgMult || 1)) }); }
-                        } else if (Z_TYPES[z.type].ranged && !Z_TYPES[z.type].isBoss && mD < 400 && now > z.nextAttack) {
-                            z.nextAttack = now + 2000; io.to(rId).emit('spawnBullet', { id: 'ac_' + now + zid, x: z.x, y: z.y, vx: (dx / l) * 400, vy: (dy / l) * 400, type: 'acid', owner: 'zombie', dmgOverride: Math.round(75 * (z.dmgMult || 1)) });
-                        } else if (!Z_TYPES[z.type].isBoss && mD < 30 + Z_TYPES[z.type].radius + 5 && now > z.nextAttack) {
-                            z.nextAttack = now + 1000; io.to(rId).emit('zombieMeleeHit', { targetId: t.id, dmg: Math.round(Z_TYPES[z.type].dmg * (z.dmgMult || 1)) });
-                        }
-                    }
-                }
+                zombieTick(r, rId, now, dt, aP, null);
             }
         }
-        
         const sy = buildSync(r, now);
         if (sy) io.to(rId).volatile.emit('sync2', sy);
     }

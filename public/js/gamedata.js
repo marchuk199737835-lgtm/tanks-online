@@ -189,7 +189,7 @@ const LEVEL_XP = [0, 200, 500, 900, 1400, 2000, 2700, 3500, 4400, 5400, 6500, 77
 const MAX_LEVEL = LEVEL_XP.length;
 const LEVEL_NAMES = ['Рекрут', 'Рядовий', 'Єфрейтор', 'Молодший сержант', 'Сержант', 'Старший сержант', 'Старшина', 'Лейтенант', 'Старший лейтенант', 'Капітан', 'Майор', 'Підполковник', 'Полковник', 'Генерал', 'Маршал'];
 const LEVEL_REWARD_MAX_PRICE = 650; // кейс за новий рівень коштує не більше за це
-const XP_WIN = [5, 15], XP_LOSS = [1, 8]; // діапазони досвіду за матч (перемога / поразка чи нічия)
+const XP_WIN = [5, 15], XP_LOSS = [1, 8], XP_DRAW = [3, 11]; // діапазони досвіду за матч (перемога / поразка / нічия)
 function levelFromXp(xp) { let l = 1; for (let i = 1; i < LEVEL_XP.length; i++) if (xp >= LEVEL_XP[i]) l = i + 1; return l; }
 // {level, cur, need, pct, max}: прогрес усередині поточного рівня
 function levelProgress(xp) {
@@ -211,7 +211,7 @@ function genLevelRewards(rnd) {
   }
   return out;
 }
-function rollXp(outcome, rnd) { rnd = rnd || Math.random; const r = outcome === 'win' ? XP_WIN : XP_LOSS; return r[0] + Math.floor(rnd() * (r[1] - r[0] + 1)); }
+function rollXp(outcome, rnd) { rnd = rnd || Math.random; const r = outcome === 'win' ? XP_WIN : outcome === 'draw' ? XP_DRAW : XP_LOSS; return r[0] + Math.floor(rnd() * (r[1] - r[0] + 1)); }
 function legendCaseId() { for (const k in CASES) if (CASES[k].legend) return +k; return null; }
-return { RARITY: RARITY, RARITY_ORDER: RARITY_ORDER, MODULES: MODULES, CASES: CASES, casePool: casePool, caseTable: caseTable, rollCase: rollCase, statMult: statMult, LEVEL_XP: LEVEL_XP, MAX_LEVEL: MAX_LEVEL, LEVEL_NAMES: LEVEL_NAMES, levelFromXp: levelFromXp, levelProgress: levelProgress, genLevelRewards: genLevelRewards, rollXp: rollXp, XP_WIN: XP_WIN, XP_LOSS: XP_LOSS, upgradeChance: upgradeChance, legendCaseId: legendCaseId };
+return { RARITY: RARITY, RARITY_ORDER: RARITY_ORDER, MODULES: MODULES, CASES: CASES, casePool: casePool, caseTable: caseTable, rollCase: rollCase, statMult: statMult, LEVEL_XP: LEVEL_XP, MAX_LEVEL: MAX_LEVEL, LEVEL_NAMES: LEVEL_NAMES, levelFromXp: levelFromXp, levelProgress: levelProgress, genLevelRewards: genLevelRewards, rollXp: rollXp, XP_WIN: XP_WIN, XP_LOSS: XP_LOSS, XP_DRAW: XP_DRAW, upgradeChance: upgradeChance, legendCaseId: legendCaseId };
 });

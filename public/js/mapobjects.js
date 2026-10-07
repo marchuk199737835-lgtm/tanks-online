@@ -467,7 +467,9 @@ var MapObj = (function () {
     const num = (v, lo, hi, d) => { v = Number(v); if (!isFinite(v)) return d; return Math.max(lo, Math.min(hi, v)); };
     const MODES = ['deathmatch', 'team_deathmatch', 'survival', 'prophunt'];
     // чи дозволена мапа в режимі (без поля modes — доступна в усіх)
-    function mapAllows(m, mode) { return !m || !Array.isArray(m.modes) || !m.modes.length || m.modes.indexOf(mode) >= 0; }
+    // нові режими успадковують дозвіл базових: кооп/соло — як «Виживання», королівський бій і полювання — як «Детматч», захоплення точок — як «Командний»
+    const MODE_ALIAS = { base_defense: 'survival', boss_raid: 'survival', convoy: 'survival', solo_arena: 'survival', boss_duel: 'survival', battle_royale: 'deathmatch', bounty: 'deathmatch', capture_points: 'team_deathmatch' };
+    function mapAllows(m, mode) { mode = MODE_ALIAS[mode] || mode; return !m || !Array.isArray(m.modes) || !m.modes.length || m.modes.indexOf(mode) >= 0; }
 
     function sanitizeMap(raw) {
         if (!raw || typeof raw !== 'object') throw new Error('Порожні дані мапи');

@@ -6,12 +6,8 @@
     const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const click = () => { if (typeof playSound === 'function') playSound('ui_click'); };
 
-    const MODES = {
-        deathmatch: { e: '⚔️', n: 'ДЕТМАТЧ', d: 'Кожен сам за себе. Збирайте жетони й знищуйте суперників — хто першим набере потрібну кількість, той перемагає.' },
-        survival: { e: '🧟', n: 'ВИЖИВАННЯ', d: 'Кооператив проти хвиль зомбі. Тримайтесь разом і протримайтесь якомога довше — з кожною хвилею стає важче.' },
-        prophunt: { e: '📦', n: 'ХОВАНКИ', d: 'Одні маскуються під предмети, інші полюють. Мисливці мають знайти всіх, ті, хто ховається, — дотягнути до кінця часу.' },
-        team_deathmatch: { e: '🤝', n: 'КОМАНДНИЙ', d: 'Команди б’ються за очки. Оберіть свою команду у списку гравців та переможіть суперників.' }
-    };
+    const MI = window.ModeInfo, MODES = {};
+    MI.ORDER.forEach(k => { const m = MI.MODES[k]; MODES[k] = { e: m.e, n: m.n, d: m.d }; });
     const TEAMS = {
         hunter: { n: 'Мисливці', c: '239,68,68' }, hider: { n: 'Ті, хто ховається', c: '59,130,246' },
         red: { n: 'Червоні', c: '239,68,68' }, blue: { n: 'Сині', c: '59,130,246' }, green: { n: 'Зелені', c: '34,197,94' }, yellow: { n: 'Жовті', c: '234,179,8' }
@@ -19,21 +15,12 @@
     const TDM_TEAMS = ['red', 'blue', 'green', 'yellow'];
     const COLORS = { white: '248,250,252', black: '71,85,105', red: '239,68,68', blue: '59,130,246', brown: '120,53,15', purple: '147,51,234' };
 
-    // параметри, які може міняти лідер (межі збігаються з серверними)
-    const PARAMS = [
-        { key: 'maxPlayers', label: 'Макс. гравців', min: 2, max: 10, def: 6, step: 1, modes: '*', desc: 'Скільки гравців може бути в сесії одночасно.' },
-        { key: 'winScore', label: 'Жетони для перемоги', min: 5, max: 1000, def: 50, step: 5, modes: ['deathmatch'], desc: 'Хто першим збере стільки жетонів — виграє. Чим більше жетонів, тим довший бій і більша нагорода.' },
-        { key: 'hideTime', label: 'Час на схованку', min: 30, max: 200, def: 30, step: 5, unit: 'с', modes: ['prophunt'], desc: 'Скільки секунд ті, хто ховається, мають, щоб замаскуватись, поки мисливці чекають.' },
-        { key: 'seekTime', label: 'Час пошуку', min: 120, max: 600, def: 120, step: 10, unit: 'с', modes: ['prophunt'], desc: 'Скільки секунд мисливці шукають. Якщо час вийшов — перемагають ті, хто ховався.' },
-        { key: 'hunterCount', label: 'Мисливців', min: 1, max: 9, def: 1, step: 1, modes: ['prophunt'], dyn: true, desc: 'Скільки гравців грає мисливцями. Не більше, ніж гравців у сесії мінус один.' },
-        { key: 'tdmTeams', label: 'Команд', min: 2, max: 4, def: 2, step: 1, modes: ['team_deathmatch'], desc: 'Скільки команд беруть участь у бою (червоні, сині, зелені, жовті).' },
-        { key: 'tdmTime', label: 'Тривалість бою', min: 60, max: 300, def: 180, step: 10, unit: 'с', modes: ['team_deathmatch'], desc: 'Максимальний час бою. Коли час вийде, перемагає команда з більшою кількістю очків.' },
-        { key: 'tdmScore', label: 'Очки для перемоги', min: 5, max: 50, def: 20, step: 1, modes: ['team_deathmatch'], desc: 'Команда, яка першою набере стільки очок (за вбивства), перемагає достроково.' },
-        { key: 'tdmAutoBalance', label: 'Автобаланс', type: 'toggle', modes: ['team_deathmatch'], desc: 'Якщо увімкнено — гру не можна почати, поки склади команд відрізняються більш ніж на одного гравця.' }
-    ];
+    // параметри, які може міняти лідер (межі збігаються з серверними — спільний файл modeinfo.js)
+    const PARAMS = MI.PARAMS;
     window.LB_PARAMS = PARAMS;
     const cur = () => (typeof currentRoomData !== 'undefined' ? currentRoomData : null);
     const val = (r, p) => r[p.key] != null ? r[p.key] : p.def;
+    const isOn = (p, mode) => MI.paramOn(p, mode);
     const maxOf = (r, p) => p.dyn ? Math.max(1, Math.min(9, Object.keys(r.players).length - 1)) : p.max;
 
     // ---------- панель параметрів лідера (будується один раз) ----------
@@ -44,12 +31,13 @@
             const d = document.createElement('div'); d.className = 'lb-param'; d.dataset.key = p.key;
             const head = '<div class="lb-param-h"><div class="lb-param-l"><span>' + esc(p.label) + '</span><button type="button" class="lb-i" aria-label="Інформація">i</button></div>';
             if (p.type === 'toggle') d.innerHTML = head + '<div class="lb-sw" role="switch"></div></div><div class="lb-tip hidden"></div>';
+            else if (p.type === 'choice') d.innerHTML = head + '</div><div class="lb-seg">' + p.options.map(o => '<button type="button" data-v="' + esc(o.v) + '">' + esc(o.l) + '</button>').join('') + '</div><div class="lb-tip hidden"></div>';
             else d.innerHTML = head + '<div class="lb-param-v"><span class="v">0</span>' + (p.unit ? '<small>' + p.unit + '</small>' : '') + '</div></div><div class="lb-step"><button type="button" data-d="-1">−</button><input type="range" min="' + p.min + '" max="' + p.max + '" step="' + p.step + '"><button type="button" data-d="1">+</button></div><div class="lb-tip hidden"></div>';
             box.appendChild(d);
             const tip = d.querySelector('.lb-tip'), ib = d.querySelector('.lb-i');
             const show = () => {
                 const r = cur(); const mx = r ? maxOf(r, p) : p.max;
-                tip.innerHTML = '<h5>' + esc(p.label) + '</h5>' + esc(p.desc) + (p.type === 'toggle' ? '' : '<div class="lb-tip-r"><div><small>Мін</small><b>' + p.min + (p.unit || '') + '</b></div><div><small>Макс</small><b>' + mx + (p.unit || '') + '</b></div><div><small>Стандарт</small><b>' + p.def + (p.unit || '') + '</b></div></div>');
+                tip.innerHTML = '<h5>' + esc(p.label) + '</h5>' + esc(p.desc) + (p.type === 'toggle' || p.type === 'choice' ? '' : '<div class="lb-tip-r"><div><small>Мін</small><b>' + p.min + (p.unit || '') + '</b></div><div><small>Макс</small><b>' + mx + (p.unit || '') + '</b></div><div><small>Стандарт</small><b>' + p.def + (p.unit || '') + '</b></div></div>');
                 tip.classList.toggle('up', [...box.children].filter(x => x.style.display !== 'none').indexOf(d) >= 2);
                 tip.classList.remove('hidden'); ib.classList.add('on'); openTip = { tip, ib };
             };
@@ -58,7 +46,9 @@
             ib.addEventListener('mouseleave', () => { if (matchMedia('(hover:hover)').matches) hide(); });
             ib.addEventListener('click', e => { e.stopPropagation(); click(); tip.classList.contains('hidden') ? (closeTip(), show()) : hide(); });
             if (p.type === 'toggle') {
-                d.querySelector('.lb-sw').addEventListener('click', () => { click(); const r = cur(); if (r) socket.emit('updateRoomSettings', { roomId: currentRoomId, tdmAutoBalance: !r.tdmAutoBalance }); });
+                d.querySelector('.lb-sw').addEventListener('click', () => { click(); const r = cur(); if (r) { const o = { roomId: currentRoomId }; o[p.key] = !val(r, p); socket.emit('updateRoomSettings', o); } });
+            } else if (p.type === 'choice') {
+                d.querySelectorAll('.lb-seg button').forEach(b => b.addEventListener('click', () => { click(); const o = { roomId: currentRoomId }; o[p.key] = b.dataset.v; socket.emit('updateRoomSettings', o); }));
             } else {
                 const rg = d.querySelector('input'), vv = d.querySelector('.v');
                 let t = null;
@@ -78,10 +68,11 @@
 
     function updateParams(r) {
         PARAMS.forEach(p => {
-            const d = document.querySelector('.lb-param[data-key="' + p.key + '"]'); if (!d) return;
-            const on = p.modes === '*' || p.modes.includes(r.mode); d.style.display = on ? '' : 'none';
+            const d = document.querySelector('#host-params .lb-param[data-key="' + p.key + '"]'); if (!d) return;
+            const on = isOn(p, r.mode); d.style.display = on ? '' : 'none';
             if (!on) return;
-            if (p.type === 'toggle') { d.querySelector('.lb-sw').classList.toggle('on', !!r.tdmAutoBalance); return; }
+            if (p.type === 'toggle') { d.querySelector('.lb-sw').classList.toggle('on', !!val(r, p)); return; }
+            if (p.type === 'choice') { d.querySelectorAll('.lb-seg button').forEach(b => b.classList.toggle('on', b.dataset.v === val(r, p))); return; }
             if (dragging === p.key) return;
             const rg = d.querySelector('input'), mx = maxOf(r, p); rg.max = mx; rg.value = Math.min(val(r, p), mx); d.querySelector('.v').textContent = rg.value;
         });
@@ -101,10 +92,23 @@
         const n = Object.keys(r.players).length;
         $('lobby-count').textContent = n + ' / ' + r.maxPlayers;
         let h = rule('👥', 'Гравців', n + ' / ' + r.maxPlayers);
-        if (r.mode === 'deathmatch') h += rule('🎯', 'Жетонів', r.winScore);
-        else if (r.mode === 'survival') h += rule('🌊', 'Хвилі', '∞') + rule('🤝', 'Режим', 'Кооп');
-        else if (r.mode === 'prophunt') h += rule('📦', 'Схованка', (r.hideTime || 30) + 'с') + rule('🔍', 'Пошук', (r.seekTime || 120) + 'с') + rule('🔴', 'Мисливців', r.hunterCount || 1);
-        else if (r.mode === 'team_deathmatch') h += rule('🚩', 'Команд', r.tdmTeams || 2) + rule('⏱', 'Час', (r.tdmTime || 180) + 'с') + rule('🏁', 'Очки', r.tdmScore || 20) + rule('⚖️', 'Автобаланс', r.tdmAutoBalance ? '✓' : '✗');
+        const v = k => val(r, MI.BYKEY[k]), tm = k => { const t = +v(k); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); }, yn = k => v(k) ? '✓' : '✗';
+        switch (r.mode) {
+            case 'deathmatch': h += rule('🎯', 'Жетонів', r.winScore); break;
+            case 'survival': h += rule('🌊', 'Хвилі', '∞') + rule('🤝', 'Режим', 'Кооп'); break;
+            case 'prophunt': h += rule('📦', 'Схованка', (r.hideTime || 30) + 'с') + rule('🔍', 'Пошук', (r.seekTime || 120) + 'с') + rule('🔴', 'Мисливців', r.hunterCount || 1); break;
+            case 'team_deathmatch': h += rule('🚩', 'Команд', r.tdmTeams || 2) + rule('⏱', 'Час', (r.tdmTime || 180) + 'с') + rule('🏁', 'Очки', r.tdmScore || 20) + rule('⚖️', 'Автобаланс', r.tdmAutoBalance ? '✓' : '✗'); break;
+            case 'base_defense': h += rule('🌊', 'Хвиль', v('bdWaves')) + rule('🏰', 'Ядро', v('bdCoreHp')) + rule('💪', 'Складність', v('pveDiff') + '%') + rule('🔧', 'Ремонт', yn('bdRepair')); break;
+            case 'boss_raid': h += rule('👹', 'Бос', MI.BOSS_NAMES[v('rbBoss')]) + rule('❤️', 'Життів', v('rbLives')) + rule('⏱', 'Час', tm('rbTime')) + rule('💪', 'Складність', v('pveDiff') + '%') + rule('👥', 'Приспішники', yn('rbMinions')); break;
+            case 'convoy': h += rule('🚚', 'Конвой', v('cvHp')) + rule('⚡', 'Швидкість', v('cvSpeed')) + rule('⏱', 'Час', tm('cvTime')) + rule('💪', 'Складність', v('pveDiff') + '%'); break;
+            case 'solo_arena': h += rule('🌊', 'Хвиль', v('saWaves')) + rule('💪', 'Складність', v('pveDiff') + '%') + rule('🩹', 'Лікування', yn('saHeal')); break;
+            case 'boss_duel': h += rule('💀', 'Босів', v('duBosses')) + rule('❤️', 'Життів', v('duLives')) + rule('💪', 'Складність', v('pveDiff') + '%') + rule('🩹', 'Лікування', yn('duHeal')); break;
+            case 'battle_royale': h += rule('⏱', 'До фіналу', tm('brTime')) + rule('☣️', 'Шкода зони', v('brDmg') + '%/с') + rule('🎁', 'Бонуси', yn('brLoot')); break;
+            case 'capture_points': h += rule('🚩', 'Команд', v('cpTeams')) + rule('📍', 'Точок', v('cpPoints')) + rule('🏁', 'Очки', v('cpScore')) + rule('⏱', 'Час', tm('cpTime')); break;
+            case 'bounty': h += rule('🏁', 'Очки', v('bnScore')) + rule('⏱', 'Час', tm('bnTime')) + rule('🎯', 'Зміна цілі', v('bnInterval') + 'с'); break;
+        }
+        const rr = MI.rewardRange(r.mode, r);
+        h += rule('💵', 'Нагорода', rr.loss + '–' + rr.win) + (rr.draw != null ? rule('🤝', 'Нічия', '💵 ' + rr.draw) : '');
         $('lobby-rules').innerHTML = h;
     }
     let lastMap = null;
@@ -122,9 +126,9 @@
     function level(p) { return Math.max(1, Math.min(15, p.level || 1)); }
     function card(r, id, p, isHost) {
         const L = level(p), rank = (window.LV ? LV.rankName(L) : ''), me = id === myId, host = id === r.hostSocket;
-        let pc = '71,85,105'; if (r.mode === 'deathmatch' || r.mode === 'survival') pc = p.color ? COLORS[p.color] : pc;
+        let pc = '71,85,105'; if (MI.usesColor(r.mode)) pc = p.color ? COLORS[p.color] : pc;
         else if (p.team && TEAMS[p.team]) pc = TEAMS[p.team].c;
-        const dot = (r.mode === 'deathmatch' || r.mode === 'survival') ? '<span class="lb-dot" style="background:rgb(' + pc + ')"></span>' : '';
+        const dot = MI.usesColor(r.mode) ? '<span class="lb-dot" style="background:rgb(' + pc + ')"></span>' : '';
         let acts = '';
         if (isHost && !me) acts = '<div class="lb-acts"><button type="button" class="lb-act" data-act="crown" data-id="' + esc(id) + '" title="Зробити лідером">👑</button><button type="button" class="lb-act danger" data-act="kick" data-id="' + esc(id) + '" title="Вигнати з сесії">✖</button><button type="button" class="lb-act danger" data-act="ban" data-id="' + esc(id) + '" title="Заблокувати в цій сесії">🚫</button></div>';
         return '<div class="lb-pl' + (p.ready ? ' ready' : '') + (me ? ' me' : '') + '" style="--pc:' + pc + '">' + dot +
@@ -146,8 +150,8 @@
             h = '<div class="lb-teams">' + teamBox(r, 'hunter', hu, isHost, r.hunterCount || 1) + teamBox(r, 'hider', hi, isHost, null) + '</div>';
             $('lobby-roster-title').textContent = 'Команди'; $('lobby-roster-sub').textContent = 'Мисливців: ' + hu.length + ' / ' + (r.hunterCount || 1);
             if (no.length) h += '<div class="lb-unass-h">Без команди</div>' + no.map(([id, p]) => card(r, id, p, isHost)).join('');
-        } else if (r.mode === 'team_deathmatch') {
-            const keys = TDM_TEAMS.slice(0, r.tdmTeams || 2), no = entries.filter(([, p]) => !p.team || !keys.includes(p.team));
+        } else if (MI.isTeamPvp(r.mode)) {
+            const keys = TDM_TEAMS.slice(0, (r.mode === 'capture_points' ? r.cpTeams : r.tdmTeams) || 2), no = entries.filter(([, p]) => !p.team || !keys.includes(p.team));
             h = '<div class="lb-teams">' + keys.map(k => teamBox(r, k, entries.filter(([, p]) => p.team === k), isHost, null)).join('') + '</div>';
             $('lobby-roster-title').textContent = 'Команди';
             const sizes = keys.map(k => entries.filter(([, p]) => p.team === k).length), unb = r.tdmAutoBalance && sizes.some(x => x > 0) && Math.max(...sizes) - Math.min(...sizes) > 1;
@@ -179,13 +183,13 @@
     function renderFoot(r) {
         const me = r.players[myId]; if (!me) return;
         myColor = me.color; isReady = me.ready;
-        const dm = r.mode === 'deathmatch' || r.mode === 'survival', taken = new Set(Object.entries(r.players).filter(([id, p]) => id !== myId && p.color).map(([, p]) => p.color));
+        const dm = MI.usesColor(r.mode), taken = new Set(Object.entries(r.players).filter(([id, p]) => id !== myId && p.color).map(([, p]) => p.color));
         $('color-selectors').classList.toggle('hidden', !dm); $('lb-team-hint').classList.toggle('hidden', dm);
         document.querySelectorAll('#color-selectors .color-btn').forEach(b => { const c = b.dataset.color; b.classList.toggle('selected', c === me.color); b.disabled = taken.has(c); });
         const btn = $('btn-ready'), ids = Object.keys(r.players), all = ids.every(id => r.players[id].ready), can = dm ? !!me.color : !!me.team, host = myId === r.hostSocket;
         let t, st;
         if (!can) { t = dm ? 'ОБЕРІТЬ КАМУФЛЯЖ' : 'ОБЕРІТЬ КОМАНДУ'; st = 'is-disabled'; }
-        else if (host) { if (me.ready) { if (ids.length >= 2 && all) { t = '🚀 ЗАПУСК СЕСІЇ'; st = 'is-go'; } else { t = 'ГОТОВИЙ (ЧЕКАЄМО...)'; st = 'is-wait'; } } else { t = 'ПІДТВЕРДИТИ'; st = ''; } }
+        else if (host) { if (me.ready) { if (ids.length >= MI.minPlayers(r.mode) && all) { t = '🚀 ЗАПУСК СЕСІЇ'; st = 'is-go'; } else { t = 'ГОТОВИЙ (ЧЕКАЄМО...)'; st = 'is-wait'; } } else { t = 'ПІДТВЕРДИТИ'; st = ''; } }
         else { if (me.ready) { t = 'ВІДМІНИТИ'; st = 'is-wait'; } else { t = 'ПІДТВЕРДИТИ'; st = ''; } }
         btn.textContent = t; btn.disabled = !can; btn.className = 'lb-ready ' + st;
     }

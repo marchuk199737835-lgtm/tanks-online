@@ -47,6 +47,9 @@ let joysticks = {
 };
 
 let BASE_RELOAD = 2000;
+const isTeamM = m => m === 'team_deathmatch' || m === 'capture_points';   // командні PvP: свої не отримують шкоди
+const isPveM = m => !!(window.ModeInfo && ModeInfo.isPve(m));            // режими із зомбі/босами (виживання й нові кооп/соло)
+const canSpecM = m => m !== 'deathmatch';                                // де після смерті спостерігаємо за живими
 let mines = {};
 let lasers = [];
 
@@ -56,12 +59,14 @@ window.getTankSpeed = function() {
     if (myLocalTank.buff === 'speed') spd *= 1.5;
     if (myLocalTank.buff === 'samurai') spd *= 1.6;
     if (myLocalTank.buff === 'boss') spd *= 0.6;
+    if (window.PERK) spd *= PERK.spd || 1;
     return spd;
 };
 
 window.getReloadTime = function() {
     let cd = BASE_RELOAD;
     cd *= GameData.statMult(myEquipped, 'cd');
+    if (window.PERK) cd *= PERK.cd || 1;
     return cd;
 };
 
@@ -244,7 +249,7 @@ function updatePhys(now, dt) {
         let hW = false, bC = window.BUFFS[b.type] || window.BUFFS['none'], isP = (b.type === 'samurai' || b.type === 'homing' || b.type.includes('piercing') || b.type === 'ghost_melee' || b.type === 'boss_proj');
         hW = checkCollision(b.x, b.y, 4, !isP, true);
         
-        let isS = currentRoomData.mode === 'survival', hP = false, hZ = false;
+        let isS = isPveM(currentRoomData.mode), hP = false, hZ = false;
         
         // ВАЖЛИВО: Беремо правильний базовий урон
         let bulletBaseDmg = window.BUFFS[b.type] ? window.BUFFS[b.type].dmg : 75;
@@ -258,7 +263,7 @@ function updatePhys(now, dt) {
                 if (Math.hypot(b.x - op.x, b.y - op.y) < hD) {
                     hP = true;
                     if (b.owner === myId) {
-                        if (currentRoomData.mode === 'team_deathmatch' && myLocalTank.team === op.team) continue;
+                        if (isTeamM(currentRoomData.mode) && myLocalTank.team === op.team) continue;
                         // Відправляємо обчислений урон
                         socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: actualDmg, type: b.type });
                     }
@@ -270,7 +275,7 @@ function updatePhys(now, dt) {
         if (!hP && myLocalTank.hp > 0 && myLocalTank.buff !== 'shield' && b.owner !== myId) {
             let mR = myLocalTank.buff === 'boss' ? 75 : 24, hD = b.type === 'samurai' ? mR + 30 : mR + 4;
             if (Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < hD) {
-                if (currentRoomData.mode === 'team_deathmatch' && opponents[b.owner] && opponents[b.owner].team === myLocalTank.team) { } 
+                if (isTeamM(currentRoomData.mode) && opponents[b.owner] && opponents[b.owner].team === myLocalTank.team) { } 
                 else {
                     hP = true;
                     if (currentRoomData.mode === 'prophunt' && myLocalTank.isDisguised) {
@@ -315,7 +320,7 @@ function updatePhys(now, dt) {
                 let sR = b.type === 'boss' ? 250 : 120;
                 for (let oid in opponents) {
                     if (opponents[oid].hp > 0 && opponents[oid].buff !== 'shield' && Math.hypot(b.x - opponents[oid].x, b.y - opponents[oid].y) < sR) {
-                        if (currentRoomData.mode === 'team_deathmatch' && opponents[oid].team === myLocalTank.team) continue;
+                        if (isTeamM(currentRoomData.mode) && opponents[oid].team === myLocalTank.team) continue;
                         let expDmg = window.BUFFS['explosive'] ? window.BUFFS['explosive'].dmg : 250;
                         socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: expDmg, type: 'explosive' });
                     }
@@ -521,6 +526,7 @@ socket.on('sync2', (data) => {
         z.tx = a[0]; z.ty = a[1]; z.hp = a[2];
     }
     if (data.pu) powerups = data.pu; if (data.tk) tokens = data.tk; if (data.mn) mines = data.mn;
+    if (data.md && window.ModesFX) ModesFX.sync(data.md);
     const _hn = performance.now();   // HUD оновлюємо не частіше ~11 разів/с: це купа записів у DOM
     if (_hn - _hudAt > 90 && typeof window.updateHUD === 'function') { _hudAt = _hn; window.updateHUD(); }
 });
@@ -574,7 +580,7 @@ socket.on('playerDied', (data) => {
     playSound('explosion');
     if (data.id === myId) {
         if (data.killer && data.killer !== 'zombie' && opponents[data.killer]) spectatingId = data.killer;
-        else if (typeof findNextSpectateTarget === 'function') findNextSpectateTarget(1);
+        else if (typeof findNextSpec === 'function') findNextSpec(1);
     }
 });
 
@@ -625,6 +631,7 @@ socket.on('gameOver', (data) => {
         dN.classList.remove('hidden');
     } else if (dN) dN.classList.add('hidden');
     
+    if (data.outcomes && window.ModesFX) { ModesFX.gameOver(data); return; }
     if (data.winner === 'ZOMBIES') {
         document.getElementById('winner-title').innerText = "ВИ НЕ ВИЖИЛИ";
         document.getElementById('winner-title').className = "text-6xl font-russo mb-4 text-red-500 tracking-widest drop-shadow-[0_0_15px_rgba(239,68,68,0.5)] relative z-10";
@@ -829,7 +836,8 @@ function draw(now) {
     
     lasers.forEach(l => { ctx.save(); ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 4; ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 15; ctx.globalAlpha = Math.max(0, l.life / 0.15); ctx.beginPath(); ctx.moveTo(l.x1, l.y1); ctx.lineTo(l.x2, l.y2); ctx.stroke(); ctx.restore(); });
     
-    if (currentRoomData.mode === 'survival') {
+    if (window.ModesFX) ModesFX.world(ctx, now, tm);
+    if (isPveM(currentRoomData.mode)) {
         for (let zid in zombies) {
             let z = zombies[zid], zC = zType(z.type); ctx.save(); ctx.translate(z.x, z.y);
             if (zC.ghost) ctx.globalAlpha = 0.5;
@@ -862,6 +870,7 @@ function draw(now) {
         ctx.fillStyle = bCol; ctx.shadowColor = bCol; ctx.shadowBlur = 10; ctx.fill(); ctx.shadowBlur = 0;
     });
     
+    if (window.ModesFX) ModesFX.top(ctx, now, tm);
     particles.forEach(p => {
         ctx.fillStyle = p.color; ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2.5));
         ctx.beginPath(); ctx.arc(p.x, p.y, Math.random() * 4 + 2, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1.0;
@@ -904,6 +913,7 @@ function draw(now) {
         if (!isMobile) { ctx.font = '14px Jura'; ctx.fillStyle = '#94a3b8'; ctx.fillText(`[A] ${I18N.t('Попередній')}  |  ${I18N.t('Наступний')} [D]`, GW / 2, 150); }
         ctx.shadowBlur = 0;
     }
+    if (window.ModesFX) ModesFX.screen(ctx, now);
     drJ();
 }
 
@@ -939,7 +949,12 @@ window.updateHUD = function() {
     if (myLocalTank.buff === 'homing' || myLocalTank.buff === 'autolaser') tU.classList.remove('hidden'); else tU.classList.add('hidden');
     
     const dH = document.getElementById('deathmatch-score-hud'), sH = document.getElementById('survival-hud'), pC = document.getElementById('pc-cd-container'), mC = document.getElementById('mob-cd-container'), sl = document.getElementById('score-list'), tdmH = document.getElementById('tdm-hud');
-    if (currentRoomData.mode === 'prophunt') {
+    if (window.ModesFX) ModesFX.toggle(currentRoomData.mode);
+    if (window.ModesFX && ModesFX.active(currentRoomData.mode)) {
+        dH.classList.add('hidden'); sH.classList.add('hidden'); if (tdmH) tdmH.classList.add('hidden');
+        if (pC) pC.classList.remove('hidden'); if (mC) mC.classList.remove('hidden');
+        ModesFX.hud();
+    } else if (currentRoomData.mode === 'prophunt') {
         dH.classList.add('hidden'); sH.classList.add('hidden'); if (tdmH) tdmH.classList.add('hidden');
         if (myLocalTank.team === 'hider') { if (pC) pC.classList.add('hidden'); if (mC) mC.classList.add('hidden'); } 
         else { if (pC) pC.classList.remove('hidden'); if (mC) mC.classList.remove('hidden'); }
@@ -982,7 +997,7 @@ window.updateHUD = function() {
         if ((myLocalTank.buff === 'homing' || myLocalTank.buff === 'autolaser') && myLocalTank.hp > 0) document.getElementById('mobile-target-btn').classList.remove('hidden');
         else document.getElementById('mobile-target-btn').classList.add('hidden');
         
-        if (myLocalTank.hp <= 0 && (currentRoomData.mode === 'survival' || currentRoomData.mode === 'prophunt' || currentRoomData.mode === 'team_deathmatch')) {
+        if (myLocalTank.hp <= 0 && canSpecM(currentRoomData.mode)) {
             document.getElementById('mobile-spec-prev').classList.remove('hidden'); document.getElementById('mobile-spec-next').classList.remove('hidden');
         } else {
             document.getElementById('mobile-spec-prev').classList.add('hidden'); document.getElementById('mobile-spec-next').classList.add('hidden');
@@ -1019,7 +1034,7 @@ window.addEventListener('keydown', e => {
     if (!e || !e.key) return;
     const k = e.key.toLowerCase();
     if (keys.hasOwnProperty(k) || k === ' ') { if (k === ' ') keys.space = true; else keys[k] = true; }
-    if (myLocalTank.hp <= 0 && currentRoomData && (currentRoomData.mode === 'survival' || currentRoomData.mode === 'prophunt' || currentRoomData.mode === 'team_deathmatch')) {
+    if (myLocalTank.hp <= 0 && currentRoomData && canSpecM(currentRoomData.mode)) {
         if (k === 'a') findNextSpec(-1); if (k === 'd') findNextSpec(1);
     }
     if (e.key === 'Tab') {

@@ -113,7 +113,7 @@
         const how = document.getElementById('lv-how');
         if (how && !how.dataset.done) {
             how.dataset.done = 1;
-            how.innerHTML = `<div class="lv-how-item"><b>🏆 Перемога</b><span>+${G.XP_WIN[0]}–${G.XP_WIN[1]} XP</span></div><div class="lv-how-item"><b>💀 Поразка / 🤝 нічия</b><span>+${G.XP_LOSS[0]}–${G.XP_LOSS[1]} XP</span></div><div class="lv-how-item"><b>🎁 Новий рівень</b><span>кейс з нагородою (до 💵650)</span></div>`;
+            how.innerHTML = `<div class="lv-how-item"><b>🏆 Перемога</b><span>+${G.XP_WIN[0]}–${G.XP_WIN[1]} XP</span></div><div class="lv-how-item"><b>🤝 Нічия</b><span>+${G.XP_DRAW[0]}–${G.XP_DRAW[1]} XP</span></div><div class="lv-how-item"><b>💀 Поразка</b><span>+${G.XP_LOSS[0]}–${G.XP_LOSS[1]} XP</span></div><div class="lv-how-item"><b>🎁 Новий рівень</b><span>кейс з нагородою (до 💵650)</span></div>`;
         }
     }
     function rewardCard(l, st) {
