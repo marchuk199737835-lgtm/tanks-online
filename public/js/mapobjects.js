@@ -294,10 +294,12 @@ var MapObj = (function () {
                 c.beginPath(); c.roundRect(x + 5, y + h / 2, w - 10, h / 2, 10); c.fill(); c.stroke(); break;
             case 'prop_rock':
                 c.fillStyle = '#52525b'; c.beginPath(); c.moveTo(x + w / 2, y); c.lineTo(x + w, y + h / 3); c.lineTo(x + w * 0.8, y + h); c.lineTo(x + w * 0.2, y + h); c.lineTo(x, y + h / 2); c.fill(); break;
-            case 'prop_bush':
-                c.fillStyle = '#15803d'; c.beginPath(); c.arc(x + w / 3, y + h / 3, w / 2, 0, Math.PI * 2); c.fill();
-                c.beginPath(); c.arc(x + w * 0.7, y + h / 3, w / 2, 0, Math.PI * 2); c.fill();
-                c.beginPath(); c.arc(x + w / 2, y + h * 0.7, w / 2.5, 0, Math.PI * 2); c.fill(); break;
+            case 'prop_bush': {   // кущ: темна основа, три гілки-кулі, світлі відблиски
+                const bl = (bx, by, br, col) => { c.fillStyle = col; c.beginPath(); c.arc(bx, by, br, 0, Math.PI * 2); c.fill(); };
+                bl(x + w * 0.35, y + h * 0.4, w * 0.36, '#14532d'); bl(x + w * 0.66, y + h * 0.42, w * 0.34, '#14532d'); bl(x + w * 0.5, y + h * 0.68, w * 0.34, '#14532d');
+                bl(x + w * 0.35, y + h * 0.36, w * 0.28, '#166534'); bl(x + w * 0.66, y + h * 0.38, w * 0.26, '#15803d'); bl(x + w * 0.5, y + h * 0.62, w * 0.25, '#166534');
+                bl(x + w * 0.3, y + h * 0.3, w * 0.12, '#4ade80'); bl(x + w * 0.62, y + h * 0.32, w * 0.08, '#86efac');
+                c.fillStyle = 'rgba(0,0,0,0.18)'; c.beginPath(); c.arc(x + w * 0.58, y + h * 0.78, w * 0.16, 0, Math.PI * 2); c.fill(); break; }
             case 'prop_cone':
                 c.fillStyle = '#ea580c'; c.beginPath(); c.moveTo(x + w / 2, y); c.lineTo(x + w, y + h); c.lineTo(x, y + h); c.fill();
                 c.fillStyle = '#fff'; c.fillRect(x + w * 0.3, y + h * 0.5, w * 0.4, h * 0.2); break;
@@ -310,8 +312,14 @@ var MapObj = (function () {
             case 'prop_radar':
                 c.fillStyle = '#334155'; c.beginPath(); c.arc(cx, cy, w / 2, 0, Math.PI * 2); c.fill();
                 c.translate(cx, cy); c.rotate(t * 2); c.strokeStyle = '#10b981'; c.lineWidth = 3; c.beginPath(); c.moveTo(0, 0); c.lineTo(w / 2, 0); c.stroke(); break;
-            case 'prop_tent':
-                c.fillStyle = '#4d7c0f'; c.fillRect(x, y, w, h); c.fillStyle = '#1a2e05'; c.beginPath(); c.moveTo(x + w / 2, y + h); c.lineTo(x + w / 2 - 15, y + h - 20); c.lineTo(x + w / 2 + 15, y + h - 20); c.fill(); break;
+            case 'prop_tent': {   // намет: два скати даху, гребінь, розтяжки й вхід
+                const hh = h / 2;
+                c.fillStyle = '#5d7a3a'; c.fillRect(x, y, w, hh); c.fillStyle = '#44602a'; c.fillRect(x, y + hh, w, hh);
+                c.fillStyle = 'rgba(255,255,255,0.14)'; c.fillRect(x, y, w, 3); c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(x, y + h - 3, w, 3);
+                c.strokeStyle = 'rgba(0,0,0,0.35)'; c.lineWidth = 1.5; c.beginPath(); for (let k = 1; k < 5; k++) { c.moveTo(x + w * k / 5, y); c.lineTo(x + w * k / 5, y + h); } c.stroke();
+                c.fillStyle = '#2b3d1a'; c.fillRect(x - 1, y + hh - 2, w + 2, 4);
+                c.fillStyle = '#1a2810'; c.beginPath(); c.moveTo(x + w / 2 - 14, y + h); c.lineTo(x + w / 2, y + h - 22); c.lineTo(x + w / 2 + 14, y + h); c.fill();
+                c.strokeStyle = 'rgba(210,200,160,0.7)'; c.lineWidth = 1; c.beginPath(); c.moveTo(x, y); c.lineTo(x - 10, y - 8); c.moveTo(x + w, y); c.lineTo(x + w + 10, y - 8); c.stroke(); break; }
             case 'prop_cont_red':
             case 'prop_cont_blue':
                 c.fillStyle = o.type === 'prop_cont_red' ? '#dc2626' : '#2563eb'; c.fillRect(x, y, w, h); c.strokeStyle = 'rgba(0,0,0,0.3)'; c.lineWidth = 2;
@@ -323,10 +331,15 @@ var MapObj = (function () {
                 c.fillStyle = '#94a3b8'; c.fillRect(x, y + h / 2 - 1, w, 2); c.setLineDash([5, 5]); c.strokeStyle = '#94a3b8';
                 c.beginPath(); c.moveTo(x, y + h / 2 - 5); c.lineTo(x + w, y + h / 2 - 5); c.stroke();
                 c.beginPath(); c.moveTo(x, y + h / 2 + 5); c.lineTo(x + w, y + h / 2 + 5); c.stroke(); break;
-            case 'prop_wreck':
-                c.fillStyle = '#1c1917'; c.fillRect(x + 5, y + 10, w - 10, h - 20);
-                c.fillStyle = '#09090b'; c.beginPath(); c.arc(cx, cy, 15, 0, Math.PI * 2); c.fill();
-                c.strokeStyle = '#09090b'; c.lineWidth = 6; c.beginPath(); c.moveTo(cx, cy); c.lineTo(x + w, y + h); c.stroke(); break;
+            case 'prop_wreck': {   // згорілий корпус: іржа, гусениці, обгоріла башта, зламаний ствол
+                c.fillStyle = '#2b2623'; c.fillRect(x, y + h * 0.08, w, h * 0.22); c.fillRect(x, y + h * 0.7, w, h * 0.22);
+                c.strokeStyle = 'rgba(255,255,255,0.08)'; c.lineWidth = 1; c.beginPath(); for (let k = 6; k < w; k += 9) { c.moveTo(x + k, y + h * 0.08); c.lineTo(x + k, y + h * 0.3); c.moveTo(x + k, y + h * 0.7); c.lineTo(x + k, y + h * 0.92); } c.stroke();
+                const gr = c.createLinearGradient(x, y, x + w, y + h); gr.addColorStop(0, '#5a4a3f'); gr.addColorStop(1, '#2f2723'); c.fillStyle = gr; c.fillRect(x + 4, y + h * 0.26, w - 8, h * 0.48);
+                c.fillStyle = 'rgba(154,77,47,0.45)'; c.fillRect(x + 8, y + h * 0.3, w * 0.3, h * 0.2); c.fillRect(x + w * 0.62, y + h * 0.5, w * 0.22, h * 0.16);
+                c.fillStyle = '#17120f'; c.beginPath(); c.arc(cx - w * 0.05, cy, Math.min(w, h) * 0.26, 0, Math.PI * 2); c.fill();
+                c.fillStyle = 'rgba(0,0,0,0.45)'; c.beginPath(); c.arc(cx - w * 0.05, cy, Math.min(w, h) * 0.14, 0, Math.PI * 2); c.fill();
+                c.strokeStyle = '#17120f'; c.lineWidth = 6; c.lineCap = 'round'; c.beginPath(); c.moveTo(cx - w * 0.05, cy); c.lineTo(x + w * 0.9, y + h * 0.78); c.stroke(); c.lineCap = 'butt';
+                c.fillStyle = 'rgba(0,0,0,0.35)'; c.beginPath(); c.ellipse(x + w * 0.25, y + h * 0.62, w * 0.14, h * 0.1, 0, 0, Math.PI * 2); c.fill(); break; }
             case 'prop_tires':
                 c.fillStyle = '#171717'; c.beginPath(); c.arc(cx, cy, w / 2, 0, Math.PI * 2); c.fill();
                 c.fillStyle = '#27272a'; c.beginPath(); c.arc(cx, cy, w / 3, 0, Math.PI * 2); c.fill(); break;
@@ -453,9 +466,13 @@ var MapObj = (function () {
                 c.fillStyle = '#3f3f46'; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fill(); c.strokeStyle = '#a1a1aa'; c.lineWidth = 3; c.stroke();
                 c.strokeStyle = '#71717a'; c.lineWidth = 2; c.beginPath(); c.arc(cx, cy, r * 0.65, 0, Math.PI * 2); c.stroke();
                 c.strokeStyle = '#d4d4d8'; c.lineWidth = 4; c.lineCap = 'round'; c.beginPath(); c.moveTo(cx - r * 0.3, cy); c.lineTo(cx + r * 0.3, cy); c.moveTo(cx, cy - r * 0.3); c.lineTo(cx, cy + r * 0.3); c.stroke(); break; }
-            case 'prop_pad': {
-                c.fillStyle = '#0f172a'; c.fillRect(x, y, w, h); c.strokeStyle = '#22d3ee'; c.lineWidth = 2; c.shadowColor = '#22d3ee'; c.shadowBlur = 10; c.strokeRect(x + 3, y + 3, w - 6, h - 6);
-                const rr = Math.min(w, h) * (0.15 + 0.25 * ((t * 0.7) % 1)); c.globalAlpha = 1 - ((t * 0.7) % 1); c.beginPath(); c.arc(cx, cy, rr, 0, Math.PI * 2); c.stroke(); break; }
+            case 'prop_pad': {   // платформа / зона захоплення: напівпрозора плита з кільцем, що пульсує
+                const rad = Math.min(w, h) * 0.16;
+                c.fillStyle = 'rgba(8,16,28,0.42)'; c.beginPath(); c.roundRect(x, y, w, h, rad); c.fill();
+                c.strokeStyle = 'rgba(255,255,255,0.28)'; c.lineWidth = 3; c.beginPath(); c.roundRect(x + 2, y + 2, w - 4, h - 4, rad); c.stroke();
+                c.strokeStyle = 'rgba(34,211,238,0.85)'; c.lineWidth = 2; c.setLineDash([14, 10]); c.beginPath(); c.roundRect(x + 10, y + 10, w - 20, h - 20, rad * 0.7); c.stroke(); c.setLineDash([]);
+                c.lineWidth = 2.5; for (let k = 0; k < 2; k++) { const ph = ((t * 0.6) + k * 0.5) % 1; c.globalAlpha = 0.9 * (1 - ph); c.strokeStyle = '#22d3ee'; c.beginPath(); c.arc(cx, cy, Math.min(w, h) * (0.08 + 0.3 * ph), 0, Math.PI * 2); c.stroke(); }
+                c.globalAlpha = 1; c.fillStyle = 'rgba(34,211,238,0.9)'; c.beginPath(); c.arc(cx, cy, 4, 0, Math.PI * 2); c.fill(); break; }
             default: ok = false;
         }
         c.restore();
@@ -472,11 +489,13 @@ var MapObj = (function () {
     // мапа, де режим названо прямо, дозволена в ньому; старі мапи (без нових режимів у списку) діють за правилами базового режиму
     function mapAllows(m, mode) { if (!m || !Array.isArray(m.modes) || !m.modes.length) return true; return m.modes.indexOf(mode) >= 0 || (!!MODE_ALIAS[mode] && m.modes.indexOf(MODE_ALIAS[mode]) >= 0); }
 
+    const THEME_IDS = ['grass', 'sand', 'snow', 'stone', 'asphalt', 'metal', 'dirt', 'swamp', 'lava', 'tech'];
     function sanitizeMap(raw) {
         if (!raw || typeof raw !== 'object') throw new Error('Порожні дані мапи');
         const size = Math.round(num(raw.size, 1000, 8000, 3000));
         const out = { size: size, bg: COLOR_RE.test(raw.bg) ? raw.bg : '#020617', grid: COLOR_RE.test(raw.grid) ? raw.grid : '#1e293b', solids: [] };
         if (typeof raw.title === 'string' && raw.title.trim()) out.title = raw.title.trim().slice(0, 40);
+        if (typeof raw.theme === 'string' && THEME_IDS.indexOf(raw.theme) >= 0) out.theme = raw.theme;
         if (Array.isArray(raw.shape) && raw.shape.length >= 3) {
             if (raw.shape.length > 300) throw new Error('Занадто багато вершин контуру (макс. 300)');
             out.shape = raw.shape.map(p => ({ x: Math.round(num(p && p.x, 0, size, 0)), y: Math.round(num(p && p.y, 0, size, 0)) }));
@@ -494,7 +513,7 @@ var MapObj = (function () {
             if (o.type === 'line' || o.type === 'shape_line') {
                 if (!Array.isArray(o.points) || o.points.length < 2) return;
                 c.type = 'line'; c.points = o.points.slice(0, 3000).map(p => ({ x: Math.round(num(p && p.x, -500, size + 500, 0)), y: Math.round(num(p && p.y, -500, size + 500, 0)) }));
-                c.color = COLOR_RE.test(o.color) ? o.color : '#3b82f6'; c.width = Math.round(num(o.width, 1, 200, 10)); delete c.x; delete c.y;
+                c.color = COLOR_RE.test(o.color) ? o.color : '#3b82f6'; c.width = Math.round(num(o.width, 1, 200, 10)); if (COLOR_RE.test(o.stripe)) c.stripe = o.stripe; delete c.x; delete c.y;
             } else {
                 if (o.w !== undefined) c.w = Math.round(num(o.w, 1, 4000, 50)); if (o.h !== undefined) c.h = Math.round(num(o.h, 1, 4000, 50));
                 if (o.r !== undefined) c.r = Math.round(num(o.r, 1, 2000, 30));
@@ -512,7 +531,7 @@ var MapObj = (function () {
     const api = {
         D2R, DOOR_TRIGGER, DOOR_PASS, PROPS_BASE, PROPS_WOOD, PROPS_EXTRA, DOORS, DOOR_BY_ID, NONSOLID, ALL_TYPES,
         isDoor, isCircular, isSolidType, center, applyRot, toLocal, distToSeg, pointInPoly, circleInPoly, hasShape, pointInObject,
-        collides, polyOf, circleHitsPoly, DISGUISE_GROUPS, DISGUISE_IDS, DISGUISE_SHAPES, drawDisguise, doorNear, updateDoors, resetDoors, shapeBounds, drawProp, sanitizeMap, MODES, mapAllows
+        collides, polyOf, circleHitsPoly, DISGUISE_GROUPS, DISGUISE_IDS, DISGUISE_SHAPES, drawDisguise, doorNear, updateDoors, resetDoors, shapeBounds, drawProp, sanitizeMap, MODES, mapAllows, THEME_IDS
     };
     return api;
 })();

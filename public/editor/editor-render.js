@@ -25,7 +25,12 @@ function drawObject(c, o, time) {
     c.save();
     if (o.preview) c.globalAlpha = 0.55;
     MapObj.applyRot(c, o);
-    if (o.type === 'line') {
+    const _fx = typeof MapFX !== 'undefined', _th = window._edTheme || null;
+    if (o.type === 'line' && _fx) { MapFX.drawLine(c, o); }
+    else if (o.type.indexOf('water') >= 0 && _fx) { MapFX.drawWater(c, o, _th, time, null, null); }
+    else if (_fx && MapFX.solidKind(o) === 'block') { MapFX.drawBlock(c, o, _th, {}); }
+    else if (_fx && o.type === 'tree') { MapFX.drawTree(c, o, _th, {}); }
+    else if (o.type === 'line') {
         c.strokeStyle = o.color; c.lineWidth = o.width; c.lineCap = 'round'; c.lineJoin = 'round';
         c.beginPath(); c.moveTo(o.points[0].x, o.points[0].y); for (let i = 1; i < o.points.length; i++) c.lineTo(o.points[i].x, o.points[i].y); c.stroke();
     } else if (o.type.indexOf('water') >= 0) {
@@ -56,7 +61,7 @@ function drawObject(c, o, time) {
         c.fillText(spc[1], o.x, o.y);
         if (ED.shape && ED.shape.length >= 3 && !MapObj.circleInPoly(ED.shape, o.x, o.y, 5)) { c.strokeStyle = '#ef4444'; c.lineWidth = 5; c.beginPath(); c.arc(o.x, o.y, 26, 0, Math.PI * 2); c.moveTo(o.x - 18, o.y - 18); c.lineTo(o.x + 18, o.y + 18); c.stroke(); }
     }
-    else if (o.type.indexOf('prop_') === 0) MapObj.drawProp(c, o, time);
+    else if (o.type.indexOf('prop_') === 0) { if (_fx) MapFX.propShadow(c, o); MapObj.drawProp(c, o, time); }
     c.restore();
 }
 
@@ -97,9 +102,10 @@ function renderLoop() {
     const now = performance.now(), dt = Math.min(0.1, (now - _lastT) / 1000); _lastT = now;
     const S = ED.settings.size, time = now / 1000;
     ctx.clearRect(0, 0, S, S);
-    ctx.fillStyle = ED.settings.bg; ctx.fillRect(0, 0, S, S);
-    ctx.strokeStyle = ED.settings.grid; ctx.lineWidth = 1;
-    for (let i = 0; i <= S; i += 50) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, S); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(S, i); ctx.stroke(); }
+    const _fxMap = { size: S, bg: ED.settings.bg, grid: ED.settings.grid, theme: ED.settings.theme || '' };
+    if (typeof MapFX !== 'undefined') { MapFX.drawGround(ctx, _fxMap, 0, 0, S, S, ED.settings.theme ? 0.22 : 1); if (ED.settings.theme) MapFX.drawEdges(ctx, _fxMap, 0, 0, S, S); }
+    else { ctx.fillStyle = ED.settings.bg; ctx.fillRect(0, 0, S, S); ctx.strokeStyle = ED.settings.grid; ctx.lineWidth = 1; for (let i = 0; i <= S; i += 50) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, S); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(S, i); ctx.stroke(); } }
+    window._edTheme = (typeof MapFX !== 'undefined') ? MapFX.themeOf(_fxMap) : null;
 
     // двері відкриваються, коли курсор поруч (щоб бачити, як вони працюватимуть)
     MapObj.updateDoors({ solids: ED.objects }, ED.mouse.in && ED.tool === 'select' ? [{ x: ED.mouse.x, y: ED.mouse.y, r: 24 }] : [], dt);
@@ -108,7 +114,7 @@ function renderLoop() {
     if (pv) list.push(pv);
     // шари: спершу вода/калюжі, потім решта (як у грі)
     list.forEach(o => { if (o.type.indexOf('water') >= 0 || o.type === 'prop_puddle' || o.type === 'prop_crater' || o.type === 'prop_pad' || o.type === 'prop_hatch') drawObject(ctx, o, time); });
-    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 12; ctx.shadowOffsetX = 6; ctx.shadowOffsetY = 9;
+    ctx.save();
     list.forEach(o => { if (!(o.type.indexOf('water') >= 0 || o.type === 'prop_puddle' || o.type === 'prop_crater' || o.type === 'prop_pad' || o.type === 'prop_hatch' || o.type.indexOf('neon') >= 0 || o.type.indexOf('spawn') >= 0)) drawObject(ctx, o, time); });
     ctx.restore();
     list.forEach(o => { if (o.type.indexOf('neon') >= 0) drawObject(ctx, o, time); });

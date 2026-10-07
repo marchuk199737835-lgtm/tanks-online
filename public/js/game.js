@@ -701,16 +701,21 @@ function draw(now) {
     
     let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'epic_map', mS = MAP_DATA[cMap].size;
     const _mp = MAP_DATA[cMap], _sh = MapObj.hasShape(_mp);
+    const _vth = typeof MapFX !== 'undefined' && MapFX.themeOf(_mp);
     if (_sh) { // фігурна мапа: все поза контуром — порожнеча
-        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, mS, mS);
+        ctx.fillStyle = _vth ? MapFX.shade(_mp.bg || '#222', 0.16) : '#000'; ctx.fillRect(0, 0, mS, mS);
         ctx.save(); ctx.beginPath(); _mp.shape.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); ctx.clip();
     }
-    ctx.fillStyle = MAP_DATA[cMap].bg || '#020617'; ctx.fillRect(0, 0, mS, mS);
-    ctx.strokeStyle = MAP_DATA[cMap].grid || '#1e293b'; ctx.lineWidth = 1;
-    
     // видима область у координатах світу (із запасом на тінь/світіння)
     const _vw = GW / VS / 2 + 70, _vh = GH / VS / 2 + 70, VX0 = camera.x - _vw, VX1 = camera.x + _vw, VY0 = camera.y - _vh, VY1 = camera.y + _vh;
-    {   // сітка: один шлях лише для видимих ліній (було 2×N окремих beginPath/stroke на всю мапу)
+    const _fx = typeof MapFX !== 'undefined', _th = _fx ? MapFX.themeOf(_mp) : null, _low = !!(window.GFX && GFX.tier === 'low');
+    if (_fx) {
+        const gx0 = Math.max(0, VX0), gy0 = Math.max(0, VY0), gx1 = Math.min(mS, VX1), gy1 = Math.min(mS, VY1);
+        MapFX.drawGround(ctx, _mp, gx0, gy0, gx1, gy1, _th ? 0 : 1);
+        if (_th) MapFX.drawEdges(ctx, _mp, gx0, gy0, gx1, gy1);
+    } else {
+        ctx.fillStyle = MAP_DATA[cMap].bg || '#020617'; ctx.fillRect(0, 0, mS, mS);
+        ctx.strokeStyle = MAP_DATA[cMap].grid || '#1e293b'; ctx.lineWidth = 1;
         const gx0 = Math.max(0, Math.floor(VX0 / 50) * 50), gx1 = Math.min(mS, Math.ceil(VX1 / 50) * 50), gy0 = Math.max(0, Math.floor(VY0 / 50) * 50), gy1 = Math.min(mS, Math.ceil(VY1 / 50) * 50);
         ctx.beginPath();
         for (let x = gx0; x <= gx1; x += 50) { ctx.moveTo(x, gy0); ctx.lineTo(x, gy1); }
@@ -720,7 +725,9 @@ function draw(now) {
     if (_sh) {
         ctx.restore();
         ctx.save(); ctx.beginPath(); _mp.shape.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath();
-        ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 6; ctx.lineJoin = 'round'; ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 18; ctx.stroke(); ctx.restore();
+        if (_vth) { ctx.lineJoin = 'round'; ctx.strokeStyle = MapFX.shade(_mp.bg || '#222', 0.28); ctx.lineWidth = 30; ctx.stroke(); ctx.strokeStyle = MapFX.shade(_mp.bg || '#222', 0.5); ctx.lineWidth = 10; ctx.stroke(); ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 3; ctx.stroke(); }
+        else { ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 6; ctx.lineJoin = 'round'; ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 18; ctx.stroke(); }
+        ctx.restore();
     }
     
     let tm = Date.now() / 1000;
@@ -730,7 +737,9 @@ function draw(now) {
         if (!solidInView(o, VX0, VX1, VY0, VY1)) return;
         ctx.save();
         MapObj.applyRot(ctx, o);
-        if (o.type === 'line') {
+        if (o.type === 'line' && _fx) { MapFX.drawLine(ctx, o); }
+        else if (o.type.includes('water') && _fx) { MapFX.drawWater(ctx, o, _th, tm, [VX0, VX1, VY0, VY1], { low: _low }); }
+        else if (o.type === 'line') {
             ctx.strokeStyle = o.color; ctx.lineWidth = o.width; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
             ctx.beginPath(); ctx.moveTo(o.points[0].x, o.points[0].y);
             for (let i = 1; i < o.points.length; i++) ctx.lineTo(o.points[i].x, o.points[i].y);
@@ -758,23 +767,27 @@ function draw(now) {
         ctx.fillStyle = cH; ctx.font = '16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('★', 0, 1); ctx.restore();
     }
     
-    ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 15; ctx.shadowOffsetX = 8; ctx.shadowOffsetY = 12;
+    if (!_fx) { ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 15; ctx.shadowOffsetX = 8; ctx.shadowOffsetY = 12; }
     MAP_DATA[cMap].solids.forEach(o => {
         if (o.type.includes('spawn') || o.type.includes('water') || o.type === 'line' || o.type === 'prop_puddle' || o.type === 'prop_crater') return;
         if (!solidInView(o, VX0, VX1, VY0, VY1)) return;
         ctx.save(); MapObj.applyRot(ctx, o);
-        if (o.type === 'shape_triangle') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w / 2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
+        const _k = _fx ? MapFX.solidKind(o) : null;
+        if (_k === 'block') MapFX.drawBlock(ctx, o, _th, { low: _low });
+        else if (_k === 'tree') MapFX.drawTree(ctx, o, _th, { low: _low });
+        else if (o.type === 'shape_triangle') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w / 2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
         else if (o.type === 'shape_rhombus') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w / 2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h / 2); ctx.lineTo(o.x + o.w / 2, o.y + o.h); ctx.lineTo(o.x, o.y + o.h / 2); ctx.fill(); }
         else if (o.type === 'shape_parallelepiped') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w * 0.2, o.y); ctx.lineTo(o.x + o.w, o.y); ctx.lineTo(o.x + o.w * 0.8, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
         else if (o.type === 'wall' || o.type === 'wall_square') { ctx.fillStyle = o.color || '#1e293b'; ctx.fillRect(o.x, o.y, o.w, o.h); }
         else if (o.type === 'tree') { ctx.beginPath(); ctx.arc(o.x, o.y, o.r || 30, 0, Math.PI * 2); ctx.fill(); }
-        else if (o.type.includes('prop_')) drPrp(ctx, o, tm);
+        else if (o.type.includes('prop_')) { if (_fx) MapFX.propShadow(ctx, o); drPrp(ctx, o, tm); }
         ctx.restore();
     });
     ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
     
     MAP_DATA[cMap].solids.forEach(o => {
         if (o.type.includes('spawn') || o.type.includes('water') || o.type === 'line' || o.type.includes('prop_')) return;
+        if (_fx && MapFX.solidKind(o)) return;   // стіни/дерева/фігури вже повністю намальовані з об'ємом
         if (!solidInView(o, VX0, VX1, VY0, VY1)) return;
         ctx.save(); MapObj.applyRot(ctx, o);
         if (o.type === 'shape_triangle') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w / 2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
