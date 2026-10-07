@@ -165,9 +165,25 @@ function getValidEdgeSpawn(m, r, t = 'spawn_zombie') {
 
 let rooms = {}, globalPlayers = {};
 
-function sendEconomy(socketId, name) {
-    if (dbUsers[name]) io.to(socketId).emit('economyUpdate', { bucks: dbUsers[name].bucks, inventory: dbUsers[name].inventory, equipped: dbUsers[name].equipped, stats: dbUsers[name].stats, adventClaims: dbUsers[name].adventClaims });
+function ecoPayload(name) {
+    const u = dbUsers[name];
+    return { bucks: u.bucks, inventory: u.inventory, equipped: u.equipped, stats: u.stats, adventClaims: u.adventClaims,
+        xp: u.xp, levelRewards: u.levelRewards, levelClaims: u.levelClaims };
 }
+function sendEconomy(socketId, name) {
+    if (dbUsers[name]) io.to(socketId).emit('economyUpdate', ecoPayload(name));
+}
+
+// ===== Система левелів: досвід за бій =====
+// outcome: 'win' | 'loss' | 'draw'. Повертає дані для анімації у вікні результату.
+function grantXp(name, outcome) {
+    const u = dbUsers[name]; if (!u) return null;
+    const before = u.xp || 0, gain = GameData.rollXp(outcome === 'win' ? 'win' : 'loss');
+    u.xp = before + gain;
+    const lb = GameData.levelFromXp(before), la = GameData.levelFromXp(u.xp);
+    return { gain, outcome, before, after: u.xp, lvlBefore: lb, lvlAfter: la };
+}
+function playerLevel(name) { return dbUsers[name] ? GameData.levelFromXp(dbUsers[name].xp || 0) : 1; }
 
 function getActiveRooms() {
     return Object.values(rooms).map(r => ({ id: r.id, hostName: r.hostName, mode: r.mode, map: r.map, playersCount: Object.keys(r.players).length, maxPlayers: r.maxPlayers, status: r.status }));
@@ -187,6 +203,9 @@ function validateUser(u) {
     if (!u.stats) u.stats = { kills: 0, matches: 0, earned: 0 };
     if (!u.usedPromos) u.usedPromos = [];
     if (!u.adventClaims) u.adventClaims = [];
+    if (typeof u.xp !== 'number' || !(u.xp >= 0)) u.xp = 0;
+    if (!u.levelRewards) u.levelRewards = GameData.genLevelRewards();
+    if (!Array.isArray(u.levelClaims)) u.levelClaims = [];
     return u;
 }
 
@@ -288,7 +307,7 @@ function resetRoomToLobby(r) {
     r.powerups = {}; r.tokens = {}; r.zombies = {}; r.mines = {}; r.wave = 1;
     Object.values(r.players).forEach(p => {
         p.ready = false; p.score = 0; p.hp = getMaxHp(p.equipped); p.buff = null;
-        p.stuckIn = []; p.onFire = null; p.isDisguised = false;
+        p.stuckIn = []; p.onFire = null; p.isDisguised = false; p.level = playerLevel(p.name);
     });
     io.to(r.id).emit('updateLobby', r);
     io.emit('roomsList', getActiveRooms());
@@ -382,7 +401,9 @@ io.on('connection', (socket) => {
         for (let n in dbUsers) { if (dbUsers[n].token === token) foundName = n; }
         if (foundName) {
             globalPlayers[socket.id] = foundName;
+            const hadLvl = !!dbUsers[foundName].levelRewards;
             dbUsers[foundName] = validateUser(dbUsers[foundName]);
+            if (!hadLvl) saveUser(foundName);     // нагороди за рівні створюються один раз і зберігаються
             socket.emit('authSuccess', { name: foundName, token, lang: cleanLang(dbUsers[foundName].lang) });
             sendEconomy(socket.id, foundName);
         } else socket.emit('authError', 'Сесія закінчилась, увійдіть знову');
@@ -470,6 +491,25 @@ io.on('connection', (socket) => {
         saveUser(n);
         sendEconomy(socket.id, n);
         socket.emit('upgradeResult', { win: win, roll: roll, ch: ch, under: d.rollUnder, newBucks: u.bucks, inv: u.inventory, tId: d.target });
+    });
+
+    // ===== Нагороди за рівні =====
+    socket.on('claimLevelReward', (lvl) => {
+        let name = globalPlayers[socket.id];
+        if (!name || !dbUsers[name]) return;
+        let u = dbUsers[name]; lvl = parseInt(lvl);
+        if (!(lvl >= 2 && lvl <= GameData.MAX_LEVEL)) return;
+        if (GameData.levelFromXp(u.xp) < lvl) return socket.emit('joinError', 'Цей рівень ще не досягнуто!');
+        if (u.levelClaims.includes(lvl)) return;
+        if (u.inventory.length >= 30) return socket.emit('joinError', 'Інвентар повний (макс 30)!');
+        const caseId = u.levelRewards[lvl];
+        let modId = getRandomModuleFromCase(caseId);
+        if (!modId) return;
+        u.levelClaims.push(lvl);
+        u.inventory.push(modId);
+        saveUser(name);
+        socket.emit('caseResult', { modId: modId, bucks: u.bucks, inventory: u.inventory, equipped: u.equipped, stats: u.stats, caseId: caseId, fromLevel: lvl });
+        sendEconomy(socket.id, name);
     });
 
     socket.on('reorderInventory', (newInv) => {
@@ -592,7 +632,7 @@ io.on('connection', (socket) => {
             id: socket.id, name: n, color: null, team: null, ready: false,
             hp: getMaxHp(uEq), score: 0, x: 0, y: 0, bodyAngle: 0, turretAngle: 0,
             buff: null, buffEndTime: 0, buffProgress: 0, stuckIn: [], laserTarget: null,
-            onFire: null, equipped: uEq, propType: 'prop_crate', isDisguised: false
+            onFire: null, equipped: uEq, propType: 'prop_crate', isDisguised: false, level: playerLevel(n)
         };
         socket.emit('joinedRoom', { roomId: roomId, roomData: r });
         io.to(roomId).emit('updateLobby', r);
@@ -636,6 +676,25 @@ io.on('connection', (socket) => {
             io.to(d.roomId).emit('updateLobby', r);
             io.emit('roomsList', getActiveRooms());
         }
+    });
+
+    // ===== Лідер кімнати: вигнати гравця / передати лідерку =====
+    socket.on('kickPlayer', (d) => {
+        let r = d ? rooms[d.roomId] : null;
+        if (!r || r.hostSocket !== socket.id || r.status !== 'lobby' || !d.targetId || d.targetId === socket.id || !r.players[d.targetId]) return;
+        const tSock = io.sockets.sockets.get(d.targetId);
+        if (tSock) { tSock.leave(r.id); tSock.emit('kicked', { roomId: r.id }); }
+        removePlayer(r.id, d.targetId);
+        if (rooms[r.id]) io.to(r.id).emit('updateLobby', r);
+        io.emit('roomsList', getActiveRooms());
+    });
+
+    socket.on('transferHost', (d) => {
+        let r = d ? rooms[d.roomId] : null;
+        if (!r || r.hostSocket !== socket.id || r.status !== 'lobby' || !d.targetId || d.targetId === socket.id || !r.players[d.targetId]) return;
+        r.hostSocket = d.targetId; r.hostName = r.players[d.targetId].name;
+        io.to(r.id).emit('updateLobby', r);
+        io.emit('roomsList', getActiveRooms());
     });
 
     socket.on('setColor', (d) => {
@@ -846,18 +905,19 @@ socket.on('selectProp', (data) => {
         
         if (r.players[socket.id].score >= r.winScore && r.mode === 'deathmatch') {
             r.status = 'finished';
-            let mt = 1 + Math.max(0, r.winScore - 5) * 0.10, bW = Math.round(10 * mt), bL = Math.round(2 * mt), rw = {};
+            let mt = 1 + Math.max(0, r.winScore - 5) * 0.10, bW = Math.round(10 * mt), bL = Math.round(2 * mt), rw = {}, xpm = {};
             Object.values(r.players).forEach(p => {
                 let a = Math.round(p.id === socket.id ? bW : bL); rw[p.id] = a;
                 if (dbUsers[p.name]) {
                     dbUsers[p.name].bucks += a; dbUsers[p.name].stats.earned += a; dbUsers[p.name].stats.matches++;
+                    xpm[p.id] = grantXp(p.name, p.id === socket.id ? 'win' : 'loss');
                     let dr = rollDrop(p.name); saveUser(p.name);
-                    io.to(p.id).emit('economyUpdate', { bucks: dbUsers[p.name].bucks, inventory: dbUsers[p.name].inventory, equipped: dbUsers[p.name].equipped, stats: dbUsers[p.name].stats, adventClaims: dbUsers[p.name].adventClaims });
+                    io.to(p.id).emit('economyUpdate', ecoPayload(p.name));
                     if (dr) io.to(p.id).emit('dropReceived', dr);
                 }
             });
             io.to(d.roomId).emit('tokenCollected', { tid: d.tid, playerId: socket.id, score: r.players[socket.id].score });
-            io.to(d.roomId).emit('gameOver', { winner: socket.id, name: r.players[socket.id] ? r.players[socket.id].name : 'ГРАВЕЦЬ', rewards: rw, isTeamWin: false });
+            io.to(d.roomId).emit('gameOver', { winner: socket.id, name: r.players[socket.id] ? r.players[socket.id].name : 'ГРАВЕЦЬ', rewards: rw, xp: xpm, isTeamWin: false });
             io.emit('roomsList', getActiveRooms());
         } else {
             io.to(d.roomId).emit('tokenCollected', { tid: d.tid, playerId: socket.id, score: r.players[socket.id].score });
@@ -905,32 +965,34 @@ socket.on('selectProp', (data) => {
 });
 
 function endPropHuntGame(r, wT) {
-    r.status = 'finished'; let rew = {}, wId = null;
+    r.status = 'finished'; let rew = {}, wId = null, xpm = {};
     Object.values(r.players).forEach(p => {
         let isW = (p.team === wT), a = isW ? 15 : 3; rew[p.id] = a; if (isW && !wId) wId = p.id;
         if (dbUsers[p.name]) {
             dbUsers[p.name].bucks += a; dbUsers[p.name].stats.earned += a; dbUsers[p.name].stats.matches++;
+            xpm[p.id] = grantXp(p.name, isW ? 'win' : 'loss');
             let dr = rollDrop(p.name); saveUser(p.name);
-            io.to(p.id).emit('economyUpdate', { bucks: dbUsers[p.name].bucks, inventory: dbUsers[p.name].inventory, equipped: dbUsers[p.name].equipped, stats: dbUsers[p.name].stats, adventClaims: dbUsers[p.name].adventClaims });
+            io.to(p.id).emit('economyUpdate', ecoPayload(p.name));
             if (dr) io.to(p.id).emit('dropReceived', dr);
         }
     });
-    io.to(r.id).emit('gameOver', { winner: wId || 'TEAM', name: wT === 'hunter' ? 'КОМАНДА МИСЛИВЦІВ' : 'ТІ, ХТО ХОВАВСЯ', rewards: rew, isTeamWin: true });
+    io.to(r.id).emit('gameOver', { winner: wId || 'TEAM', name: wT === 'hunter' ? 'КОМАНДА МИСЛИВЦІВ' : 'ТІ, ХТО ХОВАВСЯ', rewards: rew, xp: xpm, isTeamWin: true });
     io.emit('roomsList', getActiveRooms());
 }
 
 function endTDMGame(r, wT) {
-    r.status = 'finished'; let rew = {}, wId = null, isD = (wT === 'draw');
+    r.status = 'finished'; let rew = {}, wId = null, xpm = {}, isD = (wT === 'draw');
     Object.values(r.players).forEach(p => {
         let isW = !isD && (p.team === wT), a = isD ? 10 : (isW ? 20 : 5); rew[p.id] = a; if (isW && !wId) wId = p.id;
         if (dbUsers[p.name]) {
             dbUsers[p.name].bucks += a; dbUsers[p.name].stats.earned += a; dbUsers[p.name].stats.matches++;
+            xpm[p.id] = grantXp(p.name, isD ? 'draw' : (isW ? 'win' : 'loss'));
             let dr = rollDrop(p.name); saveUser(p.name);
-            io.to(p.id).emit('economyUpdate', { bucks: dbUsers[p.name].bucks, inventory: dbUsers[p.name].inventory, equipped: dbUsers[p.name].equipped, stats: dbUsers[p.name].stats, adventClaims: dbUsers[p.name].adventClaims });
+            io.to(p.id).emit('economyUpdate', ecoPayload(p.name));
             if (dr) io.to(p.id).emit('dropReceived', dr);
         }
     });
-    io.to(r.id).emit('gameOver', { winner: isD ? 'DRAW' : (wT || 'TEAM'), name: isD ? 'НІЧИЯ' : `КОМАНДА ${typeof wT === 'string' ? wT.toUpperCase() : 'ПОБЕДИТЕЛЬ'}`, rewards: rew, isTeamWin: !isD });
+    io.to(r.id).emit('gameOver', { winner: isD ? 'DRAW' : (wT || 'TEAM'), name: isD ? 'НІЧИЯ' : `КОМАНДА ${typeof wT === 'string' ? wT.toUpperCase() : 'ПОБЕДИТЕЛЬ'}`, rewards: rew, xp: xpm, isTeamWin: !isD });
     io.emit('roomsList', getActiveRooms());
 }
 
@@ -1039,11 +1101,11 @@ setInterval(() => {
         if (r.mode === 'survival') {
             const aP = Object.values(r.players).filter(pl => pl.hp > 0);
             if (aP.length === 0) {
-                r.status = 'finished'; let rw = {};
+                r.status = 'finished'; let rw = {}, xpm = {};
                 Object.values(r.players).forEach(pl => {
-                    let n = pl.name; if (dbUsers[n]) { let wv = r.wave; dbUsers[n].bucks += wv; dbUsers[n].stats.earned += wv; dbUsers[n].stats.matches++; let dr = rollDrop(n); saveUser(n); io.to(pl.id).emit('economyUpdate', { bucks: dbUsers[n].bucks, inventory: dbUsers[n].inventory, equipped: dbUsers[n].equipped, stats: dbUsers[n].stats, adventClaims: dbUsers[n].adventClaims }); if (dr) io.to(pl.id).emit('dropReceived', dr); }
+                    let n = pl.name; if (dbUsers[n]) { let wv = r.wave; dbUsers[n].bucks += wv; dbUsers[n].stats.earned += wv; dbUsers[n].stats.matches++; xpm[pl.id] = grantXp(n, 'loss'); let dr = rollDrop(n); saveUser(n); io.to(pl.id).emit('economyUpdate', ecoPayload(n)); if (dr) io.to(pl.id).emit('dropReceived', dr); }
                 });
-                io.to(rId).emit('gameOver', { winner: 'ZOMBIES', wave: r.wave, rewards: rw, isTeamWin: false }); io.emit('roomsList', getActiveRooms());
+                io.to(rId).emit('gameOver', { winner: 'ZOMBIES', wave: r.wave, rewards: rw, xp: xpm, isTeamWin: false }); io.emit('roomsList', getActiveRooms());
                 continue;
             }
             if (Object.keys(r.zombies).length === 0) {

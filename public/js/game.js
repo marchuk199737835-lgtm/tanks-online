@@ -573,6 +573,7 @@ socket.on('newWave', (data) => {
 socket.on('gameOver', (data) => {
     if (currentRoomData) currentRoomData.status = 'finished';
     document.getElementById('winner-modal').classList.remove('hidden'); document.getElementById('damage-vignette').style.opacity = 0;
+    if (window.LV) LV.animateXp((data.xp && data.xp[myId]) || null);
     let dN = document.getElementById('drop-notification');
     if (typeof pendingDrop !== 'undefined' && pendingDrop && MODULES[pendingDrop]) {
         let m = MODULES[pendingDrop];

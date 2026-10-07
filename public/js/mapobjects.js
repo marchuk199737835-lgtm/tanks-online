@@ -172,6 +172,10 @@ var MapObj = (function () {
             if (isCircular(s)) {
                 const cx = s.x + (s.w ? s.w / 2 : 0), cy = s.y + (s.h ? s.h / 2 : 0), sr = s.r || (s.w ? s.w / 2 : 30);
                 if (Math.hypot(x - cx, y - cy) <= r + sr) return true;
+            } else if (s.type === 'water_curve') { // заокруглена вода: «капсула» (прямокутник із радіусом min(w,h)/2), а не блок
+                const l = s.rot ? toLocal(s, x, y) : { x: x, y: y }, w = s.w || 30, h = s.h || 30, rr = Math.min(w, h) / 2;
+                const nx = Math.max(s.x + rr, Math.min(l.x, s.x + w - rr)), ny = Math.max(s.y + rr, Math.min(l.y, s.y + h - rr));
+                if (Math.hypot(l.x - nx, l.y - ny) <= rr + r) return true;
             } else if (polyOf(s)) {
                 const l = s.rot ? toLocal(s, x, y) : { x: x, y: y };
                 if (circleHitsPoly(polyOf(s), l.x, l.y, r)) return true;

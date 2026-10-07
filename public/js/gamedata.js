@@ -183,6 +183,35 @@ function upgradeChance(pIn, bucks, target) {
   const edge = myth ? 0.75 : 0.85, cap = myth ? 50 : 75;
   return Math.max(1, Math.min(cap, ((pIn + (bucks || 0)) / pOut) * 100 * edge));
 }
+// ===== РІВНІ ГРАВЦЯ =====
+// LEVEL_XP[i] — скільки всього досвіду потрібно, щоб мати рівень i+1. Рівень 1 дається одразу.
+const LEVEL_XP = [0, 200, 500, 900, 1400, 2000, 2700, 3500, 4400, 5400, 6500, 7700, 9000, 10500, 12000];
+const MAX_LEVEL = LEVEL_XP.length;
+const LEVEL_NAMES = ['Рекрут', 'Рядовий', 'Єфрейтор', 'Молодший сержант', 'Сержант', 'Старший сержант', 'Старшина', 'Лейтенант', 'Старший лейтенант', 'Капітан', 'Майор', 'Підполковник', 'Полковник', 'Генерал', 'Маршал'];
+const LEVEL_REWARD_MAX_PRICE = 650; // кейс за новий рівень коштує не більше за це
+const XP_WIN = [5, 15], XP_LOSS = [1, 8]; // діапазони досвіду за матч (перемога / поразка чи нічия)
+function levelFromXp(xp) { let l = 1; for (let i = 1; i < LEVEL_XP.length; i++) if (xp >= LEVEL_XP[i]) l = i + 1; return l; }
+// {level, cur, need, pct, max}: прогрес усередині поточного рівня
+function levelProgress(xp) {
+  const l = levelFromXp(xp);
+  if (l >= MAX_LEVEL) return { level: l, cur: xp - LEVEL_XP[MAX_LEVEL - 1], need: 0, pct: 100, max: true };
+  const base = LEVEL_XP[l - 1], need = LEVEL_XP[l] - base, cur = xp - base;
+  return { level: l, cur: cur, need: need, pct: Math.max(0, Math.min(100, cur / need * 100)), max: false };
+}
+// Нагороди за рівні 2..MAX_LEVEL: {рівень: id кейса}. Чим вищий рівень, тим дорожчий кейс може випасти (але до LEVEL_REWARD_MAX_PRICE)
+function genLevelRewards(rnd) {
+  rnd = rnd || Math.random;
+  const ids = Object.keys(CASES).filter(function (k) { return CASES[k].price <= LEVEL_REWARD_MAX_PRICE && !CASES[k].legend; })
+    .sort(function (a, b) { return CASES[a].price - CASES[b].price; });
+  const out = {};
+  for (let lv = 2; lv <= MAX_LEVEL; lv++) {
+    const t = (lv - 2) / (MAX_LEVEL - 2), lo = Math.floor(ids.length * 0.45 * t), top = Math.max(lo + 2, Math.ceil(ids.length * (0.3 + 0.7 * t)));
+    const win = ids.slice(lo, Math.min(top, ids.length));
+    out[lv] = +win[Math.floor(rnd() * win.length)];
+  }
+  return out;
+}
+function rollXp(outcome, rnd) { rnd = rnd || Math.random; const r = outcome === 'win' ? XP_WIN : XP_LOSS; return r[0] + Math.floor(rnd() * (r[1] - r[0] + 1)); }
 function legendCaseId() { for (const k in CASES) if (CASES[k].legend) return +k; return null; }
-return { RARITY: RARITY, RARITY_ORDER: RARITY_ORDER, MODULES: MODULES, CASES: CASES, casePool: casePool, caseTable: caseTable, rollCase: rollCase, statMult: statMult, upgradeChance: upgradeChance, legendCaseId: legendCaseId };
+return { RARITY: RARITY, RARITY_ORDER: RARITY_ORDER, MODULES: MODULES, CASES: CASES, casePool: casePool, caseTable: caseTable, rollCase: rollCase, statMult: statMult, LEVEL_XP: LEVEL_XP, MAX_LEVEL: MAX_LEVEL, LEVEL_NAMES: LEVEL_NAMES, levelFromXp: levelFromXp, levelProgress: levelProgress, genLevelRewards: genLevelRewards, rollXp: rollXp, XP_WIN: XP_WIN, XP_LOSS: XP_LOSS, upgradeChance: upgradeChance, legendCaseId: legendCaseId };
 });

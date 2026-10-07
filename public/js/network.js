@@ -1,14 +1,14 @@
-socket.on('initMusic',(data)=>{myMusicPlaylists=data;});
+socket.on('initMusic',(data)=>{myMusicPlaylists=data;if(currentMusicState){const st=currentMusicState;currentMusicState='';switchMusicState(st);}});
 socket.on('initZombies',(data)=>{for(const k in Z_TYPES)delete Z_TYPES[k];Object.assign(Z_TYPES,data);});
-socket.on('authSuccess',(data)=>{localStorage.setItem('tankToken',data.token);if(window.I18N){if(data.lang)I18N.setLanguage(data.lang);else socket.emit('setLang',I18N.lang);}myName=data.name;myId=socket.id;initAudio();if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();switchMusicState('loby');showScreen('main-menu-screen');});
-socket.on('authError',(msg)=>{alert(msg);localStorage.removeItem('tankToken');showScreen('login-screen');});
-socket.on('joinError',(msg)=>{if(typeof upgBusy!=='undefined'&&upgBusy){upgFinish();if(typeof updateUpgChance==='function')updateUpgChance();}
+socket.on('authSuccess',(data)=>{localStorage.setItem('tankToken',data.token);if(window.I18N){if(data.lang)I18N.setLanguage(data.lang);else socket.emit('setLang',I18N.lang);}myName=data.name;myId=socket.id;if(window.authBusyOff)authBusyOff();initAudio();if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();switchMusicState('loby');showScreen('main-menu-screen');if(window.soundGate)soundGate(data.name);});
+socket.on('authError',(msg)=>{localStorage.removeItem('tankToken');showScreen('login-screen');if(window.authShowError)authShowError(msg);else alert(msg);});
+socket.on('joinError',(msg)=>{if(window.authShowError&&!document.getElementById('login-screen').classList.contains('hidden')){authShowError(msg);return;}if(typeof upgBusy!=='undefined'&&upgBusy){upgFinish();if(typeof updateUpgChance==='function')updateUpgChance();}
     if(msg.includes('апгрейд')||msg.includes('Оберіть')||msg.includes('Недостатньо')||msg.includes('Неможливо')){
         let em=document.getElementById('upg-error-modal'),et=document.getElementById('upg-error-txt');
         if(em&&et){et.innerText=msg;em.classList.remove('hidden');if(typeof playSound==='function')playSound('hurt');}else alert(msg);
     }else alert(msg);
 });
-socket.on('economyUpdate',(data)=>{myBucks=data.bucks;myInventory=data.inventory||[];myEquipped=data.equipped||{cannon:null,turret:null,hull:null,tracks:null};myStats=data.stats||{kills:0,matches:0,earned:0};myAdventClaims=data.adventClaims||[];if(typeof updateGlobalBucks==='function')updateGlobalBucks();if(typeof renderHangar==='function'&&!document.getElementById('hangar-screen').classList.contains('hidden'))renderHangar();if(typeof renderUpgrader==='function'&&!document.getElementById('upgrader-screen').classList.contains('hidden'))renderUpgrader();if(typeof renderAdvent==='function'&&!document.getElementById('advent-modal').classList.contains('hidden'))renderAdvent();});
+socket.on('economyUpdate',(data)=>{myBucks=data.bucks;myInventory=data.inventory||[];myEquipped=data.equipped||{cannon:null,turret:null,hull:null,tracks:null};myStats=data.stats||{kills:0,matches:0,earned:0};myAdventClaims=data.adventClaims||[];if(window.LV)LV.setEco(data);if(typeof updateGlobalBucks==='function')updateGlobalBucks();if(typeof renderHangar==='function'&&!document.getElementById('hangar-screen').classList.contains('hidden'))renderHangar();if(typeof renderUpgrader==='function'&&!document.getElementById('upgrader-screen').classList.contains('hidden'))renderUpgrader();if(typeof renderAdvent==='function'&&!document.getElementById('advent-modal').classList.contains('hidden'))renderAdvent();});
 socket.on('promoSuccess',(msg)=>{if(typeof playSound==='function')playSound('ui_buy');alert(msg);document.getElementById('promo-modal').classList.add('hidden');document.getElementById('promo-input').value='';});
 socket.on('promoError',(msg)=>{alert(msg);});
 socket.on('adventState',(st)=>{window.adventDay=st.day;window.adventEnd=st.end;window.adventOffset=st.now-Date.now();const m=document.getElementById('advent-modal');if(m&&!m.classList.contains('hidden')&&typeof renderAdvent==='function')renderAdvent();});
@@ -16,12 +16,13 @@ socket.on('adventSuccess',(data)=>{playSound('powerup');if(data.type==='bucks')a
 let pendingDrop=null;socket.on('dropReceived',(modId)=>{pendingDrop=modId;});
 socket.on('roomsList',(rooms)=>{if(typeof renderRoomsList==='function')renderRoomsList(rooms);});
 socket.on('roomCreated',(roomId)=>{socket.emit('joinRoom',roomId);});
-socket.on('joinedRoom',(data)=>{currentRoomId=data.roomId;currentRoomData=data.roomData;showScreen('lobby-screen');});
+socket.on('joinedRoom',(data)=>{currentRoomId=data.roomId;currentRoomData=data.roomData;if(window.resetLobbyUI)resetLobbyUI();showScreen('lobby-screen');if(window.updateLobbyUI)updateLobbyUI();});
 socket.on('updateLobby',(roomData)=>{currentRoomData=roomData;if(typeof updateLobbyUI==='function')updateLobbyUI();const gameScreen=document.getElementById('game-screen');if(roomData.status==='lobby'&&gameScreen&&!gameScreen.classList.contains('hidden')){document.getElementById('winner-modal').classList.add('hidden');if(typeof showScreen==='function')showScreen('lobby-screen');if(typeof switchMusicState==='function')switchMusicState('loby');}});
 socket.on('gameStarting',(roomData)=>{currentRoomData=roomData;const pData=currentRoomData.players[myId];myLocalTank.x=pData.x;myLocalTank.y=pData.y;myLocalTank.hp=pData.hp;camera.x=pData.x;camera.y=pData.y;myLocalTank.team=pData.team;myLocalTank.isDisguised=false;myLocalTank.propType=pData.propType;homingTargetId=null;document.getElementById('damage-vignette').style.opacity=0;spectatingId=null;pendingDrop=null;document.getElementById('drop-notification').classList.add('hidden');isBossIncoming=false;document.getElementById('survival-warning').classList.add('hidden');document.getElementById('prophunt-hud-timer')?.classList.add('hidden');document.getElementById('hunter-blind-overlay')?.classList.add('hidden');if(currentRoomData.mode==='survival'||currentRoomData.mode==='prophunt')switchMusicState('survive');else switchMusicState('dezmatch');if(typeof doCountdown==='function')doCountdown();if(currentRoomData.mode==='prophunt'&&myLocalTank.team==='hider'){setTimeout(()=>{if(typeof showPropMenu==='function')showPropMenu(15);},4000);}});
 
 let rouletteTimers = [];
 socket.on('caseResult',(result)=>{
+    if(result.fromLevel&&window.LV)LV.onClaimResult();
     myBucks=result.bucks;if(result.inventory)myInventory=result.inventory;if(result.equipped)myEquipped=result.equipped;
     if(typeof updateGlobalBucks==='function')updateGlobalBucks();
     if(!MODULES[result.modId]){console.error('caseResult: невідомий модуль',result.modId);return;}
@@ -116,3 +117,4 @@ socket.on('upgradeResult',(res)=>{
 });
 
 function emitDamage(amt,attacker){playSound('hurt');shakeTime=0.3;socket.emit('takeDamage',{roomId:currentRoomId,amt:amt,attacker:attacker});}
+socket.on('kicked',()=>{currentRoomId=null;currentRoomData=null;if(window.resetLobbyUI)resetLobbyUI();const gs=document.getElementById('game-screen');showScreen('room-browser-screen');socket.emit('requestRooms');if(window.uiToast)uiToast('Лідер вигнав вас із сесії',true);});

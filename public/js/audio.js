@@ -8,7 +8,39 @@ bgMusic.volume = volMusic;
 let myMusicPlaylists = { loby: [], dezmatch: [], survive: [], main: [] };
 let activePlaylist = []; let currentMusicState = ''; let currentTrackIndex = 0;
 
-function initAudio() { if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } }
+function initAudio() { if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } }
+
+// ===== Розблокування звуку =====
+// Браузери не дозволяють музику/звуки без жесту користувача. Після автоматичного входу за токеном жесту ще не було,
+// тому музика й AudioContext лишалися «заснулими». Ловимо перший дотик/клік/клавішу і запускаємо все, що чекало.
+let audioUnlocked = false, musicWanted = false;
+function tryUnlockAudio() {
+    initAudio();
+    if (audioCtx && audioCtx.state !== 'running') { try { audioCtx.resume(); } catch (e) {} }
+    if (audioCtx && !audioUnlocked) {            // тихий буфер — «будить» звук на iOS/Safari
+        try { const b = audioCtx.createBuffer(1, 1, 22050), src = audioCtx.createBufferSource(); src.buffer = b; src.connect(audioCtx.destination); src.start(0); } catch (e) {}
+    }
+    if (musicWanted && bgMusic.paused && activePlaylist.length) {
+        const pr = bgMusic.src ? bgMusic.play() : (playCurrentTrack(), null);
+        if (pr && pr.catch) pr.catch(() => {});
+    }
+    const ctxOk = !audioCtx || audioCtx.state === 'running';
+    const musicOk = !musicWanted || !activePlaylist.length || !bgMusic.paused;
+    if (ctxOk && musicOk && audioCtx) {
+        audioUnlocked = true; hideAudioHint();
+        ['pointerdown', 'touchstart', 'touchend', 'mousedown', 'click', 'keydown'].forEach(ev => document.removeEventListener(ev, tryUnlockAudio, true));
+    }
+}
+['pointerdown', 'touchstart', 'touchend', 'mousedown', 'click', 'keydown'].forEach(ev => document.addEventListener(ev, tryUnlockAudio, true));
+document.addEventListener('visibilitychange', () => { if (!document.hidden && audioCtx && audioCtx.state !== 'running') { try { audioCtx.resume(); } catch (e) {} } });
+
+function showAudioHint() {
+    if (audioUnlocked || document.getElementById('audio-hint')) return;
+    const d = document.createElement('div'); d.id = 'audio-hint'; d.className = 'audio-hint';
+    d.innerHTML = '<span class="audio-hint-ico">🔊</span><span>Торкніться екрана, щоб увімкнути музику та звуки</span>';
+    document.body.appendChild(d);
+}
+function hideAudioHint() { const d = document.getElementById('audio-hint'); if (d) d.remove(); }
 
 // Зберігаємо нові значення в пам'ять браузера при кожній зміні
 window.setMusicVolume = function(val) { 
@@ -22,7 +54,9 @@ window.setSfxVolume = function(val) {
 };
 
 function switchMusicState(newState) {
-    if (currentMusicState === newState) return; currentMusicState = newState;
+    musicWanted = true;
+    if (currentMusicState === newState && (activePlaylist.length || !(myMusicPlaylists[newState] || []).length)) { if (bgMusic.paused && activePlaylist.length) tryUnlockAudio(); return; }
+    currentMusicState = newState;
     let tracks = [...(myMusicPlaylists[newState] || [])];
     if (newState !== 'loby') tracks = [...tracks, ...(myMusicPlaylists['main'] || [])];
     if (tracks.length === 0) tracks = [...(myMusicPlaylists['main'] || [])];
@@ -33,12 +67,14 @@ function switchMusicState(newState) {
 
 function playCurrentTrack() {
     if (activePlaylist.length === 0) return; let parts = activePlaylist[currentTrackIndex].split('/');
-    if (parts.length === 2) { bgMusic.src = '/music/' + encodeURIComponent(parts[0]) + '/' + encodeURIComponent(parts[1]); bgMusic.play().catch(e => console.log('Autoplay prevented')); }
+    if (parts.length === 2) { bgMusic.src = '/music/' + encodeURIComponent(parts[0]) + '/' + encodeURIComponent(parts[1]); bgMusic.play().catch(e => { console.log('Autoplay prevented'); showAudioHint(); }); }
 }
 bgMusic.addEventListener('ended', () => { if (activePlaylist.length > 0) { currentTrackIndex = (currentTrackIndex + 1) % activePlaylist.length; playCurrentTrack(); } });
 
 function playSound(type) {
-    if (!audioCtx || audioCtx.state === 'suspended') return;
+    if (!audioCtx) initAudio();
+    if (audioCtx && audioCtx.state === 'suspended') { try { audioCtx.resume(); } catch (e) {} }
+    if (!audioCtx || audioCtx.state !== 'running') return;
     const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
     osc.connect(gain); gain.connect(audioCtx.destination); const now = audioCtx.currentTime;
 
