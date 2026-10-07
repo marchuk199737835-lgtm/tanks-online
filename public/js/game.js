@@ -1,12 +1,18 @@
 let canvas = document.getElementById('game-canvas');
 let ctx = canvas.getContext('2d');
 
-window.addEventListener('resize', () => { 
-    canvas.width = window.innerWidth; 
-    canvas.height = window.innerHeight; 
-});
-canvas.width = window.innerWidth; 
-canvas.height = window.innerHeight;
+// ФІКСОВАНИЙ МАСШТАБ ГРИ: по висоті екрана гравець завжди бачить однакову ділянку мапи (VIEW_H одиниць),
+// тому зменшення масштабу браузера (Ctrl -), великий монітор чи планшет не дають бачити більше за інших.
+const VIEW_H_DESKTOP = 800, VIEW_H_TOUCH = 420, VIEW_MAX_ASPECT = 2.0;
+let VS = 1; // множник «одиниця світу -> піксель екрана»
+function fitCanvas() {
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    const touch = window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches, VH = touch ? VIEW_H_TOUCH : VIEW_H_DESKTOP;
+    VS = Math.max(canvas.height / VH, canvas.width / (VH * VIEW_MAX_ASPECT)); // надширокі екрани не бачать більше, ніж 2:1
+    VS = Math.min(VS, canvas.width / (VH * 0.9)); // вузький портретний екран не стискаємо до смужки
+}
+window.addEventListener('resize', fitCanvas);
+fitCanvas();
 
 let spectatingId = null;
 let isBossIncoming = false;
@@ -78,7 +84,8 @@ function findNextSpec(dir) {
 
 function updatePhys(now, dt) {
     if (!currentRoomData || !currentRoomId) return;
-    let myRad = myLocalTank.buff === 'boss' ? 75 : 24;
+    // myRad — фізичне тіло (стіни, декор, двері): менше за клітинку 50, щоб вільно проходити між об'єктами; myHitRad — хітбокс для куль і підбору (візуальний, як і раніше)
+    let myRad = myLocalTank.buff === 'boss' ? 75 : PLAYER_BODY_R, myHitRad = myLocalTank.buff === 'boss' ? 75 : 24;
     {   // авто-двері: відкриваються, коли поруч танк
         const _dm = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'epic_map';
         if (window._doorMapName !== currentRoomId + _dm) { window._doorMapName = currentRoomId + _dm; MapObj.resetDoors(MAP_DATA[_dm]); }
@@ -162,13 +169,13 @@ function updatePhys(now, dt) {
         if (fCfg.type !== 'none' && fCfg.cd) rt = (fCfg.cd < 500 ? fCfg.cd : rt);
         
         if (sh && (now - lastShootTime >= rt) && !(currentRoomData.mode === 'prophunt' && currentRoomData.state !== 'seeking')) {
-            fireBull(now, myRad, fCfg, tR);
+            fireBull(now, myHitRad, fCfg, tR);
         } else if (isMobile && !isMg && joysticks.right.released) {
             joysticks.right.released = false;
         }
         
-        for (let pid in powerups) if (Math.hypot(powerups[pid].x - myLocalTank.x, powerups[pid].y - myLocalTank.y) < myRad + 30) socket.emit('collectPowerup', { roomId: currentRoomId, pid: pid });
-        for (let tid in tokens) if (Math.hypot(tokens[tid].x - myLocalTank.x, tokens[tid].y - myLocalTank.y) < myRad + 25) socket.emit('collectToken', { roomId: currentRoomId, tid: tid });
+        for (let pid in powerups) if (Math.hypot(powerups[pid].x - myLocalTank.x, powerups[pid].y - myLocalTank.y) < myHitRad + 30) socket.emit('collectPowerup', { roomId: currentRoomId, pid: pid });
+        for (let tid in tokens) if (Math.hypot(tokens[tid].x - myLocalTank.x, tokens[tid].y - myLocalTank.y) < myHitRad + 25) socket.emit('collectToken', { roomId: currentRoomId, tid: tid });
         
         camera.x += (myLocalTank.x - camera.x) * 5 * dt;
         camera.y += (myLocalTank.y - camera.y) * 5 * dt;
@@ -622,11 +629,12 @@ function emitDamage(amt, atk) { playSound('hurt'); shakeTime = 0.3; socket.emit(
 
 function draw(now) {
     if (!currentRoomData) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.save();
     let shX = 0, shY = 0;
     if (shakeTime > 0) { shX = (Math.random() - 0.5) * 20; shY = (Math.random() - 0.5) * 20; shakeTime -= 0.03; }
-    ctx.translate(canvas.width / 2 - camera.x + shX, canvas.height / 2 - camera.y + shY);
+    ctx.scale(VS, VS);
+    ctx.translate(canvas.width / VS / 2 - camera.x + shX, canvas.height / VS / 2 - camera.y + shY);
     
     let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'epic_map', mS = MAP_DATA[cMap].size;
     const _mp = MAP_DATA[cMap], _sh = MapObj.hasShape(_mp);

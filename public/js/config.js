@@ -11,6 +11,7 @@ const MAX_HP = 500;
 const BASE_SPEED = 200; // базова швидкість танка (множники корпусу, гусениць і бафів застосовуються в getTankSpeed)
 const BASE_TURRET_ROT = 8; // рад/с при rotSpeed = 1.0
 const BASE_BULLET_SPEED = 700;
+const PLAYER_BODY_R = 22; // фізичний радіус танка для зіткнень зі стінами/декором (діаметр 44 — вміщається в клітинку мапи 50)
 
 let currentRoomId = null;
 let currentRoomData = null;
