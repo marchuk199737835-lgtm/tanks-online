@@ -519,5 +519,9 @@ I18N.add("pt", {
  "Встановити гру": "Instalar o jogo",
  "Віддалення камери": "Distância da câmera",
  "Ближче": "Mais perto",
- "Далі": "Mais longe"
+ "Далі": "Mais longe",
+ "Масштаб інтерфейсу": "Escala da interface",
+ "Масштаб камери в матчі": "Zoom da câmera na partida",
+ "Менше": "Menor",
+ "Більше": "Maior"
 }, [["Ви протримались до (\\d+) хвилі", "Você resistiu até a onda $1"], ["(\\d+)Д", "$1d"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1 s"], ["_ та -", "_ e -"]]);

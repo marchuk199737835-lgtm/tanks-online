@@ -20,6 +20,13 @@ function fitCanvas() {
 window.fitCanvas = fitCanvas;
 window.addEventListener('resize', fitCanvas);
 fitCanvas();
+(function () { // повзунок «Масштаб інтерфейсу» (меню, вікна, кнопки) — окремо від камери
+    const sl = document.getElementById('ui-scale'), lab = document.getElementById('ui-scale-val'); if (!sl || !window.getUiScale) return;
+    const show = () => { if (lab) lab.textContent = Math.round(sl.value * 100) + '%'; };
+    if (!(window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches)) sl.max = 1; // на ПК збільшувати вже нікуди (межа розкладки), лише зменшувати
+    sl.value = window.getUiScale(); show();
+    sl.addEventListener('input', () => { show(); window.setUiScale(parseFloat(sl.value) || 1); });
+})();
 (function () { // повзунок «Віддалення камери» (лише на пристроях із дотиком)
     const row = document.getElementById('view-zoom-row'), sl = document.getElementById('view-zoom'), lab = document.getElementById('view-zoom-val');
     if (!row || !sl) return;

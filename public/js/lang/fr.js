@@ -519,5 +519,9 @@ I18N.add("fr", {
  "Встановити гру": "Installer le jeu",
  "Віддалення камери": "Distance de la caméra",
  "Ближче": "Plus près",
- "Далі": "Plus loin"
+ "Далі": "Plus loin",
+ "Масштаб інтерфейсу": "Taille de l'interface",
+ "Масштаб камери в матчі": "Zoom de la caméra en match",
+ "Менше": "Plus petit",
+ "Більше": "Plus grand"
 }, [["Ви протримались до (\\d+) хвилі", "Vous avez tenu jusqu'à la vague $1"], ["(\\d+)Д", "$1j"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1 s"], ["_ та -", "_ et -"]]);
