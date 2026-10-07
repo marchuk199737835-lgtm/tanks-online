@@ -59,7 +59,7 @@ socket.on('caseResult',(result)=>{
     void tape.offsetWidth; // примусовий reflow: стрічка гарантовано стоїть на 0 перед стартом анімації
 
     rouletteTimers.push(setTimeout(()=>{
-        playSound('shoot');
+        if(!(window.UISFX&&UISFX.ready()&&UISFX.roll(tape)))playSound('shoot');
         const first=tape.firstElementChild;
         const itemWidth=first?first.offsetWidth:(window.innerWidth>1024?90:60); // реальна ширина елемента, а не припущення
         const containerWidth=tape.parentElement.offsetWidth||600;
@@ -70,7 +70,7 @@ socket.on('caseResult',(result)=>{
 
     // Нагорода з'являється після того, як стрічка зупинилась (3.5с анімації + коротка пауза)
     rouletteTimers.push(setTimeout(()=>{
-        playSound('powerup');
+        if(!(window.UISFX&&UISFX.ready()&&UISFX.reveal(MODULES[result.modId].rarity)))playSound('powerup');
         document.getElementById('roulette-modal').classList.add('hidden');
         const rw=document.getElementById('reward-modal');
         if(rw){
@@ -93,14 +93,14 @@ socket.on('upgradeResult',(res)=>{
     const pointer=document.getElementById('upg-pointer'),actionBtn=document.getElementById('upg-action-btn');
     if(pointer){
         pointer.classList.remove('hidden');pointer.style.transition='none';pointer.style.left='0%';
-        setTimeout(()=>{playSound('shoot');pointer.style.transition='left 3s cubic-bezier(0.1, 1, 0.3, 1)';pointer.style.left=res.roll+'%';},50);
+        setTimeout(()=>{if(!(window.UISFX&&UISFX.ready()&&UISFX.upgRun(pointer)))playSound('shoot');pointer.style.transition='left 3s cubic-bezier(0.1, 1, 0.3, 1)';pointer.style.left=res.roll+'%';},50);
         setTimeout(()=>{
             pointer.classList.add('hidden');
             if(typeof upgFinish==='function')upgFinish();
             upgSrcIdx=null;upgSrcId=null;upgTgtId=null;document.getElementById('upg-slot-src').innerHTML='';document.getElementById('upg-slot-tgt').innerHTML='';
             if(typeof renderUpgrader==='function')renderUpgrader();if(typeof renderHangar==='function')renderHangar();
             if(res.win){
-                playSound('powerup');const rw=document.getElementById('reward-modal');
+                if(!(window.UISFX&&UISFX.ready()&&UISFX.upgWin(MODULES[res.tId]&&MODULES[res.tId].rarity)))playSound('powerup');const rw=document.getElementById('reward-modal');
                 if(rw){
                     let mod=MODULES[res.tId];
                     document.getElementById('reward-title').innerText="АПГРЕЙД УСПІШНИЙ!";
@@ -113,7 +113,7 @@ socket.on('upgradeResult',(res)=>{
                     rw.classList.remove('hidden');
                 }
             }else{
-                playSound('hurt');
+                if(!(window.UISFX&&UISFX.ready()&&UISFX.upgFail()))playSound('hurt');
                 let em=document.getElementById('upg-error-modal'),et=document.getElementById('upg-error-txt');
                 if(em&&et){et.innerText='Апгрейд не вдався! Модуль та креди згоріли...';em.classList.remove('hidden');}
                 else alert('Апгрейд не вдався!');
