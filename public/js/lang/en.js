@@ -621,5 +621,12 @@ I18N.add("en", {
  "Увага": "Attention",
  "Фінальна нагорода!": "Final reward!",
  "буде вигнано, і він більше не зможе зайти саме в цю сесію. В інші сесії його вхід не обмежується": "will be kicked and won't be able to rejoin this particular session. Entry to other sessions is not restricted",
- "заблокував": "blocked"
+ "заблокував": "blocked",
+ "Встановіть гру на телефон": "Install the game on your phone",
+ "Так гра відкриватиметься на весь екран, без адресного рядка й кнопок браузера": "The game will open full screen, without the address bar and browser buttons",
+ "Натисніть «Поділитись» внизу (або вгорі) екрана Safari": "Tap «Share» at the bottom (or top) of the Safari screen",
+ "Оберіть «На початковий екран»": "Choose «Add to Home Screen»",
+ "Натисніть «Додати» і запускайте гру з іконки": "Tap «Add» and launch the game from its icon",
+ "Грати на весь екран": "Play full screen",
+ "Встановити гру": "Install the game"
 }, [["Ви протримались до (\\d+) хвилі", "You lasted until wave $1"], ["(\\d+)Д", "$1d"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1s"], ["_ та -", "_ and -"]]);

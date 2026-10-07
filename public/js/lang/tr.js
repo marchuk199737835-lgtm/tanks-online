@@ -509,5 +509,12 @@ I18N.add("tr", {
  "Увага": "Dikkat",
  "Фінальна нагорода!": "Final ödülü!",
  "буде вигнано, і він більше не зможе зайти саме в цю сесію. В інші сесії його вхід не обмежується": "atılacak ve bu oturuma tekrar giremeyecek. Diğer oturumlara girişi kısıtlanmaz",
- "заблокував": "engelledi"
+ "заблокував": "engelledi",
+ "Встановіть гру на телефон": "Oyunu telefonuna yükle",
+ "Так гра відкриватиметься на весь екран, без адресного рядка й кнопок браузера": "Oyun, adres çubuğu ve tarayıcı düğmeleri olmadan tam ekran açılır",
+ "Натисніть «Поділитись» внизу (або вгорі) екрана Safari": "Safari ekranının altındaki (veya üstündeki) «Paylaş» düğmesine dokun",
+ "Оберіть «На початковий екран»": "«Ana Ekrana Ekle»yi seç",
+ "Натисніть «Додати» і запускайте гру з іконки": "«Ekle»ye dokun ve oyunu simgesinden başlat",
+ "Грати на весь екран": "Tam ekranda oyna",
+ "Встановити гру": "Oyunu yükle"
 }, [["Ви протримались до (\\d+) хвилі", "$1. dalgaya kadar dayandın"], ["(\\d+)Д", "$1g"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1 sn"], ["_ та -", "_ ve -"]]);

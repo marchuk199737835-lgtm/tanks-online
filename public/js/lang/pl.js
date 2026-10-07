@@ -509,5 +509,12 @@ I18N.add("pl", {
  "Увага": "Uwaga",
  "Фінальна нагорода!": "Nagroda końcowa!",
  "буде вигнано, і він більше не зможе зайти саме в цю сесію. В інші сесії його вхід не обмежується": "zostanie wyrzucony i nie wróci do tej sesji. Inne sesje pozostają dostępne",
- "заблокував": "zablokował"
+ "заблокував": "zablokował",
+ "Встановіть гру на телефон": "Zainstaluj grę na telefonie",
+ "Так гра відкриватиметься на весь екран, без адресного рядка й кнопок браузера": "Gra otworzy się na pełnym ekranie, bez paska adresu i przycisków przeglądarki",
+ "Натисніть «Поділитись» внизу (або вгорі) екрана Safari": "Stuknij «Udostępnij» na dole (lub u góry) ekranu Safari",
+ "Оберіть «На початковий екран»": "Wybierz «Do ekranu początkowego»",
+ "Натисніть «Додати» і запускайте гру з іконки": "Stuknij «Dodaj» i uruchamiaj grę z ikony",
+ "Грати на весь екран": "Graj na pełnym ekranie",
+ "Встановити гру": "Zainstaluj grę"
 }, [["Ви протримались до (\\d+) хвилі", "Wytrzymałeś do fali $1"], ["(\\d+)Д", "$1d"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1 s"], ["_ та -", "_ i -"]]);

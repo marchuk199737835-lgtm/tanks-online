@@ -13,7 +13,7 @@ const mountEditor = require('./editor-server.js');       // серверна ч�
 process.on('uncaughtException', err => console.error('Crash prevented:', err));
 process.on('unhandledRejection', err => console.error('Promise rejection prevented:', err));
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { setHeaders: (res, fp) => { if (/(^|[\\/])(sw\.js|manifest\.webmanifest)$/.test(fp)) res.setHeader('Cache-Control', 'no-cache'); } }));
 
 const musicDir = path.join(__dirname, 'music');
 if (!fs.existsSync(musicDir)) fs.mkdirSync(musicDir);
