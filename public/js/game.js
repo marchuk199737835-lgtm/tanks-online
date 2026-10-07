@@ -4,8 +4,8 @@ if (window.GFX) GFX.attach(ctx);
 
 // ФІКСОВАНИЙ МАСШТАБ ГРИ: по висоті екрана гравець завжди бачить однакову ділянку мапи (VIEW_H одиниць),
 // тому зменшення масштабу браузера (Ctrl -), великий монітор чи планшет не дають бачити більше за інших.
-// Телефони/планшети: видимість +20% за замовчуванням (VIEW_TOUCH_DEFAULT); у налаштуваннях від 1.0 (старий масштаб) до 1.5 (+50% до старого, тобто ще +30% понад стандартні +20%).
-const VIEW_H_DESKTOP = 800, VIEW_H_TOUCH = 420, VIEW_MAX_ASPECT = 2.0, VIEW_TOUCH_DEFAULT = 1.2, VIEW_TOUCH_MAXZOOM = 1.5;
+// Телефони/планшети: видимість +20% за замовчуванням (VIEW_TOUCH_DEFAULT); у налаштуваннях від 1.0 (старий масштаб) до 1.8 (за замовчуванням 1.2).
+const VIEW_H_DESKTOP = 800, VIEW_H_TOUCH = 420, VIEW_MAX_ASPECT = 2.0, VIEW_TOUCH_DEFAULT = 1.2, VIEW_TOUCH_MAXZOOM = 1.8;
 let viewZoom = VIEW_TOUCH_DEFAULT;
 try { const _z = parseFloat(localStorage.getItem('viewZoom')); if (_z >= 1 && _z <= VIEW_TOUCH_MAXZOOM) viewZoom = _z; } catch (e) {}
 let VS = 1; // множник «одиниця світу -> піксель екрана»
