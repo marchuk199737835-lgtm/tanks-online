@@ -48,7 +48,7 @@ var MapObj = (function () {
     const NONSOLID = new Set(['prop_puddle', 'prop_crater', 'prop_hatch', 'prop_pad']);
     const BASE_TYPES = ['wall', 'wall_square', 'shape_line', 'line', 'shape_triangle', 'shape_rhombus', 'shape_parallelepiped', 'tree',
         'water_square', 'water_curve', 'neon_wall', 'neon_circle', 'neon_triangle', 'neon_cross', 'neon_diamond', 'neon_arch', 'neon_pillar',
-        'spawn_player', 'spawn_zombie', 'spawn_powerup'];
+        'spawn_player', 'spawn_zombie', 'spawn_powerup', 'spawn_core', 'spawn_cp', 'spawn_convoy_a', 'spawn_convoy_b'];
     const ALL_TYPES = new Set(BASE_TYPES);
     [PROPS_BASE, PROPS_WOOD, PROPS_EXTRA, DOORS].forEach(l => l.forEach(p => ALL_TYPES.add(p.id)));
 
@@ -465,11 +465,12 @@ var MapObj = (function () {
     // ---------- ПЕРЕВІРКА МАПИ (сервер) ----------
     const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
     const num = (v, lo, hi, d) => { v = Number(v); if (!isFinite(v)) return d; return Math.max(lo, Math.min(hi, v)); };
-    const MODES = ['deathmatch', 'team_deathmatch', 'survival', 'prophunt'];
+    const MODES = ['deathmatch', 'team_deathmatch', 'survival', 'prophunt', 'base_defense', 'boss_raid', 'convoy', 'solo_arena', 'boss_duel', 'battle_royale', 'capture_points', 'bounty'];
     // чи дозволена мапа в режимі (без поля modes — доступна в усіх)
     // нові режими успадковують дозвіл базових: кооп/соло — як «Виживання», королівський бій і полювання — як «Детматч», захоплення точок — як «Командний»
     const MODE_ALIAS = { base_defense: 'survival', boss_raid: 'survival', convoy: 'survival', solo_arena: 'survival', boss_duel: 'survival', battle_royale: 'deathmatch', bounty: 'deathmatch', capture_points: 'team_deathmatch' };
-    function mapAllows(m, mode) { mode = MODE_ALIAS[mode] || mode; return !m || !Array.isArray(m.modes) || !m.modes.length || m.modes.indexOf(mode) >= 0; }
+    // мапа, де режим названо прямо, дозволена в ньому; старі мапи (без нових режимів у списку) діють за правилами базового режиму
+    function mapAllows(m, mode) { if (!m || !Array.isArray(m.modes) || !m.modes.length) return true; return m.modes.indexOf(mode) >= 0 || (!!MODE_ALIAS[mode] && m.modes.indexOf(MODE_ALIAS[mode]) >= 0); }
 
     function sanitizeMap(raw) {
         if (!raw || typeof raw !== 'object') throw new Error('Порожні дані мапи');

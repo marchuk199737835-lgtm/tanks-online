@@ -111,7 +111,7 @@ module.exports = function createModes(D) {
         pK.forEach(id => { const p = r.players[id]; p.out = false; p.lives = 0; p.perk = null; p.caps = 0; p.score = 0; });
         switch (r.mode) {
             case 'base_defense': {
-                const c = findOpen(r, C.x, C.y, 60); S.core = { x: c.x, y: c.y, hp: r.bdCoreHp, max: r.bdCoreHp, r: 46 };
+                const mk0 = map.solids.find(o => o.type === 'spawn_core'), c = findOpen(r, mk0 ? mk0.x : C.x, mk0 ? mk0.y : C.y, 60); S.core = { x: c.x, y: c.y, hp: r.bdCoreHp, max: r.bdCoreHp, r: 46 };
                 S.wave = 0; S.W = r.bdWaves; S.st = 'wait'; S.next = now + 5000;
                 pK.forEach(id => place(r.players[id], ringSpot(r, c, 110, 200, 26)));
                 break;
@@ -123,7 +123,7 @@ module.exports = function createModes(D) {
                 const z = mkZ(r, S, now, bt, pos, 1, df(r), 'boss'); z.hp = z.maxHp = hp; z.nextAttack = S.startAt + 1500; S.bossId = z.id;
                 pK.forEach(id => { r.players[id].lives = r.rbLives; });
                 // гравці стартують якомога далі від боса
-                const far = []; for (let i = 0; i < 12; i++) far.push(randFree(r, 26));
+                const far = map.solids.filter(o => o.type === 'spawn_player').map(o => findOpen(r, o.x, o.y, 26)); if (!far.length) for (let i = 0; i < 12; i++) far.push(randFree(r, 26));
                 far.sort((a, b) => dist(b, pos) - dist(a, pos)); const base = far[0];
                 pK.forEach(id => place(r.players[id], ringSpot(r, base, 40, 140, 26)));
                 break;
@@ -131,8 +131,9 @@ module.exports = function createModes(D) {
             case 'convoy': {
                 const sp = map.solids.filter(s => s.type === 'spawn_player');
                 const cands = []; sp.forEach(a => sp.forEach(b => { if (a !== b) cands.push([a, b]); }));
-                let A = null, B = null;
-                if (cands.length) { cands.sort((x, y) => Math.hypot(y[0].x - y[1].x, y[0].y - y[1].y) - Math.hypot(x[0].x - x[1].x, x[0].y - x[1].y)); A = findOpen(r, cands[0][0].x, cands[0][0].y, 34); B = findOpen(r, cands[0][1].x, cands[0][1].y, 34); }
+                let A = null, B = null; const ma = map.solids.find(o => o.type === 'spawn_convoy_a'), mb = map.solids.find(o => o.type === 'spawn_convoy_b');
+                if (ma && mb) { A = findOpen(r, ma.x, ma.y, 34); B = findOpen(r, mb.x, mb.y, 34); }
+                else if (cands.length) { cands.sort((x, y) => Math.hypot(y[0].x - y[1].x, y[0].y - y[1].y) - Math.hypot(x[0].x - x[1].x, x[0].y - x[1].y)); A = findOpen(r, cands[0][0].x, cands[0][0].y, 34); B = findOpen(r, cands[0][1].x, cands[0][1].y, 34); }
                 const grid = Nav.getGrid(map, 30), ok = (a, b) => { const f = Nav.buildField(grid, b.x, b.y), N = grid.N, i = Math.floor(a.y / Nav.CS) * N + Math.floor(a.x / Nav.CS); return f.dist[i] >= 0; };
                 if (!A || !B || Math.hypot(A.x - B.x, A.y - B.y) < 300 || !ok(A, B)) {
                     A = findOpen(r, C.x - C.w * 0.35, C.y + C.h * 0.35, 34); B = null; let best = 0;
@@ -172,9 +173,9 @@ module.exports = function createModes(D) {
             case 'capture_points': {
                 const teams = [...new Set(pK.map(id => r.players[id].team))], sc = {}; teams.forEach(t => sc[t] = 0);
                 S.teams = teams; S.sc = sc; S.goal = r.cpScore; S.end = now + 4000 + r.cpTime * 1000; S.acc = 0;
-                const spawns = Object.values(r.teamSpawns || {}), cand = map.solids.filter(s => s.type === 'spawn_powerup').map(s => ({ x: s.x, y: s.y }));
-                for (let i = 0; i < 60; i++) cand.push(randFree(r, 50));
-                const okC = q => isFree(r, q.x, q.y, 50) && spawns.every(sp => dist(sp, q) > 380), pool = cand.filter(okC), pts = [];
+                const spawns = Object.values(r.teamSpawns || {}), marks = map.solids.filter(s => s.type === 'spawn_cp').map(s => ({ x: s.x, y: s.y })), cand = marks.length ? marks.slice() : map.solids.filter(s => s.type === 'spawn_powerup').map(s => ({ x: s.x, y: s.y }));
+                if (!marks.length) for (let i = 0; i < 60; i++) cand.push(randFree(r, 50));
+                const okC = q => isFree(r, q.x, q.y, 50) && (marks.length || spawns.every(sp => dist(sp, q) > 380)), pool = cand.filter(okC), pts = [];
                 if (pool.length) { pool.sort((a, b) => dist(a, C) - dist(b, C)); pts.push(pool.shift()); }
                 while (pts.length < r.cpPoints && pool.length) { let bi = 0, bd = -1; pool.forEach((q, i) => { const d = Math.min(...pts.map(c => dist(c, q))); if (d > bd) { bd = d; bi = i; } }); if (bd < 300 && pts.length >= 2) break; pts.push(pool.splice(bi, 1)[0]); }
                 while (pts.length < Math.min(r.cpPoints, 2)) pts.push(randFree(r, 50));

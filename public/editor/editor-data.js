@@ -48,7 +48,9 @@ const TOOLS = {
     water: [{ id: 'water_square', name: 'Куб води' }, { id: 'water_curve', name: 'Заокруглена вода' }, eraser],
     spawns: [
         { id: 'spawn_player', name: 'Спавн: Гравець (невидимий у грі)' }, { id: 'spawn_zombie', name: 'Спавн: Зомбі (невидимий)' },
-        { id: 'spawn_powerup', name: 'Спавн: Лут / баф (невидимий)' }, eraser
+        { id: 'spawn_powerup', name: 'Спавн: Лут / баф (невидимий)' },
+        { id: 'spawn_core', name: '🏰 Ядро бази — Оборона бази (невидимий)' }, { id: 'spawn_cp', name: '🚩 Точка захоплення — Захоплення точок (невидимий)' },
+        { id: 'spawn_convoy_a', name: '🚚 Конвой: старт A (невидимий)' }, { id: 'spawn_convoy_b', name: '🏁 Конвой: фініш B (невидимий)' }, eraser
     ],
     contour: [{ type: 'custom', render: 'contour' }]
 };

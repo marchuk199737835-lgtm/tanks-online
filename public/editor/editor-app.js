@@ -67,6 +67,14 @@ function buildSettingsPanel() {
             <label class="mode-row"><input type="checkbox" data-mode="team_deathmatch"> 🤝 Командний</label>
             <label class="mode-row"><input type="checkbox" data-mode="survival"> 🧟 Виживання</label>
             <label class="mode-row"><input type="checkbox" data-mode="prophunt"> 📦 Хованки</label>
+            <label class="mode-row"><input type="checkbox" data-mode="base_defense"> 🏰 Оборона бази</label>
+            <label class="mode-row"><input type="checkbox" data-mode="boss_raid"> 👹 Рейд на боса</label>
+            <label class="mode-row"><input type="checkbox" data-mode="convoy"> 🚚 Конвой</label>
+            <label class="mode-row"><input type="checkbox" data-mode="solo_arena"> 🌀 Арена хвиль (соло)</label>
+            <label class="mode-row"><input type="checkbox" data-mode="boss_duel"> 💀 Дуель з босами (соло)</label>
+            <label class="mode-row"><input type="checkbox" data-mode="battle_royale"> 🔥 Королівський бій</label>
+            <label class="mode-row"><input type="checkbox" data-mode="capture_points"> 🚩 Захоплення точок</label>
+            <label class="mode-row"><input type="checkbox" data-mode="bounty"> 🎯 Полювання за головою</label>
         </div>
         <label class="side-label">Розмір (квадрат, px)</label><input type="number" id="set-size" class="side-input" min="1000" max="8000" step="500">
         <label class="side-label">Підлога</label><input type="color" id="set-bg" class="w-full h-8 mb-3 bg-transparent cursor-pointer">

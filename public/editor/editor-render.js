@@ -50,10 +50,10 @@ function drawObject(c, o, time) {
         c.fillStyle = 'rgba(22, 163, 74, 0.4)'; c.beginPath(); c.arc(o.x + 5, o.y + 5, Math.max(5, (o.r || 30) - 10), 0, Math.PI * 2); c.fill();
     }
     else if (o.type.indexOf('spawn') >= 0) {
-        const col = o.type === 'spawn_player' ? '#3b82f6' : o.type === 'spawn_zombie' ? '#22c55e' : '#eab308';
+        const SPC = { spawn_player: ['#3b82f6', 'P'], spawn_zombie: ['#22c55e', 'Z'], spawn_core: ['#ef4444', '🏰'], spawn_cp: ['#a855f7', '🚩'], spawn_convoy_a: ['#06b6d4', 'A'], spawn_convoy_b: ['#f97316', 'B'] }, spc = SPC[o.type] || ['#eab308', '*'], col = spc[0];
         c.beginPath(); c.arc(o.x, o.y, 20, 0, Math.PI * 2); c.fillStyle = col; c.fill();
         c.fillStyle = '#fff'; c.font = '16px Russo One'; c.textAlign = 'center'; c.textBaseline = 'middle';
-        c.fillText(o.type === 'spawn_player' ? 'P' : o.type === 'spawn_zombie' ? 'Z' : '*', o.x, o.y);
+        c.fillText(spc[1], o.x, o.y);
         if (ED.shape && ED.shape.length >= 3 && !MapObj.circleInPoly(ED.shape, o.x, o.y, 5)) { c.strokeStyle = '#ef4444'; c.lineWidth = 5; c.beginPath(); c.arc(o.x, o.y, 26, 0, Math.PI * 2); c.moveTo(o.x - 18, o.y - 18); c.lineTo(o.x + 18, o.y + 18); c.stroke(); }
     }
     else if (o.type.indexOf('prop_') === 0) MapObj.drawProp(c, o, time);
