@@ -792,7 +792,7 @@ function draw(now) {
     }
     
     for (let id in opponents) {
-        const p = opponents[id], sn = currentRoomData.players[id] || { name: 'Гравець', color: 'white', equipped: {} };
+        const p = opponents[id], sn = currentRoomData.players[id]; if (!sn) { delete opponents[id]; continue; }
         const cH = sn.color ? (sn.color === 'white' ? '#f8fafc' : sn.color === 'black' ? '#1e293b' : sn.color === 'red' ? '#ef4444' : sn.color === 'blue' ? '#3b82f6' : sn.color === 'brown' ? '#78350f' : '#9333ea') : '#ef4444';
         if (p.isDisguised) MapObj.drawDisguise(ctx, { type: p.propType, x: p.x - 25, y: p.y - 25, w: 50, h: 50, r: 25 }, tm);
         else drTnk(p.x, p.y, p.bodyAngle, p.turretAngle, cH, sn.name, false, p.hp, p.buff, sn.equipped, true);
