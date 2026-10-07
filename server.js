@@ -1,7 +1,7 @@
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
-const io = require('socket.io')(http);
+const io = require('socket.io')(http, { perMessageDeflate: { threshold: 1024 } }); // стискаються лише великі повідомлення (лобі, списки); дрібні sync летять як є
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -185,6 +185,9 @@ function grantXp(name, outcome) {
 }
 function playerLevel(name) { return dbUsers[name] ? GameData.levelFromXp(dbUsers[name].xp || 0) : 1; }
 
+// Список сесій отримують лише ті, хто його дивиться (кімната 'rb'), і не частіше разу на ~300 мс (раніше — усім підключеним на кожну зміну)
+let _roomsTimer = null;
+function pushRooms() { if (_roomsTimer) return; _roomsTimer = setTimeout(() => { _roomsTimer = null; io.to('rb').emit('roomsList', getActiveRooms()); }, 300); }
 function getActiveRooms() {
     return Object.values(rooms).map(r => ({ id: r.id, hostName: r.hostName, mode: r.mode, map: r.map, playersCount: Object.keys(r.players).length, maxPlayers: r.maxPlayers, status: r.status }));
 }
@@ -310,7 +313,7 @@ function resetRoomToLobby(r) {
         p.stuckIn = []; p.onFire = null; p.isDisguised = false; p.level = playerLevel(p.name);
     });
     io.to(r.id).emit('updateLobby', r);
-    io.emit('roomsList', getActiveRooms());
+    pushRooms();
 }
 
 // Єдина логіка виходу гравця з кімнати (кнопка «Вийти» і розрив з'єднання)
@@ -320,7 +323,7 @@ function removePlayer(rId, sockId) {
     const left = r.players[sockId];
     delete r.players[sockId];
     const ids = Object.keys(r.players);
-    if (ids.length === 0) { delete rooms[rId]; return; }
+    if (ids.length === 0) { delete rooms[rId]; if (typeof SYNCS !== "undefined") SYNCS.delete(rId); return; }
     if (r.hostSocket === sockId) { r.hostSocket = ids[0]; r.hostName = r.players[ids[0]].name; }
     if (r.status === 'playing') {
         let abort = false;
@@ -590,7 +593,8 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('requestRooms', () => { socket.emit('roomsList', getActiveRooms()); });
+    socket.on('requestRooms', () => { socket.join('rb'); socket.emit('roomsList', getActiveRooms()); });
+    socket.on('rbLeave', () => { socket.leave('rb'); });
 
     socket.on('createRoom', (c) => {
         let n = globalPlayers[socket.id];
@@ -610,7 +614,7 @@ io.on('connection', (socket) => {
             wave: 1, nextWaveTime: 0, lastPowerupSpawn: Date.now()
         };
         socket.emit('roomCreated', rId);
-        io.emit('roomsList', getActiveRooms());
+        pushRooms();
     });
 
     socket.on('joinRoom', (roomId) => {
@@ -636,14 +640,14 @@ io.on('connection', (socket) => {
         };
         socket.emit('joinedRoom', { roomId: roomId, roomData: r });
         io.to(roomId).emit('updateLobby', r);
-        io.emit('roomsList', getActiveRooms());
+        pushRooms();
     });
 
     socket.on('leaveRoom', (roomId) => {
         if (rooms[roomId] && rooms[roomId].players[socket.id]) {
             socket.leave(roomId);
             removePlayer(roomId, socket.id);
-            io.emit('roomsList', getActiveRooms());
+            pushRooms();
         }
     });
 
@@ -674,7 +678,7 @@ io.on('connection', (socket) => {
             if (d.tdmScore) r.tdmScore = clampInt(d.tdmScore, 5, 50, 20);
             if (d.tdmAutoBalance !== undefined) r.tdmAutoBalance = !!d.tdmAutoBalance;
             io.to(d.roomId).emit('updateLobby', r);
-            io.emit('roomsList', getActiveRooms());
+            pushRooms();
         }
     });
 
@@ -686,7 +690,7 @@ io.on('connection', (socket) => {
         if (tSock) { tSock.leave(r.id); tSock.emit('kicked', { roomId: r.id }); }
         removePlayer(r.id, d.targetId);
         if (rooms[r.id]) io.to(r.id).emit('updateLobby', r);
-        io.emit('roomsList', getActiveRooms());
+        pushRooms();
     });
 
     socket.on('transferHost', (d) => {
@@ -694,7 +698,7 @@ io.on('connection', (socket) => {
         if (!r || r.hostSocket !== socket.id || r.status !== 'lobby' || !d.targetId || d.targetId === socket.id || !r.players[d.targetId]) return;
         r.hostSocket = d.targetId; r.hostName = r.players[d.targetId].name;
         io.to(r.id).emit('updateLobby', r);
-        io.emit('roomsList', getActiveRooms());
+        pushRooms();
     });
 
     socket.on('setColor', (d) => {
@@ -795,7 +799,7 @@ io.on('connection', (socket) => {
                     });
                 }
                 io.to(roomId).emit('gameStarting', r);
-                io.emit('roomsList', getActiveRooms());
+                pushRooms();
             }
         }
     });
@@ -918,7 +922,7 @@ socket.on('selectProp', (data) => {
             });
             io.to(d.roomId).emit('tokenCollected', { tid: d.tid, playerId: socket.id, score: r.players[socket.id].score });
             io.to(d.roomId).emit('gameOver', { winner: socket.id, name: r.players[socket.id] ? r.players[socket.id].name : 'ГРАВЕЦЬ', rewards: rw, xp: xpm, isTeamWin: false });
-            io.emit('roomsList', getActiveRooms());
+            pushRooms();
         } else {
             io.to(d.roomId).emit('tokenCollected', { tid: d.tid, playerId: socket.id, score: r.players[socket.id].score });
         }
@@ -960,7 +964,7 @@ socket.on('selectProp', (data) => {
     socket.on('disconnect', () => {
         delete globalPlayers[socket.id];
         for (let rId in rooms) removePlayer(rId, socket.id);
-        io.emit('roomsList', getActiveRooms());
+        pushRooms();
     });
 });
 
@@ -977,7 +981,7 @@ function endPropHuntGame(r, wT) {
         }
     });
     io.to(r.id).emit('gameOver', { winner: wId || 'TEAM', name: wT === 'hunter' ? 'КОМАНДА МИСЛИВЦІВ' : 'ТІ, ХТО ХОВАВСЯ', rewards: rew, xp: xpm, isTeamWin: true });
-    io.emit('roomsList', getActiveRooms());
+    pushRooms();
 }
 
 function endTDMGame(r, wT) {
@@ -993,14 +997,67 @@ function endTDMGame(r, wT) {
         }
     });
     io.to(r.id).emit('gameOver', { winner: isD ? 'DRAW' : (wT || 'TEAM'), name: isD ? 'НІЧИЯ' : `КОМАНДА ${typeof wT === 'string' ? wT.toUpperCase() : 'ПОБЕДИТЕЛЬ'}`, rewards: rew, xp: xpm, isTeamWin: !isD });
-    io.emit('roomsList', getActiveRooms());
+    pushRooms();
 }
 
+
+// ===== Дельта-синхронізація стану бою =====
+// Раніше щотіку (30 Гц) всім летів ПОВНИЙ стан: усі гравці з усіма полями, зомбі, жетони, бонуси, міни.
+// Тепер: рухомі поля — масивом і лише для тих, що змінились; статичні (ім'я, колір, екіпірування…) — лише при зміні;
+// бонуси/жетони/міни — лише коли змінились; повний зріз раз на секунду як страховка (піздній вхід, пропущений пакет).
+const r1 = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100;
+const SYNCS = new Map(); // стан дельта-синхронізації по кімнатах (окремо від r, щоб не потрапляти в updateLobby)
+function buildSync(r, now) {
+    let S = SYNCS.get(r.id);
+    if (!S) { S = { n: 0, p: {}, st: {}, ids: '', z: {}, zi: '', zs: {}, pu: '', tk: '', mn: '', ph: '', tdm: '', tm: 0, za: {}, zn: 0 }; SYNCS.set(r.id, S); }
+    const full = S.n % TICK_RATE === 0; S.n++;
+    const out = {}; let any = false;
+    const P = {}, ST = {}, ids = Object.keys(r.players);
+    for (const id of ids) {
+        const p = r.players[id];
+        const a = [r1(p.x), r1(p.y), r2(p.bodyAngle), r2(p.turretAngle), r1(p.hp), p.score | 0, p.buff || 0, r2(p.buffProgress || 0), p.isDisguised ? 1 : 0];
+        const k = a.join(',');
+        if (full || S.p[id] !== k) { S.p[id] = k; P[id] = a; any = true; }
+        const st = JSON.stringify([p.name, p.color, p.team, p.equipped, p.propType, p.level, p.ready]);
+        if (full || S.st[id] !== st) { S.st[id] = st; ST[id] = { name: p.name, color: p.color, team: p.team, equipped: p.equipped, propType: p.propType, level: p.level, ready: p.ready }; any = true; }
+    }
+    for (const id in S.p) if (!r.players[id]) { delete S.p[id]; delete S.st[id]; }
+    const idk = ids.join('|');
+    if (full || idk !== S.ids) { S.ids = idk; out.ids = ids; any = true; }
+    if (Object.keys(P).length) out.p = P; if (Object.keys(ST).length) out.s = ST;
+    // зомбі: [x, y, hp] лише для змінених; тип і maxHp — один раз; перелік id — коли склад змінився
+    if (r.zombies) {
+        const Z = {}, ZS = {}, zids = Object.keys(r.zombies);
+        for (const id of zids) {
+            const z = r.zombies[id], a = [Math.round(z.x), Math.round(z.y), Math.round(z.hp)], k = a.join(',');
+            const al = S.za[id] || (S.za[id] = ++S.zn);   // короткий числовий псевдонім замість довгого id у кожному пакеті
+            if (full || S.z[id] !== k) { S.z[id] = k; Z[al] = a; any = true; }
+            if (full || !S.zs[id]) { S.zs[id] = 1; ZS[id] = { a: al, id: z.id, type: z.type, maxHp: z.maxHp }; any = true; }
+        }
+        for (const id in S.z) if (!r.zombies[id]) { delete S.z[id]; delete S.zs[id]; delete S.za[id]; }
+        const zk = zids.join('|');
+        if (full || zk !== S.zi) { S.zi = zk; out.zi = zids; any = true; }
+        if (Object.keys(Z).length) out.z = Z; if (Object.keys(ZS).length) out.zs = ZS;
+    }
+    const chg = (key, val, name) => { const j = JSON.stringify(val); if (full || S[key] !== j) { S[key] = j; out[name] = val; any = true; } };
+    chg('pu', r.powerups || {}, 'pu'); chg('tk', r.tokens || {}, 'tk'); chg('mn', r.mines || {}, 'mn');
+    if (r.mode === 'prophunt') { const t = Math.max(0, Math.ceil((r.phaseEndTime - now) / 1000)), j = r.state + ':' + t; if (full || S.ph !== j) { S.ph = j; out.phState = r.state; out.phTimeLeft = t; any = true; } }
+    if (r.mode === 'team_deathmatch') {
+        chg('tdm', { teamScores: r.teamScores, timeEndTime: r.timeEndTime }, 'tdm');
+        if (full || now - S.tm >= 1000) { S.tm = now; out.tdmMsLeft = Math.max(0, r.timeEndTime - now); any = true; }
+    }
+    return any ? out : null;
+}
+
+// ===== Мережева частота: 20 оновлень на секунду. Уся логіка йде за реальним часом (dt/now), тож швидкість гри не залежить від частоти. =====
+const TICK_RATE = 20;
+let _lastLoop = Date.now();
 setInterval(() => {
     const now = Date.now();
+    const dt = Math.min(0.12, Math.max(0.01, (now - _lastLoop) / 1000)); _lastLoop = now;
     for (let rId in rooms) {
         let r = rooms[rId];
-        if (r.status !== 'playing') continue;
+        if (r.status !== 'playing') { if (SYNCS.has(rId)) SYNCS.delete(rId); continue; }
 
         if (r.mode === 'deathmatch' || r.mode === 'survival') {
             let pKeys = Object.keys(r.powerups);
@@ -1105,7 +1162,7 @@ setInterval(() => {
                 Object.values(r.players).forEach(pl => {
                     let n = pl.name; if (dbUsers[n]) { let wv = r.wave; dbUsers[n].bucks += wv; dbUsers[n].stats.earned += wv; dbUsers[n].stats.matches++; xpm[pl.id] = grantXp(n, 'loss'); let dr = rollDrop(n); saveUser(n); io.to(pl.id).emit('economyUpdate', ecoPayload(n)); if (dr) io.to(pl.id).emit('dropReceived', dr); }
                 });
-                io.to(rId).emit('gameOver', { winner: 'ZOMBIES', wave: r.wave, rewards: rw, xp: xpm, isTeamWin: false }); io.emit('roomsList', getActiveRooms());
+                io.to(rId).emit('gameOver', { winner: 'ZOMBIES', wave: r.wave, rewards: rw, xp: xpm, isTeamWin: false }); pushRooms();
                 continue;
             }
             if (Object.keys(r.zombies).length === 0) {
@@ -1139,7 +1196,7 @@ setInterval(() => {
                         let dx = t.x - z.x, dy = t.y - z.y, l = Math.max(Math.hypot(dx, dy), 0.001), sp = Z_TYPES[z.type].speed;
                         // шлях в обхід перешкод (барикади, стіни, вода): зомбі йде до наступної точки маршруту, а не тупо в гравця
                         const wp = Nav.steer(MAP_DATA[r.map] || MAP_DATA['epic_map'], r, t.id, t.x, t.y, z.x, z.y, Z_TYPES[z.type].radius, now), wdx = wp.x - z.x, wdy = wp.y - z.y, wl = Math.max(Math.hypot(wdx, wdy), 0.001);
-                        let nX = z.x + (wdx / wl) * sp * (1 / 30), nY = z.y + (wdy / wl) * sp * (1 / 30);
+                        let nX = z.x + (wdx / wl) * sp * dt, nY = z.y + (wdy / wl) * sp * dt;
                         if (!checkCollisionServer(r.map, nX, z.y, Z_TYPES[z.type].radius, [], r)) z.x = nX;
                         if (!checkCollisionServer(r.map, z.x, nY, Z_TYPES[z.type].radius, [], r)) z.y = nY;
                         // Анти-застрягання: зомбі, що 3с не рухається далеко від гравця, переноситься на край мапи
@@ -1164,12 +1221,10 @@ setInterval(() => {
             }
         }
         
-        let syncData = { players: r.players, zombies: compactZombies(r.zombies), powerups: r.powerups, tokens: r.tokens, mines: r.mines };
-        if (r.mode === 'prophunt') { syncData.phState = r.state; syncData.phTimeLeft = Math.max(0, Math.ceil((r.phaseEndTime - now) / 1000)); }
-        if (r.mode === 'team_deathmatch') { syncData.teamScores = r.teamScores; syncData.timeEndTime = r.timeEndTime; syncData.tdmMsLeft = Math.max(0, r.timeEndTime - now); }
-        io.to(rId).emit('sync', syncData);
+        const sy = buildSync(r, now);
+        if (sy) io.to(rId).volatile.emit('sync2', sy);
     }
-}, 1000 / 30);
+}, 1000 / TICK_RATE);
 
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => console.log(`Server running on port ${PORT}`));

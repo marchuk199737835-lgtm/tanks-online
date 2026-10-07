@@ -31,6 +31,7 @@
         { key: 'tdmScore', label: 'Очки для перемоги', min: 5, max: 50, def: 20, step: 1, modes: ['team_deathmatch'], desc: 'Команда, яка першою набере стільки очок (за вбивства), перемагає достроково.' },
         { key: 'tdmAutoBalance', label: 'Автобаланс', type: 'toggle', modes: ['team_deathmatch'], desc: 'Якщо увімкнено — гру не можна почати, поки склади команд відрізняються більш ніж на одного гравця.' }
     ];
+    window.LB_PARAMS = PARAMS;
     const cur = () => (typeof currentRoomData !== 'undefined' ? currentRoomData : null);
     const val = (r, p) => r[p.key] != null ? r[p.key] : p.def;
     const maxOf = (r, p) => p.dyn ? Math.max(1, Math.min(9, Object.keys(r.players).length - 1)) : p.max;

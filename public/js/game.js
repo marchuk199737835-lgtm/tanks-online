@@ -1,16 +1,20 @@
 let canvas = document.getElementById('game-canvas');
 let ctx = canvas.getContext('2d');
+if (window.GFX) GFX.attach(ctx);
 
 // ФІКСОВАНИЙ МАСШТАБ ГРИ: по висоті екрана гравець завжди бачить однакову ділянку мапи (VIEW_H одиниць),
 // тому зменшення масштабу браузера (Ctrl -), великий монітор чи планшет не дають бачити більше за інших.
 const VIEW_H_DESKTOP = 800, VIEW_H_TOUCH = 420, VIEW_MAX_ASPECT = 2.0;
 let VS = 1; // множник «одиниця світу -> піксель екрана»
+let GW = window.innerWidth, GH = window.innerHeight, RS = 1; // GW/GH — логічний розмір (CSS-пікселі), RS — масштаб внутрішнього розширення полотна (налаштування графіки)
 function fitCanvas() {
-    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    RS = (window.GFX && GFX.rs) || 1; GW = window.innerWidth; GH = window.innerHeight;
+    canvas.width = Math.max(1, Math.round(GW * RS)); canvas.height = Math.max(1, Math.round(GH * RS));
     const touch = window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches, VH = touch ? VIEW_H_TOUCH : VIEW_H_DESKTOP;
-    VS = Math.max(canvas.height / VH, canvas.width / (VH * VIEW_MAX_ASPECT)); // надширокі екрани не бачать більше, ніж 2:1
-    VS = Math.min(VS, canvas.width / (VH * 0.9)); // вузький портретний екран не стискаємо до смужки
+    VS = Math.max(GH / VH, GW / (VH * VIEW_MAX_ASPECT)); // надширокі екрани не бачать більше, ніж 2:1
+    VS = Math.min(VS, GW / (VH * 0.9)); // вузький портретний екран не стискаємо до смужки
 }
+window.fitCanvas = fitCanvas;
 window.addEventListener('resize', fitCanvas);
 fitCanvas();
 
@@ -43,6 +47,8 @@ window.getReloadTime = function() {
 };
 
 function createExplosion(x, y, count, color) {
+    const _fx = window.GFX ? GFX.fx : 1; count = Math.ceil(count * _fx);
+    if (particles.length > (window.GFX ? GFX.partMax : 400)) return;
     for (let i = 0; i < count; i++) {
         const ang = Math.random() * Math.PI * 2;
         const spd = Math.random() * 200 + 50;
@@ -82,6 +88,7 @@ function findNextSpec(dir) {
     else spectatingId = aO[(aO.indexOf(spectatingId) + dir + aO.length) % aO.length];
 }
 
+let _mvAt = 0, _mvLast = {};
 function updatePhys(now, dt) {
     if (!currentRoomData || !currentRoomId) return;
     // myRad — фізичне тіло (стіни, декор, двері): менше за клітинку 50, щоб вільно проходити між об'єктами; myHitRad — хітбокс для куль і підбору (візуальний, як і раніше)
@@ -95,6 +102,7 @@ function updatePhys(now, dt) {
     }
     
     if (myLocalTank.hp <= 0) {
+        if (joysticks.left.active || joysticks.right.active || joysticks.left.force) resetJoysticks();
         if (spectatingId && opponents[spectatingId]) {
             camera.x += (opponents[spectatingId].x - camera.x) * 5 * dt;
             camera.y += (opponents[spectatingId].y - camera.y) * 5 * dt;
@@ -125,7 +133,7 @@ function updatePhys(now, dt) {
         {
             let tgtA = null;
             if (joysticks.right.active) tgtA = joysticks.right.angle;
-            else if (!isMobile && !myLocalTank.isDisguised) tgtA = Math.atan2(mouseY - (canvas.height / 2), mouseX - (canvas.width / 2));
+            else if (!isMobile && !myLocalTank.isDisguised) tgtA = Math.atan2(mouseY - (GH / 2), mouseX - (GW / 2));
             if (tgtA !== null) {
                 let rotMul = 1;
                 rotMul = GameData.statMult(myEquipped, 'rotSpeed');
@@ -134,7 +142,14 @@ function updatePhys(now, dt) {
             }
         }
         
-        socket.emit('move', { roomId: currentRoomId, x: myLocalTank.x, y: myLocalTank.y, bodyAngle: myLocalTank.bodyAngle, turretAngle: myLocalTank.turretAngle });
+        // позицію шлемо не частіше 20 разів/с і лише коли щось змінилось (раніше — кожен кадр, 60+ разів/с)
+        if (now - _mvAt >= 50) {
+            const mx = Math.round(myLocalTank.x * 10) / 10, my = Math.round(myLocalTank.y * 10) / 10, mb = Math.round(myLocalTank.bodyAngle * 100) / 100, mt = Math.round(myLocalTank.turretAngle * 100) / 100;
+            if (mx !== _mvLast.x || my !== _mvLast.y || mb !== _mvLast.b || mt !== _mvLast.t || now - _mvAt >= 1000) {
+                _mvAt = now; _mvLast = { x: mx, y: my, b: mb, t: mt };
+                (socket.volatile || socket).emit('move', { roomId: currentRoomId, x: mx, y: my, bodyAngle: mb, turretAngle: mt });
+            }
+        }
         
         let fCfg = window.BUFFS[myLocalTank.buff || 'none'] || window.BUFFS['none'];
         let tR = 1.0;
@@ -181,11 +196,12 @@ function updatePhys(now, dt) {
         camera.y += (myLocalTank.y - camera.y) * 5 * dt;
     }
     
+    for (let zid in zombies) { const z = zombies[zid]; if (z.tx !== undefined) { z.x += (z.tx - z.x) * Math.min(1, _ZSMOOTH * dt); z.y += (z.ty - z.y) * Math.min(1, _ZSMOOTH * dt); } }
     for (let id in opponents) {
         let o = opponents[id];
         if (o.targetX !== undefined) {
             if (Math.hypot(o.targetX - o.x, o.targetY - o.y) > 150) { o.x = o.targetX; o.y = o.targetY; } 
-            else { o.x += (o.targetX - o.x) * 15 * dt; o.y += (o.targetY - o.y) * 15 * dt; }
+            else { o.x += (o.targetX - o.x) * Math.min(1, 15 * dt); o.y += (o.targetY - o.y) * Math.min(1, 15 * dt); }
             let db = o.targetBody - o.bodyAngle;
             while (db > Math.PI) db -= Math.PI * 2; while (db < -Math.PI) db += Math.PI * 2;
             o.bodyAngle += db * 15 * dt;
@@ -383,7 +399,7 @@ function drPrp(c, o, t) { MapObj.drawProp(c, o, t); }
 function drJ() {
     if (!isMobile || myLocalTank.hp <= 0) return;
     ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.setTransform(RS, 0, 0, RS, 0, 0);
     if (joysticks.left.active) {
         ctx.beginPath(); ctx.arc(joysticks.left.startX, joysticks.left.startY, 60, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'; ctx.fill();
@@ -427,9 +443,19 @@ function drPCA() {
     ctx.restore();
 }
 
-socket.on('sync', (data) => {
+// ===== Прийом дельта-синхронізації (сервер шле 20 разів/с лише зміни) =====
+const _ZSMOOTH = 14, _zAlias = {}; let _hudAt = 0;
+socket.on('sync2', (data) => {
     if (!currentRoomData || currentRoomData.status !== 'playing') return;
-    currentRoomData.players = data.players;
+    const pl = currentRoomData.players || (currentRoomData.players = {});
+    if (data.ids) { const keep = new Set(data.ids); for (const id in pl) if (!keep.has(id)) { delete pl[id]; delete opponents[id]; } }
+    const touched = new Set();
+    if (data.s) for (const id in data.s) { pl[id] = Object.assign(pl[id] || { id: id }, data.s[id]); touched.add(id); }
+    if (data.p) for (const id in data.p) {
+        const a = data.p[id], o = pl[id] || (pl[id] = { id: id });
+        o.x = a[0]; o.y = a[1]; o.bodyAngle = a[2]; o.turretAngle = a[3]; o.hp = a[4]; o.score = a[5];
+        o.buff = a[6] || null; o.buffProgress = a[7]; o.isDisguised = !!a[8]; touched.add(id);
+    }
     if (currentRoomData.mode === 'prophunt' && data.phState) {
         currentRoomData.state = data.phState;
         let pT = document.getElementById('prophunt-hud-timer'), pTT = document.getElementById('ph-time-text'), pPT = document.getElementById('ph-phase-text'), bO = document.getElementById('hunter-blind-overlay');
@@ -446,42 +472,38 @@ socket.on('sync', (data) => {
         }
     }
     if (currentRoomData.mode === 'team_deathmatch') {
-        currentRoomData.teamScores = data.teamScores;
-        currentRoomData.timeEndTime = data.timeEndTime;
-        currentRoomData.tdmEndLocal = Date.now() + (data.tdmMsLeft || 0); // залишок від сервера, не залежить від годинника клієнта
+        if (data.tdm) { currentRoomData.teamScores = data.tdm.teamScores; currentRoomData.timeEndTime = data.tdm.timeEndTime; }
+        if (data.tdmMsLeft !== undefined) currentRoomData.tdmEndLocal = Date.now() + data.tdmMsLeft; // залишок від сервера, не залежить від годинника клієнта
     }
-    let aO = {};
-    for (let id in data.players) {
+    touched.forEach(id => {
+        const sp = pl[id]; if (!sp) return;
         if (id !== myId) {
-            if (!opponents[id]) aO[id] = { ...data.players[id] };
+            const o = opponents[id];
+            if (!o) opponents[id] = { ...sp };
             else {
-                aO[id] = opponents[id];
-                aO[id].targetX = data.players[id].x;
-                aO[id].targetY = data.players[id].y;
-                aO[id].targetBody = data.players[id].bodyAngle;
-                aO[id].targetTurret = data.players[id].turretAngle;
+                if (data.p && data.p[id]) { o.targetX = sp.x; o.targetY = sp.y; o.targetBody = sp.bodyAngle; o.targetTurret = sp.turretAngle; }
+                o.hp = sp.hp; o.buff = sp.buff; o.equipped = sp.equipped; o.color = sp.color; o.team = sp.team; o.isDisguised = sp.isDisguised; o.propType = sp.propType;
+                if (sp.name !== undefined) { o.name = sp.name; o.level = sp.level; }
             }
-            aO[id].hp = data.players[id].hp;
-            aO[id].buff = data.players[id].buff;
-            aO[id].equipped = data.players[id].equipped;
-            aO[id].color = data.players[id].color;
-            aO[id].team = data.players[id].team;
-            aO[id].isDisguised = data.players[id].isDisguised;
-            aO[id].propType = data.players[id].propType;
         } else {
-            if (currentRoomData.mode === 'prophunt' && myLocalTank.hp > data.players[id].hp) myLocalTank.isDisguised = false;
-            myLocalTank.hp = data.players[id].hp;
-            myLocalTank.buff = data.players[id].buff;
-            myLocalTank.buffProgress = data.players[id].buffProgress;
-            myLocalTank.score = data.players[id].score;
-            myEquipped = data.players[id].equipped || myEquipped;
-            myColor = data.players[id].color;
-            myLocalTank.propType = data.players[id].propType;
+            if (currentRoomData.mode === 'prophunt' && myLocalTank.hp > sp.hp) myLocalTank.isDisguised = false;
+            myLocalTank.hp = sp.hp; myLocalTank.buff = sp.buff; myLocalTank.buffProgress = sp.buffProgress; myLocalTank.score = sp.score;
+            if (sp.equipped) myEquipped = sp.equipped;
+            if (sp.color !== undefined) myColor = sp.color;
+            myLocalTank.propType = sp.propType;
         }
+    });
+    // зомбі: отримуємо цілі позиції, малюємо плавно (див. updatePhys)
+    if (data.zi) { const keep = new Set(data.zi); for (const id in zombies) if (!keep.has(id)) delete zombies[id]; }
+    if (data.zs) for (const id in data.zs) { const st = data.zs[id], z = zombies[id] || (zombies[id] = {}); _zAlias[st.a] = id; Object.assign(z, { id: st.id, type: st.type, maxHp: st.maxHp }); }
+    if (data.z) for (const al in data.z) {
+        const a = data.z[al], z = zombies[_zAlias[al]]; if (!z) continue;   // тип ще невідомий — дочекаємось статики
+        if (z.x === undefined || Math.hypot(a[0] - z.x, a[1] - z.y) > 150) { z.x = a[0]; z.y = a[1]; }
+        z.tx = a[0]; z.ty = a[1]; z.hp = a[2];
     }
-    opponents = aO;
-    zombies = data.zombies || {}; powerups = data.powerups || {}; tokens = data.tokens || {}; mines = data.mines || {};
-    if (typeof window.updateHUD === 'function') window.updateHUD();
+    if (data.pu) powerups = data.pu; if (data.tk) tokens = data.tk; if (data.mn) mines = data.mn;
+    const _hn = performance.now();   // HUD оновлюємо не частіше ~11 разів/с: це купа записів у DOM
+    if (_hn - _hudAt > 90 && typeof window.updateHUD === 'function') { _hudAt = _hn; window.updateHUD(); }
 });
 
 socket.on('phPhaseChange', (data) => {
@@ -628,14 +650,28 @@ socket.on('gameOver', (data) => {
 
 function emitDamage(amt, atk) { playSound('hurt'); shakeTime = 0.3; socket.emit('takeDamage', { roomId: currentRoomId, amt: amt, attacker: atk }); }
 
+
+// ===== Відсікання за видимою областю: не малюємо й не тінимо те, чого не видно (на великих мапах це більшість об'єктів) =====
+function solidInView(o, X0, X1, Y0, Y1) {
+    let cx, cy, r;
+    if (o.type === 'line') {
+        let b = o._lb;
+        if (!b) { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const q of o.points) { if (q.x < x0) x0 = q.x; if (q.x > x1) x1 = q.x; if (q.y < y0) y0 = q.y; if (q.y > y1) y1 = q.y; } const w = (o.width || 10) / 2 + 4; b = o._lb = [x0 - w, y0 - w, x1 + w, y1 + w]; }
+        return !(b[2] < X0 || b[0] > X1 || b[3] < Y0 || b[1] > Y1);
+    }
+    if (o.w === undefined && o.h === undefined) { cx = o.x; cy = o.y; r = (o.r || 30) + 40; }
+    else { const w = o.w || 0, h = o.h || 0; cx = o.x + w / 2; cy = o.y + h / 2; r = Math.hypot(w, h) / 2 + 40; }
+    return !(cx + r < X0 || cx - r > X1 || cy + r < Y0 || cy - r > Y1);
+}
+
 function draw(now) {
     if (!currentRoomData) return;
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.setTransform(RS, 0, 0, RS, 0, 0); ctx.clearRect(0, 0, GW, GH);
     ctx.save();
     let shX = 0, shY = 0;
     if (shakeTime > 0) { shX = (Math.random() - 0.5) * 20; shY = (Math.random() - 0.5) * 20; shakeTime -= 0.03; }
     ctx.scale(VS, VS);
-    ctx.translate(canvas.width / VS / 2 - camera.x + shX, canvas.height / VS / 2 - camera.y + shY);
+    ctx.translate(GW / VS / 2 - camera.x + shX, GH / VS / 2 - camera.y + shY);
     
     let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'epic_map', mS = MAP_DATA[cMap].size;
     const _mp = MAP_DATA[cMap], _sh = MapObj.hasShape(_mp);
@@ -646,9 +682,14 @@ function draw(now) {
     ctx.fillStyle = MAP_DATA[cMap].bg || '#020617'; ctx.fillRect(0, 0, mS, mS);
     ctx.strokeStyle = MAP_DATA[cMap].grid || '#1e293b'; ctx.lineWidth = 1;
     
-    for (let i = 0; i <= mS; i += 50) {
-        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, mS); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(mS, i); ctx.stroke();
+    // видима область у координатах світу (із запасом на тінь/світіння)
+    const _vw = GW / VS / 2 + 70, _vh = GH / VS / 2 + 70, VX0 = camera.x - _vw, VX1 = camera.x + _vw, VY0 = camera.y - _vh, VY1 = camera.y + _vh;
+    {   // сітка: один шлях лише для видимих ліній (було 2×N окремих beginPath/stroke на всю мапу)
+        const gx0 = Math.max(0, Math.floor(VX0 / 50) * 50), gx1 = Math.min(mS, Math.ceil(VX1 / 50) * 50), gy0 = Math.max(0, Math.floor(VY0 / 50) * 50), gy1 = Math.min(mS, Math.ceil(VY1 / 50) * 50);
+        ctx.beginPath();
+        for (let x = gx0; x <= gx1; x += 50) { ctx.moveTo(x, gy0); ctx.lineTo(x, gy1); }
+        for (let y = gy0; y <= gy1; y += 50) { ctx.moveTo(gx0, y); ctx.lineTo(gx1, y); }
+        ctx.stroke();
     }
     if (_sh) {
         ctx.restore();
@@ -660,6 +701,7 @@ function draw(now) {
     
     MAP_DATA[cMap].solids.forEach(o => {
         if (o.type.includes('spawn')) return;
+        if (!solidInView(o, VX0, VX1, VY0, VY1)) return;
         ctx.save();
         MapObj.applyRot(ctx, o);
         if (o.type === 'line') {
@@ -693,6 +735,7 @@ function draw(now) {
     ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 15; ctx.shadowOffsetX = 8; ctx.shadowOffsetY = 12;
     MAP_DATA[cMap].solids.forEach(o => {
         if (o.type.includes('spawn') || o.type.includes('water') || o.type === 'line' || o.type === 'prop_puddle' || o.type === 'prop_crater') return;
+        if (!solidInView(o, VX0, VX1, VY0, VY1)) return;
         ctx.save(); MapObj.applyRot(ctx, o);
         if (o.type === 'shape_triangle') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w / 2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
         else if (o.type === 'shape_rhombus') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w / 2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h / 2); ctx.lineTo(o.x + o.w / 2, o.y + o.h); ctx.lineTo(o.x, o.y + o.h / 2); ctx.fill(); }
@@ -706,6 +749,7 @@ function draw(now) {
     
     MAP_DATA[cMap].solids.forEach(o => {
         if (o.type.includes('spawn') || o.type.includes('water') || o.type === 'line' || o.type.includes('prop_')) return;
+        if (!solidInView(o, VX0, VX1, VY0, VY1)) return;
         ctx.save(); MapObj.applyRot(ctx, o);
         if (o.type === 'shape_triangle') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w / 2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
         else if (o.type === 'shape_rhombus') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w / 2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h / 2); ctx.lineTo(o.x + o.w / 2, o.y + o.h); ctx.lineTo(o.x, o.y + o.h / 2); ctx.fill(); }
@@ -837,8 +881,8 @@ function draw(now) {
         let sN = currentRoomData.players[spectatingId] ? currentRoomData.players[spectatingId].name : 'ГРАВЕЦЬ', sT = opponents[spectatingId];
         if (sT.isDisguised) MapObj.drawDisguise(ctx, { type: sT.propType, x: sT.x - 25, y: sT.y - 25, w: 50, h: 50, r: 25 }, tm);
         ctx.fillStyle = '#fff'; ctx.font = '24px Russo One'; ctx.textAlign = 'center'; ctx.shadowColor = '#000'; ctx.shadowBlur = 10;
-        ctx.fillText(`${I18N.t('СПОСТЕРІГАННЯ:')} ${sN}`, canvas.width / 2, 120);
-        if (!isMobile) { ctx.font = '14px Jura'; ctx.fillStyle = '#94a3b8'; ctx.fillText(`[A] ${I18N.t('Попередній')}  |  ${I18N.t('Наступний')} [D]`, canvas.width / 2, 150); }
+        ctx.fillText(`${I18N.t('СПОСТЕРІГАННЯ:')} ${sN}`, GW / 2, 120);
+        if (!isMobile) { ctx.font = '14px Jura'; ctx.fillStyle = '#94a3b8'; ctx.fillText(`[A] ${I18N.t('Попередній')}  |  ${I18N.t('Наступний')} [D]`, GW / 2, 150); }
         ctx.shadowBlur = 0;
     }
     drJ();
@@ -850,10 +894,10 @@ window.updateHUD = function() {
     mHp *= GameData.statMult(myEquipped, 'hp');
     mHp = Math.round(mHp);
     let pct = Math.max(0, Math.min(100, (myLocalTank.hp / mHp) * 100)), bC = myLocalTank.hp < mHp * 0.3 ? 'h-full bg-gradient-to-r from-red-600 to-red-400 w-full transition-all duration-300 shadow-[0_0_15px_rgba(239,68,68,0.8)]' : 'h-full bg-gradient-to-r from-green-500 to-emerald-400 w-full transition-all duration-300 shadow-[0_0_10px_rgba(34,197,94,0.5)]', hpB = document.getElementById('hp-bar'), hpT = document.getElementById('hp-text');
-    if (hpB) { hpB.style.width = pct + '%'; hpB.className = bC; }
+    if (hpB) { hpB.style.width = pct + '%'; if (hpB._c !== bC) { hpB.className = bC; hpB._c = bC; } }
     if (hpT) hpT.innerText = `${Math.ceil(myLocalTank.hp)}/${mHp}`;
     let hpBM = document.getElementById('hp-bar-mob'), hpTM = document.getElementById('hp-text-mob');
-    if (hpBM) { hpBM.style.width = pct + '%'; hpBM.className = bC; }
+    if (hpBM) { hpBM.style.width = pct + '%'; if (hpBM._c !== bC) { hpBM.className = bC; hpBM._c = bC; } }
     if (hpTM) hpTM.innerText = `${Math.ceil(myLocalTank.hp)}/${mHp}`;
     
     let vO = 0;
@@ -934,14 +978,19 @@ function startGameLoop() {
 }
 
 function gameLoop(now) {
+    // обмеження частоти кадрів для слабких пристроїв (час між кадрами накопичується в dt, тож швидкість гри не змінюється)
+    if (window.GFX && GFX.cap && now - lastTime < 1000 / GFX.cap - 2) { gameLoopId = requestAnimationFrame(gameLoop); return; }
     const dt = Math.min((now - lastTime) / 1000, 0.1);
+    const _raw = (now - lastTime) / 1000;
     lastTime = now;
     if (currentRoomData && currentRoomData.status === 'playing') {
+        if (window.GFX) GFX.frame(now, _raw);
         // Помилка в одному кадрі більше не вбиває цикл: інакше картинка зависає, а звуки з сокетів продовжують грати
-        try { updatePhys(now, dt); draw(now); }
+        const _w0 = performance.now();
+        try { updatePhys(now, dt); draw(now); if (window.GFX) GFX.work(performance.now() - _w0); }
         catch (err) {
             if (now - (window.__loopErrAt || 0) > 2000) { window.__loopErrAt = now; console.error('Помилка ігрового циклу (цикл продовжує працювати):', err); }
-            try { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.shadowColor = 'transparent'; } catch (e) {}
+            try { ctx.setTransform(RS, 0, 0, RS, 0, 0); ctx.globalAlpha = 1; ctx.shadowColor = 'transparent'; } catch (e) {}
         }
     }
     gameLoopId = requestAnimationFrame(gameLoop);
@@ -978,14 +1027,15 @@ window.addEventListener('mousedown', e => { if (!isMobile && e.button === 0 && e
 window.addEventListener('mouseup', e => { if (!isMobile && e.button === 0) keys.lmb = false; });
 
 function handleTStart(e) {
-    if (!isMobile || myLocalTank.hp <= 0) return;
+    if (!isMobile) return;
+    if (myLocalTank.hp <= 0) { resetJoysticks(); return; }
     for (let i = 0; i < e.changedTouches.length; i++) {
         let t = e.changedTouches[i];
-        if (t.clientX < canvas.width / 2 && !joysticks.left.active) {
+        if (t.clientX < GW / 2 && !joysticks.left.active) {
             joysticks.left.active = true; joysticks.left.id = t.identifier;
             joysticks.left.startX = t.clientX; joysticks.left.startY = t.clientY;
             joysticks.left.currentX = t.clientX; joysticks.left.currentY = t.clientY;
-        } else if (t.clientX >= canvas.width / 2 && !joysticks.right.active) {
+        } else if (t.clientX >= GW / 2 && !joysticks.right.active) {
             joysticks.right.active = true; joysticks.right.id = t.identifier;
             joysticks.right.startX = t.clientX; joysticks.right.startY = t.clientY;
             joysticks.right.currentX = t.clientX; joysticks.right.currentY = t.clientY;
@@ -1013,8 +1063,14 @@ function handleTMove(e) {
     }
 }
 
+// скидання джойстиків (смерть/відродження/нова гра): інакше після смерті палець відпускається «в нікуди» і джойстик застрягає
+function resetJoysticks() {
+    ['left', 'right'].forEach(k => { const j = joysticks[k]; j.active = false; j.id = null; j.force = 0; j.hasAimed = false; j.released = false; });
+}
+window.resetJoysticks = resetJoysticks;
+
 function handleTEnd(e) {
-    if (!isMobile || myLocalTank.hp <= 0) return;
+    if (!isMobile) return;      // відпускання пальця обробляємо завжди, навіть коли танк мертвий
     for (let i = 0; i < e.changedTouches.length; i++) {
         let t = e.changedTouches[i];
         if (joysticks.left.active && t.identifier === joysticks.left.id) {
