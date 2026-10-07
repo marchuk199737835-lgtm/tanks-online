@@ -374,6 +374,7 @@ function fireBull(now, mR, fC, tR) {
     }
     
     if ((bT === 'homing' || bT === 'autolaser') && homingTargetId) sh.targetId = homingTargetId;
+    if (window.SFX && bT !== 'autolaser' && typeof window.getReloadTime === 'function') { try { SFX.armReload(window.getReloadTime()); } catch (e) {} }
     socket.emit('shoot', sh);
 }
 
@@ -514,6 +515,7 @@ socket.on('sync2', (data) => {
             }
         } else {
             if (currentRoomData.mode === 'prophunt' && myLocalTank.hp > sp.hp) myLocalTank.isDisguised = false;
+            if (window.SFX && sp.hp !== myLocalTank.hp) { try { SFX.onHp(sp.hp, Math.round(MAX_HP * GameData.statMult(myEquipped, 'hp'))); } catch (e) {} }
             myLocalTank.hp = sp.hp; myLocalTank.buff = sp.buff; myLocalTank.buffProgress = sp.buffProgress; myLocalTank.score = sp.score;
             if (sp.equipped) myEquipped = sp.equipped;
             if (sp.color !== undefined) myColor = sp.color;
@@ -543,7 +545,7 @@ socket.on('phPhaseChange', (data) => {
 });
 
 socket.on('spawnBullet', (data) => {
-    playSound(data.type === 'minigun' ? 'minigun' : data.type.includes('boss') ? 'boss_shoot' : data.type === 'samurai' ? 'samurai' : 'shoot');
+    if (window.SFX && SFX.ready() && SFX.shot(data) !== undefined) { /* озвучено пакетом sfx */ } else playSound(data.type === 'minigun' ? 'minigun' : data.type.includes('boss') ? 'boss_shoot' : data.type === 'samurai' ? 'samurai' : 'shoot');
     let lM = data.lifeMult || 1.0;
     if (data.type === 'shotgun') {
         for (let i = 0; i < 20; i++) {
@@ -564,7 +566,7 @@ socket.on('hitConfirmed', () => {
     void hm.offsetWidth; hm.classList.add('hitmarker-active');
 });
 
-socket.on('powerupCollected', () => playSound('powerup'));
+socket.on('powerupCollected', (d) => { if (d && (d.playerId !== myId || d.type === 'mod')) return; playSound('powerup'); });
 
 socket.on('mineExploded', (d) => {
     playSound('explosion'); createExplosion(d.x, d.y, 30, '#f97316');

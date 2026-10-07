@@ -109,10 +109,10 @@
             case 'enrage': banner('<span>Бос скаженів!</span> <b>' + esc(d.n) + '</b>', 'bad'); sfx('boss_shoot'); break;
             case 'miniboss': banner('<span>На маршруті зʼявився бос!</span>', 'bad'); sfx('boss_shoot'); break;
             case 'capture': banner('<span class="dot" style="background:' + (TC[d.t] || '#fff') + '"></span><span>Точку захоплено:</span> <b>' + String.fromCharCode(64 + d.i) + '</b>', 'good'); sfx('powerup'); break;
-            case 'zone': banner('<span>Зона звужується</span> <span>Фаза</span> <b>' + d.ph + '</b>', 'bad'); sfx('boss_shoot'); break;
-            case 'dropWarn': banner('<span>📦 Аірдроп скидається!</span>', 'gold'); sfx('boss_shoot'); break;
-            case 'dropLand': banner('<span>📦 Аірдроп приземлився!</span> <em>міфічні й легендарні модулі</em>', 'gold'); sfx('explosion'); break;
-            case 'finalLoot': finalPt = { x: d.x, y: d.y }; banner('<span>👑 У центрі зони з’явились міфічні модулі!</span>', 'gold'); sfx('powerup'); break;
+            case 'zone': banner('<span>Зона звужується</span> <span>Фаза</span> <b>' + d.ph + '</b>', 'bad'); sfx('zone'); break;
+            case 'dropWarn': banner('<span>📦 Аірдроп скидається!</span>', 'gold'); sfx('drop_warn'); break;
+            case 'dropLand': banner('<span>📦 Аірдроп приземлився!</span> <em>міфічні й легендарні модулі</em>', 'gold'); sfx('drop_land'); break;
+            case 'finalLoot': finalPt = { x: d.x, y: d.y }; banner('<span>👑 У центрі зони з’явились міфічні модулі!</span>', 'gold'); sfx('final_loot'); break;
             case 'zoneFinal': banner('<span>ФІНАЛ: зона стискається до нуля!</span>', 'bad'); sfx('boss_shoot'); break;
             case 'bountyPick': if (md && d.tg === nameOf(myId)) banner('<span>Вас обрано ціллю!</span> <em>+' + d.v + '</em>', 'bad'); else banner('<span>Ціль полювання:</span> <b>' + esc(d.tg) + '</b> <em>+' + d.v + '</em>', 'gold'); sfx('hitmarker'); break;
             case 'bountyClaimed': banner('<b>' + esc(d.by) + '</b> <span>знищив ціль</span> <b>' + esc(d.tg) + '</b> <em>+' + d.v + '</em>', 'good'); sfx('token'); break;
@@ -144,10 +144,10 @@
     socket.on('modeEvent', onEvent);
     socket.on('modPicked', d => {
         const GD = window.GameData, m = GD && GD.MODULES[d.mod]; if (!m) return; const R = GD.RARITY[m.rarity];
-        banner('<span>Отримано:</span> <b style="color:' + R.color + '">' + esc(m.name) + '</b> <span style="color:' + R.color + '">· ' + R.name + '</span>', 'good'); try { playSound('powerup'); } catch (e) {}
+        banner('<span>Отримано:</span> <b style="color:' + R.color + '">' + esc(m.name) + '</b> <span style="color:' + R.color + '">· ' + R.name + '</span>', 'good'); try { if (window.SFX && SFX.ready()) SFX.pickMod(m.rarity); else playSound('powerup'); } catch (e) {}
     });
     socket.on('bossWarning', () => { const r = cur(); if (r && NEWM.has(r.mode)) banner('<span>⚠ Бос поруч!</span>', 'bad'); });
-    socket.on('gameStarting', () => { window.PERK = { spd: 1, cd: 1 }; md = null; zr = null; finalPt = null; if (window.BRLoot) BRLoot.reset(); closePerk(); removeHud(); });
+    socket.on('gameStarting', () => { if (window.SFX) SFX.resetHp(); window.PERK = { spd: 1, cd: 1 }; md = null; zr = null; finalPt = null; if (window.BRLoot) BRLoot.reset(); closePerk(); removeHud(); });
 
     // ---------- малювання на мапі ----------
     const teamCol = t => TC[t] || '#94a3b8';
@@ -225,6 +225,7 @@
 
     window.ModesFX = {
         active: m => NEWM.has(m),
+        outside(x, y) { return !!(md && md.m === 'battle_royale' && md.z && Math.hypot(x - md.z.x, y - md.z.y) > md.z.r); },
         sync(d) { md = d || md; },
         toggle(mode) { if (NEWM.has(mode)) ensureHud(mode); else if (hud) removeHud(); },
         hud() { paint(); },
