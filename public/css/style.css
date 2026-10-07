@@ -768,6 +768,9 @@ html.gfx-medium .mm-glow, html.gfx-low .mm-glow, html.gfx-medium .au-orb, html.g
 html.gfx-medium .au-spark, html.gfx-low .au-spark { display: none; }
 /* Низька: без нескінченних анімацій і тяжких тіней в інтерфейсі */
 html.gfx-low *, html.gfx-low *::before, html.gfx-low *::after { animation-iteration-count: 1 !important; animation-duration: .01s !important; transition-duration: .12s !important; }
+/* рулетка кейсу й стрілка апгрейдера мають крутитись і в режимі «низька графіка» (це один елемент, навантаження мінімальне) */
+html.gfx-low #roulette-tape { transition-duration: 3.5s !important; }
+html.gfx-low #upg-pointer { transition-duration: 3s !important; }
 html.gfx-low .mm-grid, html.gfx-low .au-grid { animation: none !important; }
 html.gfx-low .sh-card, html.gfx-low .rb-card, html.gfx-low .hg-eq, html.gfx-low .up-card, html.gfx-low .mm-card { box-shadow: none !important; }
 html.gfx-low .sh-ico svg, html.gfx-low .mm-card-ico { filter: none !important; }
