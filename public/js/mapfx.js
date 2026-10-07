@@ -7,6 +7,7 @@
 var MapFX = (function () {
     'use strict';
     const TILE = 512;
+    const MO = typeof MapObj !== 'undefined' ? MapObj : (typeof require !== 'undefined' ? require('./mapobjects.js') : null);
 
     // ---------- допоміжне ----------
     function rngOf(seed) { let a = seed >>> 0; return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -42,8 +43,12 @@ var MapFX = (function () {
         dirt:    { kind: 'dirt',    water: ['#0b5f86', '#3b9ac4', '#d9f4ff'], tree: { kind: 'leaf', cols: ['#7c2d12', '#9a3412', '#c2410c', '#fb923c'] }, wall: '#6f5a46' },
         swamp:   { kind: 'swamp',   water: ['#14532d', '#2f8f5a', '#bbf7d0'], tree: { kind: 'leaf', cols: ['#0f2e1d', '#14532d', '#1a6b3a', '#3fa66a'] }, wall: '#4b5a4a' },
         lava:    { kind: 'lava',    water: ['#7c1d0b', '#f97316', '#fde68a'], tree: { kind: 'dead', cols: ['#1c1917', '#292524', '#44403c', '#78716c'] }, wall: '#3f3a40' },
-        tech:    { kind: 'tech',    water: ['#082f49', '#0ea5e9', '#a5f3fc'], tree: { kind: 'leaf', cols: ['#134e4a', '#0f766e', '#14b8a6', '#5eead4'] }, wall: '#334155' }
+        tech:    { kind: 'tech',    water: ['#082f49', '#0ea5e9', '#a5f3fc'], tree: { kind: 'leaf', cols: ['#134e4a', '#0f766e', '#14b8a6', '#5eead4'] }, wall: '#334155' },
+        // осінь: бура/охриста земля з опалим листям; дерева — рудо-червоні, помаранчеві й жовті (3 варіанти палітри)
+        autumn:  { kind: 'autumn',  water: ['#0b5f86', '#38a3c8', '#d9f4ff'], tree: { kind: 'leaf', cols: ['#7a2a10', '#b8431a', '#e0801e', '#fcd34d'], alts: [['#7a2a10', '#b8431a', '#e0801e', '#fcd34d'], ['#6b3a0c', '#c2640f', '#e9a020', '#fde68a'], ['#6a1d12', '#a3281b', '#d4501f', '#fbbf6a']] }, wall: '#7a5a3c' }
     };
+    // типові кольори землі теми (коли в біома немає свого bg)
+    const DEFBG = { grass: '#5c8a45', sand: '#cfae72', snow: '#dce8f1', stone: '#8a8378', asphalt: '#44474c', metal: '#566270', dirt: '#7b5d3e', swamp: '#3b5440', lava: '#2a2220', tech: '#0e1a2b', autumn: '#8f6a3b' };
     function themeOf(map) { return map && map.theme && THEMES[map.theme] || null; }
 
     // ---------- ЗЕМЛЯ (патерн 512×512 без швів) ----------
@@ -140,6 +145,27 @@ var MapFX = (function () {
             for (let x = 0; x < 8; x++) for (let y = 0; y < 8; y++) { g.fillStyle = 'rgba(125,211,252,0.45)'; g.beginPath(); g.arc(x * 64, y * 64, 1.8, 0, 6.283); g.fill(); }
             for (let i = 0; i < 700; i++) { g.fillStyle = 'rgba(255,255,255,0.03)'; g.fillRect(R() * TILE, R() * TILE, 1, 1); }
         }
+        ,
+        autumn(g, b, R) {
+            blotches(g, R, 34, shade(b, 1.3), 0.2, 50, 140); blotches(g, R, 34, shade(b, 0.66), 0.26, 50, 140); blotches(g, R, 10, '#7c2d12', 0.1, 60, 130);
+            // стежки: світліша втоптана земля з темним краєм
+            g.lineCap = 'round'; g.lineJoin = 'round';
+            for (let i = 0; i < 3; i++) {
+                let x = R() * TILE, y = R() * TILE, a = R() * 6.283; const pts = [[x, y]];
+                for (let k = 0; k < 14; k++) { a += (R() - 0.5) * 0.9; x += Math.cos(a) * 38; y += Math.sin(a) * 38; pts.push([x, y]); }
+                g.strokeStyle = rgba(shade(b, 0.55), 0.16); g.lineWidth = 17; polyline(g, pts, 520); g.strokeStyle = rgba(shade(b, 1.32), 0.2); g.lineWidth = 11; polyline(g, pts, 520);
+            }
+            // суха трава
+            const dry = [shade(b, 1.5), '#a3762f', '#7a4a1c', '#c08a3a'];
+            for (let i = 0; i < 1100; i++) { const x = R() * TILE, y = R() * TILE, l = 4 + R() * 7, a = -Math.PI / 2 + (R() - 0.5) * 1.3; g.strokeStyle = rgba(dry[i & 3], 0.5); g.lineWidth = 1.1; W(x, y, 12, (px, py) => { g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(a) * l, py + Math.sin(a) * l); g.stroke(); }); }
+            for (let i = 0; i < 14; i++) { g.fillStyle = 'rgba(55,28,10,0.16)'; W(R() * TILE, R() * TILE, 40, (px, py) => { g.beginPath(); g.ellipse(px, py, 14 + R() * 18, 7 + R() * 9, R() * 3, 0, 6.283); g.fill(); }); }
+            // опале листя: розсип + купки
+            const lc = ['#c2410c', '#b91c1c', '#d97706', '#eab308', '#92400e', '#9a3412', '#ea580c'];
+            const leaf = (x, y, s0, a, col, al) => { g.fillStyle = rgba(col, al); W(x, y, 8, (px, py) => { g.beginPath(); g.ellipse(px, py, s0, s0 * 0.5, a, 0, 6.283); g.fill(); }); };
+            for (let i = 0; i < 640; i++) leaf(R() * TILE, R() * TILE, 2.2 + R() * 2.6, R() * 3.14, lc[(R() * 7) | 0], 0.55 + R() * 0.4);
+            for (let i = 0; i < 26; i++) { const cx = R() * TILE, cy = R() * TILE, rad = 12 + R() * 16; for (let k = 0; k < 22; k++) { const a = R() * 6.283, d = Math.sqrt(R()) * rad; leaf(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 2.4 + R() * 2.4, R() * 3.14, lc[(R() * 7) | 0], 0.75 + R() * 0.25); } }
+            for (let i = 0; i < 30; i++) { g.strokeStyle = rgba('#3b2410', 0.4); g.lineWidth = 1.2; W(R() * TILE, R() * TILE, 12, (px, py) => { const a = R() * 3.14, l = 5 + R() * 8; g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(a) * l, py + Math.sin(a) * l); g.stroke(); }); }
+        }
     };
     function groundTile(kind, base) {
         const key = kind + '|' + base; if (_tiles[key]) return _tiles[key];
@@ -151,11 +177,79 @@ var MapFX = (function () {
         const tile = groundTile(kind, base); let m = _pats.get(c); if (!m) { m = Object.create(null); _pats.set(c, m); }
         const k = kind + '|' + base; return m[k] || (m[k] = c.createPattern(tile, 'repeat'));
     }
+    // ---------- БІОМИ ----------
+    let _curBiomes = null, _curSize = 0;          // біоми мапи, що малюється зараз (для вибору теми дерев/води/стін за позицією)
+    const _p2d = new WeakMap();
+    // м'який перехід: кілька проходів обведення зсередини біома базовим візерунком із малою альфою (від краю вглиб)
+    const FEATHER = (function () {
+        const D = 150, N = 10, out = []; let prev = 0;
+        for (let k = 0; k < N; k++) { const d = D * (1 - k / N), O = k === N - 1 ? 1 : Math.pow((k + 1) / (N + 1), 1.25); out.push([d * 2, 1 - (1 - O) / (1 - prev)]); prev = O; }
+        return out;
+    })();
+    function biomePath(b, S) {
+        const sp = MO.biomePoly(b, S), e = _p2d.get(b);
+        if (e && e.sp === sp) return e.p;
+        const p = new Path2D(); sp.forEach((q, i) => i ? p.lineTo(q.x, q.y) : p.moveTo(q.x, q.y)); p.closePath(); _p2d.set(b, { sp: sp, p: p }); return p;
+    }
+    // Положення прямокутника (inflate m) відносно багатокутника: 0 зовні, 1 всередині, 2 — ребро перетинає/поруч
+    function rectVsPoly(P, x0, y0, x1, y1, m) {
+        x0 -= m; y0 -= m; x1 += m; y1 += m; const n = P.length;
+        for (let i = 0; i < n; i++) {
+            const a = P[i], b = P[(i + 1) % n];
+            if ((a.x < x0 && b.x < x0) || (a.x > x1 && b.x > x1) || (a.y < y0 && b.y < y0) || (a.y > y1 && b.y > y1)) continue;
+            if ((a.x >= x0 && a.x <= x1 && a.y >= y0 && a.y <= y1) || (b.x >= x0 && b.x <= x1 && b.y >= y0 && b.y <= y1)) return 2;
+            // відрізок проти чотирьох сторін
+            const sx = b.x - a.x, sy = b.y - a.y, hit = (px, py, qx, qy) => { const rx = qx - px, ry = qy - py, d = sx * ry - sy * rx; if (!d) return false; const t = ((px - a.x) * ry - (py - a.y) * rx) / d, u = ((px - a.x) * sy - (py - a.y) * sx) / d; return t >= 0 && t <= 1 && u >= 0 && u <= 1; };
+            if (hit(x0, y0, x1, y0) || hit(x1, y0, x1, y1) || hit(x1, y1, x0, y1) || hit(x0, y1, x0, y0)) return 2;
+        }
+        let ins = false; const px = (x0 + x1) / 2, py = (y0 + y1) / 2;
+        for (let i = 0, j = n - 1; i < n; j = i++) { const a = P[i], b = P[j]; if ((a.y > py) !== (b.y > py) && px < (b.x - a.x) * (py - a.y) / (b.y - a.y) + a.x) ins = !ins; }
+        return ins ? 1 : 0;
+    }
+    function drawBiomes(c, map, baseStyle, x0, y0, x1, y1) {
+        const S = map.size;
+        for (const b of map.biomes) {
+            const bth = THEMES[b.theme]; if (!bth) continue;
+            MO.biomePoly(b, S); const bb = MO.biomeBBox(b);
+            if (bb[2] < x0 || bb[0] > x1 || bb[3] < y0 || bb[1] > y1) continue;
+            const rel = rectVsPoly(MO.biomePoly(b, S), x0, y0, x1, y1, 170);   // 0 — зовні, 1 — повністю всередині (без м'якого краю), 2 — край поруч
+            if (rel === 0) continue;
+            if (rel === 1) { c.fillStyle = groundPattern(c, bth.kind, b.bg || DEFBG[b.theme]); c.fillRect(x0, y0, x1 - x0, y1 - y0); continue; }
+            const path = biomePath(b, S);
+            c.save(); c.clip(path);
+            c.fillStyle = groundPattern(c, bth.kind, b.bg || DEFBG[b.theme]); c.fillRect(x0, y0, x1 - x0, y1 - y0);
+            c.strokeStyle = baseStyle; c.lineJoin = 'round';
+            const sp = MO.biomePoly(b, S), n = sp.length, lp = new Path2D(), X0 = x0 - 170, Y0 = y0 - 170, X1 = x1 + 170, Y1 = y1 + 170; let prevIn = false;   // обводимо лише ребра біля вікна
+            for (let i = 0; i < n; i++) {
+                const a = sp[i], q = sp[(i + 1) % n], inn = !((a.x < X0 && q.x < X0) || (a.x > X1 && q.x > X1) || (a.y < Y0 && q.y < Y0) || (a.y > Y1 && q.y > Y1));
+                if (inn) { if (!prevIn) lp.moveTo(a.x, a.y); lp.lineTo(q.x, q.y); } prevIn = inn;
+            }
+            for (let i = 0; i < FEATHER.length; i++) { c.globalAlpha = FEATHER[i][1]; c.lineWidth = FEATHER[i][0]; c.stroke(lp); }
+            c.restore();
+        }
+    }
+    // Тема землі в точці (тема біома або базова тема мапи; null — стара плоска мапа)
+    function themeAt(map, x, y) {
+        const b = map && map.biomes && map.biomes.length && MO.biomeAt(map, x, y);
+        return b ? THEMES[b.theme] : themeOf(map);
+    }
+    // Тема об'єкта за його позицією (кеш на об'єкті: _bt, інвалідується зміною масиву map.biomes)
+    function objTheme(o, base) {
+        if (!_curBiomes) return base;
+        if (o._bm === _curBiomes && o._bt !== undefined) return o._bt || base;
+        const cx = o.type === 'tree' ? o.x : o.x + (o.w || 0) / 2, cy = o.type === 'tree' ? o.y : o.y + (o.h || 0) / 2;
+        const b = MO.biomeAt({ biomes: _curBiomes, size: _curSize }, cx, cy);
+        if (!('_bm' in o)) Object.defineProperties(o, { _bm: { value: null, writable: true, configurable: true }, _bt: { value: 0, writable: true, configurable: true } });   // службові поля не потрапляють у JSON/clone
+        o._bm = _curBiomes; o._bt = b ? THEMES[b.theme] : 0; return o._bt || base;
+    }
     // Малює землю в прямокутнику (x0,y0)-(x1,y1) (світові координати). gridAlpha: 0 — без сітки.
     function drawGround(c, map, x0, y0, x1, y1, gridAlpha) {
         const th = themeOf(map);
+        _curBiomes = map.biomes && map.biomes.length ? map.biomes : null; _curSize = map.size;
         c.fillStyle = map.bg || '#020617'; c.fillRect(x0, y0, x1 - x0, y1 - y0);
-        if (th) { c.fillStyle = groundPattern(c, th.kind, map.bg || '#4c6b3a'); c.fillRect(x0, y0, x1 - x0, y1 - y0); }
+        let baseStyle = map.bg || '#020617';
+        if (th) { baseStyle = groundPattern(c, th.kind, map.bg || '#4c6b3a'); c.fillStyle = baseStyle; c.fillRect(x0, y0, x1 - x0, y1 - y0); }
+        if (_curBiomes) drawBiomes(c, map, baseStyle, x0, y0, x1, y1);
         const ga = gridAlpha == null ? (th ? 0 : 1) : gridAlpha;
         if (ga > 0) {
             c.save(); c.globalAlpha = ga; c.strokeStyle = map.grid || '#1e293b'; c.lineWidth = 1; c.beginPath();
@@ -196,6 +290,7 @@ var MapFX = (function () {
         return [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
     }
     function drawBlock(c, o, th, opt) {
+        th = objTheme(o, th);
         const base = o.color || (th && th.wall) || '#475569', pts = polyPts(o), w = o.w, h = o.h;
         const big = (o.type === 'wall_square') && Math.min(w, h) >= 140;
         const d = big ? 16 : Math.max(6, Math.min(15, Math.min(w, h) * 0.32)); let ex = d * 0.55, ey = d, sx = ex * 2.1, sy = ey * 1.7;
@@ -290,14 +385,16 @@ var MapFX = (function () {
         return (_trees[key] = cv);
     }
     function drawTree(c, o, th, opt) {
+        th = objTheme(o, th);
         const r = o.r || 30, tt = (th && th.tree) || { kind: 'leaf', cols: ['#14532d', '#166534', '#22863a', '#4ade80'] };
-        const v = ((o.x * 7 + o.y * 13) | 0) % 3, rs = Math.min(r, 110), sp = treeSprite(tt.kind, tt.cols, Math.max(8, Math.round(rs / 4) * 4), v < 0 ? -v : v), k = r / Math.max(8, Math.round(rs / 4) * 4);
+        const v0 = ((o.x * 7 + o.y * 13) | 0) % 3, v = v0 < 0 ? -v0 : v0, rs = Math.min(r, 110), sp = treeSprite(tt.kind, tt.alts ? tt.alts[v] : tt.cols, Math.max(8, Math.round(rs / 4) * 4), v), k = r / Math.max(8, Math.round(rs / 4) * 4);
         c.fillStyle = 'rgba(0,0,0,0.26)'; c.beginPath(); c.ellipse(o.x + r * 0.34, o.y + r * 0.46, r * 0.98, r * 0.88, 0, 0, 6.283); c.fill();
         const sz = sp.width * k; c.drawImage(sp, o.x - sz / 2, o.y - sz / 2, sz, sz);
     }
 
     // ---------- ВОДА і ДОРОГИ ----------
     function drawWater(c, o, th, tm, view, opt) {
+        th = objTheme(o, th);
         const col = (th && th.water) || ['#0b5f86', '#38a3c8', '#d9f4ff'];
         const curve = o.type === 'water_curve';
         c.beginPath(); if (curve) c.roundRect(o.x, o.y, o.w, o.h, Math.min(o.w, o.h) / 2); else c.rect(o.x, o.y, o.w, o.h);
@@ -335,7 +432,7 @@ var MapFX = (function () {
     }
 
     // ---------- ТІЛО ПРОПІВ: тінь + бокові грані (дешево, без blur) ----------
-    const NOSHADOW = { prop_puddle: 1, prop_crater: 1, prop_hatch: 1, prop_pad: 1, prop_campfire: 1 };
+    const NOSHADOW = { prop_puddle: 1, prop_crater: 1, prop_hatch: 1, prop_pad: 1, prop_campfire: 1, prop_floor: 1, prop_roof: 1 };
     const BOX = { prop_crate: '#b45309', prop_concrete: '#71717a', prop_cont_red: '#b91c1c', prop_cont_blue: '#1d4ed8', prop_generator: '#4d7c0f', prop_terminal: '#334155', prop_solar: '#1e3a8a', prop_tent: '#6b7280',
         prop_sandbag: '#a68a64', prop_wood_pallet: '#a16207', prop_wood_planks: '#92400e', prop_wood_cart: '#78350f', prop_wood_table: '#92400e', prop_wood_bench: '#78350f', prop_wood_firewood: '#78350f', prop_wood_wall: '#78350f',
         prop_fence_wood: '#92400e', prop_fence_metal: '#64748b', prop_wreck: '#57534e', prop_hay: '#ca8a04', prop_tires: '#27272a', prop_pipe: '#6b7280', prop_spotlight: '#475569' };
@@ -364,6 +461,32 @@ var MapFX = (function () {
         if (t === 'tree') return 'tree';
         return null;
     }
-    return { THEMES, themeOf, shade, rgba, drawGround, drawEdges, drawBlock, drawTree, drawWater, drawLine, propShadow, solidKind, groundTile, treeSprite };
+    // ---------- ДАХИ БУДІВЕЛЬ: зникають, коли локальний гравець усередині ----------
+    const _roofCache = new WeakMap();
+    function roofsOf(solids) {
+        let e = _roofCache.get(solids);
+        if (!e || e.len !== solids.length || e.last !== solids[solids.length - 1]) {
+            const list = []; for (let i = 0; i < solids.length; i++) if (solids[i].type === 'prop_roof') list.push(solids[i]);
+            e = { len: solids.length, last: solids[solids.length - 1], list: list }; _roofCache.set(solids, e);
+        }
+        return e.list;
+    }
+    // view {x0,x1,y0,y1}; (px,py) — центр локального танка (або камери, якщо мертвий); dt — секунди
+    function drawRoofs(c, solids, view, px, py, dt) {
+        const list = roofsOf(solids), k = Math.min(1, (dt || 0.016) * 7);
+        for (let i = 0; i < list.length; i++) {
+            const o = list[i], w = o.w || 50, h = o.h || 50;
+            const cx = o.x + w / 2, cy = o.y + h / 2, rr = Math.hypot(w, h) / 2 + 60;
+            if (cx + rr < view.x0 || cx - rr > view.x1 || cy + rr < view.y0 || cy - rr > view.y1) continue;
+            const l = o.rot ? MO.toLocal(o, px, py) : { x: px, y: py };
+            const inside = l.x > o.x + 6 && l.x < o.x + w - 6 && l.y > o.y + 6 && l.y < o.y + h - 6, tgt = inside ? 0 : 1;
+            let a = o._a === undefined ? tgt : o._a;
+            a = a < tgt ? Math.min(tgt, a + k) : Math.max(tgt, a - k);
+            o._a = a;
+            if (a < 0.02) continue;
+            c.save(); MO.applyRot(c, o); MO.drawProp(c, o, 0); c.restore();
+        }
+    }
+    return { THEMES, DEFBG, themeAt, drawRoofs, themeOf, shade, rgba, drawGround, drawEdges, drawBlock, drawTree, drawWater, drawLine, propShadow, solidKind, groundTile, treeSprite };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = MapFX;

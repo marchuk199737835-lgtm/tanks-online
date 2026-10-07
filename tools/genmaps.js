@@ -703,6 +703,12 @@ def('Harbor', 3200, 'metal', ['bounty'], '#5a6572', m => {
 // =====================================================================================================
 //  запис
 // =====================================================================================================
+// ---- Grand Expanse (battle_royale, окремий генератор; def()/EXTRA не використовуємо) ----
+{
+    const br = require('./genbr.js')().map, sm = MO.sanitizeMap(JSON.parse(JSON.stringify(br)));
+    if (sm.solids.length !== br.solids.length || (sm.biomes || []).length !== (br.biomes || []).length) throw new Error('Grand Expanse: sanitizeMap гублює дані');
+    maps[br.title] = br;
+}
 const outFile = path.join(__dirname, '..', 'maps_modes.js');
 fs.writeFileSync(outFile, '// Вбудовані мапи під режими (створено tools/genmaps.js). Це звичайні мапи редактора: відкрийте /editor.html, змініть і збережіть.\n// Якщо мапу з такою назвою збережено в редакторі, вона замінює цю.\nmodule.exports = ' + JSON.stringify(maps) + ';\n');
 console.log('maps:', Object.keys(maps).length, Object.keys(maps).map(k => k + ' (' + maps[k].solids.length + ')').join(', '));

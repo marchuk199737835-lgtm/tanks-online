@@ -7,7 +7,7 @@
         warn:    { c: '245,158,11', icon: '⚠️', title: 'Увага' },
         success: { c: '16,185,129', icon: '🎉', title: 'Готово' },
         info:    { c: '59,130,246', icon: 'ℹ️', title: 'Повідомлення' },
-        money:   { c: '245,158,11', icon: '💸', title: 'Не вистачає баксів' },
+        money:   { c: '245,158,11', icon: '💸', title: 'Не вистачає кредів' },
         danger:  { c: '239,68,68',  icon: '🚪', title: 'Увага' }
     };
     const tr = s => (window.I18N && I18N.t) ? I18N.t(String(s)) : String(s);
@@ -34,7 +34,7 @@
         el.querySelector('.dlg-t').textContent = tr(o.title || k.title);
         const p = el.querySelector('.dlg-p'); p.textContent = o.text ? tr(o.text) : ''; p.style.display = o.text ? '' : 'none';
         const rows = el.querySelector('.dlg-rows'); rows.innerHTML = ''; rows.style.display = o.rows && o.rows.length ? '' : 'none';
-        (o.rows || []).forEach(r => { const d = document.createElement('div'); d.className = 'dlg-row' + (r[2] ? ' ' + r[2] : ''); const a = document.createElement('span'), b = document.createElement('b'); a.textContent = tr(r[0]); b.textContent = r[1]; d.appendChild(a); d.appendChild(b); rows.appendChild(d); });
+        (o.rows || []).forEach(r => { const d = document.createElement('div'); d.className = 'dlg-row' + (r[2] ? ' ' + r[2] : ''); const a = document.createElement('span'), b = document.createElement('b'); a.textContent = tr(r[0]); if (r[3]) b.innerHTML = r[1]; else b.textContent = r[1]; d.appendChild(a); d.appendChild(b); rows.appendChild(d); });
         const btns = el.querySelector('.dlg-btns'); btns.innerHTML = '';
         (o.buttons && o.buttons.length ? o.buttons : [{ t: 'Зрозуміло', cls: 'primary' }]).forEach(b => {
             const x = document.createElement('button'); x.type = 'button'; x.className = 'dlg-b ' + (b.cls || 'ghost'); x.textContent = tr(b.t);
@@ -53,15 +53,15 @@
     }
     function money(o) {
         o = o || {}; const rows = [];
-        if (o.price != null) { rows.push(['Ціна', '💵 ' + o.price]); rows.push(['Ваш баланс', '💵 ' + (o.have || 0)]); rows.push(['Бракує', '💵 ' + Math.max(0, o.price - (o.have || 0)), 'bad']); }
-        show({ kind: 'money', title: 'Не вистачає баксів', text: o.text || 'Заробляйте бакси в боях, отримуйте за рівні та в адвенті або активуйте промокод.', rows,
-            buttons: [{ t: 'Закрити', cls: 'ghost' }, { t: '🎁 Промокод', cls: 'primary', cb: () => { const m = document.getElementById('promo-modal'); if (m) m.classList.remove('hidden'); } }] });
+        if (o.price != null) { const cr = n => creditIcon(16) + ' ' + (n | 0); rows.push(['Ціна', cr(o.price), '', 1]); rows.push(['Ваш баланс', cr(o.have || 0), '', 1]); rows.push(['Бракує', cr(Math.max(0, o.price - (o.have || 0))), 'bad', 1]); }
+        show({ kind: 'money', title: 'Не вистачає кредів', text: o.text || 'Заробляйте креди в боях і в адвенті, продавайте зайві модулі або активуйте промокод.', rows,
+            buttons: [{ t: 'Закрити', cls: 'ghost' }, { t: '🎁 Як заробити', cls: 'primary', cb: () => { if (window.Wallet) Wallet.open('earn'); } }] });
     }
 
     // ---- window.alert -> вікно гри: тип підбираємо за змістом повідомлення ----
     function alertKind(m) {
         if (/Вітаємо|ВІТАЄМО|успіш|Нараховано|активовано|Готово/i.test(m)) return 'success';
-        if (/Недостатньо баксів/i.test(m)) return 'money';
+        if (/Недостатньо кредів/i.test(m)) return 'money';
         if (/Звільніть місце|Інвентар повний/i.test(m)) return 'warn';
         if (/не вдав|помилк|невір|занят|повна|не знайден|не можете|некоректн|вже|ще не/i.test(m)) return 'error';
         return 'info';
@@ -79,8 +79,8 @@
         if (!inMatch()) return;
         uiDialog.confirm({
             kind: 'danger', icon: '🚪', title: 'Вийти з матчу?',
-            text: 'Ви залишите бій передчасно й не отримаєте жодної нагороди: ні баксів, ні досвіду, ні кейсу. Для решти гравців бій триватиме.',
-            rows: [['Бакси', '— 0', 'bad'], ['Досвід', '— 0', 'bad'], ['Кейс', '— 0', 'bad']],
+            text: 'Ви залишите бій передчасно й не отримаєте жодної нагороди: ні кредів, ні досвіду, ні кейсу. Для решти гравців бій триватиме.',
+            rows: [['Креди', '— 0', 'bad'], ['Досвід', '— 0', 'bad'], ['Кейс', '— 0', 'bad']],
             cancelText: 'Залишитись', okText: 'Вийти без нагороди', danger: true
         }).then(ok => {
             if (!ok || !inMatch()) return;

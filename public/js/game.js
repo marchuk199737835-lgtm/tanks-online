@@ -213,7 +213,7 @@ function updatePhys(now, dt) {
             joysticks.right.released = false;
         }
         
-        for (let pid in powerups) if (Math.hypot(powerups[pid].x - myLocalTank.x, powerups[pid].y - myLocalTank.y) < myHitRad + 30) socket.emit('collectPowerup', { roomId: currentRoomId, pid: pid });
+        for (let pid in powerups) if (Math.hypot(powerups[pid].x - myLocalTank.x, powerups[pid].y - myLocalTank.y) < myHitRad + 30 && (!powerups[pid].mod || !window.ModesFX || ModesFX.canTake(powerups[pid]))) socket.emit('collectPowerup', { roomId: currentRoomId, pid: pid });
         for (let tid in tokens) if (Math.hypot(tokens[tid].x - myLocalTank.x, tokens[tid].y - myLocalTank.y) < myHitRad + 25) socket.emit('collectToken', { roomId: currentRoomId, tid: tid });
         
         camera.x += (myLocalTank.x - camera.x) * 5 * dt;
@@ -442,13 +442,16 @@ function drJ() {
 }
 
 function drAL() {
-    if (!isMobile || !joysticks.right.active || myLocalTank.hp <= 0 || (currentRoomData.mode === 'prophunt' && myLocalTank.team === 'hider') || !joysticks.right.hasAimed) return;
-    ctx.save();
-    ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)'; ctx.lineWidth = 2; ctx.setLineDash([10, 10]);
-    ctx.beginPath(); ctx.moveTo(myLocalTank.x, myLocalTank.y);
+    if (myLocalTank.hp <= 0 || (currentRoomData.mode === 'prophunt' && myLocalTank.team === 'hider')) return;
+    if (isMobile ? (!joysticks.right.active || !joysticks.right.hasAimed) : !(window.AimFX && AimFX.lineOn(false))) return;
+    if (window.AimFX && !AimFX.lineOn(isMobile)) return; // «Показувати лінію» вимкнено в налаштуваннях
     let tR = 1.0;
     tR *= GameData.statMult(myEquipped, 'range');
     let bS = (myLocalTank.buff === 'fast' || myLocalTank.buff === 'minigun') ? BASE_BULLET_SPEED * 1.8 : BASE_BULLET_SPEED, mD = (2.5 * tR) * bS;
+    if (window.AimFX) { AimFX.drawLine(ctx, myLocalTank.x, myLocalTank.y, myLocalTank.x + Math.cos(myLocalTank.turretAngle) * mD, myLocalTank.y + Math.sin(myLocalTank.turretAngle) * mD, VS); return; }
+    ctx.save();
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)'; ctx.lineWidth = 2; ctx.setLineDash([10, 10]);
+    ctx.beginPath(); ctx.moveTo(myLocalTank.x, myLocalTank.y);
     ctx.lineTo(myLocalTank.x + Math.cos(myLocalTank.turretAngle) * mD, myLocalTank.y + Math.sin(myLocalTank.turretAngle) * mD);
     ctx.stroke();
     ctx.restore();
@@ -468,7 +471,7 @@ function drPCA() {
 }
 
 // ===== Прийом дельта-синхронізації (сервер шле 20 разів/с лише зміни) =====
-const _ZSMOOTH = 14, _zAlias = {}; let _hudAt = 0;
+const _ZSMOOTH = 14, _zAlias = {}, _PV = { x0: 0, x1: 0, y0: 0, y1: 0 }; let _hudAt = 0;
 socket.on('sync2', (data) => {
     if (!currentRoomData || currentRoomData.status !== 'playing') return;
     const pl = currentRoomData.players || (currentRoomData.players = {});
@@ -754,7 +757,7 @@ function draw(now) {
             ctx.setLineDash([20, 20]); ctx.lineDashOffset = -tm * 20;
             for (let wy = o.y + 10; wy < o.y + o.h; wy += 30) { ctx.beginPath(); ctx.moveTo(o.x, wy); ctx.lineTo(o.x + o.w, wy); ctx.stroke(); }
             ctx.setLineDash([]);
-        } else if (o.type === 'prop_puddle' || o.type === 'prop_crater') drPrp(ctx, o, tm);
+        } else if (o.type === 'prop_puddle' || o.type === 'prop_crater' || o.type === 'prop_floor') drPrp(ctx, o, tm);
         ctx.restore();
     });
     
@@ -769,7 +772,7 @@ function draw(now) {
     
     if (!_fx) { ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 15; ctx.shadowOffsetX = 8; ctx.shadowOffsetY = 12; }
     MAP_DATA[cMap].solids.forEach(o => {
-        if (o.type.includes('spawn') || o.type.includes('water') || o.type === 'line' || o.type === 'prop_puddle' || o.type === 'prop_crater') return;
+        if (o.type.includes('spawn') || o.type.includes('water') || o.type === 'line' || o.type === 'prop_puddle' || o.type === 'prop_crater' || o.type === 'prop_floor' || o.type === 'prop_roof') return;
         if (!solidInView(o, VX0, VX1, VY0, VY1)) return;
         ctx.save(); MapObj.applyRot(ctx, o);
         const _k = _fx ? MapFX.solidKind(o) : null;
@@ -813,8 +816,12 @@ function draw(now) {
         ctx.restore();
     });
     
+    const _pv = _PV; _pv.x0 = VX0; _pv.x1 = VX1; _pv.y0 = VY0; _pv.y1 = VY1;   // один об'єкт на всі виклики (без виділень на кадр)
+    if (window.ModesFX && ModesFX.ground) ModesFX.ground(ctx, now, _pv);   // аірдроп (королівський бій): нижній шар
     for (let pid in powerups) {
-        let p = powerups[pid]; ctx.save(); ctx.translate(p.x, p.y);
+        let p = powerups[pid];
+        if (p.mod) { if (window.ModesFX) ModesFX.lootDraw(ctx, p, now, _pv); continue; }
+        ctx.save(); ctx.translate(p.x, p.y);
         ctx.fillStyle = '#1e293b'; ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2; ctx.shadowColor = '#f59e0b'; ctx.shadowBlur = 10;
         ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(-15, -15, 30, 30, 5); else ctx.rect(-15, -15, 30, 30);
         ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
@@ -872,6 +879,11 @@ function draw(now) {
         ctx.fillStyle = bCol; ctx.shadowColor = bCol; ctx.shadowBlur = 10; ctx.fill(); ctx.shadowBlur = 0;
     });
     
+    if (_fx) {   // дахи будівель: прозорі лише для локального гравця всередині (інші танки під дахом не видно)
+        const _rdt = Math.min(0.1, Math.max(0, (now - (draw._rt || now)) / 1000)); draw._rt = now;
+        const _alive = myLocalTank.hp > 0;
+        MapFX.drawRoofs(ctx, MAP_DATA[cMap].solids, { x0: VX0, x1: VX1, y0: VY0, y1: VY1 }, _alive ? myLocalTank.x : camera.x, _alive ? myLocalTank.y : camera.y, _rdt);
+    }
     if (window.ModesFX) ModesFX.top(ctx, now, tm);
     particles.forEach(p => {
         ctx.fillStyle = p.color; ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2.5));

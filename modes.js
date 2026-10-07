@@ -5,6 +5,7 @@
  * Стан кожного матчу лежить у MS (окремо від кімнати, бо кімнату серіалізують і шлють клієнтам). */
 'use strict';
 const ModeInfo = require('./public/js/modeinfo.js');
+const GD = require('./public/js/gamedata.js');
 
 module.exports = function createModes(D) {
     const { io, rooms, dbUsers, MAP_DATA, MapObj, Nav, Z_TYPES, waveScale, getValidSpawn, getValidEdgeSpawn, checkCollisionServer, getMaxHp,
@@ -88,7 +89,7 @@ module.exports = function createModes(D) {
     // o: { outcomes:{id:'win'|'loss'|'draw'}, ctx:(p)=>{...}, winner, name, msg, lines:[...] }
     function finish(r, o) {
         if (r.status !== 'playing') return;
-        r.status = 'finished'; const rw = {}, xpm = {}, oc = {}, per = {};
+        r.status = 'finished'; restoreEq(r); const rw = {}, xpm = {}, oc = {}, per = {};
         Object.values(r.players).forEach(p => {
             const out = o.outcomes[p.id] || 'loss', amt = ModeInfo.reward(r.mode, r, out, Object.assign({ n: Object.keys(r.players).length }, o.ctx ? o.ctx(p) : {}));
             rw[p.id] = amt; oc[p.id] = out; if (o.per) per[p.id] = o.per(p);
@@ -161,7 +162,14 @@ module.exports = function createModes(D) {
             case 'battle_royale': {
                 const R0 = Math.hypot(C.w, C.h) / 2 + 40, Rf = Math.max(120, Math.min(220, Math.min(C.w, C.h) * 0.08));
                 S.zone = { x: C.x, y: C.y, r: R0, R0, Rf, ph: 0, phases: 5, T: r.brTime * 1000, grace: 15000 };
-                S.zStart = now + 4000 + S.zone.grace; S.place = {}; S.dts = {}; S.killsB = {}; S.zdmgAt = now; S.sudden = false; S.lootAt = now + 6000;
+                S.zStart = now + 4000 + S.zone.grace; S.place = {}; S.dts = {}; S.killsB = {}; S.zdmgAt = now; S.sudden = false;
+                // усі стартують БЕЗ модулів: власний порожній набір, реальна екіпіровка акаунту (посилання) — у p.realEq й повертається після матчу
+                pK.forEach(id => {
+                    const p = r.players[id], real = p.realEq || p.equipped;
+                    Object.defineProperty(p, 'realEq', { value: real, writable: true, configurable: true, enumerable: false });   // не серіалізується клієнтам
+                    p.equipped = { cannon: null, turret: null, hull: null, tracks: null }; p.hp = getMaxHp(p.equipped);
+                });
+                brLootInit(r, S, map, C, now);
                 // спавн з рознесенням: жадібно беремо точки, найвіддаленіші одна від одної
                 const pts = []; for (let i = 0; i < 80; i++) { const q = randFree(r, 30); if (Math.hypot(q.x - C.x, q.y - C.y) < Math.min(C.w, C.h) * 0.46) pts.push(q); }
                 if (pts.length < pK.length) while (pts.length < pK.length) pts.push(randFree(r, 30));
@@ -438,6 +446,159 @@ module.exports = function createModes(D) {
         return false;
     }
 
+    // --- королівський бій: модулі на мапі, аірдроп, фінальна здобич ---
+    // Запис модуля в r.powerups: { id, x, y, type:'mod', mod:'<id>', rar:'<рідкість>', keep:bool, active:true, spawnTime }.
+    const SLOTS = ['cannon', 'turret', 'hull', 'tracks'], RORD = GD.RARITY_ORDER;
+    const MOD_IDX = {}; SLOTS.forEach(s => { MOD_IDX[s] = {}; RORD.forEach(q => { MOD_IDX[s][q] = []; }); });
+    Object.keys(GD.MODULES).forEach(id => { const m = GD.MODULES[id]; if (MOD_IDX[m.type] && MOD_IDX[m.type][m.rarity]) MOD_IDX[m.type][m.rarity].push(id); });
+    const rarIdx = q => RORD.indexOf(q);
+    const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; };
+    /* Ваги рідкості від прогресу матчу f = 0..1 (f = (now - t0 - 4000) / T, T — час до фіналу зони):
+     *   common    52 -> 8    (лінійно)          rare   36 -> 30 (лінійно)        epic 12 -> 32 (лінійно)
+     *   legendary 0 до f=0.25, далі плавно (smoothstep) до 30 при f=1.   Сума ваг ~100 (нормалізується).  Міфічних тут НЕМАЄ — лише аірдроп і фінал. */
+    function brWeights(f) {
+        f = Math.max(0, Math.min(1, f)); const t = Math.max(0, (f - 0.25) / 0.75);
+        return { common: 52 - 44 * f, rare: 36 - 6 * f, epic: 12 + 20 * f, legendary: 30 * t * t * (3 - 2 * t) };
+    }
+    function rollRarity(f, rnd) {
+        rnd = rnd || Math.random; const w = brWeights(f), ks = Object.keys(w); let tot = 0; ks.forEach(k => { tot += w[k]; });
+        let x = rnd() * tot; for (const k of ks) { x -= w[k]; if (x < 0 && w[k] > 0) return k; }
+        return 'epic';
+    }
+    // випадковий модуль: слот рівномірно серед тих, де є така рідкість, далі модуль рівномірно в слоті
+    function rollMod(rar, rnd, slot) {
+        rnd = rnd || Math.random; const sl = slot ? [slot] : SLOTS.filter(s => MOD_IDX[s][rar].length), s = sl[Math.floor(rnd() * sl.length)], l = MOD_IDX[s][rar];
+        return l[Math.floor(rnd() * l.length)];
+    }
+    const brF = (S, now) => Math.max(0, Math.min(1, (now - S.t0 - 4000) / S.zone.T));
+    // ліміт модулів на мапі (без keep): clamp(round(sqrt(площа)/90), 14, 42), ×0.5 якщо «Модулі на мапі» вимкнено
+    function lootCap(r, C) { return Math.max(1, Math.round(Math.max(14, Math.min(42, Math.round(Math.sqrt(C.w * C.h) / 90))) * (r.brLoot ? 1 : 0.5))); }
+    function restoreEq(r) {      // повернути реальну екіпіровку акаунту (посилання на dbUsers[..].equipped)
+        Object.values(r.players).forEach(p => { if (p.realEq) { p.equipped = p.realEq; p.realEq = null; } });
+    }
+    function brLootInit(r, S, map, C, now) {
+        const T = S.zone.T, cap = lootCap(r, C), L = S.loot = { q: [], seq: 0, cap, every: Math.max(2500, Math.round(T / cap / 1.6)), nextAt: now + 4000 + Math.max(2500, Math.round(T / cap / 1.6)), grid: null, dist: null, marks: [] };
+        // досяжність: поле від spawn_player (або центру) на навігаційній сітці — порахувати ОДИН раз за матч (за потреби — ще кілька кандидатів, якщо перше в ізольованій кишені)
+        try {
+            const g = Nav.getGrid(map, 30), N = g.N; let walk = 0; for (let i = 0; i < g.walk.length; i++) walk += g.walk[i];
+            const srcs = map.solids.filter(o => o.type === 'spawn_player').slice(0, 3).map(o => findOpen(r, o.x, o.y, 30)); srcs.push(findOpen(r, C.x, C.y, 30));
+            let best = null, bc = -1;
+            for (const q of srcs) {
+                const f = Nav.buildField(g, q.x, q.y); let c = 0; for (let i = 0; i < f.dist.length; i++) if (f.dist[i] >= 0) c++;
+                if (c > bc) { bc = c; best = f; } if (c >= walk * 0.6) break;
+            }
+            if (best && bc > 50) { L.grid = g; L.dist = best.dist; }
+        } catch (e) { L.grid = null; }
+        // маркери spawn_powerup: лише вільні й досяжні
+        map.solids.forEach(o => { if (o.type === 'spawn_powerup' && isFree(r, o.x, o.y, 34) && lootReach(L, o.x, o.y)) L.marks.push({ x: o.x, y: o.y }); });
+        S.air = { plan: [], i: 0, cur: null, seq: 0 };
+        const m0 = now + 4000, n = T <= 240000 ? 1 : 2, a = 0.15 + Math.random() * 0.30;      // 1 дроп до 4 хв, 2 — довше; вікна 15–45% і 55–85% (другий ≥ +20% після першого)
+        S.air.plan.push(m0 + Math.round(T * a));
+        if (n === 2) { const lo = Math.max(0.55, a + 0.2); S.air.plan.push(m0 + Math.round(T * (lo + Math.random() * (0.85 - lo)))); }
+        for (let i = 0, k = Math.round(cap * (0.5 + Math.random() * 0.1)); i < k; i++) lootSpawn(r, S, now, 0);      // початкове насичення 50–60% ліміту
+    }
+    function lootReach(L, x, y) {
+        if (!L.dist) return true; const N = L.grid.N, CS = Nav.CS, cx = Math.floor(x / CS), cy = Math.floor(y / CS);
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const gx = cx + dx, gy = cy + dy; if (gx >= 0 && gy >= 0 && gx < N && gy < N && L.dist[gy * N + gx] >= 0) return true; }
+        return false;
+    }
+    function addMod(r, S, id, x, y, keep, now) {
+        const L = S.loot, m = GD.MODULES[id], pid = 'bm_' + (L.seq++);
+        r.powerups[pid] = { id: pid, x: Math.round(x), y: Math.round(y), type: 'mod', mod: id, rar: m.rarity, keep: !!keep, active: true, spawnTime: now };
+        if (!keep) {      // FIFO: найстарші знищуються, якщо модулів (без keep) більше за ліміт
+            L.q.push(pid);
+            if (L.q.length > L.cap) { L.q = L.q.filter(k => r.powerups[k]); while (L.q.length > L.cap) delete r.powerups[L.q.shift()]; }
+        }
+        return pid;
+    }
+    // нове місце для модуля: у межах поточної зони, повністю вільне (r=34), ≥140 від інших модулів, досяжне; 50% — з маркерів spawn_powerup
+    function lootSpot(r, S) {
+        const L = S.loot, Z = S.zone, lim = Z.r - 40; if (lim < 30) return null;
+        const mods = Object.values(r.powerups).filter(p => p.mod);
+        for (let k = 0; k < 40; k++) {
+            let x, y;
+            if (L.marks.length && Math.random() < 0.5) { const m = L.marks[Math.floor(Math.random() * L.marks.length)]; x = m.x; y = m.y; }
+            else { const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * lim; x = Z.x + Math.cos(a) * d; y = Z.y + Math.sin(a) * d; }
+            if (Math.hypot(x - Z.x, y - Z.y) > lim || !isFree(r, x, y, 34) || !lootReach(L, x, y)) continue;
+            if (mods.some(p => Math.hypot(p.x - x, p.y - y) < 140)) continue;
+            return { x, y };
+        }
+        return null;
+    }
+    function lootSpawn(r, S, now, f) {
+        const sp = lootSpot(r, S); if (!sp) return false;
+        addMod(r, S, rollMod(rollRarity(f)), sp.x, sp.y, false, now); return true;
+    }
+    function brLootTick(r, S, now) {
+        const L = S.loot, Z = S.zone; if (!L) return;
+        if (now >= L.nextAt) { L.nextAt = now + L.every; lootSpawn(r, S, now, brF(S, now)); }
+        // фінал: 3 міфічні модулі в центрі зони
+        if (S.sudden && !S.finalLoot) {
+            S.finalLoot = true; const c0 = findOpen(r, Z.x, Z.y, 34), sl = shuffle(SLOTS.slice()), put = [];
+            for (let k = 0; k < 3; k++) {
+                let q = k === 0 ? c0 : null;
+                for (let t = 0; !q && t < 12; t++) { const s = ringSpot(r, c0, 45, 85, 34); if (put.every(o => Math.hypot(o.x - s.x, o.y - s.y) >= 50) && (t > 8 || !nearMod(r, s.x, s.y, 56))) q = s; }
+                if (!q) q = findOpen(r, c0.x + (k - 1) * 70, c0.y + 70, 34);
+                put.push(q); addMod(r, S, rollMod('mythic', null, sl[k]), q.x, q.y, true, now);
+            }
+            note(r, 'finalLoot', { x: Math.round(c0.x), y: Math.round(c0.y) });
+        }
+        // аірдроп: warn(3с) -> fall(8с) -> open(25с) -> done(5с)
+        const A = S.air, c = A.cur;
+        if (!c) {
+            if (A.i < A.plan.length && now >= A.plan[A.i] && !S.sudden) {
+                const sp = dropSpot(r, S);
+                if (!sp) { A.plan[A.i] = now + 4000; return; }
+                A.i++; const cur = A.cur = { id: 'd' + (A.seq++), x: Math.round(sp.x), y: Math.round(sp.y), st: 'warn', t: now, dur: 3000 };
+                note(r, 'dropWarn', { id: cur.id, x: cur.x, y: cur.y });
+            }
+        } else if (c.st === 'warn' && now - c.t >= 3000) { c.st = 'fall'; c.t = now; c.dur = 8000; }
+        else if (c.st === 'fall' && now - c.t >= 8000) { c.st = 'open'; c.t = now; c.dur = 25000; dropLoot(r, S, c, now); note(r, 'dropLand', { id: c.id, x: c.x, y: c.y }); }
+        else if (c.st === 'open' && now - c.t >= 25000) { c.st = 'done'; c.t = now; c.dur = 5000; }
+        else if (c.st === 'done' && now - c.t >= 5000) A.cur = null;
+    }
+    const nearMod = (r, x, y, d) => { for (const k in r.powerups) { const p = r.powerups[k]; if (p.mod && Math.hypot(p.x - x, p.y - y) < d) return true; } return false; };
+    // місце для ящика: у зоні, не біля краю, вільне радіусом 90, досяжне
+    function dropSpot(r, S) {
+        const Z = S.zone, L = S.loot, lim = Z.r > 450 ? Z.r - 220 : Z.r * 0.5; if (lim < 40) return null;
+        for (let k = 0; k < 50; k++) {
+            const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * lim, x = Z.x + Math.cos(a) * d, y = Z.y + Math.sin(a) * d;
+            if (isFree(r, x, y, 90) && lootReach(L, x, y)) return { x, y };
+        }
+        return null;
+    }
+    // 5 топових модулів навколо ящика: 1–2 міфічні (різні слоти) + решта легендарні; keep=true
+    function dropLoot(r, S, c, now) {
+        const sl = shuffle(SLOTS.slice()), nm = 1 + (Math.random() < 0.5 ? 1 : 0), list = [];
+        for (let i = 0; i < nm; i++) list.push(rollMod('mythic', null, sl[i]));
+        for (let j = 0; list.length < 5; j++) list.push(rollMod('legendary', null, sl[(nm + j) % 4]));
+        const put = [], base = Math.random() * Math.PI * 2, L = S.loot;
+        list.forEach((id, i) => {
+            let q = null;
+            for (let t = 0; !q && t < 30; t++) {
+                const a = base + i * Math.PI * 2 / list.length + (Math.random() - 0.5) * (t < 15 ? 0.5 : 2.5), d = 60 + Math.random() * 50, x = c.x + Math.cos(a) * d, y = c.y + Math.sin(a) * d;
+                if (isFree(r, x, y, 34) && (t > 18 || lootReach(L, x, y)) && put.every(o => Math.hypot(o.x - x, o.y - y) >= 44) && (t > 24 || !nearMod(r, x, y, 56))) q = { x, y };
+            }
+            if (!q) { q = findOpen(r, c.x + Math.cos(base + i * 1.3) * 90, c.y + Math.sin(base + i * 1.3) * 90, 34); }
+            put.push(q); addMod(r, S, id, q.x, q.y, true, now);
+        });
+    }
+    // підбір модуля гравцем (виклик із server.js collectPowerup). Правило: слот порожній АБО рідкість строго вища за поточну
+    function pickMod(r, sockId, pid) {
+        const S = MS.get(r.id), pu = r.powerups[pid], p = r.players[sockId];
+        if (!S || r.mode !== 'battle_royale' || !pu || !pu.mod || !pu.active || !p || p.hp <= 0 || p.out || !p.realEq) return false;
+        const m = GD.MODULES[pu.mod]; if (!m) { delete r.powerups[pid]; return false; }
+        if (Math.hypot(pu.x - p.x, pu.y - p.y) > 90) return false;
+        const slot = m.type, old = p.equipped[slot], oldM = old && GD.MODULES[old];
+        if (oldM && rarIdx(m.rarity) <= rarIdx(oldM.rarity)) return false;
+        const mx0 = getMaxHp(p.equipped); p.equipped[slot] = m.id; const mx1 = getMaxHp(p.equipped);
+        p.hp = mx1 > mx0 ? Math.min(mx1, p.hp + (mx1 - mx0)) : Math.min(p.hp, mx1);
+        pu.active = false; delete r.powerups[pid];
+        emit(r, 'powerupCollected', { pid, playerId: sockId, type: 'mod' });
+        io.to(sockId).emit('modPicked', { mod: m.id, slot, rar: m.rarity, replaced: old || null });
+        return true;
+    }
+
     // --- королівський бій ---
     function brTick(r, S, now, dt, al) {
         const Z = S.zone;
@@ -458,13 +619,7 @@ module.exports = function createModes(D) {
             const mult = 1 + 0.5 * Math.max(0, Z.ph - 0);
             al.forEach(p => { if (Math.hypot(p.x - Z.x, p.y - Z.y) > Z.r && p.buff !== 'shield') { p.hp = Math.max(0, p.hp - getMaxHp(p.equipped) * r.brDmg / 100 * mult * k); if (p.hp === 0) D.processPlayerDeath(r, p.id, null); } });
         }
-        if (now >= S.lootAt) {   // бонуси на випадкових місцях усередині зони
-            S.lootAt = now + (r.brLoot ? 12000 : 30000); const max = r.brLoot ? 8 : 3, cur = Object.keys(r.powerups).length;
-            for (let i = 0; i < (r.brLoot ? 3 : 1) && cur + i < max; i++) {
-                const q = randFree(r, 30); if (Math.hypot(q.x - Z.x, q.y - Z.y) > Math.max(60, Z.r - 40)) continue;
-                const pid = 'p_br_' + now + '_' + i; r.powerups[pid] = { id: pid, x: q.x, y: q.y, type: POW_TYPES[Math.floor(Math.random() * POW_TYPES.length)], active: true, spawnTime: now };
-            }
-        }
+        brLootTick(r, S, now);
         return false;
     }
 
@@ -495,16 +650,16 @@ module.exports = function createModes(D) {
             case 'convoy': return { m: r.mode, cv: { x: rn(S.cv.x), y: rn(S.cv.y), hp: rn(S.cv.hp), max: S.cv.max, a: Math.round(S.cv.a * 100) / 100, r: S.cv.r }, A: S.A, B: S.B, prog: Math.round(S.prog * 100), t: left, hold: S.hold, go: now >= S.startAt };
             case 'solo_arena': return { m: r.mode, w: S.wave, W: S.W, st: S.st, pk: S.perks, z: Object.keys(r.zombies).length };
             case 'boss_duel': { const b = r.zombies[S.bossId], p = Object.values(r.players)[0]; return { m: r.mode, i: S.i + 1, N: S.list.length, st: S.st, b: b ? { n: Z_TYPES[S.list[S.i]].name, hp: rn(b.hp), max: b.maxHp } : null, lv: p ? p.lives : 0 }; }
-            case 'battle_royale': { const Z = S.zone; return { m: r.mode, z: { x: rn(Z.x), y: rn(Z.y), r: Math.round(Z.r / 4) * 4, ph: Z.ph, np: S.nextPh | 0, go: now >= S.zStart }, al: alive(r).length, n: Object.keys(r.players).length, zt: Math.max(0, Math.ceil((S.zStart - now) / 1000)) }; }
+            case 'battle_royale': { const Z = S.zone; const o = { m: r.mode, z: { x: rn(Z.x), y: rn(Z.y), r: Math.round(Z.r / 4) * 4, ph: Z.ph, np: S.nextPh | 0, go: now >= S.zStart }, al: alive(r).length, n: Object.keys(r.players).length, zt: Math.max(0, Math.ceil((S.zStart - now) / 1000)) }, dc = S.air && S.air.cur; if (dc) o.dr = { id: dc.id, x: dc.x, y: dc.y, st: dc.st, dur: dc.dur }; return o; }
             case 'capture_points': { const sc = {}; S.teams.forEach(t => sc[t] = Math.floor(S.sc[t])); return { m: r.mode, pts: S.pts.map(p => ({ i: p.i, x: p.x, y: p.y, r: p.r, o: p.o, w: p.w, p: Math.round(p.p) })), sc, goal: S.goal, t: left }; }
             case 'bounty': return { m: r.mode, tg: S.target, bv: S.bv, nt: S.target ? Math.max(0, Math.ceil((S.tEnd - now) / 1000)) : 0, t: left, goal: r.bnScore };
         }
     }
-    function cleanup(roomId) { MS.delete(roomId); }
+    function cleanup(roomId) { MS.delete(roomId); const r = rooms[roomId]; if (r) restoreEq(r); }
     function powerupRule(r) {      // null — режим без бонусів; null-поле own — спавнить сам режим
         if (r.mode === 'battle_royale') return { own: true };
         return { every: 30000, max: 4, count: 2 };
     }
 
-    return { has, readSettings, applyUpdate, start, tick, onDeath, afterLeave, md, cleanup, pickPerk, dmgMult, dmgTaken, onZombieKill, powerupRule, MS };
+    return { has, readSettings, applyUpdate, start, tick, onDeath, afterLeave, md, cleanup, pickPerk, dmgMult, dmgTaken, onZombieKill, powerupRule, pickMod, MS, BR: { brWeights, rollRarity, rollMod, lootCap, brF, SLOTS } };
 };

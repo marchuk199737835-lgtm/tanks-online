@@ -176,7 +176,7 @@ function statMult(equipped, stat) {
   const lim = STAT_LIMITS[stat];
   return lim ? Math.max(lim[0], Math.min(lim[1], m)) : m;
 }
-// Шанс апгрейду (%): справедливий шанс (вхід+бакси)/ціна цілі зі «зборами казино»: -15% (на міфічні -25%) і стеля 75% (на міфічні 50%).
+// Шанс апгрейду (%): справедливий шанс (вхід+креди)/ціна цілі зі «зборами казино»: -15% (на міфічні -25%) і стеля 75% (на міфічні 50%).
 // Ланцюжок дрібних апгрейдів тому не безпечний: кожен крок множить очікувану цінність на 0.85.
 function upgradeChance(pIn, bucks, target) {
   const myth = target && target.rarity === 'mythic', pOut = (target && target.price) || 5;
@@ -211,7 +211,8 @@ function genLevelRewards(rnd) {
   }
   return out;
 }
+const DROP_CHANCE = 0.10; // шанс випадіння модуля після матчу (rollDrop на сервері; показується у вікні гаманця)
 function rollXp(outcome, rnd) { rnd = rnd || Math.random; const r = outcome === 'win' ? XP_WIN : outcome === 'draw' ? XP_DRAW : XP_LOSS; return r[0] + Math.floor(rnd() * (r[1] - r[0] + 1)); }
 function legendCaseId() { for (const k in CASES) if (CASES[k].legend) return +k; return null; }
-return { RARITY: RARITY, RARITY_ORDER: RARITY_ORDER, MODULES: MODULES, CASES: CASES, casePool: casePool, caseTable: caseTable, rollCase: rollCase, statMult: statMult, LEVEL_XP: LEVEL_XP, MAX_LEVEL: MAX_LEVEL, LEVEL_NAMES: LEVEL_NAMES, levelFromXp: levelFromXp, levelProgress: levelProgress, genLevelRewards: genLevelRewards, rollXp: rollXp, XP_WIN: XP_WIN, XP_LOSS: XP_LOSS, XP_DRAW: XP_DRAW, upgradeChance: upgradeChance, legendCaseId: legendCaseId };
+return { DROP_CHANCE: DROP_CHANCE, RARITY: RARITY, RARITY_ORDER: RARITY_ORDER, MODULES: MODULES, CASES: CASES, casePool: casePool, caseTable: caseTable, rollCase: rollCase, statMult: statMult, LEVEL_XP: LEVEL_XP, MAX_LEVEL: MAX_LEVEL, LEVEL_NAMES: LEVEL_NAMES, levelFromXp: levelFromXp, levelProgress: levelProgress, genLevelRewards: genLevelRewards, rollXp: rollXp, XP_WIN: XP_WIN, XP_LOSS: XP_LOSS, XP_DRAW: XP_DRAW, upgradeChance: upgradeChance, legendCaseId: legendCaseId };
 });

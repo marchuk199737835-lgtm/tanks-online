@@ -103,12 +103,12 @@
             case 'convoy': h += rule('🚚', 'Конвой', v('cvHp')) + rule('⚡', 'Швидкість', v('cvSpeed')) + rule('⏱', 'Час', tm('cvTime')) + rule('💪', 'Складність', v('pveDiff') + '%'); break;
             case 'solo_arena': h += rule('🌊', 'Хвиль', v('saWaves')) + rule('💪', 'Складність', v('pveDiff') + '%') + rule('🩹', 'Лікування', yn('saHeal')); break;
             case 'boss_duel': h += rule('💀', 'Босів', v('duBosses')) + rule('❤️', 'Життів', v('duLives')) + rule('💪', 'Складність', v('pveDiff') + '%') + rule('🩹', 'Лікування', yn('duHeal')); break;
-            case 'battle_royale': h += rule('⏱', 'До фіналу', tm('brTime')) + rule('☣️', 'Шкода зони', v('brDmg') + '%/с') + rule('🎁', 'Бонуси', yn('brLoot')); break;
+            case 'battle_royale': h += rule('⏱', 'До фіналу', tm('brTime')) + rule('☣️', 'Шкода зони', v('brDmg') + '%/с') + rule('🎁', 'Модулі', yn('brLoot')); break;
             case 'capture_points': h += rule('🚩', 'Команд', v('cpTeams')) + rule('📍', 'Точок', v('cpPoints')) + rule('🏁', 'Очки', v('cpScore')) + rule('⏱', 'Час', tm('cpTime')); break;
             case 'bounty': h += rule('🏁', 'Очки', v('bnScore')) + rule('⏱', 'Час', tm('bnTime')) + rule('🎯', 'Зміна цілі', v('bnInterval') + 'с'); break;
         }
         const rr = MI.rewardRange(r.mode, r);
-        h += rule('💵', 'Нагорода', rr.loss + '–' + rr.win) + (rr.draw != null ? rule('🤝', 'Нічия', '💵 ' + rr.draw) : '');
+        h += rule(creditIcon(20), 'Нагорода', rr.loss + '–' + rr.win) + (rr.draw != null ? rule('🤝', 'Нічия', creditAmount(rr.draw, 14)) : '');
         $('lobby-rules').innerHTML = h;
     }
     let lastMap = null;

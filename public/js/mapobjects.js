@@ -30,7 +30,8 @@ var MapObj = (function () {
         { id: 'prop_campfire', name: 'Багаття' }, { id: 'prop_hay', name: 'Стіг сіна' }, { id: 'prop_well', name: 'Колодязь' },
         { id: 'prop_statue', name: 'Статуя' }, { id: 'prop_crystal', name: 'Кристал' }, { id: 'prop_terminal', name: 'Термінал' },
         { id: 'prop_solar', name: 'Сонячна панель' }, { id: 'prop_pipe', name: 'Труба' }, { id: 'prop_hatch', name: 'Люк (без колізії)' },
-        { id: 'prop_pad', name: 'Платформа (без колізії)' }
+        { id: 'prop_pad', name: 'Платформа (без колізії)' },
+        { id: 'prop_floor', name: 'Підлога будівлі (без колізії)' }, { id: 'prop_roof', name: 'Дах будівлі (зникає всередині)' }
     ];
     // len — довжина, thick — товщина, leaves — кількість стулок
     const DOORS = [
@@ -45,7 +46,7 @@ var MapObj = (function () {
         { id: 'prop_door_space_gate', name: 'Космічні ворота', w: 300, h: 30, leaves: 2, style: 'space' }
     ];
     const DOOR_BY_ID = {}; DOORS.forEach(d => DOOR_BY_ID[d.id] = d);
-    const NONSOLID = new Set(['prop_puddle', 'prop_crater', 'prop_hatch', 'prop_pad']);
+    const NONSOLID = new Set(['prop_puddle', 'prop_crater', 'prop_hatch', 'prop_pad', 'prop_floor', 'prop_roof']);
     const BASE_TYPES = ['wall', 'wall_square', 'shape_line', 'line', 'shape_triangle', 'shape_rhombus', 'shape_parallelepiped', 'tree',
         'water_square', 'water_curve', 'neon_wall', 'neon_circle', 'neon_triangle', 'neon_cross', 'neon_diamond', 'neon_arch', 'neon_pillar',
         'spawn_player', 'spawn_zombie', 'spawn_powerup', 'spawn_core', 'spawn_cp', 'spawn_convoy_a', 'spawn_convoy_b'];
@@ -155,9 +156,112 @@ var MapObj = (function () {
         return l.x >= o.x - pad && l.x <= o.x + w + pad && l.y >= o.y - pad && l.y <= o.y + h + pad;
     }
 
+    // ---------- БІОМИ: згладжений контур (Chaikin x2) і пошук біому за точкою ----------
+    // Вершини на межі мапи виносяться за її межі, щоб край біому по межі не давав м'якого переходу.
+    const _bc = new WeakMap();   // кеш контурів біомів (не пишемо службові поля в самі дані мапи)
+    function biomePoly(b, S) {
+        S = S || 0; let e = _bc.get(b);
+        if (e && e.pts === b.points && e.n === b.points.length && e.S === S) return e.sp;
+        const lo = v => v <= 2 ? -600 : (S && v >= S - 2 ? S + 600 : v);
+        let P = b.points.map(p => ({ x: lo(p.x), y: lo(p.y) }));
+        for (let it = 0; it < 2; it++) {
+            const N = []; for (let i = 0; i < P.length; i++) { const a = P[i], c = P[(i + 1) % P.length]; N.push({ x: a.x * 0.75 + c.x * 0.25, y: a.y * 0.75 + c.y * 0.25 }, { x: a.x * 0.25 + c.x * 0.75, y: a.y * 0.25 + c.y * 0.75 }); }
+            P = N;
+        }
+        let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; P.forEach(p => { if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y; });
+        _bc.set(b, e = { pts: b.points, n: b.points.length, S: S, sp: P, bb: [x0, y0, x1, y1] });
+        return P;
+    }
+    function biomeBBox(b) { const e = _bc.get(b); return e ? e.bb : null; }
+    // Біом, у який потрапляє точка (пізніші біоми — зверху), або null
+    function biomeAt(map, x, y) {
+        const bs = map && map.biomes; if (!bs || !bs.length) return null;
+        for (let i = bs.length - 1; i >= 0; i--) {
+            const b = bs[i], sp = biomePoly(b, map.size), bb = biomeBBox(b);
+            if (x < bb[0] || x > bb[2] || y < bb[1] || y > bb[3]) continue;
+            if (pointInPoly(sp, x, y)) return b;
+        }
+        return null;
+    }
+
     // ---------- ЗІТКНЕННЯ (єдина функція для клієнта і сервера) ----------
+    // Геометрія одного твердого об'єкта: чи перетинає коло (x,y,r) об'єкт s
+    function solidHit(s, x, y, r) {
+        if (isCircular(s)) {
+            const cx = s.x + (s.w ? s.w / 2 : 0), cy = s.y + (s.h ? s.h / 2 : 0), sr = s.r || (s.w ? s.w / 2 : 30);
+            return Math.hypot(x - cx, y - cy) <= r + sr;
+        } else if (s.type === 'water_curve') { // заокруглена вода: «капсула» (прямокутник із радіусом min(w,h)/2), а не блок
+            const l = s.rot ? toLocal(s, x, y) : { x: x, y: y }, w = s.w || 30, h = s.h || 30, rr = Math.min(w, h) / 2;
+            const nx = Math.max(s.x + rr, Math.min(l.x, s.x + w - rr)), ny = Math.max(s.y + rr, Math.min(l.y, s.y + h - rr));
+            return Math.hypot(l.x - nx, l.y - ny) <= rr + r;
+        } else if (polyOf(s)) {
+            const l = s.rot ? toLocal(s, x, y) : { x: x, y: y };
+            return circleHitsPoly(polyOf(s), l.x, l.y, r);
+        }
+        const l = s.rot ? toLocal(s, x, y) : { x: x, y: y };
+        const tX = Math.max(s.x, Math.min(l.x, s.x + (s.w || 30))), tY = Math.max(s.y, Math.min(l.y, s.y + (s.h || 30)));
+        return Math.hypot(l.x - tX, l.y - tY) <= r;
+    }
+    // Просторовий індекс (сітка IDX_CELL px) для великих мап: кеш у WeakMap за масивом solids, з інкрементальним доповненням.
+    const IDX_MIN = 300, IDX_CELL = 200, IDX_OFF = 16, IDX_W = 1024;
+    const _idx = new WeakMap();
+    function idxAdd(e, s, i) {
+        if (!isSolidType(s)) return;
+        let cx, cy, R;
+        if (isCircular(s)) { cx = s.x + (s.w ? s.w / 2 : 0); cy = s.y + (s.h ? s.h / 2 : 0); R = s.r || (s.w ? s.w / 2 : 30); }
+        else { const w = s.w || 30, h = s.h || 30; cx = s.x + w / 2; cy = s.y + h / 2; R = Math.hypot(w, h) / 2; }
+        R += 2;
+        const a0 = Math.floor((cx - R) / IDX_CELL), a1 = Math.floor((cx + R) / IDX_CELL), b0 = Math.floor((cy - R) / IDX_CELL), b1 = Math.floor((cy + R) / IDX_CELL);
+        for (let a = a0; a <= a1; a++) for (let b = b0; b <= b1; b++) {
+            const k = (a + IDX_OFF) * IDX_W + (b + IDX_OFF); let c = e.cells.get(k); if (!c) e.cells.set(k, c = []); c.push(i);
+        }
+    }
+    function idxOf(arr) {
+        let e = _idx.get(arr);
+        if (e && (e.len > arr.length || (e.len > 0 && arr[e.len - 1] !== e.last))) e = null;   // масив скоротився/змінився — перебудова
+        if (!e) { e = { len: 0, last: null, cells: new Map(), mark: null, stamp: 0 }; _idx.set(arr, e); }
+        if (e.len < arr.length) {
+            for (let i = e.len; i < arr.length; i++) idxAdd(e, arr[i], i);
+            e.len = arr.length; e.last = arr[arr.length - 1]; e.mark = new Int32Array(arr.length); e.stamp = 0;
+        }
+        return e;
+    }
+    function invalidateIndex(arr) { if (arr) _idx.delete(arr); }
     // opts: { ignore:[індекси], skipWater:bool, doorOpen:(o,i)=>bool }
     function collides(map, x, y, r, opts) {
+        opts = opts || {};
+        const S = map.size;
+        if (x - r < 0 || x + r > S || y - r < 0 || y + r > S) return true;
+        if (hasShape(map) && !circleInPoly(map.shape, x, y, r)) return true;
+        const arr = map.solids, ig = opts.ignore;
+        if (arr.length > IDX_MIN) {   // велика мапа: перевіряємо лише об'єкти з сусідніх клітинок
+            const e = idxOf(arr), mark = e.mark, st = ++e.stamp;
+            const a0 = Math.floor((x - r) / IDX_CELL), a1 = Math.floor((x + r) / IDX_CELL), b0 = Math.floor((y - r) / IDX_CELL), b1 = Math.floor((y + r) / IDX_CELL);
+            for (let a = a0; a <= a1; a++) for (let b = b0; b <= b1; b++) {
+                const c = e.cells.get((a + IDX_OFF) * IDX_W + (b + IDX_OFF)); if (!c) continue;
+                for (let q = 0; q < c.length; q++) {
+                    const i = c[q]; if (mark[i] === st) continue; mark[i] = st;
+                    if (ig && ig.length && ig.indexOf(i) >= 0) continue;
+                    const s = arr[i];
+                    if (opts.skipWater && s.type.indexOf('water') >= 0) continue;
+                    if (isDoor(s)) { if (opts.doorOpen ? opts.doorOpen(s, i) : (s._open || 0) >= DOOR_PASS) continue; }
+                    if (solidHit(s, x, y, r)) return true;
+                }
+            }
+            return false;
+        }
+        for (let i = 0; i < arr.length; i++) {
+            const s = arr[i];
+            if (ig && ig.length && ig.indexOf(i) >= 0) continue;
+            if (!isSolidType(s)) continue;
+            if (opts.skipWater && s.type.indexOf('water') >= 0) continue;
+            if (isDoor(s)) { if (opts.doorOpen ? opts.doorOpen(s, i) : (s._open || 0) >= DOOR_PASS) continue; }
+            if (solidHit(s, x, y, r)) return true;
+        }
+        return false;
+    }
+    // наївна версія (без індексу) — для тестів
+    function collidesNaive(map, x, y, r, opts) {
         opts = opts || {};
         const S = map.size;
         if (x - r < 0 || x + r > S || y - r < 0 || y + r > S) return true;
@@ -169,21 +273,7 @@ var MapObj = (function () {
             if (!isSolidType(s)) continue;
             if (opts.skipWater && s.type.indexOf('water') >= 0) continue;
             if (isDoor(s)) { if (opts.doorOpen ? opts.doorOpen(s, i) : (s._open || 0) >= DOOR_PASS) continue; }
-            if (isCircular(s)) {
-                const cx = s.x + (s.w ? s.w / 2 : 0), cy = s.y + (s.h ? s.h / 2 : 0), sr = s.r || (s.w ? s.w / 2 : 30);
-                if (Math.hypot(x - cx, y - cy) <= r + sr) return true;
-            } else if (s.type === 'water_curve') { // заокруглена вода: «капсула» (прямокутник із радіусом min(w,h)/2), а не блок
-                const l = s.rot ? toLocal(s, x, y) : { x: x, y: y }, w = s.w || 30, h = s.h || 30, rr = Math.min(w, h) / 2;
-                const nx = Math.max(s.x + rr, Math.min(l.x, s.x + w - rr)), ny = Math.max(s.y + rr, Math.min(l.y, s.y + h - rr));
-                if (Math.hypot(l.x - nx, l.y - ny) <= rr + r) return true;
-            } else if (polyOf(s)) {
-                const l = s.rot ? toLocal(s, x, y) : { x: x, y: y };
-                if (circleHitsPoly(polyOf(s), l.x, l.y, r)) return true;
-            } else {
-                const l = s.rot ? toLocal(s, x, y) : { x: x, y: y };
-                const tX = Math.max(s.x, Math.min(l.x, s.x + (s.w || 30))), tY = Math.max(s.y, Math.min(l.y, s.y + (s.h || 30)));
-                if (Math.hypot(l.x - tX, l.y - tY) <= r) return true;
-            }
+            if (solidHit(s, x, y, r)) return true;
         }
         return false;
     }
@@ -271,6 +361,94 @@ var MapObj = (function () {
         const ind = open > 0.5 ? '#22c55e' : '#ef4444';
         c.fillStyle = ind; c.shadowColor = ind; c.shadowBlur = 6; c.beginPath(); c.arc(x + w / 2, y - 6, 3, 0, 7); c.fill(); c.shadowBlur = 0;
         c.restore();
+    }
+
+    // ----- підлога й дах будівлі -----
+    const _tn = Object.create(null);
+    function tint(hex, k) {   // k<1 — темніше, k>1 — світліше (до білого)
+        const key = hex + '|' + k; if (_tn[key]) return _tn[key];
+        const n = parseInt(String(hex || '#808080').slice(1, 7), 16), v = isNaN(n) ? 0x808080 : n, r = (v >> 16) & 255, g = (v >> 8) & 255, b = v & 255; let R, G, B;
+        if (k <= 1) { R = r * k; G = g * k; B = b * k; } else { const t = Math.min(1, k - 1); R = r + (255 - r) * t; G = g + (255 - g) * t; B = b + (255 - b) * t; }
+        return (_tn[key] = 'rgb(' + (R | 0) + ',' + (G | 0) + ',' + (B | 0) + ')');
+    }
+    function srand(seed) { let a = seed >>> 0; return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+    const seedOf = o => ((Math.round(o.x) * 73856093) ^ (Math.round(o.y) * 19349663)) >>> 0;
+    const PLANK_K = [0.86, 0.92, 0.97, 1, 1.04, 1.09, 1.14];
+    function drawFloor(c, o) {
+        const x = o.x, y = o.y, w = o.w || 50, h = o.h || 50, base = o.color || '#a8763e';
+        c.fillStyle = base; c.fillRect(x, y, w, h);
+        c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
+        if (o.neon) {   // плитка-шахматка color/neon
+            const T = 40; c.fillStyle = o.neon;
+            for (let iy = 0; iy * T < h; iy++) for (let ix = 0; ix * T < w; ix++) if ((ix + iy) & 1) c.fillRect(x + ix * T, y + iy * T, T, T);
+            c.strokeStyle = 'rgba(0,0,0,0.16)'; c.lineWidth = 1; c.beginPath();
+            for (let ix = 1; ix * T < w; ix++) { c.moveTo(x + ix * T, y); c.lineTo(x + ix * T, y + h); }
+            for (let iy = 1; iy * T < h; iy++) { c.moveTo(x, y + iy * T); c.lineTo(x + w, y + iy * T); }
+            c.stroke();
+        } else {        // дерев'яні дошки вздовж довшої осі
+            const R = srand(seedOf(o)), horiz = w >= h, len = horiz ? w : h, wid = horiz ? h : w, RH = 22;
+            c.beginPath();
+            for (let p = 0; p < wid; p += RH) {
+                const rh = Math.min(RH, wid - p); let q = -R() * 150;
+                while (q < len) {
+                    const l = 110 + R() * 90, a = Math.max(q, 0), b2 = Math.min(q + l, len);
+                    if (b2 > a) { c.fillStyle = tint(base, PLANK_K[(R() * 7) | 0]); if (horiz) c.fillRect(x + a, y + p, b2 - a, rh); else c.fillRect(x + p, y + a, rh, b2 - a); }
+                    if (q + l < len && q + l > 0) { if (horiz) { c.moveTo(x + q + l, y + p); c.lineTo(x + q + l, y + p + rh); } else { c.moveTo(x + p, y + q + l); c.lineTo(x + p + rh, y + q + l); } }
+                    q += l;
+                }
+                if (horiz) { c.moveTo(x, y + p); c.lineTo(x + w, y + p); } else { c.moveTo(x + p, y); c.lineTo(x + p, y + h); }
+            }
+            c.strokeStyle = 'rgba(30,14,4,0.5)'; c.lineWidth = 1.3; c.stroke();
+            c.strokeStyle = 'rgba(255,255,255,0.07)'; c.lineWidth = 1; c.beginPath();
+            for (let p = 1; p < wid; p += RH) { if (horiz) { c.moveTo(x, y + p + 1); c.lineTo(x + w, y + p + 1); } else { c.moveTo(x + p + 1, y); c.lineTo(x + p + 1, y + h); } }
+            c.stroke();
+        }
+        c.strokeStyle = 'rgba(0,0,0,0.11)'; [44, 30, 16].forEach(lw => { c.lineWidth = lw; c.strokeRect(x, y, w, h); });   // внутрішня тінь від стін
+        c.restore();
+    }
+    // дах: горизонтальний гребінь (довша вісь); для вертикального повертаємо на -90° (світла сторона — західна)
+    function drawRoof(c, o) {
+        const x = o.x, y = o.y, w = o.w || 50, h = o.h || 50, base = o.color || '#b5593c', m = Math.min(w, h);
+        if (o._a !== undefined) c.globalAlpha *= o._a;
+        if (c.globalAlpha < 0.01) return;
+        const sx = Math.min(26, m * 0.14), sy = Math.min(34, m * 0.18);
+        c.fillStyle = 'rgba(0,0,0,0.13)'; c.fillRect(x + sx * 0.5, y + sy * 0.5, w, h);
+        c.fillStyle = 'rgba(0,0,0,0.17)'; c.fillRect(x + sx, y + sy, w, h);
+        const horiz = w >= h, L = horiz ? w : h, H = horiz ? h : w, cx = x + w / 2, cy = y + h / 2, x0 = cx - L / 2, y0 = cy - H / 2, ry = y0 + H / 2;
+        if (!horiz) { c.translate(cx, cy); c.rotate(-Math.PI / 2); c.translate(-cx, -cy); }
+        // два скати
+        let g = c.createLinearGradient(0, ry, 0, y0); g.addColorStop(0, tint(base, 1.22)); g.addColorStop(1, tint(base, 1.02));
+        c.fillStyle = g; c.fillRect(x0, y0, L, H / 2);
+        g = c.createLinearGradient(0, ry, 0, y0 + H); g.addColorStop(0, tint(base, 0.86)); g.addColorStop(1, tint(base, 0.66));
+        c.fillStyle = g; c.fillRect(x0, ry, L, H / 2);
+        // ряди черепиці/дощок зі зсувом
+        const RW = 13; c.lineWidth = 1; c.strokeStyle = 'rgba(0,0,0,0.20)'; c.beginPath();
+        for (let d = RW, k = 0; d < H / 2 - 2; d += RW, k++) {
+            c.moveTo(x0, ry - d); c.lineTo(x0 + L, ry - d); c.moveTo(x0, ry + d); c.lineTo(x0 + L, ry + d);
+            for (let t = (k & 1) * 11 + 6; t < L - 2; t += 22) { c.moveTo(x0 + t, ry - d); c.lineTo(x0 + t, ry - d + RW); c.moveTo(x0 + t, ry + d); c.lineTo(x0 + t, ry + d - RW); }
+        }
+        c.stroke();
+        c.strokeStyle = 'rgba(255,255,255,0.09)'; c.beginPath();
+        for (let d = RW; d < H / 2 - 2; d += RW) { c.moveTo(x0, ry - d + 1.5); c.lineTo(x0 + L, ry - d + 1.5); c.moveTo(x0, ry + d + 1.5); c.lineTo(x0 + L, ry + d + 1.5); }
+        c.stroke();
+        // сніг / мох (кольор stripe) плямистою шапкою від гребеня
+        if (o.stripe) {
+            const R = srand(seedOf(o) ^ 0x9e3779b1), lobes = [];
+            for (let t = 4; t < L - 4; t += 15) for (let sd = -1; sd <= 1; sd += 2) lobes.push([x0 + t + R() * 6, sd, (H / 2) * (0.22 + R() * 0.3), 12 + R() * 9]);
+            c.fillStyle = 'rgba(0,0,0,0.16)'; lobes.forEach(b => { c.beginPath(); c.ellipse(b[0] + 2, ry + b[1] * b[2] / 2 + 3, b[3], b[2] / 2 + 3, 0, 0, 6.2832); c.fill(); });
+            c.fillStyle = o.stripe; lobes.forEach(b => { c.beginPath(); c.ellipse(b[0], ry + b[1] * b[2] / 2, b[3], b[2] / 2 + 2, 0, 0, 6.2832); c.fill(); });
+            c.fillStyle = tint(o.stripe, 0.88); lobes.forEach((b, i) => { if (i % 3) return; c.beginPath(); c.ellipse(b[0] + 3, ry + b[1] * (b[2] * 0.62), b[3] * 0.5, b[2] * 0.14, 0, 0, 6.2832); c.fill(); });
+            c.fillStyle = o.stripe; for (let i = 0; i < Math.round(L / 60); i++) { const px = x0 + 20 + R() * (L - 40), py = ry + (R() < 0.5 ? -1 : 1) * (H / 2 * (0.55 + R() * 0.35)); c.beginPath(); c.ellipse(px, py, 10 + R() * 14, 5 + R() * 6, R(), 0, 6.2832); c.fill(); }
+        }
+        // гребінь із бліком
+        c.lineCap = 'round'; c.strokeStyle = tint(base, 0.55); c.lineWidth = 8; c.beginPath(); c.moveTo(x0 + 5, ry + 0.5); c.lineTo(x0 + L - 5, ry + 0.5); c.stroke();
+        c.strokeStyle = o.stripe ? o.stripe : tint(base, 1.4); c.lineWidth = 3; c.beginPath(); c.moveTo(x0 + 6, ry - 1.5); c.lineTo(x0 + L - 6, ry - 1.5); c.stroke();
+        c.strokeStyle = 'rgba(255,255,255,0.55)'; c.lineWidth = 2; c.beginPath(); c.moveTo(x0 + L * 0.22, ry - 2); c.lineTo(x0 + L * 0.22 + Math.min(40, L * 0.14), ry - 2); c.stroke();
+        c.lineCap = 'butt';
+        // карниз: виступ, світлий кант з NW і темний з SE, внутрішня лінія
+        c.lineJoin = 'miter'; c.strokeStyle = 'rgba(0,0,0,0.5)'; c.lineWidth = 3; c.strokeRect(x0, y0, L, H);
+        c.strokeStyle = 'rgba(0,0,0,0.20)'; c.lineWidth = 2; c.strokeRect(x0 + 6, y0 + 6, L - 12, H - 12);
+        c.strokeStyle = 'rgba(255,255,255,0.22)'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x0 + 1.5, y0 + H - 1.5); c.lineTo(x0 + 1.5, y0 + 1.5); c.lineTo(x0 + L - 1.5, y0 + 1.5); c.stroke();
     }
 
     // Малює декор/двері. Повертає true, якщо тип відомий. Поворот (o.rot) застосовує викликаючий.
@@ -473,6 +651,8 @@ var MapObj = (function () {
                 c.strokeStyle = 'rgba(34,211,238,0.85)'; c.lineWidth = 2; c.setLineDash([14, 10]); c.beginPath(); c.roundRect(x + 10, y + 10, w - 20, h - 20, rad * 0.7); c.stroke(); c.setLineDash([]);
                 c.lineWidth = 2.5; for (let k = 0; k < 2; k++) { const ph = ((t * 0.6) + k * 0.5) % 1; c.globalAlpha = 0.9 * (1 - ph); c.strokeStyle = '#22d3ee'; c.beginPath(); c.arc(cx, cy, Math.min(w, h) * (0.08 + 0.3 * ph), 0, Math.PI * 2); c.stroke(); }
                 c.globalAlpha = 1; c.fillStyle = 'rgba(34,211,238,0.9)'; c.beginPath(); c.arc(cx, cy, 4, 0, Math.PI * 2); c.fill(); break; }
+            case 'prop_floor': drawFloor(c, o); break;
+            case 'prop_roof': drawRoof(c, o); break;
             default: ok = false;
         }
         c.restore();
@@ -489,13 +669,25 @@ var MapObj = (function () {
     // мапа, де режим названо прямо, дозволена в ньому; старі мапи (без нових режимів у списку) діють за правилами базового режиму
     function mapAllows(m, mode) { if (!m || !Array.isArray(m.modes) || !m.modes.length) return true; return m.modes.indexOf(mode) >= 0 || (!!MODE_ALIAS[mode] && m.modes.indexOf(MODE_ALIAS[mode]) >= 0); }
 
-    const THEME_IDS = ['grass', 'sand', 'snow', 'stone', 'asphalt', 'metal', 'dirt', 'swamp', 'lava', 'tech'];
+    const THEME_IDS = ['grass', 'sand', 'snow', 'stone', 'asphalt', 'metal', 'dirt', 'swamp', 'lava', 'tech', 'autumn'];
     function sanitizeMap(raw) {
         if (!raw || typeof raw !== 'object') throw new Error('Порожні дані мапи');
         const size = Math.round(num(raw.size, 1000, 8000, 3000));
         const out = { size: size, bg: COLOR_RE.test(raw.bg) ? raw.bg : '#020617', grid: COLOR_RE.test(raw.grid) ? raw.grid : '#1e293b', solids: [] };
         if (typeof raw.title === 'string' && raw.title.trim()) out.title = raw.title.trim().slice(0, 40);
         if (typeof raw.theme === 'string' && THEME_IDS.indexOf(raw.theme) >= 0) out.theme = raw.theme;
+        if (Array.isArray(raw.biomes) && raw.biomes.length) {   // біоми: до 12 полігонів із власною темою землі
+            if (raw.biomes.length > 12) throw new Error('Занадто багато біомів (макс. 12)');
+            const bl = [];
+            raw.biomes.forEach(b => {
+                if (!b || THEME_IDS.indexOf(b.theme) < 0 || !Array.isArray(b.points) || b.points.length < 3) return;
+                if (b.points.length > 120) throw new Error('Занадто багато вершин біому (макс. 120)');
+                const nb = { theme: b.theme, points: b.points.map(p => ({ x: Math.round(num(p && p.x, 0, size, 0)), y: Math.round(num(p && p.y, 0, size, 0)) })) };
+                if (COLOR_RE.test(b.bg)) nb.bg = b.bg;
+                bl.push(nb);
+            });
+            if (bl.length) out.biomes = bl;
+        }
         if (Array.isArray(raw.shape) && raw.shape.length >= 3) {
             if (raw.shape.length > 300) throw new Error('Занадто багато вершин контуру (макс. 300)');
             out.shape = raw.shape.map(p => ({ x: Math.round(num(p && p.x, 0, size, 0)), y: Math.round(num(p && p.y, 0, size, 0)) }));
@@ -531,7 +723,7 @@ var MapObj = (function () {
     const api = {
         D2R, DOOR_TRIGGER, DOOR_PASS, PROPS_BASE, PROPS_WOOD, PROPS_EXTRA, DOORS, DOOR_BY_ID, NONSOLID, ALL_TYPES,
         isDoor, isCircular, isSolidType, center, applyRot, toLocal, distToSeg, pointInPoly, circleInPoly, hasShape, pointInObject,
-        collides, polyOf, circleHitsPoly, DISGUISE_GROUPS, DISGUISE_IDS, DISGUISE_SHAPES, drawDisguise, doorNear, updateDoors, resetDoors, shapeBounds, drawProp, sanitizeMap, MODES, mapAllows, THEME_IDS
+        collides, collidesNaive, invalidateIndex, biomeAt, biomePoly, biomeBBox, polyOf, circleHitsPoly, DISGUISE_GROUPS, DISGUISE_IDS, DISGUISE_SHAPES, drawDisguise, doorNear, updateDoors, resetDoors, shapeBounds, drawProp, sanitizeMap, MODES, mapAllows, THEME_IDS
     };
     return api;
 })();

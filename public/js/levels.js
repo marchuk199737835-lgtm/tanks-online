@@ -113,7 +113,7 @@
         const how = document.getElementById('lv-how');
         if (how && !how.dataset.done) {
             how.dataset.done = 1;
-            how.innerHTML = `<div class="lv-how-item"><b>🏆 Перемога</b><span>+${G.XP_WIN[0]}–${G.XP_WIN[1]} XP</span></div><div class="lv-how-item"><b>🤝 Нічия</b><span>+${G.XP_DRAW[0]}–${G.XP_DRAW[1]} XP</span></div><div class="lv-how-item"><b>💀 Поразка</b><span>+${G.XP_LOSS[0]}–${G.XP_LOSS[1]} XP</span></div><div class="lv-how-item"><b>🎁 Новий рівень</b><span>кейс з нагородою (до 💵650)</span></div>`;
+            how.innerHTML = `<div class="lv-how-item"><b>🏆 Перемога</b><span>+${G.XP_WIN[0]}–${G.XP_WIN[1]} XP</span></div><div class="lv-how-item"><b>🤝 Нічия</b><span>+${G.XP_DRAW[0]}–${G.XP_DRAW[1]} XP</span></div><div class="lv-how-item"><b>💀 Поразка</b><span>+${G.XP_LOSS[0]}–${G.XP_LOSS[1]} XP</span></div><div class="lv-how-item"><b>🎁 Новий рівень</b><span>кейс з нагородою (до ${creditAmount(650, 13)})</span></div>`;
         }
     }
     function rewardCard(l, st) {
@@ -122,7 +122,7 @@
         const btn = st === 'ready' ? `<button class="lv-claim" onclick="LV.claim(${l})">ЗАБРАТИ</button>`
             : st === 'done' ? '<div class="lv-state done">✓ Отримано</div>'
             : `<div class="lv-state lock">🔒 ${num(need)} XP</div>`;
-        return `<div class="lv-card ${st}"><div class="lv-card-ico">${iconSvg(l, 46)}</div><div class="lv-card-mid"><div class="lv-card-lvl">Рівень ${l}<span> · ${rankName(l)}</span></div><button class="lv-case" onclick="openCaseInfo(${cid})" title="Що може випасти"><span class="lv-case-ico">${caseIcon(cs)}</span><span class="lv-case-txt"><b>${cs.name}</b><i>💵 ${cs.price} · вміст ›</i></span></button></div>${btn}</div>`;
+        return `<div class="lv-card ${st}"><div class="lv-card-ico">${iconSvg(l, 46)}</div><div class="lv-card-mid"><div class="lv-card-lvl">Рівень ${l}<span> · ${rankName(l)}</span></div><button class="lv-case" onclick="openCaseInfo(${cid})" title="Що може випасти"><span class="lv-case-ico">${caseIcon(cs)}</span><span class="lv-case-txt"><b>${cs.name}</b><i>${creditAmount(cs.price,13)} · вміст ›</i></span></button></div>${btn}</div>`;
     }
 
     let reopen = false;

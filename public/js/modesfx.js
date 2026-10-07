@@ -8,7 +8,7 @@
     const TN = { red: 'Червоні', blue: 'Сині', green: 'Зелені', yellow: 'Жовті' };
     const fmt = s => { s = Math.max(0, s | 0); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
     const cur = () => (typeof currentRoomData !== 'undefined' ? currentRoomData : null);
-    let md = null, hud = null, hudMode = null, ref = {}, bannerT = null, zr = null, lastNow = 0;
+    let VIEW = { x0: -1e9, x1: 1e9, y0: -1e9, y1: 1e9 }, finalPt = null, md = null, hud = null, hudMode = null, ref = {}, bannerT = null, zr = null, lastNow = 0;
 
     // ---------- каркас ігрового інтерфейсу ----------
     function box(html, cls) { return '<div class="mfx-box ' + (cls || '') + '">' + html + '</div>'; }
@@ -19,7 +19,7 @@
         convoy: () => box('<div class="mfx-col"><span class="mfx-t">Конвой</span>' + bar('hp', 'cyan') + '<span class="mfx-n" data-r="hpn">0</span></div><div class="mfx-col mfx-w"><span class="mfx-t">Маршрут</span>' + bar('pg', 'blue wide') + '<span class="mfx-n"><b data-r="pgn">0</b>%</span></div><div class="mfx-col mfx-c"><span class="mfx-t">Час</span><span class="mfx-big" data-r="t">0:00</span></div>') + '<div class="mfx-chip" data-r="hold"></div>',
         solo_arena: () => box('<div class="mfx-col mfx-c"><span class="mfx-t">Хвиля</span><span class="mfx-big"><b data-r="w">0</b><em>/</em><b data-r="W">0</b></span></div><div class="mfx-col mfx-c"><span class="mfx-t">Ворогів</span><span class="mfx-big" data-r="z">0</span></div>') + '<div class="mfx-perks" data-r="pk"></div>',
         boss_duel: () => box('<div class="mfx-col mfx-c"><span class="mfx-t">Бос</span><span class="mfx-big"><b data-r="i">0</b><em>/</em><b data-r="N">0</b></span></div><div class="mfx-col mfx-w"><span class="mfx-t"><b data-r="bn">—</b></span>' + bar('hp', 'red wide') + '<span class="mfx-n" data-r="hpn">0</span></div><div class="mfx-col mfx-c"><span class="mfx-t">Життя</span><span class="mfx-big mfx-hearts" data-r="lv">❤</span></div>'),
-        battle_royale: () => box('<div class="mfx-col mfx-c"><span class="mfx-t">Живих</span><span class="mfx-big"><b data-r="al">0</b><em>/</em><b data-r="n">0</b></span></div><div class="mfx-col mfx-c mfx-zone"><span class="mfx-t" data-r="zt">Зона</span><span class="mfx-big" data-r="zv">—</span></div>'),
+        battle_royale: () => box('<div class="mfx-col mfx-c"><span class="mfx-t">Живих</span><span class="mfx-big"><b data-r="al">0</b><em>/</em><b data-r="n">0</b></span></div><div class="mfx-col mfx-c mfx-zone"><span class="mfx-t" data-r="zt">Зона</span><span class="mfx-big" data-r="zv">—</span></div><div class="mfx-col mfx-c"><span class="mfx-t">Модулі</span><div class="mfx-slots" data-r="slots">' + ['cannon', 'turret', 'hull', 'tracks'].map(s => '<i class="mfx-slot empty" data-s="' + s + '"></i>').join('') + '</div></div>'),
         capture_points: () => box('<div class="mfx-scores" data-r="sc"></div><div class="mfx-col mfx-c"><span class="mfx-t">Мета</span><span class="mfx-big" data-r="goal">0</span></div><div class="mfx-col mfx-c"><span class="mfx-t">Час</span><span class="mfx-big" data-r="t">0:00</span></div>') + '<div class="mfx-pts" data-r="pts"></div>',
         bounty: () => box('<div class="mfx-col mfx-w mfx-tg"><span class="mfx-t">Ціль полювання</span><span class="mfx-big mfx-gold" data-r="tg">—</span><span class="mfx-n" data-r="tgn"></span></div><div class="mfx-col mfx-c"><span class="mfx-t">Час</span><span class="mfx-big" data-r="t">0:00</span></div><div class="mfx-col mfx-c"><span class="mfx-t">До перемоги</span><span class="mfx-big" data-r="goal">0</span></div>') + '<div class="mfx-board" data-r="bd"></div>'
     };
@@ -66,7 +66,7 @@
                 set('al', md.al); set('n', md.n);
                 let t, v;
                 if (md.zt > 0) { t = 'Зона зʼявиться'; v = fmt(md.zt); } else if (md.z.ph >= 5) { t = 'Фінал'; v = '🔥'; } else if (md.z.np > 0) { t = 'Зона звужується через'; v = fmt(md.z.np); } else { t = 'Зона звужується'; v = '⚠'; }
-                set('zt', t); set('zv', v); break;
+                set('zt', t); set('zv', v); paintSlots(); break;
             }
             case 'capture_points': {
                 const sc = ref.sc, ts = Object.keys(md.sc), sig = ts.map(t => t + md.sc[t]).join();
@@ -86,6 +86,16 @@
             }
         }
     }
+    // ряд слотів модулів гравця (БР): колір рідкості, назва в title, порожній — сірий пунктир
+    function paintSlots() {
+        const w = ref.slots, eq = typeof myEquipped !== 'undefined' ? myEquipped : null, GD = window.GameData; if (!w || !GD || !window.BRLoot) return;
+        for (let i = 0; i < w.children.length; i++) {
+            const e = w.children[i], slot = e.dataset.s, id = eq && eq[slot], m = id && GD.MODULES[id], key = m ? id : '';
+            if (e.dataset.k === key) continue; e.dataset.k = key;
+            if (m) { const c = GD.RARITY[m.rarity].color; e.className = 'mfx-slot'; e.style.setProperty('--rc', c); e.title = m.name + ' · ' + GD.RARITY[m.rarity].name; e.innerHTML = BRLoot.svg[slot]; }
+            else { e.className = 'mfx-slot empty'; e.style.removeProperty('--rc'); e.title = BRLoot.slotName[slot] + ': порожньо'; e.innerHTML = BRLoot.svg[slot]; }
+        }
+    }
     const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
     // ---------- плашка-повідомлення ----------
@@ -100,6 +110,9 @@
             case 'miniboss': banner('<span>На маршруті зʼявився бос!</span>', 'bad'); sfx('boss_shoot'); break;
             case 'capture': banner('<span class="dot" style="background:' + (TC[d.t] || '#fff') + '"></span><span>Точку захоплено:</span> <b>' + String.fromCharCode(64 + d.i) + '</b>', 'good'); sfx('powerup'); break;
             case 'zone': banner('<span>Зона звужується</span> <span>Фаза</span> <b>' + d.ph + '</b>', 'bad'); sfx('boss_shoot'); break;
+            case 'dropWarn': banner('<span>📦 Аірдроп скидається!</span>', 'gold'); sfx('boss_shoot'); break;
+            case 'dropLand': banner('<span>📦 Аірдроп приземлився!</span> <em>міфічні й легендарні модулі</em>', 'gold'); sfx('explosion'); break;
+            case 'finalLoot': finalPt = { x: d.x, y: d.y }; banner('<span>👑 У центрі зони з’явились міфічні модулі!</span>', 'gold'); sfx('powerup'); break;
             case 'zoneFinal': banner('<span>ФІНАЛ: зона стискається до нуля!</span>', 'bad'); sfx('boss_shoot'); break;
             case 'bountyPick': if (md && d.tg === nameOf(myId)) banner('<span>Вас обрано ціллю!</span> <em>+' + d.v + '</em>', 'bad'); else banner('<span>Ціль полювання:</span> <b>' + esc(d.tg) + '</b> <em>+' + d.v + '</em>', 'gold'); sfx('hitmarker'); break;
             case 'bountyClaimed': banner('<b>' + esc(d.by) + '</b> <span>знищив ціль</span> <b>' + esc(d.tg) + '</b> <em>+' + d.v + '</em>', 'good'); sfx('token'); break;
@@ -129,8 +142,12 @@
     socket.on('perkOffer', showPerks);
     socket.on('perkState', d => { window.PERK = { spd: d.spd || 1, cd: d.cd || 1 }; });
     socket.on('modeEvent', onEvent);
+    socket.on('modPicked', d => {
+        const GD = window.GameData, m = GD && GD.MODULES[d.mod]; if (!m) return; const R = GD.RARITY[m.rarity];
+        banner('<span>Отримано:</span> <b style="color:' + R.color + '">' + esc(m.name) + '</b> <span style="color:' + R.color + '">· ' + R.name + '</span>', 'good'); try { playSound('powerup'); } catch (e) {}
+    });
     socket.on('bossWarning', () => { const r = cur(); if (r && NEWM.has(r.mode)) banner('<span>⚠ Бос поруч!</span>', 'bad'); });
-    socket.on('gameStarting', () => { window.PERK = { spd: 1, cd: 1 }; md = null; zr = null; closePerk(); removeHud(); });
+    socket.on('gameStarting', () => { window.PERK = { spd: 1, cd: 1 }; md = null; zr = null; finalPt = null; if (window.BRLoot) BRLoot.reset(); closePerk(); removeHud(); });
 
     // ---------- малювання на мапі ----------
     const teamCol = t => TC[t] || '#94a3b8';
@@ -195,13 +212,15 @@
         ctx.fillStyle = '#facc15'; ctx.font = '18px Russo One'; ctx.textAlign = 'center'; ctx.fillText('🎯 +' + m.bv, 0, -66); ctx.restore();
     }
     // стрілки на краю екрана до важливих цілей
-    function arrow(ctx, wx, wy, col, txt, now) {
+    function arrow(ctx, wx, wy, col, txt, now, sub) {
         const sx = GW / 2 + (wx - camera.x) * VS, sy = GH / 2 + (wy - camera.y) * VS, mg = 34;
         if (sx > mg && sx < GW - mg && sy > mg + 40 && sy < GH - mg) return;
         const cx = GW / 2, cy = GH / 2, dx = sx - cx, dy = sy - cy, k = Math.min((cx - mg) / Math.abs(dx || 1e-6), (cy - mg - 20) / Math.abs(dy || 1e-6)), ax = cx + dx * k, ay = cy + dy * k, a = Math.atan2(dy, dx);
         ctx.save(); ctx.translate(ax, ay); ctx.globalAlpha = .75 + .25 * Math.sin(now / 250);
         ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 10; ctx.rotate(a); ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(-8, -11); ctx.lineTo(-8, 11); ctx.closePath(); ctx.fill(); ctx.rotate(-a);
-        ctx.shadowBlur = 0; ctx.font = '15px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; ctx.fillText(txt, -Math.cos(a) * 20, -Math.sin(a) * 20); ctx.restore();
+        ctx.shadowBlur = 0; ctx.font = '15px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; ctx.fillText(txt, -Math.cos(a) * 20, -Math.sin(a) * 20);
+        if (sub) { ctx.font = '11px "Russo One", Arial'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(2,6,23,.9)'; ctx.strokeText(sub, -Math.cos(a) * 20, -Math.sin(a) * 20 + 15); ctx.fillText(sub, -Math.cos(a) * 20, -Math.sin(a) * 20 + 15); }
+        ctx.restore();
     }
 
     window.ModesFX = {
@@ -211,14 +230,29 @@
         hud() { paint(); },
         world(ctx, now) {
             const r = cur(); if (!md || !r || md.m !== r.mode) return;
+            if (md.m === 'battle_royale') { if (window.BRLoot) BRLoot.sky(ctx, md.dr, now, VIEW); return; }
             if (md.m === 'base_defense') drawCore(ctx, md.c, now); else if (md.m === 'convoy') drawConvoy(ctx, md, now); else if (md.m === 'capture_points') drawPoints(ctx, md, now);
         },
+        // нижній шар аірдропу (до малювання танків) і модулі на землі — викликає game.js
+        ground(ctx, now, view) { const r = cur(); if (!md || !r || md.m !== 'battle_royale' || md.m !== r.mode || !window.BRLoot) return; VIEW = view; BRLoot.ground(ctx, md.dr, now, view); },
+        lootDraw(ctx, p, now, view) { if (window.BRLoot) BRLoot.drawMod(ctx, p, now, view); },
+        canTake(p) { return window.BRLoot ? BRLoot.canTake(p) : true; },
         top(ctx, now) {
             const r = cur(); if (!md || !r || md.m !== r.mode) return;
             if (md.m === 'battle_royale') drawZone(ctx, md, now); else if (md.m === 'bounty') drawBounty(ctx, md, now);
         },
         screen(ctx, now) {
             const r = cur(); if (!md || !r || md.m !== r.mode) return;
+            if (md.m === 'battle_royale') {
+                const dm = x => Math.round(Math.hypot(x.x - camera.x, x.y - camera.y) / 10) + ' м';
+                if (md.dr && md.dr.st !== 'done') { if (window.BRLoot) BRLoot.track(md.dr, now); arrow(ctx, md.dr.x, md.dr.y, md.dr.st === 'open' ? '#ff3b6b' : '#f59e0b', '📦', now, dm(md.dr)); }
+                if (finalPt) {
+                    let any = false; const pu = typeof powerups !== 'undefined' ? powerups : null;
+                    if (pu) for (const k in pu) { const q = pu[k]; if (q.mod && q.keep && q.rar === 'mythic' && Math.hypot(q.x - finalPt.x, q.y - finalPt.y) < 220) { any = true; break; } }
+                    if (any) arrow(ctx, finalPt.x, finalPt.y, '#ff3b6b', '👑', now, dm(finalPt)); else finalPt = null;
+                }
+                return;
+            }
             if (md.m === 'bounty' && md.tg && md.tg !== myId) { const t = opponents[md.tg]; if (t && t.hp > 0) arrow(ctx, t.x, t.y, '#facc15', '🎯', now); }
             else if (md.m === 'convoy') { arrow(ctx, md.cv.x, md.cv.y, '#38bdf8', '🚚', now); arrow(ctx, md.B.x, md.B.y, '#facc15', 'B', now); }
             else if (md.m === 'base_defense') arrow(ctx, md.c.x, md.c.y, '#38bdf8', '🏰', now);
@@ -246,6 +280,6 @@
             sum.innerHTML = rows.map(x => '<div><span>' + esc(x.l) + '</span><b>' + (x.l === 'Рахунок' ? String(x.v).split(' ').map(s => { const q = s.split(':'); return '<i style="color:' + (TC[q[0]] || '#fff') + '">' + q[1] + '</i>'; }).join('<em>:</em>') : esc(x.v)) + '</b></div>').join('');
             closePerk(); removeHud();
         },
-        reset() { md = null; zr = null; closePerk(); removeHud(); }
+        reset() { md = null; zr = null; finalPt = null; if (window.BRLoot) BRLoot.reset(); closePerk(); removeHud(); }
     };
 })();

@@ -80,7 +80,7 @@ function buildSettingsPanel() {
         <label class="side-label">Текстура землі (стиль)</label>
         <select id="set-theme" class="side-input">
             <option value="">— плоска (стара) —</option><option value="grass">🌿 Трава</option><option value="sand">🏜 Пісок</option><option value="snow">❄️ Сніг</option><option value="stone">🏛 Кам'яні плити</option>
-            <option value="asphalt">🛣 Асфальт</option><option value="metal">⚙️ Метал</option><option value="dirt">🟤 Ґрунт</option><option value="swamp">🐸 Болото</option><option value="lava">🌋 Лава / вулкан</option><option value="tech">🔷 Техно</option>
+            <option value="asphalt">🛣 Асфальт</option><option value="metal">⚙️ Метал</option><option value="dirt">🟤 Ґрунт</option><option value="swamp">🐸 Болото</option><option value="lava">🌋 Лава / вулкан</option><option value="tech">🔷 Техно</option><option value="autumn">🍂 Осінь</option>
         </select>
         <label class="side-label">Підлога (основний колір)</label><input type="color" id="set-bg" class="w-full h-8 mb-3 bg-transparent cursor-pointer">
         <label class="side-label">Сітка</label><input type="color" id="set-grid" class="w-full h-8 mb-3 bg-transparent cursor-pointer">
@@ -154,6 +154,7 @@ canvas.addEventListener('contextmenu', e => {
 function onHistoryRestored() { applyZoom(); syncSettingsInputs(); refreshContourPanel(); closeMenu(); updateTopbar(); }
 function loadMapIntoEditor(name, m) {
     ED.settings = { name: name, title: m.title || '', modes: (m.modes && m.modes.length) ? m.modes.slice() : MapObj.MODES.slice(), size: m.size, bg: m.bg || '#020617', grid: m.grid || '#1e293b', theme: m.theme || '' };
+    if (m.biomes && m.biomes.length) ED.settings.biomes = clone(m.biomes);   // біоми: лише збереження/показ (без UI)
     ED.objects = clone(m.solids).map(o => { if (o.type === 'shape_line') o.type = 'line'; delete o._open; return o; });
     ED.shape = m.shape && m.shape.length >= 3 ? clone(m.shape) : null; ED.selected = null; ED.draftShape = null;
     HIST.reset(); ED.dirty = false; applyZoom(); syncSettingsInputs(); refreshContourPanel(); fitZoom();
@@ -170,8 +171,9 @@ function newMap() {
 
 // ---------- збереження на сервер ----------
 function currentMapData() {
-    const m = { size: ED.settings.size, bg: ED.settings.bg, grid: ED.settings.grid, solids: clone(ED.objects).map(o => { delete o._open; delete o.preview; return o; }) };
+    const m = { size: ED.settings.size, bg: ED.settings.bg, grid: ED.settings.grid, solids: clone(ED.objects).map(o => { delete o._open; delete o._a; delete o.preview; return o; }) };
     if (ED.settings.theme) m.theme = ED.settings.theme;
+    if (ED.settings.biomes && ED.settings.biomes.length) m.biomes = clone(ED.settings.biomes);
     if (ED.settings.title && ED.settings.title.trim()) m.title = ED.settings.title.trim();
     if (ED.shape && ED.shape.length >= 3) m.shape = clone(ED.shape);
     if (ED.settings.modes && ED.settings.modes.length && ED.settings.modes.length < MapObj.MODES.length) m.modes = ED.settings.modes.slice();

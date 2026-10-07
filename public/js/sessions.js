@@ -80,7 +80,7 @@
     function reward() {
         const t = $('cr-prev-rw'); if (!t) return;
         const cfg = window.collectCreateExtra({}); const mp = $('create-max-players'); if (mp) cfg.maxPlayers = +mp.value; const rr = MI.rewardRange(mode, cfg);
-        t.textContent = '💵 ' + rr.loss + '–' + rr.win;
+        t.innerHTML = creditAmount(rr.loss + '–' + rr.win, 14);
     }
     // показ груп параметрів за режимом (початковий стан — детматч)
     function showGroups(m) {

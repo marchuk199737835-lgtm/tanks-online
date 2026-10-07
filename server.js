@@ -48,6 +48,8 @@ if (mongoUri) {
         const db = client.db("tanks_db");
         dbUsersCol = db.collection("users");
         dbMapsCol = db.collection("maps");
+        promoCol = db.collection("promo_uses");
+        promoCol.find({}).toArray().then(rows => { rows.forEach(r => { if (r && r._id) promoUses[r._id] = Math.max(promoUses[r._id] || 0, r.uses | 0); }); }).catch(e => console.error('❌ Лічильники промокодів:', e.message));
         if (editorApi) editorApi.loadSaved().catch(e => console.error('❌ Не вдалося завантажити мапи з БД:', e.message));
         dbUsersCol.find({}).toArray().then(users => {
             users.forEach(u => dbUsers[u.name] = u);
@@ -66,6 +68,47 @@ function saveUser(name) {
 }
 
 function hashPwd(pwd) { return crypto.createHash('sha256').update(pwd).digest('hex'); }
+
+// ===== ПРОМОКОДИ =====
+// Коди й суми живуть лише на сервері (клієнту суму не довіряємо). credits — скільки Кредів (поле bucks) дає код;
+// maxUses — загальний ліміт активацій (0 = без ліміту); expires — 'YYYY-MM-DD' (включно, UTC) або null; once — один раз на акаунт.
+// Лічильники використань: колекція promo_uses у MongoDB (або пам'ять, якщо БД нема); застосовані коди акаунта — u.usedPromos.
+const PROMO_CODES = {
+    'WELCOME':   { credits: 50,  maxUses: 0,    expires: null,         once: true },
+    'BONUS25':   { credits: 25,  maxUses: 1000, expires: '2026-12-31', once: true },
+    'ALEX-TOP1': { credits: 200, maxUses: 0,    expires: null,         once: true }   // старий код (раніше був зашитий у usePromo)
+};
+let promoCol = null;
+const promoUses = Object.create(null);
+const promoRate = Object.create(null);   // за ім'ям акаунта: { last, fails, windowStart, blockedUntil }
+const PROMO_MIN_GAP = 1500, PROMO_MAX_FAILS = 8, PROMO_WINDOW = 10 * 60 * 1000, PROMO_BLOCK = 5 * 60 * 1000;
+function redeemPromoCode(name, rawCode, now) {
+    now = now || Date.now();
+    const u = dbUsers[name];
+    if (!u) return { ok: false, msg: 'Спершу увійдіть в акаунт' };
+    const rt = promoRate[name] || (promoRate[name] = { last: 0, fails: 0, windowStart: now, blockedUntil: 0 });
+    if (now < rt.blockedUntil) return { ok: false, msg: 'Забагато невдалих спроб. Спробуйте пізніше' };
+    if (now - rt.last < PROMO_MIN_GAP) return { ok: false, msg: 'Не так швидко! Зачекайте секунду' };
+    rt.last = now;
+    if (now - rt.windowStart > PROMO_WINDOW) { rt.windowStart = now; rt.fails = 0; }
+    const fail = msg => { if (++rt.fails >= PROMO_MAX_FAILS) { rt.blockedUntil = now + PROMO_BLOCK; rt.fails = 0; } return { ok: false, msg }; };
+    if (typeof rawCode !== 'string') return fail('Невірний промокод');
+    const code = rawCode.trim().toUpperCase();
+    if (!code) return { ok: false, msg: 'Введіть промокод' };
+    if (code.length > 40 || !Object.prototype.hasOwnProperty.call(PROMO_CODES, code)) return fail('Невірний промокод');
+    const p = PROMO_CODES[code];
+    if (p.expires && now > Date.parse(p.expires + 'T23:59:59.999Z')) return fail('Термін дії промокоду минув');
+    if (!Array.isArray(u.usedPromos)) u.usedPromos = [];
+    if (p.once !== false && u.usedPromos.some(x => String(x).toUpperCase() === code)) return fail('Цей промокод уже використано');
+    if (p.maxUses > 0 && (promoUses[code] || 0) >= p.maxUses) return fail('Ліміт активацій цього промокоду вичерпано');
+    const amt = Math.max(0, Math.floor(p.credits)) || 0;
+    promoUses[code] = (promoUses[code] || 0) + 1;
+    if (promoCol) promoCol.updateOne({ _id: code }, { $inc: { uses: 1 } }, { upsert: true }).catch(e => console.error('❌ Лічильник промокоду', code, e.message));
+    u.usedPromos.push(code);
+    u.bucks += amt; u.stats.earned += amt;
+    rt.fails = 0;
+    return { ok: true, msg: 'Успішно! +' + amt + ' кредів', amount: amt, bucks: u.bucks };
+}
 
 // --- КОНСТАНТИ ---
 const MAP_DATA={"epic_map":{size:3000,bg:"#565a6c",grid:"#494d55",solids:[{type:"wall_square",x:850,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1150,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1150,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1800,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:1700,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:1850,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1800,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1950,w:50,h:50,color:"#353940"},{type:"wall_square",x:1700,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:1700,y:1950,w:50,h:50,color:"#353940"},{type:"wall_square",x:1850,y:1800,w:50,h:50,color:"#353940"},{type:"wall_square",x:1850,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1000,w:50,h:50,color:"#353940"},{type:"wall_square",x:1850,y:1150,w:50,h:50,color:"#353940"},{type:"wall_square",x:1700,y:1000,w:50,h:50,color:"#353940"},{type:"wall_square",x:800,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:800,y:1150,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1000,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1000,w:50,h:50,color:"#353940"},{type:"wall_square",x:800,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1950,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1950,w:50,h:50,color:"#353940"},{type:"wall_square",x:800,y:1800,w:50,h:50,color:"#353940"},{type:"shape_rhombus",x:1150,y:1300,w:400,h:400,color:"#353940"},{type:"shape_rhombus",x:1250,y:1350,w:200,h:300,color:"#22252a"},{type:"tree",x:0,y:700,r:424.26},{type:"tree",x:2650,y:2550,r:180.27},{type:"tree",x:300,y:2400,r:158.11},{type:"tree",x:2850,y:750,r:364.00},{type:"neon_circle",x:850,y:1100,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:900,y:1050,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:1750,y:1050,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:1800,y:1100,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:1800,y:1850,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:1750,y:1900,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:850,y:1850,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:900,y:1900,w:50,h:50,color:"#21252c"},{type:"prop_crate",x:3000,y:2950,w:50,h:50},{type:"spawn_player",x:250,y:2750},{type:"spawn_player",x:2850,y:2850},{type:"spawn_player",x:1500,y:2750},{type:"spawn_powerup",x:1500,y:1500},{type:"spawn_powerup",x:800,y:800},{type:"spawn_powerup",x:2200,y:800},{type:"spawn_powerup",x:1500,y:2200}]},'Бій Насмерть':{size:2500,bg:'#3e2604',grid:'#1e293b',solids:[{type:"spawn_player",x:1400,y:1450},{type:"spawn_player",x:100,y:1350},{type:"spawn_player",x:1400,y:750},{type:"spawn_player",x:100,y:700},{type:"spawn_powerup",x:700,y:700},{type:"spawn_powerup",x:1800,y:700},{type:"spawn_powerup",x:700,y:1800},{type:"spawn_powerup",x:1800,y:1800}]}};
@@ -215,7 +258,7 @@ function validateUser(u) {
 }
 
 function rollDrop(name) {
-    if (Math.random() <= 0.10) {
+    if (Math.random() <= GameData.DROP_CHANCE) {
         let r = Math.random() * 100, rarity = 'common';
         if (r > 90 && r <= 98) rarity = 'rare';
         else if (r > 98 && r <= 99.5) rarity = 'epic';
@@ -453,21 +496,17 @@ io.on('connection', (socket) => {
         sendEconomy(socket.id, name);
     });
 
-    socket.on('usePromo', (code) => {
+    // Промокод: клієнт надсилає лише текст коду; сума, ліміти й одноразовість рахуються на сервері (redeemPromoCode)
+    function handlePromo(code, legacy) {
         let name = globalPlayers[socket.id];
         if (!name || !dbUsers[name]) return;
-        if (typeof code !== 'string') return socket.emit('promoError', 'Невірний код!');
-        let u = dbUsers[name], nCode = code.trim().toLowerCase();
-        if (nCode === 'alex-top1') {
-            if (u.usedPromos.includes(nCode)) return socket.emit('promoError', 'Промокод вже використано!');
-            u.bucks += 200;
-            u.stats.earned += 200;
-            u.usedPromos.push(nCode);
-            saveUser(name);
-            sendEconomy(socket.id, name);
-            socket.emit('promoSuccess', 'Успішно! +200 баксів.');
-        } else socket.emit('promoError', 'Невірний код!');
-    });
+        const res = redeemPromoCode(name, code);
+        if (res.ok) { saveUser(name); sendEconomy(socket.id, name); }
+        if (legacy) socket.emit(res.ok ? 'promoSuccess' : 'promoError', res.msg);
+        else socket.emit('promoResult', res);
+    }
+    socket.on('redeemPromo', (d) => handlePromo(d && typeof d === 'object' ? d.code : d, false));
+    socket.on('usePromo', (code) => handlePromo(code, true));   // сумісність зі старими клієнтами
 
     socket.on('buyCase', (caseId) => {
         let name = globalPlayers[socket.id];
@@ -483,8 +522,8 @@ io.on('connection', (socket) => {
                 u.inventory.push(modId);
                 saveUser(name);
                 socket.emit('caseResult', { modId: modId, bucks: u.bucks, inventory: u.inventory, equipped: u.equipped, stats: u.stats, caseId: caseId });
-            } else { u.bucks += cs.price; } // кейс не видав предмет - повертаємо бакси
-        } else socket.emit('joinError', 'Недостатньо баксів!');
+            } else { u.bucks += cs.price; } // кейс не видав предмет - повертаємо креди
+        } else socket.emit('joinError', 'Недостатньо кредів!');
     });
 
     socket.on('upgradeItem', (d) => {
@@ -497,7 +536,7 @@ io.on('connection', (socket) => {
         let pIn = sMod.price || 5, pOut = tMod.price || 5;
         if (pIn >= pOut) return socket.emit('joinError', 'Ви не можете апгрейднути в дешевший або такий самий предмет!');
         let b = parseInt(d.bucks) || 0;
-        if (b < 0 || u.bucks < b) return socket.emit('joinError', 'Недостатньо баксів!');
+        if (b < 0 || u.bucks < b) return socket.emit('joinError', 'Недостатньо кредів!');
         u.bucks -= b;
         u.inventory.splice(d.idx, 1);
         let ch = GameData.upgradeChance(pIn, b, tMod), roll = Math.random() * 100, win = d.rollUnder ? (roll <= ch) : (roll >= (100 - ch));
@@ -906,7 +945,7 @@ socket.on('selectProp', (data) => {
             if (r.state !== 'seeking' || !atk || atk.team !== 'hunter' || v.team === 'hunter') return;
             fD = 250; v.isDisguised = false;
         } else {
-            if (atkName && dbUsers[atkName]) fD *= GameData.statMult(dbUsers[atkName].equipped, 'dmg');
+            if (atk) fD *= GameData.statMult(atk.equipped, 'dmg');   // екіпіровка гравця в кімнаті (у королівському бою — підібрані модулі)
         }
         
         if (data.type === 'incendiary') v.onFire = { end: Date.now() + 5000, nextTick: Date.now() + 1000, owner: socket.id };
@@ -962,6 +1001,7 @@ socket.on('selectProp', (data) => {
 
     socket.on('collectPowerup', (d) => {
         let r = rooms[d.roomId];
+        if (r && r.status === 'playing' && r.powerups[d.pid] && r.powerups[d.pid].mod) { Modes.pickMod(r, socket.id, d.pid); return; }   // модуль (королівський бій)
         if (r && r.status === 'playing' && r.powerups[d.pid] && r.powerups[d.pid].active && r.players[socket.id] && r.players[socket.id].hp > 0 && powerupsOn(r.mode)) {
             let pT = r.powerups[d.pid].type, p = r.players[socket.id];
             p.buff = pT; p.buffEndTime = Date.now() + BUFF_DURATION; r.powerups[d.pid].active = false;
@@ -974,8 +1014,8 @@ socket.on('selectProp', (data) => {
     socket.on('zombieHit', (d) => {
         let r = rooms[d.roomId];
         if (r && r.status === 'playing' && r.zombies[d.zid] && r.zombies[d.zid].hp > 0) {
-            let fD = d.dmg, aN = r.players[socket.id]?.name;
-            if (aN && dbUsers[aN]) fD *= GameData.statMult(dbUsers[aN].equipped, 'dmg');
+            let fD = d.dmg, aP = r.players[socket.id];
+            if (aP) fD *= GameData.statMult(aP.equipped, 'dmg');
             if (Modes.has(r.mode)) fD *= Modes.dmgMult(r, socket.id);
             if (d.type === 'incendiary') r.zombies[d.zid].onFire = { end: Date.now() + 5000, nextTick: Date.now() + 1000, owner: socket.id };
             r.zombies[d.zid].hp -= fD;
@@ -1150,7 +1190,7 @@ setInterval(() => {
         const PWR = Modes.has(r.mode) ? Modes.powerupRule(r) : null;
         if (powerupsOn(r.mode)) {
             let pKeys = Object.keys(r.powerups);
-            pKeys.forEach(k => { if (now - r.powerups[k].spawnTime > 60000) delete r.powerups[k]; });
+            pKeys.forEach(k => { if (!r.powerups[k].mod && now - r.powerups[k].spawnTime > 60000) delete r.powerups[k]; });   // модулі (mod) не зникають за часом
             pKeys = Object.keys(r.powerups);
             if (!(PWR && PWR.own) && now - r.lastPowerupSpawn >= 30000) {
                 r.lastPowerupSpawn = now;
