@@ -4,9 +4,9 @@ if (window.GFX) GFX.attach(ctx);
 
 // ФІКСОВАНИЙ МАСШТАБ ГРИ: по висоті екрана гравець завжди бачить однакову ділянку мапи (VIEW_H одиниць),
 // тому зменшення масштабу браузера (Ctrl -), великий монітор чи планшет не дають бачити більше за інших.
-// Телефони/планшети: видимість +20% за замовчуванням (VIEW_TOUCH_MAXZOOM), у налаштуваннях можна наблизити до 1.0 (старий масштаб).
-const VIEW_H_DESKTOP = 800, VIEW_H_TOUCH = 420, VIEW_MAX_ASPECT = 2.0, VIEW_TOUCH_MAXZOOM = 1.2;
-let viewZoom = VIEW_TOUCH_MAXZOOM;
+// Телефони/планшети: видимість +20% за замовчуванням (VIEW_TOUCH_DEFAULT); у налаштуваннях від 1.0 (старий масштаб) до 1.5 (+50% до старого, тобто ще +30% понад стандартні +20%).
+const VIEW_H_DESKTOP = 800, VIEW_H_TOUCH = 420, VIEW_MAX_ASPECT = 2.0, VIEW_TOUCH_DEFAULT = 1.2, VIEW_TOUCH_MAXZOOM = 1.5;
+let viewZoom = VIEW_TOUCH_DEFAULT;
 try { const _z = parseFloat(localStorage.getItem('viewZoom')); if (_z >= 1 && _z <= VIEW_TOUCH_MAXZOOM) viewZoom = _z; } catch (e) {}
 let VS = 1; // множник «одиниця світу -> піксель екрана»
 let GW = window.innerWidth, GH = window.innerHeight, RS = 1; // GW/GH — логічний розмір (CSS-пікселі), RS — масштаб внутрішнього розширення полотна (налаштування графіки)
@@ -27,7 +27,7 @@ fitCanvas();
     if (!touch) return; row.style.display = '';
     const show = () => { if (lab) lab.textContent = Math.round(viewZoom * 100) + '%'; };
     sl.min = 1; sl.max = VIEW_TOUCH_MAXZOOM; sl.step = 0.02; sl.value = viewZoom; show();
-    sl.addEventListener('input', () => { viewZoom = Math.min(VIEW_TOUCH_MAXZOOM, Math.max(1, parseFloat(sl.value) || VIEW_TOUCH_MAXZOOM)); try { localStorage.setItem('viewZoom', String(viewZoom)); } catch (e) {} show(); fitCanvas(); });
+    sl.addEventListener('input', () => { viewZoom = Math.min(VIEW_TOUCH_MAXZOOM, Math.max(1, parseFloat(sl.value) || VIEW_TOUCH_DEFAULT)); try { localStorage.setItem('viewZoom', String(viewZoom)); } catch (e) {} show(); fitCanvas(); });
 })();
 
 let spectatingId = null;
