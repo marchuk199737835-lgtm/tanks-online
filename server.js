@@ -323,7 +323,7 @@ function removePlayer(rId, sockId) {
     const left = r.players[sockId];
     delete r.players[sockId];
     const ids = Object.keys(r.players);
-    if (ids.length === 0) { delete rooms[rId]; if (typeof SYNCS !== "undefined") SYNCS.delete(rId); return; }
+    if (ids.length === 0) { delete rooms[rId]; if (typeof SYNCS !== "undefined") SYNCS.delete(rId); BANS.delete(rId); return; }
     if (r.hostSocket === sockId) { r.hostSocket = ids[0]; r.hostName = r.players[ids[0]].name; }
     if (r.status === 'playing') {
         let abort = false;
@@ -623,6 +623,7 @@ io.on('connection', (socket) => {
         if (!rooms[roomId]) return socket.emit('joinError', 'Кімната не знайдена');
         let r = rooms[roomId];
         if (r.players[socket.id]) return socket.emit('joinedRoom', { roomId: roomId, roomData: r }); // вже тут
+        if (BANS.has(roomId) && BANS.get(roomId).has(n)) return socket.emit('joinError', 'Лідер заблокував вас у цій сесії');
         for (const rid in rooms) {
             for (const pid in rooms[rid].players) {
                 if (rooms[rid].players[pid].name === n) return socket.emit('joinError', 'Цей акаунт уже перебуває в сесії!');
@@ -688,6 +689,20 @@ io.on('connection', (socket) => {
         if (!r || r.hostSocket !== socket.id || r.status !== 'lobby' || !d.targetId || d.targetId === socket.id || !r.players[d.targetId]) return;
         const tSock = io.sockets.sockets.get(d.targetId);
         if (tSock) { tSock.leave(r.id); tSock.emit('kicked', { roomId: r.id }); }
+        removePlayer(r.id, d.targetId);
+        if (rooms[r.id]) io.to(r.id).emit('updateLobby', r);
+        pushRooms();
+    });
+
+    // Блокування: гравця викидає з сесії, і він більше не зможе зайти саме в цю сесію (інші сесії — без обмежень)
+    socket.on('banPlayer', (d) => {
+        let r = d ? rooms[d.roomId] : null;
+        if (!r || r.hostSocket !== socket.id || r.status !== 'lobby' || !d.targetId || d.targetId === socket.id || !r.players[d.targetId]) return;
+        const nm = r.players[d.targetId].name;
+        if (!BANS.has(r.id)) BANS.set(r.id, new Set());
+        BANS.get(r.id).add(nm);
+        const tSock = io.sockets.sockets.get(d.targetId);
+        if (tSock) { tSock.leave(r.id); tSock.emit('kicked', { roomId: r.id, banned: true }); }
         removePlayer(r.id, d.targetId);
         if (rooms[r.id]) io.to(r.id).emit('updateLobby', r);
         pushRooms();
@@ -1006,7 +1021,9 @@ function endTDMGame(r, wT) {
 // Тепер: рухомі поля — масивом і лише для тих, що змінились; статичні (ім'я, колір, екіпірування…) — лише при зміні;
 // бонуси/жетони/міни — лише коли змінились; повний зріз раз на секунду як страховка (піздній вхід, пропущений пакет).
 const r1 = v => Math.round(v * 10) / 10, r2 = v => Math.round(v * 100) / 100;
-const SYNCS = new Map(); // стан дельта-синхронізації по кімнатах (окремо від r, щоб не потрапляти в updateLobby)
+const SYNCS = new Map();
+const BANS = new Map(); // roomId -> Set(імен акаунтів), яких лідер заблокував у цій сесії
+ // стан дельта-синхронізації по кімнатах (окремо від r, щоб не потрапляти в updateLobby)
 function buildSync(r, now) {
     let S = SYNCS.get(r.id);
     if (!S) { S = { n: 0, p: {}, st: {}, ids: '', z: {}, zi: '', zs: {}, pu: '', tk: '', mn: '', ph: '', tdm: '', tm: 0, za: {}, zn: 0 }; SYNCS.set(r.id, S); }

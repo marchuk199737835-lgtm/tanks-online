@@ -3,16 +3,21 @@ socket.on('initZombies',(data)=>{for(const k in Z_TYPES)delete Z_TYPES[k];Object
 socket.on('authSuccess',(data)=>{localStorage.setItem('tankToken',data.token);if(window.I18N){if(data.lang)I18N.setLanguage(data.lang);else socket.emit('setLang',I18N.lang);}myName=data.name;myId=socket.id;if(window.authBusyOff)authBusyOff();initAudio();if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();switchMusicState('loby');showScreen('main-menu-screen');if(window.soundGate)soundGate(data.name);});
 socket.on('authError',(msg)=>{localStorage.removeItem('tankToken');showScreen('login-screen');if(window.authShowError)authShowError(msg);else alert(msg);});
 socket.on('joinError',(msg)=>{if(window.authShowError&&!document.getElementById('login-screen').classList.contains('hidden')){authShowError(msg);return;}if(typeof upgBusy!=='undefined'&&upgBusy){upgFinish();if(typeof updateUpgChance==='function')updateUpgChance();}
-    if(msg.includes('апгрейд')||msg.includes('Оберіть')||msg.includes('Недостатньо')||msg.includes('Неможливо')){
+    const upgVisible=!document.getElementById('upgrader-screen').classList.contains('hidden');
+    if(upgVisible&&(msg.includes('апгрейд')||msg.includes('Оберіть')||msg.includes('Недостатньо')||msg.includes('Неможливо'))){
         let em=document.getElementById('upg-error-modal'),et=document.getElementById('upg-error-txt');
-        if(em&&et){et.innerText=msg;em.classList.remove('hidden');if(typeof playSound==='function')playSound('hurt');}else alert(msg);
-    }else alert(msg);
+        if(em&&et){et.innerText=msg;em.classList.remove('hidden');if(typeof playSound==='function')playSound('hurt');return;}
+    }
+    if(msg.includes('Недостатньо баксів'))return uiDialog.money({price:null,have:myBucks});
+    if(msg.includes('Інвентар повний'))return uiDialog.show({kind:'warn',icon:'🎒',title:'Інвентар повний',text:'Звільніть місце в інвентарі: продайте або викиньте зайві модулі.',buttons:[{t:'Закрити',cls:'ghost'},{t:'До ангару',cls:'primary',cb:()=>{if(typeof renderHangar==='function')renderHangar();showScreen('hangar-screen');}}]});
+    if(msg.includes('заблокував'))return uiDialog.show({kind:'error',icon:'⛔',title:'Вхід заборонено',text:msg});
+    uiDialog.show({kind:'error',title:'Не вдалося',text:msg});
 });
 socket.on('economyUpdate',(data)=>{myBucks=data.bucks;myInventory=data.inventory||[];myEquipped=data.equipped||{cannon:null,turret:null,hull:null,tracks:null};myStats=data.stats||{kills:0,matches:0,earned:0};myAdventClaims=data.adventClaims||[];if(window.LV)LV.setEco(data);if(typeof updateGlobalBucks==='function')updateGlobalBucks();if(typeof renderHangar==='function'&&!document.getElementById('hangar-screen').classList.contains('hidden'))renderHangar();if(typeof renderUpgrader==='function'&&!document.getElementById('upgrader-screen').classList.contains('hidden'))renderUpgrader();if(typeof renderShop==='function'&&!document.getElementById('shop-screen').classList.contains('hidden'))renderShop();if(typeof renderAdvent==='function'&&!document.getElementById('advent-modal').classList.contains('hidden'))renderAdvent();});
-socket.on('promoSuccess',(msg)=>{if(typeof playSound==='function')playSound('ui_buy');alert(msg);document.getElementById('promo-modal').classList.add('hidden');document.getElementById('promo-input').value='';});
-socket.on('promoError',(msg)=>{alert(msg);});
+socket.on('promoSuccess',(msg)=>{if(typeof playSound==='function')playSound('ui_buy');uiDialog.show({kind:'success',icon:'🎁',title:'Промокод активовано',text:msg});document.getElementById('promo-modal').classList.add('hidden');document.getElementById('promo-input').value='';});
+socket.on('promoError',(msg)=>{uiDialog.show({kind:'error',icon:'🎟️',title:'Промокод не підійшов',text:msg});});
 socket.on('adventState',(st)=>{window.adventDay=st.day;window.adventEnd=st.end;window.adventOffset=st.now-Date.now();const m=document.getElementById('advent-modal');if(m&&!m.classList.contains('hidden')&&typeof renderAdvent==='function')renderAdvent();});
-socket.on('adventSuccess',(data)=>{playSound('powerup');if(data.type==='bucks')alert(`Вітаємо! Нараховано +${data.amount} 💵 за день ${data.day}.10.`);else alert(`ВІТАЄМО! Твоя фінальна Легендарна нагорода вже в Інвентарі!`);});
+socket.on('adventSuccess',(data)=>{if(data.type==='bucks')uiDialog.show({kind:'success',icon:'🎃',title:'Нагорода адвенту',text:`Вітаємо! Нараховано +${data.amount} 💵 за день ${data.day}.10.`});else uiDialog.show({kind:'success',icon:'🏆',title:'Фінальна нагорода!',text:`ВІТАЄМО! Твоя фінальна Легендарна нагорода вже в Інвентарі!`});});
 let pendingDrop=null;socket.on('dropReceived',(modId)=>{pendingDrop=modId;});
 socket.on('roomsList',(rooms)=>{if(typeof renderRoomsList==='function')renderRoomsList(rooms);});
 socket.on('roomCreated',(roomId)=>{socket.emit('joinRoom',roomId);});
@@ -117,4 +122,4 @@ socket.on('upgradeResult',(res)=>{
 });
 
 function emitDamage(amt,attacker){playSound('hurt');shakeTime=0.3;socket.emit('takeDamage',{roomId:currentRoomId,amt:amt,attacker:attacker});}
-socket.on('kicked',()=>{currentRoomId=null;currentRoomData=null;if(window.resetLobbyUI)resetLobbyUI();const gs=document.getElementById('game-screen');showScreen('room-browser-screen');socket.emit('requestRooms');if(window.uiToast)uiToast('Лідер вигнав вас із сесії',true);});
+socket.on('kicked',(d)=>{currentRoomId=null;currentRoomData=null;if(window.resetLobbyUI)resetLobbyUI();const gs=document.getElementById('game-screen');showScreen('room-browser-screen');socket.emit('requestRooms');if(d&&d.banned)uiDialog.show({kind:'error',icon:'⛔',title:'Вас заблоковано',text:'Лідер заблокував вас у цій сесії. Ви не зможете зайти до неї знову.'});else if(window.uiToast)uiToast('Лідер вигнав вас із сесії',true);});

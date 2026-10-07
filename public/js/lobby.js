@@ -126,7 +126,7 @@
         else if (p.team && TEAMS[p.team]) pc = TEAMS[p.team].c;
         const dot = (r.mode === 'deathmatch' || r.mode === 'survival') ? '<span class="lb-dot" style="background:rgb(' + pc + ')"></span>' : '';
         let acts = '';
-        if (isHost && !me) acts = '<div class="lb-acts"><button type="button" class="lb-act" data-act="crown" data-id="' + esc(id) + '" title="Зробити лідером">👑</button><button type="button" class="lb-act danger" data-act="kick" data-id="' + esc(id) + '" title="Вигнати з сесії">✖</button></div>';
+        if (isHost && !me) acts = '<div class="lb-acts"><button type="button" class="lb-act" data-act="crown" data-id="' + esc(id) + '" title="Зробити лідером">👑</button><button type="button" class="lb-act danger" data-act="kick" data-id="' + esc(id) + '" title="Вигнати з сесії">✖</button><button type="button" class="lb-act danger" data-act="ban" data-id="' + esc(id) + '" title="Заблокувати в цій сесії">🚫</button></div>';
         return '<div class="lb-pl' + (p.ready ? ' ready' : '') + (me ? ' me' : '') + '" style="--pc:' + pc + '">' + dot +
             '<span class="lb-pl-ico">' + (window.LV ? LV.icon(L, 32) : '') + '</span>' +
             '<div class="lb-pl-main"><span class="lb-pl-name">' + esc(p.name) + (host ? '<em>👑</em>' : '') + (me ? '<u>ВИ</u>' : '') + '</span><span class="lb-pl-lv">Рівень <b>' + L + '</b> · ' + esc(rank) + '</span></div>' +
@@ -164,6 +164,11 @@
         if (b.dataset.team) { click(); socket.emit('setTeam', { roomId: currentRoomId, team: b.dataset.team }); return; }
         const id = b.dataset.id; if (!id) return;
         if (b.dataset.act === 'crown') { click(); socket.emit('transferHost', { roomId: currentRoomId, targetId: id }); }
+        else if (b.dataset.act === 'ban') {
+            click(); const nm = (r.players[id] && r.players[id].name) || '';
+            uiDialog.confirm({ kind: 'danger', icon: '🚫', title: 'Заблокувати гравця?', text: nm + ' буде вигнано, і він більше не зможе зайти саме в цю сесію. В інші сесії його вхід не обмежується.', cancelText: 'Скасувати', okText: 'Заблокувати', danger: true })
+                .then(ok => { if (ok && cur() && cur().players[id]) socket.emit('banPlayer', { roomId: currentRoomId, targetId: id }); });
+        }
         else if (b.dataset.act === 'kick') {
             if (kickArm === id) { kickArm = null; click(); socket.emit('kickPlayer', { roomId: currentRoomId, targetId: id }); }
             else { kickArm = id; click(); b.classList.add('confirm'); b.textContent = 'ТОЧНО?'; setTimeout(() => { if (kickArm === id) { kickArm = null; if (cur()) renderRoster(cur()); } }, 2600); }

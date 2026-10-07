@@ -773,3 +773,25 @@ html.gfx-low .sh-card, html.gfx-low .rb-card, html.gfx-low .hg-eq, html.gfx-low 
 html.gfx-low .sh-ico svg, html.gfx-low .mm-card-ico { filter: none !important; }
 @media (prefers-reduced-motion: reduce) { .mm-glow, .au-orb, .au-spark, .mm-grid, .au-grid, .hg-ring { animation: none !important; } }
 #settings-modal > div { max-height: calc(var(--uvh, 1dvh) * 94); overflow-y: auto; }
+
+/* ===== Вікна гри (uiDialog) замість alert/confirm ===== */
+.dlg { position: fixed; inset: 0; z-index: 300; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(2,6,23,.78); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); zoom: var(--ui-zoom, 1); animation: fade-in .2s both; }
+.dlg.hidden { display: none; }
+.dlg-box { --c: 59,130,246; position: relative; width: 100%; max-width: 380px; padding: 26px 18px 16px; border-radius: 24px; text-align: center; overflow: hidden; background: radial-gradient(ellipse at 50% 0%, rgba(var(--c),.3), transparent 62%), linear-gradient(170deg, rgba(15,23,42,.98), rgba(2,6,23,.99)); border: 1px solid rgba(var(--c),.7); box-shadow: 0 0 44px rgba(var(--c),.38), 0 20px 60px rgba(0,0,0,.7); animation: slide-up .3s cubic-bezier(.2,1.2,.4,1) both; }
+.dlg-ico { display: flex; align-items: center; justify-content: center; width: 68px; height: 68px; margin: -4px auto 10px; border-radius: 50%; font-style: normal; font-size: 34px; background: radial-gradient(circle, rgba(var(--c),.45), rgba(var(--c),.1) 70%); border: 1.5px solid rgba(var(--c),.85); box-shadow: 0 0 26px rgba(var(--c),.6); animation: dlg-pop .5s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes dlg-pop { from { transform: scale(.4) rotate(-12deg); opacity: 0; } to { transform: none; opacity: 1; } }
+.dlg-t { font-family: 'Russo One', sans-serif; font-size: 19px; letter-spacing: .08em; text-transform: uppercase; color: #fff; margin-bottom: 8px; }
+.dlg-p { font-size: 13px; line-height: 1.45; font-weight: 600; color: #cbd5e1; margin-bottom: 12px; word-break: break-word; }
+.dlg-rows { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+.dlg-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 12px; border-radius: 11px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #94a3b8; background: rgba(2,6,23,.6); border: 1px solid rgba(71,85,105,.6); }
+.dlg-row b { font-family: 'Russo One', sans-serif; font-size: 14px; color: #e2e8f0; letter-spacing: .04em; }
+.dlg-row.bad { border-color: rgba(239,68,68,.55); background: rgba(127,29,29,.25); } .dlg-row.bad b { color: #f87171; }
+.dlg-btns { display: flex; gap: 8px; } .dlg-btns .dlg-b { flex: 1; min-height: 44px; padding: 0 10px; border-radius: 14px; font-size: 12px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; transition: transform .15s, box-shadow .2s, background .2s; }
+.dlg-b.ghost { color: #cbd5e1; background: rgba(51,65,85,.7); border: 1px solid rgba(100,116,139,.6); } .dlg-b.ghost:hover { background: rgba(71,85,105,.9); }
+.dlg-b.primary { font-family: 'Russo One', sans-serif; color: #fff; background: linear-gradient(135deg, #2563eb, #7c3aed); border: 1px solid rgba(165,180,252,.8); box-shadow: 0 0 20px rgba(99,102,241,.5); } .dlg-b.primary:hover { transform: translateY(-1px); box-shadow: 0 0 30px rgba(139,92,246,.85); }
+.dlg-b.danger { font-family: 'Russo One', sans-serif; color: #fff; background: linear-gradient(135deg, #dc2626, #9f1239); border: 1px solid rgba(252,165,165,.8); box-shadow: 0 0 20px rgba(239,68,68,.5); } .dlg-b.danger:hover { transform: translateY(-1px); box-shadow: 0 0 30px rgba(248,113,113,.85); }
+.dlg-b:active { transform: scale(.96); }
+@media (orientation: landscape) and (max-height: 520px) { .dlg-box { max-width: 460px; padding: 14px 16px 12px; } .dlg-ico { width: 46px; height: 46px; font-size: 24px; margin-bottom: 6px; } .dlg-t { font-size: 15px; margin-bottom: 4px; } .dlg-p { font-size: 11px; margin-bottom: 8px; } .dlg-rows { flex-direction: row; gap: 4px; margin-bottom: 8px; } .dlg-row { flex: 1; flex-direction: column; gap: 1px; padding: 4px 6px; font-size: 8px; } .dlg-row b { font-size: 12px; } .dlg-btns .dlg-b { min-height: 36px; } }
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) { .dlg-box { max-width: 460px; padding: 34px 26px 22px; border-radius: 30px; } .dlg-ico { width: 88px; height: 88px; font-size: 44px; } .dlg-t { font-size: 24px; } .dlg-p { font-size: 15px; } .dlg-row { font-size: 13px; padding: 9px 16px; } .dlg-row b { font-size: 17px; } .dlg-btns .dlg-b { min-height: 54px; font-size: 14px; } }
+html.gfx-medium .dlg, html.gfx-low .dlg { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(2,6,23,.9); }
+.lb-act.danger[data-act=ban]:hover { border-color: #f87171; }
