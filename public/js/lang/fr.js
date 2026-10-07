@@ -516,5 +516,8 @@ I18N.add("fr", {
  "Оберіть «На початковий екран»": "Choisissez «Sur l'écran d'accueil»",
  "Натисніть «Додати» і запускайте гру з іконки": "Appuyez sur «Ajouter» et lancez le jeu depuis son icône",
  "Грати на весь екран": "Jouer en plein écran",
- "Встановити гру": "Installer le jeu"
+ "Встановити гру": "Installer le jeu",
+ "Віддалення камери": "Distance de la caméra",
+ "Ближче": "Plus près",
+ "Далі": "Plus loin"
 }, [["Ви протримались до (\\d+) хвилі", "Vous avez tenu jusqu'à la vague $1"], ["(\\d+)Д", "$1j"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1 s"], ["_ та -", "_ et -"]]);

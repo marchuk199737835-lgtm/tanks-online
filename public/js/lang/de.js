@@ -516,5 +516,8 @@ I18N.add("de", {
  "Оберіть «На початковий екран»": "Wähle «Zum Home-Bildschirm»",
  "Натисніть «Додати» і запускайте гру з іконки": "Tippe auf «Hinzufügen» und starte das Spiel über das Symbol",
  "Грати на весь екран": "Im Vollbild spielen",
- "Встановити гру": "Spiel installieren"
+ "Встановити гру": "Spiel installieren",
+ "Віддалення камери": "Kameraabstand",
+ "Ближче": "Näher",
+ "Далі": "Weiter"
 }, [["Ви протримались до (\\d+) хвилі", "Du hast bis Welle $1 durchgehalten"], ["(\\d+)Д", "$1T"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1 s"], ["_ та -", "_ und -"]]);

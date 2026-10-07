@@ -4,19 +4,31 @@ if (window.GFX) GFX.attach(ctx);
 
 // ФІКСОВАНИЙ МАСШТАБ ГРИ: по висоті екрана гравець завжди бачить однакову ділянку мапи (VIEW_H одиниць),
 // тому зменшення масштабу браузера (Ctrl -), великий монітор чи планшет не дають бачити більше за інших.
-const VIEW_H_DESKTOP = 800, VIEW_H_TOUCH = 420, VIEW_MAX_ASPECT = 2.0;
+// Телефони/планшети: видимість +20% за замовчуванням (VIEW_TOUCH_MAXZOOM), у налаштуваннях можна наблизити до 1.0 (старий масштаб).
+const VIEW_H_DESKTOP = 800, VIEW_H_TOUCH = 420, VIEW_MAX_ASPECT = 2.0, VIEW_TOUCH_MAXZOOM = 1.2;
+let viewZoom = VIEW_TOUCH_MAXZOOM;
+try { const _z = parseFloat(localStorage.getItem('viewZoom')); if (_z >= 1 && _z <= VIEW_TOUCH_MAXZOOM) viewZoom = _z; } catch (e) {}
 let VS = 1; // множник «одиниця світу -> піксель екрана»
 let GW = window.innerWidth, GH = window.innerHeight, RS = 1; // GW/GH — логічний розмір (CSS-пікселі), RS — масштаб внутрішнього розширення полотна (налаштування графіки)
 function fitCanvas() {
     RS = (window.GFX && GFX.rs) || 1; GW = window.innerWidth; GH = window.innerHeight;
     canvas.width = Math.max(1, Math.round(GW * RS)); canvas.height = Math.max(1, Math.round(GH * RS));
-    const touch = window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches, VH = touch ? VIEW_H_TOUCH : VIEW_H_DESKTOP;
+    const touch = window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches, VH = touch ? VIEW_H_TOUCH * viewZoom : VIEW_H_DESKTOP;
     VS = Math.max(GH / VH, GW / (VH * VIEW_MAX_ASPECT)); // надширокі екрани не бачать більше, ніж 2:1
     VS = Math.min(VS, GW / (VH * 0.9)); // вузький портретний екран не стискаємо до смужки
 }
 window.fitCanvas = fitCanvas;
 window.addEventListener('resize', fitCanvas);
 fitCanvas();
+(function () { // повзунок «Віддалення камери» (лише на пристроях із дотиком)
+    const row = document.getElementById('view-zoom-row'), sl = document.getElementById('view-zoom'), lab = document.getElementById('view-zoom-val');
+    if (!row || !sl) return;
+    const touch = window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+    if (!touch) return; row.style.display = '';
+    const show = () => { if (lab) lab.textContent = Math.round(viewZoom * 100) + '%'; };
+    sl.min = 1; sl.max = VIEW_TOUCH_MAXZOOM; sl.step = 0.02; sl.value = viewZoom; show();
+    sl.addEventListener('input', () => { viewZoom = Math.min(VIEW_TOUCH_MAXZOOM, Math.max(1, parseFloat(sl.value) || VIEW_TOUCH_MAXZOOM)); try { localStorage.setItem('viewZoom', String(viewZoom)); } catch (e) {} show(); fitCanvas(); });
+})();
 
 let spectatingId = null;
 let isBossIncoming = false;

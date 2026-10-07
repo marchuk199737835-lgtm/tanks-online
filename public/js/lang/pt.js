@@ -516,5 +516,8 @@ I18N.add("pt", {
  "Оберіть «На початковий екран»": "Escolha «Adicionar à Tela de Início»",
  "Натисніть «Додати» і запускайте гру з іконки": "Toque em «Adicionar» e abra o jogo pelo ícone",
  "Грати на весь екран": "Jogar em tela cheia",
- "Встановити гру": "Instalar o jogo"
+ "Встановити гру": "Instalar o jogo",
+ "Віддалення камери": "Distância da câmera",
+ "Ближче": "Mais perto",
+ "Далі": "Mais longe"
 }, [["Ви протримались до (\\d+) хвилі", "Você resistiu até a onda $1"], ["(\\d+)Д", "$1d"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1 s"], ["_ та -", "_ e -"]]);

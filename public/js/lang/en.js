@@ -628,5 +628,8 @@ I18N.add("en", {
  "Оберіть «На початковий екран»": "Choose «Add to Home Screen»",
  "Натисніть «Додати» і запускайте гру з іконки": "Tap «Add» and launch the game from its icon",
  "Грати на весь екран": "Play full screen",
- "Встановити гру": "Install the game"
+ "Встановити гру": "Install the game",
+ "Віддалення камери": "Camera distance",
+ "Ближче": "Closer",
+ "Далі": "Farther"
 }, [["Ви протримались до (\\d+) хвилі", "You lasted until wave $1"], ["(\\d+)Д", "$1d"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1s"], ["_ та -", "_ and -"]]);
