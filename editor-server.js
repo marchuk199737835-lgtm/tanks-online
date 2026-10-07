@@ -92,7 +92,7 @@ module.exports = function mountEditor(app, ctx) {
 
     // ---------- /mapdata.js для клієнтів ----------
     app.get('/mapdata.js', (req, res) => {
-        send(res, 200, '(function(){var d=' + JSON.stringify(applied).replace(/</g, '\\u003c') + ';var h=' + JSON.stringify(hidden) + ';for(var k in d){MAP_DATA[k]=d[k];}h.forEach(function(k){delete MAP_DATA[k];});if(window.onMapDataLoaded)window.onMapDataLoaded();})();', 'application/javascript; charset=utf-8');
+        send(res, 200, '(function(){var d=' + JSON.stringify(Object.assign({}, BUILTIN, applied)).replace(/</g, '\\u003c') + ';var h=' + JSON.stringify(hidden) + ';for(var k in d){MAP_DATA[k]=d[k];}h.forEach(function(k){delete MAP_DATA[k];});if(window.onMapDataLoaded)window.onMapDataLoaded();})();', 'application/javascript; charset=utf-8');
     });
 
     // ---------- API редактора ----------
