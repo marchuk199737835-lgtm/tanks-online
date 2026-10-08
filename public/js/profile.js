@@ -15,7 +15,22 @@
     var lsGet = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
     var lsSet = function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} };
     var MODS = function () { return typeof MODULES !== 'undefined' ? MODULES : null; }, RAR = function () { return typeof RARITY !== 'undefined' ? RARITY : null; }, CATN = function () { return typeof CAT_NAMES !== 'undefined' ? CAT_NAMES : null; }, SVGI = function () { return typeof SVG_ICONS !== 'undefined' ? SVG_ICONS : null; };
-    var NAME_RE = /^[A-Za-zА-Яа-яІіЇїЄєҐґ0-9_-]{3,12}$/;
+    var NAME_RE = /^[A-Za-zА-Яа-яІіЇїЄєҐґ0-9_-]{3,12}$/;     // лише для ЛОГІНІВ (старі акаунти можуть мати кирилицю)
+    var PASS_RE_NEW = /^[\x21-\x7E]{4,128}$/;                 // новий пароль: друковані ASCII без пробілів
+    // ігрове ім'я: будь-яка мова/символи, 2–16 «символів» (графем), без керівних/невидимих; дзеркало серверної cleanNick
+    var NICK_BAD = /[\p{C}\p{Zl}\p{Zp}\u034F\u115F\u1160\u17B4\u17B5\u2800\u3164\uFFA0]/u, NICK_VIS = /[\p{L}\p{N}\p{S}\p{P}]/u;
+    var SEG = (window.Intl && Intl.Segmenter) ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : null;
+    function gLen(v) { if (!SEG) return Array.from(v).length; var n = 0; for (var x of SEG.segment(v)) n++; return n; }
+    function cleanNick(raw) {      // → { ok, nick, len, msg }
+        var v = String(raw || '').normalize('NFC');
+        if (NICK_BAD.test(v)) return { ok: false, len: gLen(v), msg: 'Ім\'я містить недопустимі (керівні або невидимі) символи' };
+        v = v.replace(/[\p{Zs}\t]+/gu, ' ').trim();
+        var len = gLen(v);
+        if (len < 2 || len > 16) return { ok: false, len: len, msg: 'Ім\'я: від 2 до 16 символів' };
+        if (Array.from(v).length > 32 || (window.TextEncoder && new TextEncoder().encode(v).length > 64)) return { ok: false, len: len, msg: 'Ім\'я задовге (макс. 16 символів, до 64 байтів)' };
+        if (!NICK_VIS.test(v)) return { ok: false, len: len, msg: 'Ім\'я має містити літеру, цифру або знак' };
+        return { ok: true, nick: v, len: len };
+    }
 
     // =====================================================================================
     //  Відображувані імена
@@ -62,7 +77,7 @@
         else if (pat === 1) g = '<g stroke="#fff" stroke-opacity=".16" stroke-width="6"><path d="M-10 30L30 -10M-10 52L52 -10M-10 74L74 -10M12 80L80 12M34 80L80 34"/></g>';
         else if (pat === 2) g = '<path d="M32 -4L56 10V38L32 52L8 38V10Z" transform="translate(6 14) scale(.9)" fill="#fff" opacity=".13"/><path d="M52 40l12 7v14l-12 7-12-7V47z" fill="#fff" opacity=".12"/>';
         else g = '<path d="M0 64L32 8L64 64Z" fill="#fff" opacity=".12"/><path d="M-6 30L20 -4L46 30Z" fill="#fff" opacity=".1"/>';
-        return '<span class="pf-av' + (ring ? ' ring' : '') + '" style="width:' + size + 'px;height:' + size + 'px;font-size:' + Math.round(size * 0.46) + 'px"><svg viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true"><defs><linearGradient id="' + id + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(' + h1 + ',72%,52%)"/><stop offset="1" stop-color="hsl(' + h2 + ',70%,26%)"/></linearGradient></defs><rect width="64" height="64" fill="url(#' + id + ')"/>' + g + '</svg><b>' + esc(ini) + '</b></span>';
+        return '<span class="pf-av i18n-skip' + (ring ? ' ring' : '') + '" style="width:' + size + 'px;height:' + size + 'px;font-size:' + Math.round(size * 0.46) + 'px"><svg viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true"><defs><linearGradient id="' + id + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(' + h1 + ',72%,52%)"/><stop offset="1" stop-color="hsl(' + h2 + ',70%,26%)"/></linearGradient></defs><rect width="64" height="64" fill="url(#' + id + ')"/>' + g + '</svg><b>' + esc(ini) + '</b></span>';
     }
 
     // =====================================================================================
@@ -325,8 +340,8 @@
         h += '</div>';
         if (p.self) {
             h += '<div class="pf-card"><div class="pf-h">Акаунт</div><div class="pf-acts"><button class="pf-btn" type="button" data-f="nick">✏️ Змінити ім\'я</button><button class="pf-btn alt" type="button" data-f="pw">🔒 Змінити пароль</button><button class="pf-btn alt" type="button" data-f="hangar">🛡 В ангар</button></div>';
-            h += '<form class="pf-form" id="pf-f-nick" autocomplete="off"><label for="pf-nick-in">Нове ім\'я</label><input class="pf-in" id="pf-nick-in" maxlength="12" placeholder="' + esc(name) + '" autocomplete="off" spellcheck="false"><div class="pf-hint" id="pf-nick-hint"></div><div class="pf-err" id="pf-nick-err"></div><div class="pf-okm" id="pf-nick-ok"></div><div><button class="pf-btn go" type="submit" id="pf-nick-go">Зберегти ім\'я</button></div></form>';
-            h += '<form class="pf-form" id="pf-f-pw" autocomplete="off"><label for="pf-pw0">Старий пароль</label><input class="pf-in" id="pf-pw0" type="password" autocomplete="current-password" maxlength="128"><label for="pf-pw1">Новий пароль (від 4 символів)</label><input class="pf-in" id="pf-pw1" type="password" autocomplete="new-password" maxlength="128"><label for="pf-pw2">Підтвердіть новий пароль</label><input class="pf-in" id="pf-pw2" type="password" autocomplete="new-password" maxlength="128"><div class="pf-err" id="pf-pw-err"></div><div class="pf-okm" id="pf-pw-ok"></div><div><button class="pf-btn go" type="submit" id="pf-pw-go">Змінити пароль</button></div></form></div>';
+            h += '<form class="pf-form" id="pf-f-nick" autocomplete="off"><label for="pf-nick-in">Нове ім\'я</label><input class="pf-in" id="pf-nick-in" maxlength="48" placeholder="' + esc(name) + '" autocomplete="off" spellcheck="false"><div class="pf-hint" id="pf-nick-hint"></div><div class="pf-err" id="pf-nick-err"></div><div class="pf-okm" id="pf-nick-ok"></div><div><button class="pf-btn go" type="submit" id="pf-nick-go">Зберегти ім\'я</button></div></form>';
+            h += '<form class="pf-form" id="pf-f-pw" autocomplete="off"><label for="pf-pw0">Старий пароль</label><input class="pf-in" id="pf-pw0" type="password" autocomplete="current-password" maxlength="128"><label for="pf-pw1">Новий пароль (4–128 символів: латиниця, цифри, знаки; без пробілів)</label><input class="pf-in" id="pf-pw1" type="password" autocomplete="new-password" maxlength="128"><label for="pf-pw2">Підтвердіть новий пароль</label><input class="pf-in" id="pf-pw2" type="password" autocomplete="new-password" maxlength="128"><div class="pf-err" id="pf-pw-err"></div><div class="pf-okm" id="pf-pw-ok"></div><div><button class="pf-btn go" type="submit" id="pf-pw-go">Змінити пароль</button></div></form></div>';
         }
         pfBody.innerHTML = h; pfBody.scrollTop = 0;
         // анімація смуги досвіду
@@ -363,38 +378,48 @@
         function nickHint() {
             var left = p.nickNextAt ? p.nickNextAt - Date.now() : 0;
             if (left > 0) { var m = Math.ceil(left / 60000); hint.textContent = 'Змінювати ім\'я можна раз на 24 години. Наступна зміна через ' + (m >= 60 ? Math.floor(m / 60) + ' год ' + (m % 60) + ' хв' : m + ' хв') + '. Логін @' + p.login + ' не змінюється.'; }
-            else hint.textContent = '3–12 символів: літери, цифри, _ та -. ' + (p.nickChanges ? 'Після зміни наступна буде доступна через 24 години.' : 'Перша зміна безкоштовна й без очікування.') + ' Логін @' + p.login + ' не змінюється.';
+            else hint.textContent = tt('Ім\'я в грі: будь-якою мовою, 2–16 символів (літери, цифри, емодзі, знаки).') + ' ' + (p.nickChanges ? 'Після зміни наступна буде доступна через 24 години.' : 'Перша зміна безкоштовна й без очікування.') + ' Логін @' + p.login + ' не змінюється.';
         }
         nickHint();
+        ni.addEventListener('input', function () {
+            var c = cleanNick(ni.value), e = $('pf-nick-err');
+            if (!ni.value.trim()) { msg('pf-nick-err', ''); return; }
+            msg('pf-nick-err', c.ok ? '' : tt(c.msg) + (c.len ? ' (' + c.len + '/16)' : ''), false);
+        });
         $('pf-f-nick').onsubmit = function (e) {
             e.preventDefault(); msg('pf-nick-err', ''); msg('pf-nick-ok', '');
-            var v = ni.value.trim();
-            if (!NAME_RE.test(v)) { snd('ui_error'); return msg('pf-nick-err', 'Ім\'я: 3–12 символів (літери, цифри, _ -)', true); }
+            var c = cleanNick(ni.value);
+            if (!c.ok) { snd('ui_error'); return msg('pf-nick-err', tt(c.msg), true); }
+            var v = c.nick;
             go.disabled = true; setTimeout(function () { go.disabled = false; }, 4000);
             socket.emit('changeNick', { nick: v });
         };
         $('pf-f-pw').onsubmit = function (e) {
             e.preventDefault(); msg('pf-pw-err', ''); msg('pf-pw-ok', '');
-            var a = $('pf-pw0').value.trim(), b = $('pf-pw1').value.trim(), c = $('pf-pw2').value.trim();
-            var er = !a || !b || !c ? 'Заповніть усі поля' : b.length < 4 ? 'Новий пароль — від 4 символів' : b.length > 128 ? 'Новий пароль — до 128 символів' : b !== c ? 'Підтвердження не збігається з новим паролем' : '';
-            if (er) { snd('ui_error'); return msg('pf-pw-err', er, true); }
+            var a = $('pf-pw0').value.trim(), b = $('pf-pw1').value, c = $('pf-pw2').value;
+            var er = !a || !b || !c ? 'Заповніть усі поля' : b.length < 4 ? 'Новий пароль — від 4 символів' : b.length > 128 ? 'Новий пароль — до 128 символів' : !PASS_RE_NEW.test(b) ? 'Новий пароль: лише латиниця, цифри та знаки, без пробілів і кирилиці' : b !== c ? 'Підтвердження не збігається з новим паролем' : '';
+            if (er) { snd('ui_error'); return msg('pf-pw-err', tt(er), true); }
             var g = $('pf-pw-go'); g.disabled = true; setTimeout(function () { g.disabled = false; }, 4000);
             socket.emit('changePassword', { oldPassword: a, newPassword: b, confirm: c });
         };
     }
 
     // ---------- танк з екіпірованих модулів ----------
-    function stopTank() { if (tankRaf) { cancelAnimationFrame(tankRaf); tankRaf = 0; } }
-    function startTank(eq) {
-        stopTank();
-        var cv = $('pf-tank'); if (!cv || typeof drawModVis !== 'function') return;
+    function stopTank() { if (tankStopper) { tankStopper(); tankStopper = null; } }
+    function startTank(eq) { stopTank(); var stop = tankOn($('pf-tank'), eq, function () { return isOpen(pfEl); }); tankStopper = stop; }
+    var tankStopper = null;
+    // малює танк з модулів eq на canvas cv, поки alive() істинне; повертає функцію зупинки (використовує і картка гравця)
+    function tankOn(cv, eq, alive) {
+        var raf = 0, dead = false; eq = eq || {};
+        var stopFn = function () { dead = true; if (raf) { cancelAnimationFrame(raf); raf = 0; } };
+        if (!cv || typeof drawModVis !== 'function') return stopFn;
         var c = cv.getContext('2d'), still = low() || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
         // світіння під танком — за найвищою рідкістю
         var tiers = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4 }, best = null, bt = -1;
         SLOTS.forEach(function (sl) { var m = eq[sl] && MODULES[eq[sl]]; if (m && (tiers[m.rarity] || 0) > bt) { bt = tiers[m.rarity] || 0; best = m; } });
         if (best && RARITY[best.rarity]) { var st = cv.parentElement; st.style.setProperty('--tg', RARITY[best.rarity].color + '66'); }
         function draw() {
-            if (!cv.isConnected || !isOpen(pfEl)) { tankRaf = 0; return; }
+            if (dead || !cv.isConnected || !alive()) { raf = 0; return; }
             var r = cv.getBoundingClientRect(), k = Math.max(1, Math.min(2.5, (r.width / 300) * (window.devicePixelRatio || 1))), px = Math.round(300 * k);
             if (px > 0 && cv.width !== px) { cv.width = px; cv.height = px; }
             c.setTransform(px / 300, 0, 0, px / 300, 0, 0); c.clearRect(0, 0, 300, 300);
@@ -405,9 +430,9 @@
             c.restore(); c.save(); c.rotate(ta);
             drawModVis(c, 'cannon', eq.cannon || null, T); drawModVis(c, 'turret', eq.turret || null, T);
             c.restore(); c.restore();
-            tankRaf = still ? 0 : requestAnimationFrame(draw);
+            raf = still ? 0 : requestAnimationFrame(draw);
         }
-        draw();
+        draw(); return stopFn;
     }
 
     // =====================================================================================
@@ -657,7 +682,7 @@
         MenuHub.addCard({ id: 'mm-rating-card', icon: '🏆', title: 'РЕЙТИНГ', sub: 'Сезонні таблиці', color: 'amber', bg: '👑', onClick: openRanking });
     }
     window.Profile = {
-        open: openProfile, close: closeProfile, avatar: avatar,
+        open: openProfile, close: closeProfile, avatar: avatar, tank: tankOn,
         nick: function () { return (meProfile && meProfile.nick) || (NC[myLogin()] && NC[myLogin()].nick) || myLogin(); },
         me: function () { return meProfile; }
     };

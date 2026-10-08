@@ -80,7 +80,7 @@
         if (root.nodeType === 3) return doText(root);
         if (root.nodeType !== 1 && root.nodeType !== 11) return;
         if (root.nodeType === 1) {
-            var tag = root.tagName; if (tag === 'SCRIPT' || tag === 'STYLE') return;
+            var tag = root.tagName; if (tag === 'SCRIPT' || tag === 'STYLE' || (root.classList && root.classList.contains('i18n-skip'))) return;   // .i18n-skip: тексти користувачів (чат, ніки) не перекладаємо
             for (var i = 0; i < ATTRS.length; i++) if (root.hasAttribute && root.hasAttribute(ATTRS[i])) doAttr(root, ATTRS[i]);
         }
         var c = root.firstChild;

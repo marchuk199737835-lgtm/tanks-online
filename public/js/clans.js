@@ -203,7 +203,7 @@
     // ---------- Допоміжне ----------
     function hue(s) { var h = 7; s = String(s); for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h % 360; }
     function avatar(login, nick, online) {
-        var h = hue(login), ch = esc(String(nick || login).trim().charAt(0).toUpperCase() || '?');
+        var h = hue(login), ch = esc(window.firstChar ? firstChar(nick || login) : String(nick || login).trim().charAt(0).toUpperCase() || '?');
         return '<div class="cl-av" style="background:linear-gradient(135deg,hsl(' + h + ',75%,52%),hsl(' + ((h + 50) % 360) + ',70%,30%))">' + ch + (online != null ? '<i class="cl-dot' + (online ? ' on' : '') + '" title="' + (online ? 'Онлайн' : 'Офлайн') + '"></i>' : '') + '</div>';
     }
     function dn(m) { try { if (window.dispName) return window.dispName({ name: m.login, nick: m.nick }) || m.nick || m.login; } catch (e) {} return m.nick || m.login; }
@@ -398,13 +398,12 @@
         var me = m.login === (typeof myName !== 'undefined' ? myName : '');
         return '<div class="cl-msg' + (me ? ' me' : '') + '"><b>' + esc(dn(m)) + '<time>' + hhmm(m.t) + '</time></b>' + esc(m.text) + '</div>';
     }
-    function pChat(c) {
-        return '<div class="cl-box cl-chat"><div class="cl-msgs" id="cl-msgs">' + (c.chat.length ? c.chat.map(msgHtml).join('') : '<div class="cl-empty" style="margin:auto"><i>💬</i>Тут поки тихо.<br>Напишіть першим!</div>') + '</div>' +
-            '<div class="cl-send"><input id="cl-chat-in" type="text" maxlength="200" placeholder="Повідомлення (до 200 символів)" autocomplete="off"><button type="button" class="cl-btn" data-a="send">Надіслати</button></div></div>';
+    function pChat(c) {   // чат клану тепер у спільному вікні чату (chat.js): тут лише перехід
+        return '<div class="cl-box cl-chat"><div class="cl-empty" style="margin:auto"><i>💬</i>Чат клану відкривається в окремому вікні чату.<br><br><button type="button" class="cl-btn" data-a="send">Відкрити чат клану</button></div></div>';
     }
     function sendChat() {
-        var i = $('cl-chat-in'); if (!i) return; var t = i.value.trim(); if (!t) return;
-        if (emit('clanChat', { text: t })) i.value = '';
+        try { close(); } catch (e) {}
+        if (window.Chat) setTimeout(function () { Chat.open('clan'); }, 60);
     }
 
     // ---------- Налаштування лідера / редактор емблеми ----------

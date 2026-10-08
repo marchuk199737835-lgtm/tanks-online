@@ -3,7 +3,27 @@
     const $ = id => document.getElementById(id);
     const tt = s => (window.I18N && I18N.t) ? I18N.t(s) : s;
     const click = () => { if (typeof playSound === 'function') playSound('ui_click'); };
-    const NAME_RE = /^[A-Za-zА-Яа-яІіЇїЄєҐґ0-9_-]{3,12}$/;
+    // Реєстрація (нові акаунти): логін — лише латиниця; пароль — лише друковані ASCII. Вхід старих акаунтів НЕ обмежуємо (там може бути кирилиця).
+    const LOGIN_RE_NEW = /^[A-Za-z0-9_-]{3,12}$/, PASS_RE_NEW = /^[\x21-\x7E]{4,128}$/;
+    const H_NAME = '3–12 символів: лише латиниця, цифри, _ та -', H_PASS = '4–128 символів: латиниця, цифри та знаки, без пробілів';
+    function nameProblem(n) {
+        if (!n) return '';
+        if (/\s/.test(n)) return 'Логін без пробілів';
+        if (/[^\x00-\x7F]/.test(n)) return 'Лише латиниця (A–Z): кирилиця, емодзі й інші символи не підходять';
+        if (/[^A-Za-z0-9_-]/.test(n)) return 'Дозволені лише літери A–Z, цифри, _ та -';
+        if (n.length < 3) return 'Логін: мінімум 3 символи';
+        if (n.length > 12) return 'Логін: максимум 12 символів';
+        return '';
+    }
+    function passProblem(p) {
+        if (!p) return '';
+        if (/\s/.test(p)) return 'Пароль без пробілів';
+        if (/[^\x21-\x7E]/.test(p)) return 'Лише латиниця, цифри та знаки: без кирилиці й емодзі';
+        if (p.length < 4) return 'Пароль: мінімум 4 символи';
+        if (p.length > 128) return 'Пароль: максимум 128 символів';
+        return '';
+    }
+    let isBusy = false;
 
     // ---------- іскри на тлі ----------
     const sp = $('au-sparks');
@@ -56,11 +76,16 @@
     const STR_T = ['', 'слабкий', 'середній', 'добрий', 'надійний'];
     function validate() {
         const n = $('nickname-input').value.trim(), p = $('password-input').value;
-        const reg = authMode === 'register', nameOk = NAME_RE.test(n);
-        $('au-f-name').classList.toggle('ok', reg && nameOk); $('au-f-name').classList.toggle('bad', reg && n.length > 0 && !nameOk);
-        $('au-hint-name').classList.toggle('bad', reg && n.length > 0 && !nameOk);
-        const st = reg ? strength(p) : 0; $('au-strength').dataset.s = st; $('au-strength-t').textContent = STR_T[st];
-        $('au-f-pass').classList.toggle('bad', reg && p.length > 0 && p.length < 4);
+        const reg = authMode === 'register', nameOk = LOGIN_RE_NEW.test(n), passOk = PASS_RE_NEW.test(p);
+        const nProb = reg ? nameProblem(n) : '', pProb = reg ? passProblem(p) : '';
+        $('au-f-name').classList.toggle('ok', reg && nameOk); $('au-f-name').classList.toggle('bad', !!nProb);
+        $('au-hint-name').classList.toggle('bad', !!nProb); $('au-hint-name').textContent = tt(nProb || H_NAME);
+        const hp = $('au-hint-pass'); if (hp) { hp.classList.toggle('bad', !!pProb); hp.textContent = tt(pProb || H_PASS); }
+        const st = reg && !pProb ? strength(p) : 0; $('au-strength').dataset.s = st; $('au-strength-t').textContent = tt(STR_T[st]);
+        $('au-f-pass').classList.toggle('bad', !!pProb);
+        $('au-f-pass').classList.toggle('ok', reg && passOk);
+        // у режимі реєстрації кнопка заблокована, доки логін/пароль не відповідають правилам
+        const b = $('auth-btn'); b.disabled = isBusy || (reg && !(nameOk && passOk));
     }
     $('nickname-input').addEventListener('input', () => { validate(); showErr(''); });
     $('password-input').addEventListener('input', () => { validate(); showErr(''); });
@@ -70,17 +95,22 @@
         const e = $('auth-err'); e.textContent = msg ? tt(msg) : ''; e.classList.toggle('show', !!msg);
         if (msg) { card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake'); if (typeof playSound === 'function') playSound('hurt'); }
     }
-    function busy(on) { const b = $('auth-btn'); b.disabled = on; b.classList.toggle('loading', on); }
+    function busy(on) { isBusy = on; const b = $('auth-btn'); b.classList.toggle('loading', on); validate(); b.disabled = on || b.disabled; }
     window.authShowError = function (msg) { busy(false); showErr(msg); };
     window.authBusyOff = function () { busy(false); };
 
     card.addEventListener('submit', e => {
         e.preventDefault(); click();
-        const n = $('nickname-input').value.trim().toUpperCase(), p = $('password-input').value.trim();
+        const rawN = $('nickname-input').value.trim(), rawP = $('password-input').value;
+        const n = rawN.toUpperCase();
+        // реєстрація: пароль надсилаємо як є (без обрізання); вхід: як раніше (з обрізанням країв) — для старих акаунтів
+        const p = authMode === 'register' ? rawP : rawP.trim();
         if (!n || !p) return showErr('Введіть логін та пароль!');
         if (authMode === 'register') {
-            if (!NAME_RE.test(n)) return showErr('Логін 3-12 символів (літери, цифри, _ -)!');
-            if (p.length < 4) return showErr('Пароль від 4 символів!');
+            const e1 = nameProblem(rawN) || (LOGIN_RE_NEW.test(rawN) ? '' : 'Логін: 3–12 символів, лише латиниця, цифри, _ та -');
+            if (e1) return showErr(e1);
+            const e2 = passProblem(rawP) || (PASS_RE_NEW.test(rawP) ? '' : 'Пароль: 4–128 символів, лише латиниця, цифри та знаки');
+            if (e2) return showErr(e2);
         }
         busy(true); showErr('');
         socket.emit(authMode, { name: n, password: p, lang: window.I18N ? I18N.lang : null });

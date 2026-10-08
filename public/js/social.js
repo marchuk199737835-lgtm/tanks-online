@@ -92,7 +92,7 @@
     // ---------- допоміжне ----------
     function hue(s) { var h = 7; s = String(s); for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h % 360; }
     function avatar(f, extra, dot) {
-        var h = hue(f.login), ch = esc(String(f.nick || f.login).trim().charAt(0).toUpperCase() || '?');
+        var h = hue(f.login), ch = esc(window.firstChar ? firstChar(f.nick || f.login) : String(f.nick || f.login).trim().charAt(0).toUpperCase() || '?');
         return '<div class="sc-av' + (extra || '') + '" style="background:linear-gradient(135deg,hsl(' + h + ',75%,52%),hsl(' + ((h + 50) % 360) + ',70%,30%))">' + ch + (dot || '') + '</div>';
     }
     function dname(f) { try { if (window.dispName) return window.dispName({ name: f.login, nick: f.nick }) || f.nick || f.login; } catch (e) {} return f.nick || f.login; }

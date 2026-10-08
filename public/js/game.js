@@ -1299,7 +1299,7 @@ window.updateHUD = function() {
         if (pC) _hid(pC, false); if (mC) _hid(mC, false);
         let _h = '';
         Object.values(currentRoomData.players).sort((a, b) => b.score - a.score).forEach(p => {
-            _h += `<div class="flex justify-between w-full ${p.id === myId ? 'text-blue-400' : 'text-slate-300'} border-b border-slate-700/50 pb-1 ${p.hp <= 0 ? 'opacity-30 line-through' : ''}"><span>${window.dispName ? dispName(p) : p.name}</span><span class="font-bold">${p.score}</span></div>`;
+            _h += `<div class="flex justify-between w-full ${p.id === myId ? 'text-blue-400' : 'text-slate-300'} border-b border-slate-700/50 pb-1 ${p.hp <= 0 ? 'opacity-30 line-through' : ''}"><span>${escHtml(window.dispName ? dispName(p) : p.name)}</span><span class="font-bold">${p.score}</span></div>`;
         });
         if (sl._h !== _h) { sl._h = _h; sl.innerHTML = _h; }   // таблицю перебудовуємо лише коли змінились очки/склад
     }
