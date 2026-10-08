@@ -20,18 +20,22 @@ require('./static_gzip.js')(app, express, { publicDir: path.join(__dirname, 'pub
 const musicDir = path.join(__dirname, 'music');
 if (!fs.existsSync(musicDir)) fs.mkdirSync(musicDir);
 
-const musicCategories = ['loby', 'dezmatch', 'survive', 'main'];
+// Музика: лише меню (main) і лобі (loby). У боях музики немає. Беруться ТІЛЬКИ треки з music/<категорія>/lic/free/ (перевірена ліцензія);
+// файли, що лежать у lic/ поруч із free, ігноруються, доки їх не перенесено у free.
+const musicCategories = ['main', 'loby'];
 let musicData = {};
 
 musicCategories.forEach(cat => {
-    const catDir = path.join(musicDir, cat);
-    if (!fs.existsSync(catDir)) fs.mkdirSync(catDir, { recursive: true });
+    const freeDir = path.join(musicDir, cat, 'lic', 'free');
+    if (!fs.existsSync(freeDir)) fs.mkdirSync(freeDir, { recursive: true });
 });
 
 function scanMusic() {
     musicCategories.forEach(cat => {
-        const catDir = path.join(musicDir, cat);
-        musicData[cat] = fs.readdirSync(catDir).filter(f => f.endsWith('.mp3')).map(f => `${cat}/${f}`);
+        const freeDir = path.join(musicDir, cat, 'lic', 'free');
+        let list = [];
+        try { list = fs.readdirSync(freeDir).filter(f => /\.mp3$/i.test(f)).sort().map(f => `${cat}/lic/free/${f}`); } catch (e) {}
+        musicData[cat] = list;
     });
 }
 scanMusic();
