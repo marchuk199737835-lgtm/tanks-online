@@ -296,7 +296,12 @@ canvas { display: block; cursor: crosshair; }
 @keyframes mm-spin { to { transform: rotate(360deg); } }
 .mm-brand-t { display: flex; flex-direction: column; line-height: 1.1; min-width: 0; }
 .mm-brand-t b { font-family: 'Russo One', sans-serif; font-size: 13px; letter-spacing: .1em; color: #fff; white-space: nowrap; }
-.mm-brand-t span { font-size: 8px; font-weight: 800; letter-spacing: .25em; color: #60a5fa; text-transform: uppercase; white-space: nowrap; }
+.mm-brand-t > span { font-size: 8px; font-weight: 800; letter-spacing: .25em; color: #60a5fa; text-transform: uppercase; white-space: nowrap; }
+/* кнопка «Музика» під логотипом */
+.mm-music { align-self: flex-start; display: inline-flex; align-items: center; gap: 5px; margin-top: 5px; padding: 3px 10px 3px 6px; border-radius: 999px; border: 1px solid rgba(129,140,248,.45); background: rgba(49,46,129,.35); color: #c7d2fe; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; transition: background .2s, border-color .2s, transform .15s; }
+.mm-music i { font-style: normal; font-size: 12px; line-height: 1; }
+.mm-music:hover { background: rgba(79,70,229,.55); border-color: rgba(165,180,252,.8); color: #fff; }
+.mm-music:active { transform: scale(.96); }
 .mm-top-r { display: flex; align-items: center; gap: 6px; justify-content: flex-end; min-width: 0; }
 .mm-pill { display: flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 999px; background: rgba(6,78,59,.35); border: 1px solid rgba(16,185,129,.5); cursor: pointer; transition: box-shadow .2s, background .2s; flex-shrink: 0; }
 .mm-pill:hover { background: rgba(6,78,59,.6); box-shadow: 0 0 18px rgba(16,185,129,.4); }
@@ -332,9 +337,9 @@ canvas { display: block; cursor: crosshair; }
 .mm-dot { position: absolute; top: 10px; right: 12px; width: 14px; height: 14px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 12px #fbbf24; animation: claim-pulse 1.2s infinite; z-index: 2; }
 .mm-dot.hidden { display: none; }
 @media (max-height: 520px) and (orientation: landscape) { .mm-hero { display: none; } .mm-card-ico { font-size: 34px; } .mm-card h2 { font-size: 12px; } .mm-advent { margin-top: 4px; } .mm-advent-in { padding: 2px 10px; } .mm-advent-l, .mm-advent-r { font-size: 20px; } .mm-advent-c b { font-size: 10px; } }
-@media (max-width: 480px) and (orientation: portrait) { .mm-brand { display: none; } .mm-top { padding-top: 10px; } .mm-top-r { width: 100%; flex-wrap: wrap; } .lv-mini { flex: 1 1 100%; width: auto; } .mm-pill { margin-right: auto; } .mm-card-ico { font-size: 52px; } .mm-card h2 { font-size: 15px; } .mm-card p { font-size: 9px; } .mm-title { font-size: 24px; } }
+@media (max-width: 480px) and (orientation: portrait) { .mm-top { flex-wrap: wrap; } .mm-brand { order: 2; } .mm-brand-ico, .mm-brand-t > b, .mm-brand-t > span { display: none; } .mm-music { margin-top: 0; } .mm-top { padding-top: 10px; } .mm-top-r { width: 100%; flex-wrap: wrap; } .lv-mini { flex: 1 1 100%; width: auto; } .mm-pill { margin-right: auto; } .mm-card-ico { font-size: 52px; } .mm-card h2 { font-size: 15px; } .mm-card p { font-size: 9px; } .mm-title { font-size: 24px; } }
 @media (min-width:1024px) and (hover:hover) and (pointer:fine) {
-  .mm-top { padding: 18px 28px 0; } .mm-brand-ico { width: 52px; height: 52px; } .mm-brand-t b { font-size: 20px; } .mm-brand-t span { font-size: 10px; }
+  .mm-top { padding: 18px 28px 0; } .mm-brand-ico { width: 52px; height: 52px; } .mm-brand-t b { font-size: 20px; } .mm-brand-t > span { font-size: 10px; } .mm-music { font-size: 11px; padding: 4px 12px 4px 8px; margin-top: 7px; } .mm-music i { font-size: 14px; }
   .mm-top-r { gap: 12px; } .mm-pill { padding: 11px 18px; } .mm-pill span { font-size: 18px; } .mm-pill i { width: 22px; height: 22px; font-size: 15px; }
   .mm-round { width: 48px; height: 48px; font-size: 20px; }
   .mm-advent { margin-top: 14px; width: 560px; } .mm-advent-in { padding: 10px 20px; } .mm-advent-c b { font-size: 22px; } #hw-timer { font-size: 18px; padding: 3px 14px; } .mm-advent-l, .mm-advent-r { font-size: 44px; }

@@ -1,5 +1,5 @@
 /* credits.js — «Музика та ліцензії»: вікно з авторами треків, посиланнями на Pixabay і ліцензію.
- * Картка в головному меню (MenuHub). Дані — у масиві TRACKS нижче: додав трек у music/<main|loby>/lic/free — додай рядок сюди. */
+ * Кнопка #mm-music-btn під логотипом головного меню. Дані — у масиві TRACKS нижче: додав трек у music/<main|loby>/lic/free — додай рядок сюди. */
 (function () {
     'use strict';
     var P = 'https://pixabay.com/';
@@ -65,5 +65,7 @@
     function close() { if (ov) ov.classList.remove('on'); }
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && ov && ov.classList.contains('on')) close(); });
     window.Credits = { open: open, close: close, tracks: TRACKS };
-    if (window.MenuHub) MenuHub.addCard({ id: 'mm-credits', icon: '🎵', title: 'Музика', sub: 'Автори та ліцензії', color: 'indigo', onClick: open });
+    // кнопка «Музика» — під логотипом у лівому верхньому куті головного меню (раніше була окремою карткою в сітці)
+    var mb = document.getElementById('mm-music-btn');
+    if (mb) mb.addEventListener('click', function () { if (typeof playSound === 'function') playSound('ui_click'); open(); });
 })();

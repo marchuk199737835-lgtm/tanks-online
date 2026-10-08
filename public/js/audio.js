@@ -53,21 +53,20 @@ window.setSfxVolume = function(val) {
     localStorage.setItem('tankVolSfx', val);
 };
 
-// Стани музики: 'main' — головне меню, 'loby' — лобі/кімнати. У бою ('dezmatch'/'survive'/'battle'/'') музики немає.
-// Якщо для стану немає треків — береться другий список (щоб меню не мовчало); немає жодного — тиша.
+// Стани музики: усе меню ('main' — головне меню, 'loby' — сесії/лобі) — ОДИН спільний плейлист 'menu' (треки main + loby),
+// тож при переходах між екранами меню трек не перемикається, а грає далі. У бою ('battle'/'') музики немає.
 function stopMusic() {
     activePlaylist = []; currentTrackIndex = 0; currentMusicState = '';
     try { bgMusic.pause(); } catch (e) {}
     hideAudioHint();
 }
 function switchMusicState(newState) {
-    if (newState !== 'main' && newState !== 'loby') { musicWanted = false; stopMusic(); currentMusicState = newState || ''; return; }
+    if (newState !== 'main' && newState !== 'loby' && newState !== 'menu') { musicWanted = false; stopMusic(); currentMusicState = newState || ''; return; }
+    newState = 'menu';
     musicWanted = true;
     if (currentMusicState === newState && activePlaylist.length) { if (bgMusic.paused) tryUnlockAudio(); return; }
     currentMusicState = newState;
-    const other = newState === 'main' ? 'loby' : 'main';
-    let tracks = [...(myMusicPlaylists[newState] || [])];
-    if (!tracks.length) tracks = [...(myMusicPlaylists[other] || [])];
+    let tracks = [...(myMusicPlaylists.main || []), ...(myMusicPlaylists.loby || [])];
     if (!tracks.length) { activePlaylist = []; try { bgMusic.pause(); } catch (e) {} return; }
     for (let i = tracks.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [tracks[i], tracks[j]] = [tracks[j], tracks[i]]; }
     activePlaylist = tracks; currentTrackIndex = 0; playCurrentTrack();
