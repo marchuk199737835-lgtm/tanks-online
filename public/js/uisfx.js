@@ -3,11 +3,11 @@
  * Файли: public/sfx/{ui,case,roll,reveal,upg}_*.mp3. Якщо файли ще не завантажились — працює старий синтезований звук. */
 (function () {
     'use strict';
-    var NAMES = ['ui_hover', 'ui_click', 'ui_tab', 'ui_back', 'ui_open', 'ui_close', 'ui_on', 'ui_off', 'ui_confirm', 'ui_error', 'ui_buy', 'ui_sell', 'ui_equip', 'ui_slot', 'ui_screen', 'ui_notify', 'ui_tick',
+    var NAMES = ['ui_hover', 'ui_click', 'ui_tab', 'ui_back', 'ui_open', 'ui_close', 'ui_on', 'ui_off', 'ui_confirm', 'ui_error', 'ui_buy', 'ui_sell', 'ui_equip', 'ui_slot', 'ui_screen', 'ui_notify', 'ui_tick', 'ui_invite', 'ui_friend',
         'case_confirm', 'roll_start', 'roll_tick_1', 'roll_tick_2', 'roll_tick_3', 'roll_stop', 'reveal_common', 'reveal_rare', 'reveal_epic', 'reveal_legendary', 'reveal_mythic',
         'upg_start', 'upg_charge', 'upg_tick_1', 'upg_tick_2', 'upg_stop', 'upg_win', 'upg_fail'];
     var GAIN = { ui_hover: 0.22, ui_click: 0.6, ui_tab: 0.55, ui_back: 0.55, ui_open: 0.5, ui_close: 0.45, ui_on: 0.55, ui_off: 0.5, ui_confirm: 0.6, ui_error: 0.55, ui_buy: 0.7, ui_sell: 0.6, ui_equip: 0.65, ui_slot: 0.65,
-        ui_screen: 0.4, ui_notify: 0.55, ui_tick: 0.35, case_confirm: 0.75, roll_start: 0.7, roll_tick: 0.6, roll_stop: 0.8, reveal: 0.85, upg_start: 0.75, upg_charge: 0.6, upg_tick: 0.4, upg_stop: 0.8, upg_win: 0.9, upg_fail: 0.9 };
+        ui_screen: 0.4, ui_notify: 0.55, ui_tick: 0.35, ui_invite: 0.95, ui_friend: 0.75, case_confirm: 0.75, roll_start: 0.7, roll_tick: 0.6, roll_stop: 0.8, reveal: 0.85, upg_start: 0.75, upg_charge: 0.6, upg_tick: 0.4, upg_stop: 0.8, upg_win: 0.9, upg_fail: 0.9 };
     var buf = {}, loading = false, loaded = 0, lastAt = {}, lastVar = {}, active = 0, lastClick = 0, lastAny = 0, armedAt = 0, raf = 0, dbg = [], loops = [];
     var AC = function () { try { return typeof audioCtx !== 'undefined' ? audioCtx : null; } catch (e) { return null; } };
     var vol = function () { try { return typeof volSfx === 'number' ? volSfx : 0.6; } catch (e) { return 0.6; } };

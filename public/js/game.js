@@ -265,7 +265,7 @@ function updatePhys(now, dt) {
                     if (b.owner === myId) {
                         if (isTeamM(currentRoomData.mode) && myLocalTank.team === op.team) continue;
                         // Відправляємо обчислений урон
-                        socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: actualDmg, type: b.type });
+                        socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: actualDmg, type: b.type, bid: b.bid });
                     }
                     break;
                 }
@@ -322,7 +322,7 @@ function updatePhys(now, dt) {
                     if (opponents[oid].hp > 0 && opponents[oid].buff !== 'shield' && Math.hypot(b.x - opponents[oid].x, b.y - opponents[oid].y) < sR) {
                         if (isTeamM(currentRoomData.mode) && opponents[oid].team === myLocalTank.team) continue;
                         let expDmg = window.BUFFS['explosive'] ? window.BUFFS['explosive'].dmg : 250;
-                        socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: expDmg, type: 'explosive' });
+                        socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: expDmg, type: 'explosive', bid: b.bid });
                     }
                 }
             }
@@ -674,7 +674,7 @@ socket.on('gameOver', (data) => {
             document.getElementById('winner-title').innerText = "ЕХХ...";
             document.getElementById('winner-title').className = "text-5xl lg:text-6xl font-russo mb-4 text-slate-400 tracking-widest relative z-10";
             document.getElementById('winner-emoji').innerText = "💔";
-            document.getElementById('winner-message').innerText = `${data.name} здобуває перемогу.`;
+            document.getElementById('winner-message').innerText = `${window.dispName ? dispName(data.name) : data.name} здобуває перемогу.`;
         }
     }
 });
@@ -843,7 +843,7 @@ function draw(now) {
         const p = opponents[id], sn = currentRoomData.players[id]; if (!sn) { delete opponents[id]; continue; }
         const cH = sn.color ? (sn.color === 'white' ? '#f8fafc' : sn.color === 'black' ? '#1e293b' : sn.color === 'red' ? '#ef4444' : sn.color === 'blue' ? '#3b82f6' : sn.color === 'brown' ? '#78350f' : '#9333ea') : '#ef4444';
         if (p.isDisguised) MapObj.drawDisguise(ctx, { type: p.propType, x: p.x - 25, y: p.y - 25, w: 50, h: 50, r: 25 }, tm);
-        else drTnk(p.x, p.y, p.bodyAngle, p.turretAngle, cH, sn.name, false, p.hp, p.buff, sn.equipped, true);
+        else drTnk(p.x, p.y, p.bodyAngle, p.turretAngle, cH, (window.dispName ? dispName(sn) : sn.name), false, p.hp, p.buff, sn.equipped, true);
         if ((myLocalTank.buff === 'homing' || myLocalTank.buff === 'autolaser') && id === homingTargetId && p.hp > 0) {
             ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(now / 300); ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3; ctx.setLineDash([15, 10]); ctx.strokeRect(-45, -45, 90, 90); ctx.restore();
         }
@@ -853,7 +853,7 @@ function draw(now) {
     if (myLocalTank.hp > 0) {
         const mC = myColor ? (myColor === 'white' ? '#f8fafc' : myColor === 'black' ? '#1e293b' : myColor === 'red' ? '#ef4444' : myColor === 'blue' ? '#3b82f6' : myColor === 'brown' ? '#78350f' : '#9333ea') : '#3b82f6';
         if (myLocalTank.isDisguised) MapObj.drawDisguise(ctx, { type: myLocalTank.propType, x: myLocalTank.x - 25, y: myLocalTank.y - 25, w: 50, h: 50, r: 25 }, tm);
-        else { drTnk(myLocalTank.x, myLocalTank.y, myLocalTank.bodyAngle, myLocalTank.turretAngle, mC, myName, true, myLocalTank.hp, myLocalTank.buff, myEquipped, true); drPCA(); }
+        else { drTnk(myLocalTank.x, myLocalTank.y, myLocalTank.bodyAngle, myLocalTank.turretAngle, mC, (window.dispName ? dispName(myName) : myName), true, myLocalTank.hp, myLocalTank.buff, myEquipped, true); drPCA(); }
     }
     
     lasers.forEach(l => { ctx.save(); ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 4; ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 15; ctx.globalAlpha = Math.max(0, l.life / 0.15); ctx.beginPath(); ctx.moveTo(l.x1, l.y1); ctx.lineTo(l.x2, l.y2); ctx.stroke(); ctx.restore(); });
@@ -922,7 +922,7 @@ function draw(now) {
     } else tC.classList.add('hidden');
     
     if (myLocalTank.hp <= 0 && spectatingId && opponents[spectatingId]) {
-        let sN = currentRoomData.players[spectatingId] ? currentRoomData.players[spectatingId].name : 'ГРАВЕЦЬ', sT = opponents[spectatingId];
+        let sN = currentRoomData.players[spectatingId] ? (window.dispName ? dispName(currentRoomData.players[spectatingId]) : currentRoomData.players[spectatingId].name) : 'ГРАВЕЦЬ', sT = opponents[spectatingId];
         if (sT.isDisguised) MapObj.drawDisguise(ctx, { type: sT.propType, x: sT.x - 25, y: sT.y - 25, w: 50, h: 50, r: 25 }, tm);
         ctx.fillStyle = '#fff'; ctx.font = '24px Russo One'; ctx.textAlign = 'center'; ctx.shadowColor = '#000'; ctx.shadowBlur = 10;
         ctx.fillText(`${I18N.t('СПОСТЕРІГАННЯ:')} ${sN}`, GW / 2, 120);
@@ -1005,7 +1005,7 @@ window.updateHUD = function() {
         if (pC) pC.classList.remove('hidden'); if (mC) mC.classList.remove('hidden');
         sl.innerHTML = '';
         Object.values(currentRoomData.players).sort((a, b) => b.score - a.score).forEach(p => {
-            sl.innerHTML += `<div class="flex justify-between w-full ${p.id === myId ? 'text-blue-400' : 'text-slate-300'} border-b border-slate-700/50 pb-1 ${p.hp <= 0 ? 'opacity-30 line-through' : ''}"><span>${p.name}</span><span class="font-bold">${p.score}</span></div>`;
+            sl.innerHTML += `<div class="flex justify-between w-full ${p.id === myId ? 'text-blue-400' : 'text-slate-300'} border-b border-slate-700/50 pb-1 ${p.hp <= 0 ? 'opacity-30 line-through' : ''}"><span>${window.dispName ? dispName(p) : p.name}</span><span class="font-bold">${p.score}</span></div>`;
         });
     }
     

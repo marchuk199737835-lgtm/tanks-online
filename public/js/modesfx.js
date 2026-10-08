@@ -39,6 +39,7 @@
     const width = (k, p) => { const e = ref[k]; if (e) e.style.width = Math.max(0, Math.min(100, p)) + '%'; };
     const myPl = () => { const r = cur(); return r && r.players ? r.players[myId] : null; };
     const nameOf = id => { const r = cur(); return r && r.players[id] ? r.players[id].name : ''; };
+    const dn = p => window.dispName ? dispName(p) : (p && typeof p === 'object' ? (p.nick || p.name) : p);
 
     // оновлення панелі з поточного md
     function paint() {
@@ -77,11 +78,11 @@
                 break;
             }
             case 'bounty': {
-                const tg = md.tg ? nameOf(md.tg) : '';
+                const tg = md.tg ? (cur() && cur().players[md.tg] ? dn(cur().players[md.tg]) : nameOf(md.tg)) : '';
                 set('tg', md.tg ? tg : '—'); set('tgn', md.tg ? ('+' + md.bv + '  ·  ' + fmt(md.nt)) : ''); set('t', fmt(md.t)); set('goal', md.goal);
                 hud.classList.toggle('me-tg', md.tg === myId);
                 const bd = ref.bd, list = Object.values(r.players).sort((a, b) => (b.score || 0) - (a.score || 0)).slice(0, 4), sig = list.map(p => p.id + ':' + (p.score || 0)).join();
-                if (bd && bd.dataset.s !== sig) { bd.dataset.s = sig; bd.innerHTML = list.map(p => '<span class="' + (p.id === myId ? 'me' : '') + (p.id === md.tg ? ' tg' : '') + '"><u>' + (p.id === md.tg ? '🎯' : '') + '</u>' + esc(p.name) + '<b>' + (p.score || 0) + '</b></span>').join(''); }
+                if (bd && bd.dataset.s !== sig) { bd.dataset.s = sig; bd.innerHTML = list.map(p => '<span class="' + (p.id === myId ? 'me' : '') + (p.id === md.tg ? ' tg' : '') + '"><u>' + (p.id === md.tg ? '🎯' : '') + '</u>' + esc(dn(p)) + '<b>' + (p.score || 0) + '</b></span>').join(''); }
                 break;
             }
         }
@@ -114,9 +115,9 @@
             case 'dropLand': banner('<span>📦 Аірдроп приземлився!</span> <em>міфічні й легендарні модулі</em>', 'gold'); sfx('drop_land'); break;
             case 'finalLoot': finalPt = { x: d.x, y: d.y }; banner('<span>👑 У центрі зони з’явились міфічні модулі!</span>', 'gold'); sfx('final_loot'); break;
             case 'zoneFinal': banner('<span>ФІНАЛ: зона стискається до нуля!</span>', 'bad'); sfx('boss_shoot'); break;
-            case 'bountyPick': if (md && d.tg === nameOf(myId)) banner('<span>Вас обрано ціллю!</span> <em>+' + d.v + '</em>', 'bad'); else banner('<span>Ціль полювання:</span> <b>' + esc(d.tg) + '</b> <em>+' + d.v + '</em>', 'gold'); sfx('hitmarker'); break;
-            case 'bountyClaimed': banner('<b>' + esc(d.by) + '</b> <span>знищив ціль</span> <b>' + esc(d.tg) + '</b> <em>+' + d.v + '</em>', 'good'); sfx('token'); break;
-            case 'bountySurvived': banner('<b>' + esc(d.tg) + '</b> <span>пережив полювання</span> <em>+2</em>', 'gold'); sfx('powerup'); break;
+            case 'bountyPick': if (md && d.tg === nameOf(myId)) banner('<span>Вас обрано ціллю!</span> <em>+' + d.v + '</em>', 'bad'); else banner('<span>Ціль полювання:</span> <b>' + esc(dn(d.tg)) + '</b> <em>+' + d.v + '</em>', 'gold'); sfx('hitmarker'); break;
+            case 'bountyClaimed': banner('<b>' + esc(dn(d.by)) + '</b> <span>знищив ціль</span> <b>' + esc(dn(d.tg)) + '</b> <em>+' + d.v + '</em>', 'good'); sfx('token'); break;
+            case 'bountySurvived': banner('<b>' + esc(dn(d.tg)) + '</b> <span>пережив полювання</span> <em>+2</em>', 'gold'); sfx('powerup'); break;
         }
     }
 
@@ -272,7 +273,7 @@
             else { T.innerText = 'ПОРАЗКА'; T.className = 'text-5xl lg:text-6xl ' + cls + 'text-slate-400'; E.innerText = coop ? '💀' : '💔'; }
             M.innerText = data.msg || '';
             if (data.team) { const nm = { red: 'Червоні', blue: 'Сині', green: 'Зелені', yellow: 'Жовті' }[data.team]; if (nm) M.innerText = nm + ' перемогли'; }
-            else if (!coop && me !== 'draw' && data.winner && data.name && data.winner !== myId) M.innerText = (data.msg || '') + ' · ' + data.name;
+            else if (!coop && me !== 'draw' && data.winner && data.name && data.winner !== myId) M.innerText = (data.msg || '') + ' · ' + dn(data.name);
             // підсумки
             let sum = $('mfx-sum'); if (!sum) { sum = document.createElement('div'); sum.id = 'mfx-sum'; M.insertAdjacentElement('afterend', sum); }
             const rows = (data.lines || []).map(l => ({ l: l[0], v: l[1] }));

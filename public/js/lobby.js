@@ -83,9 +83,9 @@
     function rule(i, l, v) { return '<div class="lb-rule"><i>' + i + '</i><div><small>' + l + '</small><b>' + v + '</b></div></div>'; }
     function renderInfo(r) {
         const M = MODES[r.mode] || MODES.deathmatch;
-        $('lobby-room-name').textContent = r.hostName + ' · СЕСІЯ';
+        $('lobby-room-name').textContent = (window.dispName ? dispName(r.hostName) : r.hostName) + ' · СЕСІЯ';
         $('lobby-mode-chip').textContent = M.e + ' ' + M.n;
-        $('lobby-host-chip').textContent = '👑 ' + r.hostName;
+        $('lobby-host-chip').textContent = '👑 ' + (window.dispName ? dispName(r.hostName) : r.hostName);
         $('lobby-mode-badge').textContent = M.e + ' ' + M.n;
         $('lobby-mode-desc').textContent = M.d;
         $('lobby-map-title').textContent = mapTitle(r.map);
@@ -124,6 +124,11 @@
     // ---------- список гравців ----------
     let kickArm = null;
     function level(p) { return Math.max(1, Math.min(15, p.level || 1)); }
+    function statLine(p) {
+        const s = p && p.stats; if (!s || !(s.games > 0)) return '';
+        const kd = s.deaths > 0 ? (s.kills / s.deaths).toFixed(2) : String(s.kills || 0), wr = Math.round(100 * (s.wins || 0) / s.games);
+        return '<span class="lb-pl-lv lb-pl-stat" title="K/D · win rate">K/D <b>' + kd + '</b> · <b>' + wr + '%</b></span>';
+    }
     function card(r, id, p, isHost) {
         const L = level(p), rank = (window.LV ? LV.rankName(L) : ''), me = id === myId, host = id === r.hostSocket;
         let pc = '71,85,105'; if (MI.usesColor(r.mode)) pc = p.color ? COLORS[p.color] : pc;
@@ -133,7 +138,7 @@
         if (isHost && !me) acts = '<div class="lb-acts"><button type="button" class="lb-act" data-act="crown" data-id="' + esc(id) + '" title="Зробити лідером">👑</button><button type="button" class="lb-act danger" data-act="kick" data-id="' + esc(id) + '" title="Вигнати з сесії">✖</button><button type="button" class="lb-act danger" data-act="ban" data-id="' + esc(id) + '" title="Заблокувати в цій сесії">🚫</button></div>';
         return '<div class="lb-pl' + (p.ready ? ' ready' : '') + (me ? ' me' : '') + '" style="--pc:' + pc + '">' + dot +
             '<span class="lb-pl-ico">' + (window.LV ? LV.icon(L, 32) : '') + '</span>' +
-            '<div class="lb-pl-main"><span class="lb-pl-name">' + esc(p.name) + (host ? '<em>👑</em>' : '') + (me ? '<u>ВИ</u>' : '') + '</span><span class="lb-pl-lv">Рівень <b>' + L + '</b> · ' + esc(rank) + '</span></div>' +
+            '<div class="lb-pl-main"><span class="lb-pl-name">' + esc(window.dispName ? dispName(p) : p.name) + (host ? '<em>👑</em>' : '') + (me ? '<u>ВИ</u>' : '') + '</span><span class="lb-pl-lv">Рівень <b>' + L + '</b> · ' + esc(rank) + '</span>' + statLine(p) + '</div>' +
             '<span class="lb-pl-st">' + (p.ready ? 'ГОТОВИЙ' : 'ЧЕКАЄ') + '</span>' + acts + '</div>';
     }
     function teamBox(r, key, members, isHost, cap) {
@@ -169,7 +174,7 @@
         const id = b.dataset.id; if (!id) return;
         if (b.dataset.act === 'crown') { click(); socket.emit('transferHost', { roomId: currentRoomId, targetId: id }); }
         else if (b.dataset.act === 'ban') {
-            click(); const nm = (r.players[id] && r.players[id].name) || '';
+            click(); const nm = (r.players[id] && (window.dispName ? dispName(r.players[id]) : r.players[id].name)) || '';
             uiDialog.confirm({ kind: 'danger', icon: '🚫', title: 'Заблокувати гравця?', text: nm + ' буде вигнано, і він більше не зможе зайти саме в цю сесію. В інші сесії його вхід не обмежується.', cancelText: 'Скасувати', okText: 'Заблокувати', danger: true })
                 .then(ok => { if (ok && cur() && cur().players[id]) socket.emit('banPlayer', { roomId: currentRoomId, targetId: id }); });
         }
