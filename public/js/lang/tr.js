@@ -1479,3 +1479,26 @@ I18N.add("tr", {
  ["^Ви в муті ще (\\d+)(?: с| s| sn)$", "Susturuldun, $1 sn kaldı"],
  ["Логін @(.+?) не змінюється\\.", "@$1 kullanıcı adı değişmez."]
 ]);
+
+// ===== АВТО-4: музика та ліцензії, перемикач керування =====
+I18N.add("tr", {
+ "МУЗИКА ТА ЛІЦЕНЗІЇ": "MÜZİK VE LİSANSLAR",
+ "Дякуємо авторам за музику в грі": "Oyundaki müzik için yapımcılara teşekkürler",
+ "Музика в грі — з бібліотеки Pixabay за ліцензією Pixabay Content License: безкоштовне використання, зокрема в іграх; зазначення автора не обов’язкове, але ми вказуємо всіх. Права на треки належать їхнім авторам.": "Oyundaki müzik, Pixabay Content License kapsamında Pixabay kütüphanesinden alınmıştır: oyunlar dahil ücretsiz kullanım; yapımcıyı belirtmek zorunlu değildir ama hepsini belirtiyoruz. Parçaların hakları yapımcılarına aittir.",
+ "Головне меню": "Ana menü",
+ "Лобі та кімнати": "Lobi ve odalar",
+ "Трек": "Parça",
+ "Автор": "Yapımcı",
+ "Ліцензія Pixabay": "Pixabay lisansı",
+ "Умови використання": "Kullanım koşulları",
+ "Музика на Pixabay": "Pixabay'de müzik",
+ "Назви треків і імена авторів наведено мовою оригіналу.": "Parça adları ve yapımcı isimleri orijinal dilde gösterilir.",
+ "Автори та ліцензії": "Yapımcılar ve lisanslar",
+ "Керування": "Kontroller",
+ "ПК": "PC",
+ "Телефон": "Telefon",
+ "Авто сама визначає пристрій. Якщо на планшеті керування не те — оберіть вручну.": "Otomatik cihazı kendisi algılar. Tablette kontroller yanlışsa elle seçin.",
+ "Керування: Телефон": "Kontroller: Telefon",
+ "Керування: ПК": "Kontroller: PC",
+ "Керування: Авто": "Kontroller: Otomatik"
+});

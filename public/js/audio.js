@@ -5,7 +5,7 @@ let volSfx = localStorage.getItem('tankVolSfx') !== null ? parseFloat(localStora
 let audioCtx = null;
 let bgMusic = new Audio(); 
 bgMusic.volume = volMusic;
-let myMusicPlaylists = { loby: [], dezmatch: [], survive: [], main: [] };
+let myMusicPlaylists = { loby: [], main: [] };
 let activePlaylist = []; let currentMusicState = ''; let currentTrackIndex = 0;
 
 function initAudio() { if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } }
@@ -53,22 +53,48 @@ window.setSfxVolume = function(val) {
     localStorage.setItem('tankVolSfx', val);
 };
 
+// Стани музики: 'main' — головне меню, 'loby' — лобі/кімнати. У бою ('dezmatch'/'survive'/'battle'/'') музики немає.
+// Якщо для стану немає треків — береться другий список (щоб меню не мовчало); немає жодного — тиша.
+function stopMusic() {
+    activePlaylist = []; currentTrackIndex = 0; currentMusicState = '';
+    try { bgMusic.pause(); } catch (e) {}
+    hideAudioHint();
+}
 function switchMusicState(newState) {
+    if (newState !== 'main' && newState !== 'loby') { musicWanted = false; stopMusic(); currentMusicState = newState || ''; return; }
     musicWanted = true;
-    if (currentMusicState === newState && (activePlaylist.length || !(myMusicPlaylists[newState] || []).length)) { if (bgMusic.paused && activePlaylist.length) tryUnlockAudio(); return; }
+    if (currentMusicState === newState && activePlaylist.length) { if (bgMusic.paused) tryUnlockAudio(); return; }
     currentMusicState = newState;
+    const other = newState === 'main' ? 'loby' : 'main';
     let tracks = [...(myMusicPlaylists[newState] || [])];
-    if (newState !== 'loby') tracks = [...tracks, ...(myMusicPlaylists['main'] || [])];
-    if (tracks.length === 0) tracks = [...(myMusicPlaylists['main'] || [])];
-    if (tracks.length === 0) { bgMusic.pause(); return; }
+    if (!tracks.length) tracks = [...(myMusicPlaylists[other] || [])];
+    if (!tracks.length) { activePlaylist = []; try { bgMusic.pause(); } catch (e) {} return; }
     for (let i = tracks.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [tracks[i], tracks[j]] = [tracks[j], tracks[i]]; }
     activePlaylist = tracks; currentTrackIndex = 0; playCurrentTrack();
 }
 
 function playCurrentTrack() {
-    if (activePlaylist.length === 0) return; let parts = activePlaylist[currentTrackIndex].split('/');
-    if (parts.length === 2) { bgMusic.src = '/music/' + encodeURIComponent(parts[0]) + '/' + encodeURIComponent(parts[1]); bgMusic.play().catch(e => { console.log('Autoplay prevented'); showAudioHint(); }); }
+    if (!musicWanted || activePlaylist.length === 0) return;
+    const url = '/music/' + activePlaylist[currentTrackIndex].split('/').map(encodeURIComponent).join('/');
+    bgMusic.src = url;
+    const pr = bgMusic.play();
+    if (pr && pr.catch) pr.catch(e => { console.log('Autoplay prevented'); showAudioHint(); });
 }
+// екран → музика: меню грає «main», лобі й список кімнат — «loby», у бою (game-screen) тиша
+(function () {
+    function hook() {
+        const orig = window.showScreen; if (typeof orig !== 'function' || orig.__music) return;
+        const w = function (id) {
+            orig.apply(this, arguments);
+            if (typeof myName === 'undefined' || !myName) return;
+            if (id === 'main-menu-screen') switchMusicState('main');
+            else if (id === 'lobby-screen' || id === 'room-browser-screen') switchMusicState('loby');
+            else if (id === 'game-screen') switchMusicState('battle');
+        };
+        w.__music = true; window.showScreen = w;
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(hook, 0)); else setTimeout(hook, 0);
+})();
 bgMusic.addEventListener('ended', () => { if (activePlaylist.length > 0) { currentTrackIndex = (currentTrackIndex + 1) % activePlaylist.length; playCurrentTrack(); } });
 
 function playSound(type) {

@@ -39,7 +39,28 @@ fitCanvas();
 
 let spectatingId = null;
 let isBossIncoming = false;
-let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+// Тип керування: авто-визначення + ручний перемикач (налаштування «Керування»: 'pc' | 'phone'; порожньо = авто).
+// iPad у PWA/«версії для ПК» видає себе за Mac — тому додатково дивимось на дотик + грубий вказівник.
+function detectMobileAuto() {
+    try {
+        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) return true;
+        const coarse = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches), noHover = !!(window.matchMedia && matchMedia('(hover: none)').matches);
+        const mtp = navigator.maxTouchPoints || 0;
+        if ((mtp > 0 && coarse && noHover) || (mtp > 1 && (coarse || noHover))) return true;
+        if (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1) return true;
+    } catch (e) {}
+    return false;
+}
+function ctlMode() { try { const v = localStorage.getItem('ctlMode'); return v === 'pc' || v === 'phone' ? v : 'auto'; } catch (e) { return 'auto'; } }
+let isMobile = ctlMode() === 'phone' ? true : ctlMode() === 'pc' ? false : detectMobileAuto();
+window.setCtlMode = function (m) {
+    try { if (m === 'pc' || m === 'phone') localStorage.setItem('ctlMode', m); else localStorage.removeItem('ctlMode'); } catch (e) {}
+    isMobile = m === 'phone' ? true : m === 'pc' ? false : detectMobileAuto();
+    if (typeof resetJoysticks === 'function') resetJoysticks();
+    try { keys.lmb = false; } catch (e) {}
+    document.documentElement.classList.toggle('ctl-touch', isMobile);
+    try { if (typeof fitCanvas === 'function') fitCanvas(); } catch (e) {}
+};
 
 let joysticks = {
     left: { active: false, startX: 0, startY: 0, currentX: 0, currentY: 0, angle: 0, force: 0, id: null },

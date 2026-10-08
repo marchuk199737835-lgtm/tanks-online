@@ -138,7 +138,8 @@
         setTimeout(() => {
             const playing = typeof bgMusic !== 'undefined' && !bgMusic.paused && audioCtx && audioCtx.state === 'running';
             if (playing || document.getElementById('sound-gate')) return;
-            if (!activePlaylist.length && audioCtx && audioCtx.state === 'running') return;      // немає музики й звуки вже працюють
+            if (!activePlaylist.length && audioCtx && audioCtx.state === 'running' && !(typeof myMusicPlaylists !== 'undefined' && ((myMusicPlaylists.main || []).length || (myMusicPlaylists.loby || []).length))) return;      // немає музики й звуки вже працюють
+            if (typeof audioUnlocked !== 'undefined' && audioUnlocked && playing) return;
             const g = document.createElement('div'); g.id = 'sound-gate'; g.className = 'sound-gate';
             const lv = window.LV ? LV.state().level : 1;
             g.innerHTML = '<div class="sound-gate-card"><div class="sg-hi">З поверненням</div>' + (window.LV ? LV.icon(lv, 64) : '') + '<div class="sg-name"></div><button class="sg-btn" type="button">▶ УВІЙТИ В ГРУ</button></div>';

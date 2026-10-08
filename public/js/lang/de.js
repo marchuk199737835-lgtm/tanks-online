@@ -1479,3 +1479,26 @@ I18N.add("de", {
  ["^Ви в муті ще (\\d+)(?: с| s| sn)$", "Du bist noch $1 s stummgeschaltet"],
  ["Логін @(.+?) не змінюється\\.", "Das Login @$1 ändert sich nicht."]
 ]);
+
+// ===== АВТО-4: музика та ліцензії, перемикач керування =====
+I18N.add("de", {
+ "МУЗИКА ТА ЛІЦЕНЗІЇ": "MUSIK & LIZENZEN",
+ "Дякуємо авторам за музику в грі": "Danke an die Autoren für die Musik im Spiel",
+ "Музика в грі — з бібліотеки Pixabay за ліцензією Pixabay Content License: безкоштовне використання, зокрема в іграх; зазначення автора не обов’язкове, але ми вказуємо всіх. Права на треки належать їхнім авторам.": "Die Spielmusik stammt aus der Pixabay-Bibliothek unter der Pixabay Content License: kostenlos nutzbar, auch in Spielen; eine Namensnennung ist nicht erforderlich, wir nennen aber alle. Die Rechte an den Titeln liegen bei den Autoren.",
+ "Головне меню": "Hauptmenü",
+ "Лобі та кімнати": "Lobby & Räume",
+ "Трек": "Titel",
+ "Автор": "Autor",
+ "Ліцензія Pixabay": "Pixabay-Lizenz",
+ "Умови використання": "Nutzungsbedingungen",
+ "Музика на Pixabay": "Musik auf Pixabay",
+ "Назви треків і імена авторів наведено мовою оригіналу.": "Titel und Autorennamen werden in der Originalsprache angezeigt.",
+ "Автори та ліцензії": "Autoren & Lizenzen",
+ "Керування": "Steuerung",
+ "ПК": "PC",
+ "Телефон": "Handy",
+ "Авто сама визначає пристрій. Якщо на планшеті керування не те — оберіть вручну.": "Auto erkennt das Gerät selbst. Wenn die Steuerung auf einem Tablet nicht passt, wähle manuell.",
+ "Керування: Телефон": "Steuerung: Handy",
+ "Керування: ПК": "Steuerung: PC",
+ "Керування: Авто": "Steuerung: Auto"
+});
