@@ -134,12 +134,17 @@
 
     // ---------- «торкніться, щоб увійти»: гарантований жест → музика й звуки ----------
     // Після автовходу за токеном жесту не було, а браузер забороняє звук без нього. Якщо звук заблоковано — просимо один дотик.
+    // «З поверненням» показуємо завжди при автовході (жесту користувача в цій сесії ще не було) — незалежно від того, чи вже грає звук.
+    // Після ручного входу (був клік/дотик) екран не потрібен: звук і так розблоковано.
+    let hadGesture = false;
+    ['pointerdown', 'touchstart', 'mousedown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { hadGesture = true; }, { capture: true, once: true, passive: true }));
     window.soundGate = function (name) {
+        const auto = !hadGesture;
         setTimeout(() => {
+            if (document.getElementById('sound-gate')) return;
             const playing = typeof bgMusic !== 'undefined' && !bgMusic.paused && audioCtx && audioCtx.state === 'running';
-            if (playing || document.getElementById('sound-gate')) return;
-            if (!activePlaylist.length && audioCtx && audioCtx.state === 'running' && !(typeof myMusicPlaylists !== 'undefined' && ((myMusicPlaylists.main || []).length || (myMusicPlaylists.loby || []).length))) return;      // немає музики й звуки вже працюють
-            if (typeof audioUnlocked !== 'undefined' && audioUnlocked && playing) return;
+            if (!auto && playing) return;
+            if (!auto && !activePlaylist.length && audioCtx && audioCtx.state === 'running' && !(typeof myMusicPlaylists !== 'undefined' && ((myMusicPlaylists.main || []).length || (myMusicPlaylists.loby || []).length))) return;
             const g = document.createElement('div'); g.id = 'sound-gate'; g.className = 'sound-gate';
             const lv = window.LV ? LV.state().level : 1;
             g.innerHTML = '<div class="sound-gate-card"><div class="sg-hi">З поверненням</div>' + (window.LV ? LV.icon(lv, 64) : '') + '<div class="sg-name"></div><button class="sg-btn" type="button">▶ УВІЙТИ В ГРУ</button></div>';
