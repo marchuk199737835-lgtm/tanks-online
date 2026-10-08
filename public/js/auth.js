@@ -102,7 +102,7 @@
     card.addEventListener('submit', e => {
         e.preventDefault(); click();
         const rawN = $('nickname-input').value.trim(), rawP = $('password-input').value;
-        const n = rawN.toUpperCase();
+        const n = rawN;     // логін надсилаємо як є (без зміни регістру): сервер сам знайде акаунт незалежно від регістру
         // реєстрація: пароль надсилаємо як є (без обрізання); вхід: як раніше (з обрізанням країв) — для старих акаунтів
         const p = authMode === 'register' ? rawP : rawP.trim();
         if (!n || !p) return showErr('Введіть логін та пароль!');

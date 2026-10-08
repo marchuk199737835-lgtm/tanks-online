@@ -1,5 +1,7 @@
-socket.on('initMusic',(data)=>{myMusicPlaylists=data;if(currentMusicState){const st=currentMusicState;currentMusicState='';switchMusicState(st);}});
+socket.on('initMusic',(data)=>{if(!data||typeof data!=='object')return;myMusicPlaylists={main:Array.isArray(data.main)?data.main:[],loby:Array.isArray(data.loby)?data.loby:[]};if(currentMusicState&&!activePlaylist.length){const st=currentMusicState;currentMusicState='';switchMusicState(st);}});
 socket.on('initZombies',(data)=>{for(const k in Z_TYPES)delete Z_TYPES[k];Object.assign(Z_TYPES,data);});
+// сокет створено раніше за цей файл: перші initMusic/initZombies могли прийти до підписки — перепитуємо (і після перепідключення)
+socket.on('connect',()=>socket.emit('getInit'));if(socket.connected)socket.emit('getInit');
 socket.on('authSuccess',(data)=>{localStorage.setItem('tankToken',data.token);if(window.I18N){if(data.lang)I18N.setLanguage(data.lang);else socket.emit('setLang',I18N.lang);}myName=data.name;myId=socket.id;if(window.authBusyOff)authBusyOff();initAudio();if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();try{switchMusicState('main');}catch(e){console.error('music',e);}showScreen('main-menu-screen');try{if(window.soundGate)soundGate(data.name);}catch(e){console.error('gate',e);}});
 socket.on('authError',(msg)=>{localStorage.removeItem('tankToken');showScreen('login-screen');if(window.authShowError)authShowError(msg);else alert(msg);});
 socket.on('joinError',(msg)=>{if(window.authShowError&&!document.getElementById('login-screen').classList.contains('hidden')){authShowError(msg);return;}if(typeof upgBusy!=='undefined'&&upgBusy){upgFinish();if(typeof updateUpgChance==='function')updateUpgChance();}
