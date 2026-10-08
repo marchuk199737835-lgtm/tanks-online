@@ -389,6 +389,13 @@ function readCreds(data) {
     if (!data || typeof data.name !== 'string' || typeof data.password !== 'string') return null;
     return { name: data.name.trim(), password: data.password };
 }
+// Пошук акаунта для входу: точний збіг, інакше без урахування регістру (клієнт деякий час надсилав логін ВЕЛИКИМИ літерами)
+function findLogin(name, pwdHash) {
+    if (!name) return null;
+    if (Object.prototype.hasOwnProperty.call(dbUsers, name) && dbUsers[name].password === pwdHash) return name;
+    const low = name.toLowerCase();
+    return Object.keys(dbUsers).find(k => k.toLowerCase() === low && dbUsers[k].password === pwdHash) || null;
+}
 // Штраф мисливцю за промах у хованках. 0 = вимкнено. Наприклад 10 = мінус 10 HP за промах (HP не опуститься нижче 1).
 const HUNTER_MISS_PENALTY = 0;
 
@@ -574,7 +581,10 @@ io.on('connection', (socket) => {
     rescanMusicSoon();
     socket.emit('initMusic', musicData);
     socket.emit('initZombies', Z_TYPES_CLIENT);
-    
+    // клієнт створює сокет раніше, ніж network.js підписується на події, тож перші initMusic/initZombies можуть загубитися — він перепитує
+    let initAsks = 0;
+    socket.on('getInit', () => { if (++initAsks > 20) return; rescanMusicSoon(); socket.emit('initMusic', musicData); socket.emit('initZombies', Z_TYPES_CLIENT); });
+
     socket.on('register', (data) => {
         const creds = readCreds(data);
         if (!creds) return socket.emit('joinError', 'Некоректні дані!');
@@ -594,9 +604,10 @@ io.on('connection', (socket) => {
     socket.on('login', (data) => {
         const creds = readCreds(data);
         if (!creds) return socket.emit('joinError', 'Невірний логін або пароль!');
-        const { name, password } = creds;
-        let u = dbUsers[name];
-        if (!u || u.password !== hashPwd(password)) return socket.emit('joinError', 'Невірний логін або пароль!');
+        const { password } = creds;
+        const name = findLogin(creds.name, hashPwd(password));
+        let u = name ? dbUsers[name] : null;
+        if (!u) return socket.emit('joinError', 'Невірний логін або пароль!');
         const token = crypto.randomUUID();
         u.token = token;
         u = validateUser(u);
