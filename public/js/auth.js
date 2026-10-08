@@ -138,12 +138,15 @@
     // Після ручного входу (був клік/дотик) екран не потрібен: звук і так розблоковано.
     let hadGesture = false;
     ['pointerdown', 'touchstart', 'mousedown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { hadGesture = true; }, { capture: true, once: true, passive: true }));
+    // запасний шлях: навіть якщо обробник у network.js збоїть раніше, екран «З поверненням» усе одно з'явиться
+    if (typeof socket !== 'undefined' && socket && socket.on) socket.on('authSuccess', d => setTimeout(() => { try { if (window.soundGate && !document.getElementById('sound-gate') && !window.__gateShown) window.soundGate(d && d.name); } catch (e) { console.error('gate', e); } }, 60));
     window.soundGate = function (name) {
         const auto = !hadGesture;
         setTimeout(() => {
-            if (document.getElementById('sound-gate')) return;
+            if (document.getElementById('sound-gate') || window.__gateShown) return;
+            window.__gateShown = true;
             const playing = typeof bgMusic !== 'undefined' && !bgMusic.paused && audioCtx && audioCtx.state === 'running';
-            if (!auto && playing) return;
+            if (!auto && playing) { window.__gateShown = false; return; }
             if (!auto && !activePlaylist.length && audioCtx && audioCtx.state === 'running' && !(typeof myMusicPlaylists !== 'undefined' && ((myMusicPlaylists.main || []).length || (myMusicPlaylists.loby || []).length))) return;
             const g = document.createElement('div'); g.id = 'sound-gate'; g.className = 'sound-gate';
             const lv = window.LV ? LV.state().level : 1;
@@ -151,7 +154,7 @@
             g.querySelector('.sg-name').textContent = name || '';
             document.body.appendChild(g);
             if (typeof hideAudioHint === 'function') hideAudioHint();
-            const go = () => { if (typeof tryUnlockAudio === 'function') tryUnlockAudio(); g.classList.add('out'); setTimeout(() => g.remove(), 400); };
+            const go = () => { if (typeof tryUnlockAudio === 'function') tryUnlockAudio(); g.classList.add('out'); setTimeout(() => { g.remove(); window.__gateShown = false; }, 400); };
             g.addEventListener('pointerup', go); g.addEventListener('click', go);
         }, 450);
     };
