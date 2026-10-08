@@ -258,7 +258,7 @@ module.exports = function (ctx) {
         s.requests = staff ? c.requests.map(k => ({ login: k, nick: nick(k), level: ctx.playerLevel(k) })) : [];
         s.reqCount = c.requests.length;
         s.log = c.log.slice().reverse().map(e => ({ t: e.t, k: e.k, text: logText(e) })).filter(e => e.text);
-        s.chat = (chats.get(c.id) || []).slice(-MAX_CHAT);
+        s.chat = [];   // чат клану тепер у окремому модулі chat.js (вкладка «Чат» відкриває його)
         s.award = c.award && c.award.eligible.includes(login) ? { place: c.award.place, amount: c.award.amount } : null;
         return s;
     }
@@ -516,21 +516,13 @@ module.exports = function (ctx) {
             pushLog(c, 'settings', me); markDirty(c); res(true, 'Налаштування збережено', A); pushClan(c);
         });
 
-        on('clanChat', CHAT_GAP, (me, u, d) => {
-            const A = 'chat', c = myClan(me); if (!c) return res(false, 'Ви не в клані', A);
-            const text = str(d.text, 600).replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, CHAT_LEN);
-            if (!text) return res(false, 'Порожнє повідомлення', A);
-            const msg = { t: Date.now(), login: me, nick: nick(me), text };
-            let arr = chats.get(c.id); if (!arr) chats.set(c.id, arr = []);
-            arr.push(msg); if (arr.length > MAX_CHAT) arr.splice(0, arr.length - MAX_CHAT);
-            Object.keys(c.members).forEach(k => emitTo(k, 'clanChatMsg', msg));
-        });
+        on('clanChat', CHAT_GAP, () => res(false, 'Чат клану відкривається кнопкою чату', 'chat'));   // застарілий канал; див. chat.js
     });
 
     // ---------- Експорт ----------
     ctx.hooks.clanTag = name => tagOf(name);
     ctx.Clans = {
-        clanOf, tagOf, COST,
+        clanOf, tagOf, COST, membersOf: id => { const c = clanById(id); return c ? Object.keys(c.members) : []; },
         _t: { clans, settle, claimAward, addPts, seasonNow, rankTick, ranking, get loaded() { return loaded; } }
     };
 };

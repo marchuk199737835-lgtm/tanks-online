@@ -199,18 +199,40 @@ module.exports = function (ctx) {
     // ---------- ім'я ----------
     const NICK_CD = 24 * 3600 * 1000;
     const RESERVED = ['admin', 'administrator', 'moderator', 'system', 'server', 'bot', 'null', 'undefined'];
+    // канонічний вигляд для порівняння унікальності: NFKC + нижній регістр (+ стиснуті пробіли)
+    const canon = v => String(v).normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
+    ctx.canonName = canon;
     function nameTaken(n, except) {
-        const low = n.toLowerCase();
+        const low = canon(n);
         if (RESERVED.includes(low)) return true;
         for (const l in dbUsers) {
             if (l === except) continue;
-            if (l.toLowerCase() === low) return true;
-            const k = dbUsers[l] && dbUsers[l].nick; if (k && k.toLowerCase() === low) return true;
+            if (canon(l) === low) return true;
+            const k = dbUsers[l] && dbUsers[l].nick; if (k && canon(k) === low) return true;
         }
         const bn = ctx.botNames;
-        if (bn && typeof bn.forEach === 'function') { let hit = false; bn.forEach(b => { if (typeof b === 'string' && b.toLowerCase() === low) hit = true; }); if (hit) return true; }
+        if (bn && typeof bn.forEach === 'function') { let hit = false; bn.forEach(b => { if (typeof b === 'string' && canon(b) === low) hit = true; }); if (hit) return true; }
         return false;
     }
+    ctx.hooks.nameTaken = n => nameTaken(String(n));
+    // ---- ігрове ім'я: будь-яка мова/символи, 2–16 графем, без керівних/невидимих ----
+    const NICK_BAD = /[\p{C}\p{Zl}\p{Zp}\u034F\u115F\u1160\u17B4\u17B5\u2800\u3164\uFFA0]/u;
+    const NICK_VISIBLE = /[\p{L}\p{N}\p{S}\p{P}]/u;
+    const SEG = (typeof Intl !== 'undefined' && Intl.Segmenter) ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : null;
+    const gLen = v => { if (!SEG) return [...v].length; let n = 0; for (const _ of SEG.segment(v)) n++; return n; };
+    // повертає { ok, nick } або { ok:false, msg }
+    function cleanNick(raw) {
+        if (typeof raw !== 'string') return { ok: false, msg: 'Некоректне ім\'я' };
+        let v = raw.slice(0, 120).normalize('NFC');
+        if (NICK_BAD.test(v.replace(/[\p{Zs}\t]+/gu, ' '))) return { ok: false, msg: 'Ім\'я містить недопустимі (керівні або невидимі) символи' };
+        v = v.replace(/[\p{Zs}\t]+/gu, ' ').trim();                       // усі види пробілів → звичайний, стиснути, обрізати краї
+        const g = gLen(v);
+        if (g < 2 || g > 16) return { ok: false, msg: 'Ім\'я: від 2 до 16 символів' };
+        if ([...v].length > 32 || Buffer.byteLength(v, 'utf8') > 64) return { ok: false, msg: 'Ім\'я задовге (макс. 16 символів, до 64 байтів)' };
+        if (!NICK_VISIBLE.test(v)) return { ok: false, msg: 'Ім\'я має містити літеру, цифру або знак' };
+        return { ok: true, nick: v };
+    }
+    ctx.cleanNick = cleanNick;
     function fmtLeft(ms) { const m = Math.ceil(ms / 60000), h = Math.floor(m / 60); return h > 0 ? h + ' год ' + (m % 60) + ' хв' : m + ' хв'; }
 
     // ---------- пароль: захист від перебору ----------
@@ -245,8 +267,9 @@ module.exports = function (ctx) {
             const fail = msg => socket.emit('nickResult', { ok: false, msg });
             if (!u) return;
             if (!limit('cn', 1200)) return fail('Забагато запитів, зачекайте секунду');
-            const n = str(d && d.nick, 40).trim();
-            if (!NAME_RE.test(n)) return fail('Ім\'я: 3–12 символів (літери, цифри, _ -)');
+            const cn = cleanNick(d && d.nick);
+            if (!cn.ok) return fail(cn.msg);
+            const n = cn.nick;
             if (u.nick === n) return fail('Це ім\'я вже ваше');
             const t = now();
             if (u.nickChangedAt && t - u.nickChangedAt < NICK_CD) return fail('Змінювати ім\'я можна раз на 24 години. Спробуйте через ' + fmtLeft(NICK_CD - (t - u.nickChangedAt)));
@@ -274,7 +297,7 @@ module.exports = function (ctx) {
             if (!d || typeof d.oldPassword !== 'string' || typeof d.newPassword !== 'string') return fail('Заповніть усі поля');
             const op = d.oldPassword.slice(0, 200), np = d.newPassword, cf = typeof d.confirm === 'string' ? d.confirm : '';
             if (!op || !np) return fail('Заповніть усі поля');
-            if (np.length < 4 || np.length > 128) return fail('Новий пароль: від 4 до 128 символів');
+            if (!ctx.PASS_RE_NEW.test(np)) return fail('Новий пароль: 4–128 символів, лише латиниця, цифри та знаки (без пробілів і кирилиці)');
             if (np !== cf) return fail('Підтвердження не збігається з новим паролем');
             if (u.password !== hashPwd(op)) {
                 tr.n++; if (tr.n >= PW_MAX) { tr.n = 0; tr.until = t + PW_LOCK; return fail('Забагато невдалих спроб. Спробуйте через ' + fmtLeft(PW_LOCK)); }

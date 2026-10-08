@@ -66,31 +66,35 @@ module.exports = function (ctx) {
     // =====================================================================
     //  ІМЕНА
     // =====================================================================
-    const UA = ['Ярослав', 'Олеся', 'Микита', 'Богдан', 'Соломія', 'Тарас', 'Оксана', 'Дмитро', 'Назар', 'Марічка', 'Остап', 'Данило', 'Влад', 'Катерина', 'Андрій', 'Роман', 'Софія', 'Артем', 'Ігор', 'Орест', 'Максим', 'Юрко', 'Дарина', 'Захар', 'Левко', 'Оля', 'Таня', 'Василь', 'Тимур', 'Єва', 'Назарко', 'Гліб', 'Антон', 'Ілля', 'Марко', 'Лесь', 'Христя', 'Мирон', 'Устим', 'Злата'];
-    const LAT = ['Yaroslav', 'Olesya', 'Mykyta', 'Bohdan', 'Taras', 'Oksana', 'Dmytro', 'Nazar', 'Ostap', 'Danylo', 'Vlad', 'Andriy', 'Roman', 'Sofia', 'Artem', 'Ihor', 'Orest', 'Maks', 'Yurko', 'Daryna', 'Zahar', 'Levko', 'Olya', 'Tanya', 'Vasyl', 'Timur', 'Gleb', 'Anton', 'Illya', 'Marko', 'Les', 'Myron', 'Zlata', 'Kolya', 'Petro', 'Stas', 'Sasha', 'Misha', 'Dima', 'Vova'];
-    const EN = ['Dark', 'Wolf', 'Viper', 'Shadow', 'Storm', 'Ghost', 'Iron', 'Steel', 'Blaze', 'Frost', 'Hawk', 'Raven', 'Titan', 'Reaper', 'Falcon', 'Cobra', 'Rogue', 'Nova', 'Pixel', 'Turbo', 'Mad', 'Zero', 'Toxic', 'Neon', 'Rex', 'Sniper', 'Killer', 'Hunter', 'Slayer', 'Boss', 'Hammer', 'Blade', 'Fox', 'Bear', 'Demon', 'Tank', 'Rider', 'Wraith', 'Spark', 'Rocket', 'Joker', 'Ninja', 'Panda', 'Tiger', 'Eagle', 'Thunder', 'Cyber', 'Alpha', 'Omega', 'Lucky'];
-    const UAW = ['Karatel', 'Sokil', 'Kozak', 'Vovk', 'Bars', 'Hrim', 'Dozor', 'Taran', 'Orel', 'Zubr', 'Lys', 'Strila', 'Burya', 'Hurt', 'Kobra', 'Vorog', 'Boyko', 'Lytsar', 'Panzer', 'Bronya', 'Tihon', 'Khyzhak'];
-    const CYR = ['Козак', 'Барс', 'Сокіл', 'Вовк', 'Танкіст', 'Ворон', 'Грім', 'Лис', 'Бойко', 'Хижак', 'Стрілець', 'Залізо', 'Тінь', 'Буря', 'Вогонь', 'Лютий', 'Тигр', 'Рись', 'Орел', 'Дзвін'];
-    const STEM = ['Ярош', 'Мико', 'Тарас', 'Влад', 'Олесь', 'Богдан', 'Макс', 'Дан', 'Артем', 'Назар', 'Остап', 'Іван'];
-    const ENS = ['Tank', 'Pro', 'Boss', 'Wolf', 'Gun', 'Killer', 'Hero', 'King', 'Fire', 'Ace'];
-    const YEARS = ['99', '98', '2003', '2005', '2007', '2008', '2010', '2011', '2013', '2004', '01', '07', '12', '777', '17', '24', '2k', '88', '2006', '33', '69'];
+    // Лише латиниця (ніяких кириличних символів): пули слів → комбінації різних стилів; довжина ≤ 12.
+    const ADJ = ['Dark', 'Iron', 'Silent', 'Swift', 'Crimson', 'Frozen', 'Mad', 'Wild', 'Lucky', 'Rapid', 'Toxic', 'Neon', 'Atomic', 'Cosmic', 'Savage', 'Sleepy', 'Angry', 'Happy', 'Brave', 'Rusty', 'Golden', 'Silver', 'Black', 'Red', 'Blue', 'Hyper', 'Mega', 'Ultra', 'Lone', 'Final', 'Epic', 'Chill', 'Stormy', 'Sneaky', 'Fierce', 'Grim', 'Lazy', 'Tiny', 'Big', 'Cold'];
+    const NOUN = ['Wolf', 'Fox', 'Viper', 'Hawk', 'Raven', 'Cobra', 'Tiger', 'Bear', 'Falcon', 'Shark', 'Panda', 'Koala', 'Otter', 'Lynx', 'Badger', 'Bison', 'Eagle', 'Moose', 'Gecko', 'Mantis', 'Ghost', 'Storm', 'Blaze', 'Frost', 'Thunder', 'Spark', 'Comet', 'Rocket', 'Hammer', 'Blade', 'Arrow', 'Bullet', 'Tank', 'Sniper', 'Hunter', 'Rogue', 'Ninja', 'Joker', 'Pilot', 'Rider', 'Titan', 'Reaper', 'Wraith', 'Pixel', 'Turbo', 'Nova', 'Zero', 'Boom', 'Rex', 'Ace', 'Boss', 'King', 'Knight', 'Pirate', 'Viking', 'Samurai', 'Dragon', 'Phoenix', 'Cannon', 'Bolt', 'Rhino'];
+    const SHORT = ['Nova', 'Rex', 'Ace', 'Zed', 'Kai', 'Neo', 'Jax', 'Vex', 'Orc', 'Fox', 'Ash', 'Ice', 'Zap', 'Max', 'Rio', 'Dex', 'Lux', 'Ray', 'Sky', 'Taz', 'Ziggy', 'Echo', 'Onyx', 'Hex', 'Flux', 'Volt', 'Drift', 'Rush', 'Kilo', 'Mojo'];
+    const FIRST = ['Viktor', 'Alex', 'Max', 'Dan', 'Nick', 'Tom', 'Leo', 'Ivan', 'Oleg', 'Artem', 'Denys', 'Taras', 'Yura', 'Misha', 'Dima', 'Vova', 'Kolya', 'Stas', 'Sasha', 'Roman', 'Oksana', 'Olya', 'Anna', 'Kate', 'Sofia', 'Mila', 'Nina', 'Eva', 'Lena', 'Dasha', 'Mark', 'Ben', 'Jack', 'Sam', 'Ryan', 'Luke', 'Adam', 'Eric', 'Paul', 'Hugo', 'Igor', 'Bogdan', 'Danylo', 'Andrew', 'Pavlo', 'Yan', 'Egor', 'Gleb', 'Timur', 'Zoya'];
+    const SUFFIX = ['X', 'Z', 'Pro', 'GG', 'TV', 'XD', 'HD', 'UA', 'EU', 'Jr', 'One', 'Prime', 'Rage', 'Fury', 'Zone', 'Ops', 'Lab'];
+    const YEARS = ['99', '98', '97', '2k', '03', '05', '07', '08', '10', '11', '12', '13', '17', '21', '24', '33', '66', '77', '88', '69', '42', '007', '101', '404', '777', '123'];
+    const LEET = [['Shadow', 'Sh4dow'], ['Killer', 'K1ller'], ['Hunter', 'Hunt3r'], ['Sniper', 'Snip3r'], ['Master', 'M4ster'], ['Ninja', 'N1nja'], ['Zero', 'Z3ro'], ['Elite', 'El1te'], ['Pirate', 'P1rate'], ['Legend', 'L3gend']];
     const mkName = () => {
-        const n2 = () => String(rint(2, 99)), yr = () => pick(YEARS);
-        switch (rint(0, 13)) {
-            case 0: return pick(EN) + '_' + pick(EN);
-            case 1: return pick(EN) + pick(EN);
-            case 2: return pick(LAT) + yr();
-            case 3: return pick(UA) + '_' + pick('ТАВКМДОРСЛ'.split(''));
-            case 4: return pick(UAW) + pick(['UA', 'UA', '_ua', '2k', '777', '_UA']);
-            case 5: return pick(STEM) + pick(ENS);
-            case 6: return pick(EN) + n2();
-            case 7: return pick(UA) + pick(['_', '', '']) + n2();
-            case 8: return 'xX' + pick(EN) + 'Xx';
-            case 9: return pick(CYR) + pick(['', '_', '']) + n2();
-            case 10: return pick(['The', 'Mr_', 'Sir', 'Big', 'Lil_']) + pick(EN);
-            case 11: return pick(EN).toLowerCase() + '_' + pick(['ua', 'pro', 'xd', 'gg', 'tv', '97', '04']);
-            case 12: return pick(UAW) + '_' + pick(EN);
-            default: return pick(LAT) + '_' + pick(EN);
+        const yr = () => pick(YEARS), n2 = () => String(rint(2, 99)), cap = w => w[0].toUpperCase() + w.slice(1).toLowerCase();
+        switch (rint(0, 17)) {
+            case 0: return pick(ADJ) + pick(NOUN);                                   // DarkWolf
+            case 1: return pick(SHORT) + '_' + pick(['X', 'Z', 'V', 'K', 'M', 'R', 'Q', 'One', 'Pro', 'GG']); // Nova_X
+            case 2: return pick(NOUN) + pick(['', '', '_']) + yr();                  // Tank77
+            case 3: return pick(FIRST) + '_' + pick(['Z', 'X', 'K', 'V', 'M', 'T', 'R', 'D', 'S', 'B']); // Viktor_Z
+            case 4: return 'xX' + pick(NOUN) + 'Xx';                                 // xXSniperXx
+            case 5: return pick(['Koala', 'Panda', 'Otter', 'Lynx', 'Bison', 'Gecko', 'Moose', 'Fox']) + pick(['Pro', 'Pro', 'Boss', 'King', 'Ace', 'Master', 'Lord', 'Chief']); // KoalaPro
+            case 6: return pick(['Mr', 'Mrs', 'Sir', 'Dr', 'Big', 'Lil', 'Mad', 'Capt']) + pick(['_', '_', '.']) + pick(NOUN); // Mr_Boom
+            case 7: return pick(['Iron', 'Steel', 'Red', 'Blue', 'Black', 'Dark', 'Ice', 'Night', 'Sky']) + '.' + pick(NOUN); // Iron.Fox
+            case 8: return pick(FIRST) + pick(['', '_', '']) + yr();                 // Oleg2k
+            case 9: return pick(NOUN).toLowerCase() + '_' + pick(['pro', 'xd', 'gg', 'tv', 'ua', 'hd', 'exe', 'bot', 'yt']); // wolf_pro
+            case 10: return pick(ADJ) + pick(NOUN) + n2();                           // SavageHawk42
+            case 11: return pick(['The', 'Its', 'Im', 'Just', 'Not']) + pick(NOUN);  // TheViper
+            case 12: { const l = pick(LEET); return l[1] + pick(['', '', '_' + n2(), n2()]); }   // Sh4dow
+            case 13: return pick(SHORT) + pick(SUFFIX);                              // NovaPro
+            case 14: return pick(['Mr', 'Mr', 'Big']) + pick(NOUN) + pick(['', n2()]); // MrBoom7
+            case 15: return pick(NOUN) + '-' + pick(NOUN);                           // Wolf-Fox
+            case 16: return pick(FIRST) + '_' + pick(SHORT);                         // Oleg_Rex
+            default: return pick(SHORT) + '_' + pick(NOUN);                          // Ace_Tank
         }
     };
     // імена людей: логіни й ніки існуючих акаунтів (без урахування регістру) кешуємо на 30 с
@@ -98,18 +102,19 @@ module.exports = function (ctx) {
     function humanNames() {
         const t = now0(); if (humanSet && t - humanSetAt < 30000) return humanSet;
         humanSet = new Set(); humanSetAt = t;
-        for (const k in dbUsers) { const u = dbUsers[k]; humanSet.add(String(k).toLowerCase()); if (u && u.nick) humanSet.add(String(u.nick).toLowerCase()); }
+        const cn = ctx.canonName || (x => String(x).toLowerCase());
+        for (const k in dbUsers) { const u = dbUsers[k]; humanSet.add(cn(k)); if (u && u.nick) humanSet.add(cn(u.nick)); }
         return humanSet;
     }
     function freshName() {
         const hs = humanNames();
         for (let i = 0; i < 200; i++) {
             const nm = mkName();
-            if (!ctx.NAME_RE.test(nm) || nm.length > 12) continue;
+            if (!/^[A-Za-z0-9_.-]{3,12}$/.test(nm)) continue;
             const lc = nm.toLowerCase(); if (botNames.has(lc) || hs.has(lc)) continue;
             return nm;
         }
-        return 'Gamer' + rint(1000, 99999999) % 100000;
+        return 'Gamer' + rint(1000, 99999);
     }
     const takeName = nm => { botNames.add(nm); botNames.add(nm.toLowerCase()); };
     const freeName = nm => { botNames.delete(nm); botNames.delete(nm.toLowerCase()); };

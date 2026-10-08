@@ -373,6 +373,9 @@ function processPlayerDeath(r, victimId, killerId, meta) {
 }
 // Реєстрація: 3-12 символів (літери, цифри, _ та -). Для входу старі акаунти не обмежуємо.
 const NAME_RE = /^[A-Za-zА-Яа-яІіЇїЄєҐґ0-9_-]{3,12}$/;
+// Нові акаунти: логін ТІЛЬКИ латиницею, пароль — лише друковані ASCII (без пробілів/кирилиці/емодзі). NAME_RE лишається для старих логінів/ботів.
+const LOGIN_RE_NEW = /^[A-Za-z0-9_-]{3,12}$/;
+const PASS_RE_NEW = /^[\x21-\x7E]{4,128}$/;
 function readCreds(data) {
     if (!data || typeof data.name !== 'string' || typeof data.password !== 'string') return null;
     return { name: data.name.trim(), password: data.password };
@@ -566,8 +569,9 @@ io.on('connection', (socket) => {
         const creds = readCreds(data);
         if (!creds) return socket.emit('joinError', 'Некоректні дані!');
         const { name, password } = creds;
-        if (!NAME_RE.test(name) || password.length < 4 || password.length > 128) return socket.emit('joinError', 'Логін 3-12 символів (літери, цифри, _ -), пароль від 4!');
-        if (dbUsers[name] || (hooks.botNames && hooks.botNames.has(name.toLowerCase()))) return socket.emit('joinError', 'Цей логін вже зайнятий!');
+        if (!LOGIN_RE_NEW.test(name)) return socket.emit('joinError', 'Логін: 3-12 символів, лише латиниця, цифри, _ та -');
+        if (!PASS_RE_NEW.test(password)) return socket.emit('joinError', 'Пароль: 4-128 символів, лише латиниця, цифри та знаки (без пробілів і кирилиці)');
+        if (Object.prototype.hasOwnProperty.call(dbUsers, name) || (hooks.botNames && hooks.botNames.has(name.toLowerCase())) || (hooks.nameTaken && hooks.nameTaken(name))) return socket.emit('joinError', 'Цей логін вже зайнятий!');
         const token = crypto.randomUUID();
         dbUsers[name] = validateUser({ name: name, password: hashPwd(password), token: token, bucks: 0, lang: cleanLang(data && data.lang) });
         saveUser(name);
@@ -1411,12 +1415,12 @@ setInterval(() => {
     const onlineSocketsOf = name => Object.keys(globalPlayers).filter(id => globalPlayers[id] === name);
     const ctx = {
         io, rooms, dbUsers, globalPlayers, Events, GameData, MODULES, CASES, ModeInfo, Modes, MAP_DATA, MapObj, Nav, VALID_MODES, MAX_HP,
-        saveUser, sendEconomy, ecoPayload, grantXp, rollDrop, playerLevel, getMaxHp, pushRooms, hashPwd, validateUser, NAME_RE,
+        saveUser, sendEconomy, ecoPayload, grantXp, rollDrop, playerLevel, getMaxHp, pushRooms, hashPwd, validateUser, NAME_RE, LOGIN_RE_NEW, PASS_RE_NEW,
         checkCollisionServer, getValidSpawn, processPlayerDeath, removePlayer, resetRoomToLobby, getRandomModuleFromCase,
         hooks, displayName: nickOf, onConnection: f => connHooks.push(f), getDb: () => dbRef, onlineSocketsOf, isOnline: name => onlineSocketsOf(name).length > 0,
         get BANS() { return BANS; }, get TICK_RATE() { return TICK_RATE; }, get SYNCS() { return SYNCS; }, startRoomGame, collectTokenFor, emitMatchEnd, teamsOf, isTeamPvp, powerupsOn, pickMap, clampInt, BUFF_DURATION, VALID_COLORS, TDM_TEAMS
     };
-    ['progress', 'profile', 'social', 'clans', 'bots'].forEach(f => {
+    ['handles', 'progress', 'profile', 'social', 'clans', 'chat', 'playercard', 'bots'].forEach(f => {
         if (!fs.existsSync(path.join(__dirname, f + '.js'))) return;
         try { require('./' + f + '.js')(ctx); console.log('✅ Модуль', f); } catch (e) { console.error('❌ Модуль', f, e && e.stack || e); }
     });

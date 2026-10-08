@@ -241,6 +241,14 @@ module.exports = function (ctx) {
             } else if (str(d.login)) target = user(d.login) ? d.login : null;
             addFriend(n, target || '', socket);
         }, 30, 10000, 'g'));
+        // запит дружби за непрозорим h (картка гравця); для бота — лише "ілюзія": успіх без жодних змін у базі
+        socket.on('socialAddByHandle', guard((n, d) => {
+            if (!d || typeof d !== 'object' || typeof d.h !== 'string' || d.h.length > 32 || !ctx.Handles) return;
+            if (limited(socket.id, 5, 10000, 'add')) return sendRes(socket, false, 'Забагато запитів, спробуйте за мить', 'add');
+            if (ctx.Handles.botOf && ctx.Handles.botOf(d.h)) return sendRes(socket, true, 'Запит надіслано', 'add');
+            const target = ctx.Handles.loginOf(d.h);
+            addFriend(n, target || '', socket);
+        }, 30, 10000, 'g'));
         socket.on('socialAccept', guard((n, d) => {
             const o = d && str(d.login), u = dbUsers[n];
             if (!o || !user(o) || !arr(u, 'friendReqIn').includes(o)) return sendRes(socket, false, 'Запит більше не актуальний', 'req');
