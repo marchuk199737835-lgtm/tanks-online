@@ -155,7 +155,7 @@ module.exports = function createAI(ctx, CFG) {
         if (BTt.fire) v.onFire = { end: now + 5000, nextTick: now + 1000, owner: b.owner };
         v.hp = Math.max(0, v.hp - fD);
         const bv = brains.get(v.id); if (bv) { bv.lastAttacker = b.owner; bv.lastHitAt = now; }
-        perf.hits++; const ba = brains.get(b.owner); if (ba) { ba.stat.hits++; if (v.hp === 0) ba.stat.kills++; }
+        perf.hits++; const ba = brains.get(b.owner); if (ba) { ba.stat.hits++; if (v.hp === 0) { ba.stat.kills++; ba.killAt = now; ba.killPos = { x: v.x, y: v.y }; } }
         if (v.hp === 0) ctx.processPlayerDeath(room, v.id, b.owner, { weapon: b.type });
         return true;
     }
@@ -317,6 +317,38 @@ module.exports = function createAI(ctx, CFG) {
         }
         return best;
     }
+    // Жетони детматчу: найкращий жетон для «підбору зараз» з урахуванням бою. Жетон — це очко, тож справжній гравець після вбивства
+    // одразу їде по нього (а не стріляє далі в інших), підбирає жетони поруч навіть у бою й «перехоплює» ті, до яких біжить суперник.
+    // Повертає { x, y, id, d, sc } або null. Бот «знає» лише про жетони, які бачить, які лежать поруч, або які випали з його жертви.
+    function tokenGoal(room, B, p, now, list, map) {
+        if (room.mode !== 'deathmatch' || !room.tokens) return null;
+        if (!B.tokSeen) B.tokSeen = Object.create(null);
+        const seen = B.tokSeen; let best = null, bs = -1e9, any = false;
+        for (const tid in room.tokens) {
+            const t = room.tokens[tid]; if (!t || !t.active) continue; any = true;
+            const d = Math.hypot(t.x - p.x, t.y - p.y); if (d > 1300) continue;
+            const mine = B.killPos && now - B.killAt < 12000 && Math.hypot(t.x - B.killPos.x, t.y - B.killPos.y) < 70;
+            let s = seen[tid];
+            if (!s) {
+                const vis = d < 380 || mine || los(map, p.x, p.y, t.x, t.y);
+                if (!vis) continue;
+                // реакція: свій жетон — майже одразу, чужий — за часом реакції бота
+                s = seen[tid] = { at: now + (mine ? rnd(120, 320) : B.reactionMs * rnd(0.6, 1.1)), reach: reachable(map, t.x, t.y) };
+            }
+            if (now < s.at || !s.reach) continue;
+            // найближчий видимий суперник до жетона: якщо він ближче — це «гонка» (поспішаємо), якщо він стоїть просто на жетоні й стріляє — обережніше
+            let foeD = 1e9; for (let i = 0; i < list.length && i < 5; i++) { const e = list[i]; if (!e.vis) continue; const fd = Math.hypot(e.q.x - t.x, e.q.y - t.y); if (fd < foeD) foeD = fd; }
+            let sc = 760 - d * 0.95 + 260 * B.greed;
+            if (mine) sc += 520;
+            if (foeD < d && foeD > 90) sc += 140;            // суперник теж їде по нього — перехопити
+            if (foeD < 90) sc -= 220 * (1 - B.aggr);         // суперник уже на жетоні
+            if (B.goal && B.goal.kind === 'token' && B.goal.id === tid) sc += 180;   // не «смикатись» між жетонами
+            if (sc > bs) { bs = sc; best = { x: t.x, y: t.y, id: tid, d, sc }; }
+        }
+        if (!any) B.tokSeen = Object.create(null);
+        else if (Math.random() < 0.02) for (const k in seen) if (!room.tokens[k]) delete seen[k];
+        return best;
+    }
     function objectiveGoal(room, B, p, now, S) {
         if (room.mode === 'capture_points' && S && S.pts) {
             let best = null, bs = -1e9;
@@ -407,6 +439,25 @@ module.exports = function createAI(ctx, CFG) {
             setState(B, 'retreat', now); st = 'retreat'; B.retreatSince = now; B.retreatUntil = now + rnd(5500, 9500); B.hiddenSince = 0; B.cover = null; B.stat.retreats++; B.goal = null;
         }
 
+        // ---- жетони детматчу: після вбивства / поруч — їдемо підбирати, навіть під час бою (стріляємо на ходу) ----
+        const tk = zd ? null : tokenGoal(room, B, p, now, list, map);
+        let grab = false;
+        if (tk) {
+            const fightD = best && vis ? best.d : 1e9;
+            if (st === 'retreat') grab = tk.d < 170 || (tk.d < 380 && !(foeNear && foeNear.vis && foeNear.d < 320));
+            else grab = tk.sc > 0 && (tk.d < 300 || fightD > 260 || hpF > 0.45 || tk.sc > 800);
+        }
+        // захоплення точок: у бою поруч із чужою/нічийною точкою — заїжджаємо на неї й б'ємось уже звідти (очки йдуть за утримання)
+        let push = null;
+        if (!grab && !zd && st !== 'retreat' && room.mode === 'capture_points' && S && S.pts && best && vis && (hpF > 0.4 || best.d > 300)) {
+            let pd = 1e9;
+            for (const pt of S.pts) {
+                if (pt.o === p.team && !(pt.w && pt.w !== p.team)) continue;
+                const d = Math.hypot(pt.x - p.x, pt.y - p.y), r = pt.r || 120;
+                if (d < 560 && d > r * 0.55 && d < pd) { pd = d; push = { x: pt.x, y: pt.y, id: pt.i, r }; }
+            }
+        }
+
         // ---- виконання станів ----
         B.mv = null; B.wantFire = false; B.flee = false; B.speedF = 1;
         const foePts = list.filter(e => e.d < 1000 && (e.vis || now - (B.mem[e.id] ? B.mem[e.id].t : 0) < 4000)).slice(0, 3).map(e => ({ x: e.q.x, y: e.q.y }));
@@ -425,7 +476,7 @@ module.exports = function createAI(ctx, CFG) {
             else {
                 // у схованці: вичікуємо, дивимось на загрозу; за можливості добираємо аптечку
                 const hp = pickItemGoal(room, B, p, now, hpF, S);
-                if (hp && (hp.kind === 'pu') && PUtype(room, hp) === 'healing' && !(foeNear && foeNear.vis && foeNear.d < 450)) B.mv = { kind: 'goal', x: hp.x, y: hp.y };
+                if (hp && (hp.kind === 'pu') && PUtype(room, hp) === 'healing' && !(foeNear && foeNear.vis && foeNear.d < 450)) B.mv = { kind: 'goal', x: hp.x, y: hp.y, exact: true };
                 else B.mv = { kind: 'hold' };
             }
             // «загнаний»: ворог близько й дивиться на нас — відстрілюємось
@@ -433,7 +484,17 @@ module.exports = function createAI(ctx, CFG) {
                 const cornered = best.d < 300 || (cv && Math.hypot(cv.x - p.x, cv.y - p.y) < 60 && best.d < 520);
                 B.wantFire = (cornered || Math.random() < 0.28 * (1 - B.charge * 0.2)) && best.d < 800;
             }
+            if (grab) { B.goal = { x: tk.x, y: tk.y, kind: 'token', id: tk.id }; B.goalAt = now; B.mv = { kind: 'goal', x: tk.x, y: tk.y, exact: true }; }
             if (zd) B.mv = { kind: 'goal', x: zd.cx + rnd(-60, 60), y: zd.cy + rnd(-60, 60) };
+        } else if (grab) {
+            // підбір жетона: їдемо точно на нього; якщо ворог у полі зору — відстрілюємось на ходу
+            setState(B, 'grab', now); B.goal = { x: tk.x, y: tk.y, kind: 'token', id: tk.id }; B.goalAt = now;
+            B.mv = { kind: 'goal', x: tk.x, y: tk.y, exact: true }; B.speedF = 1;
+            if (best && vis && B.canEngage) B.wantFire = fireDiscipline(B, best, now);
+        } else if (push) {
+            setState(B, 'combat', now); B.goal = { x: push.x, y: push.y, kind: 'point', id: push.id, r: push.r }; B.goalAt = now;
+            B.mv = { kind: 'goal', x: push.x + rnd(-30, 30), y: push.y + rnd(-30, 30) }; B.speedF = 1;
+            if (B.canEngage) B.wantFire = fireDiscipline(B, best, now);
         } else if (zd) {
             setState(B, 'zone', now);
             B.mv = { kind: 'goal', x: zd.cx + rnd(-90, 90) * 0 + Math.cos(now / 4000) * zd.r * 0.15, y: zd.cy + Math.sin(now / 4000) * zd.r * 0.15 }; B.speedF = 1;
@@ -450,7 +511,7 @@ module.exports = function createAI(ctx, CFG) {
         } else {
             // ---- немає цілі: предмети / завдання режиму / блукання ----
             const item = pickItemGoal(room, B, p, now, hpF, S);
-            if (item && (hpF < 0.7 || !threatened)) { setState(B, 'collect', now); B.goal = item; B.goalAt = now; B.mv = { kind: 'goal', x: item.x, y: item.y }; }
+            if (item && (hpF < 0.7 || !threatened)) { setState(B, 'collect', now); B.goal = item; B.goalAt = now; B.mv = { kind: 'goal', x: item.x, y: item.y, exact: true }; }
             else {
                 // «осідлість»: кемпер чекає у вибраній точці
                 if (B.campUntil > now && B.campPt) { setState(B, 'wander', now); B.mv = { kind: 'hold', look: true }; }
@@ -560,6 +621,8 @@ module.exports = function createAI(ctx, CFG) {
         if (mv.kind === 'goal') {
             const wp = B.wp || mv, dx = wp.x - p.x, dy = wp.y - p.y, d = Math.hypot(dx, dy); if (d < 8) return null;
             const gd = Math.hypot(mv.x - p.x, mv.y - p.y); let f = B.speedF || 1;
+            // предмети/жетони: під'їжджаємо впритул (радіус підбору ~50), звичайні цілі — зупинка за 55 з пригальмовуванням
+            if (mv.exact) { if (gd < 6) return null; if (gd < 40) f = Math.min(f, 0.7); return { x: dx / d, y: dy / d, f }; }
             if (gd < 55) return null;
             if (gd < 130) f = Math.min(f, 0.55);
             return { x: dx / d, y: dy / d, f };
@@ -650,7 +713,7 @@ module.exports = function createAI(ctx, CFG) {
     function aimTurret(room, B, p, dt, now, wish) {
         let want = null;
         const t = B.tgtObj;
-        if (t && t.hp > 0 && (B.canEngage || B.state === 'retreat') && (B.wantFire || B.state === 'combat' || B.state === 'retreat')) {
+        if (t && t.hp > 0 && (B.canEngage || B.state === 'retreat') && (B.wantFire || B.state === 'combat' || B.state === 'retreat' || B.state === 'grab')) {
             // упередження: пристрілка за швидкістю цілі
             const tr = B.tr[B.target]; const bs = BASE_BULLET_SPEED * ((p.buff && BT[p.buff]) ? BT[p.buff].spd : 1);
             let px = t.x, py = t.y;
@@ -658,7 +721,7 @@ module.exports = function createAI(ctx, CFG) {
             if (now >= B.aimBiasUntil) { B.aimBias = gauss() * B.aimSigma * (B.mistake ? 3 : 1); B.aimBiasUntil = now + rnd(350, 900); if (B.mistake && Math.random() < 0.5) B.mistake = false; }
             want = Math.atan2(py - p.y, px - p.x) + B.aimBias;
             B.aimAng = want;
-        } else if (B.state === 'seek' || B.state === 'wander' || B.state === 'capture' || B.state === 'collect' || B.state === 'zone') {
+        } else if (B.state === 'seek' || B.state === 'wander' || B.state === 'capture' || B.state === 'collect' || B.state === 'zone' || B.state === 'grab') {
             // дивимось у напрямку руху, інколи «оглядаємось»
             if (wish) want = Math.atan2(wish.y, wish.x) + Math.sin(now / 1400 + B.strafeDir * 2) * 0.5; else want = p.turretAngle + Math.sin(now / 900) * 0.04 + 0.02;
         } else if (B.state === 'retreat' && B.cover && !(t && B.wantFire)) {

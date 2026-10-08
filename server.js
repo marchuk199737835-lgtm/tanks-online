@@ -219,7 +219,22 @@ function getValidEdgeSpawn(m, r, t = 'spawn_zombie') {
     return getValidSpawn(m, r);
 }
 
-let rooms = {}, globalPlayers = {};
+let rooms = {};
+// globalPlayers: socket.id → логін. Обгортка підтримує зворотний індекс логін → сокети, щоб onlineSocketsOf/isOnline
+// (їх десятки разів на секунду викликають друзі, чат, клани, прогрес) не перебирали всі підключення.
+const _sockByName = new Map();
+const globalPlayers = new Proxy({}, {
+    set(t, k, v) {
+        if (Object.prototype.hasOwnProperty.call(t, k)) { const s = _sockByName.get(t[k]); if (s) { s.delete(k); if (!s.size) _sockByName.delete(t[k]); } }
+        t[k] = v;
+        if (typeof v === 'string') { let s = _sockByName.get(v); if (!s) _sockByName.set(v, s = new Set()); s.add(k); }
+        return true;
+    },
+    deleteProperty(t, k) {
+        if (Object.prototype.hasOwnProperty.call(t, k)) { const s = _sockByName.get(t[k]); if (s) { s.delete(k); if (!s.size) _sockByName.delete(t[k]); } delete t[k]; }
+        return true;
+    }
+});
 const hooks = { clanTag: () => '', extraRooms: () => [], preJoin: () => false, botNames: null };   // модулі підміняють (clans.js → hooks.clanTag; bots.js → extraRooms/preJoin/botNames)
 const nickOf = n => (dbUsers[n] && dbUsers[n].nick) || n;
 const connHooks = [];   // обробники підключення від додаткових модулів (ctx.onConnection)
@@ -367,6 +382,8 @@ function processPlayerDeath(r, victimId, killerId, meta) {
     } else if (r.mode === 'deathmatch') {
         const tid = 'tkn_' + Date.now() + Math.random();
         r.tokens[tid] = { id: tid, x: v.x, y: v.y, color: v.color, active: true };
+        // ліміт жетонів на мапі: найстаріші зникають (інакше список росте весь бій і щотіку серіалізується й розсилається всім)
+        const tks = Object.keys(r.tokens); for (let i = 0; i < tks.length - 60; i++) delete r.tokens[tks[i]];
         setTimeout(() => {
             if (rooms[r.id] && rooms[r.id].players[victimId] && rooms[r.id].status === 'playing') {
                 v.hp = getMaxHp(v.equipped);
@@ -417,7 +434,7 @@ function pickMap(want, mode) {
     if (MAP_DATA[want] && MapObj.mapAllows(MAP_DATA[want], mode)) return want;
     return Object.keys(MAP_DATA).find(k => MapObj.mapAllows(MAP_DATA[k], mode)) || Object.keys(MAP_DATA)[0] || 'epic_map';
 }
-const VALID_COLORS = ['white', 'black', 'red', 'blue', 'brown', 'purple'];
+const VALID_COLORS = ['white', 'black', 'red', 'blue', 'brown', 'purple', 'green', 'yellow', 'orange', 'cyan'];   // 10 кольорів = макс. гравців у кімнаті
 const TDM_TEAMS = ['red', 'blue', 'green', 'yellow']; // порядок як у кнопках лобі
 
 // Повернути кімнату в лобі (кінець гри, скасування гри) з повним очищенням ігрового стану
@@ -827,6 +844,7 @@ io.on('connection', (socket) => {
     socket.on('rbLeave', () => { socket.leave('rb'); });
 
     socket.on('createRoom', (c) => {
+        if (!c || typeof c !== 'object') c = {};
         let n = globalPlayers[socket.id];
         if (!n || !dbUsers[n]) return socket.emit('joinError', 'Помилка авторизації');
         let rId = 'room_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
@@ -886,6 +904,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('updateRoomSettings', (d) => {
+        if (!d || typeof d !== 'object') return;
         let r = rooms[d.roomId];
         if (r && r.hostSocket === socket.id && r.status === 'lobby') {
             if (d.mode && VALID_MODES.includes(d.mode)) {
@@ -1012,15 +1031,20 @@ socket.on('selectProp', (data) => {
     });
 
     socket.on('setLaserTarget', (data) => {
+        if (!data || typeof data !== 'object') return;
         let r = rooms[data.roomId], p = r ? r.players[socket.id] : null;
         if (p && p.buff === 'autolaser') p.laserTarget = data.targetId;
     });
 
     socket.on('move', (data) => {
+        if (!data || typeof data !== 'object') return;
         let r = rooms[data.roomId];
         if (r && r.players[socket.id] && r.status === 'playing') {
+            // лише скінченні числа: NaN/рядки в координатах ламали синхронізацію, ботів і зіткнення
+            const x = +data.x, y = +data.y, ba = +data.bodyAngle, ta = +data.turretAngle;
+            if (!Number.isFinite(x) || !Number.isFinite(y)) return;
             let p = r.players[socket.id];
-            p.x = data.x; p.y = data.y; p.bodyAngle = data.bodyAngle; p.turretAngle = data.turretAngle;
+            p.x = x; p.y = y; if (Number.isFinite(ba)) p.bodyAngle = ba; if (Number.isFinite(ta)) p.turretAngle = ta;
             if (p.stuckIn.length > 0) {
                 let cM = MAP_DATA[r.map] ? r.map : 'epic_map', arr = MAP_DATA[cM].solids, sI = [];
                 p.stuckIn.forEach(i => {
@@ -1035,6 +1059,7 @@ socket.on('selectProp', (data) => {
     });
 
     socket.on('shoot', (data) => {
+        if (!data || typeof data !== 'object') return;
         let r = rooms[data.roomId];
         if (r && r.status === 'playing') {
             let p = r.players[socket.id];
@@ -1051,6 +1076,7 @@ socket.on('selectProp', (data) => {
     });
 
     socket.on('registerHit', (data) => {
+        if (!data || typeof data !== 'object') return;
         let r = rooms[data.roomId];
         if (!r || r.status !== 'playing' || !r.players[data.targetId]) return;
         let v = r.players[data.targetId], atk = r.players[socket.id], atkName = globalPlayers[socket.id];
@@ -1059,8 +1085,9 @@ socket.on('selectProp', (data) => {
         if (isTeamPvp(r.mode) && atk && atk.team === v.team) return;
         if (Modes.has(r.mode) && atk && (atk.hp <= 0 || atk.out)) return;
         
-        let fD = data.amt;
-        
+        if (!atk) return;                                         // влучати можуть лише гравці цієї кімнати
+        let fD = Math.min(500, Math.max(0, +data.amt || 0));      // базова шкода снаряда (макс. — баф «бос» 500); NaN/рядки → 0
+
         if (r.mode === 'prophunt') {
             if (r.state !== 'seeking' || !atk || atk.team !== 'hunter' || v.team === 'hunter') return;
             fD = 250; v.isDisguised = false;
@@ -1091,6 +1118,7 @@ socket.on('selectProp', (data) => {
     });
 
     socket.on('takeDamage', (d) => {
+        if (!d || typeof d !== 'object') return;
         let r = rooms[d.roomId];
         if (!r || r.status !== 'playing' || !r.players[socket.id] || (d.attacker !== 'zombie' && d.attacker !== 'bomber')) return;
         let v = r.players[socket.id];
@@ -1102,6 +1130,7 @@ socket.on('selectProp', (data) => {
     socket.on('collectToken', (d) => { if (d) collectTokenFor(d.roomId, socket.id, d.tid); });
 
     socket.on('collectPowerup', (d) => {
+        if (!d || typeof d !== 'object') return;
         let r = rooms[d.roomId];
         if (r && r.status === 'playing' && r.powerups[d.pid] && r.powerups[d.pid].mod) { Modes.pickMod(r, socket.id, d.pid); return; }   // модуль (королівський бій)
         if (r && r.status === 'playing' && r.powerups[d.pid] && r.powerups[d.pid].active && r.players[socket.id] && r.players[socket.id].hp > 0 && powerupsOn(r.mode)) {
@@ -1114,6 +1143,7 @@ socket.on('selectProp', (data) => {
     });
 
     socket.on('zombieHit', (d) => {
+        if (!d || typeof d !== 'object') return;
         let r = rooms[d.roomId];
         if (r && r.status === 'playing' && r.zombies[d.zid] && r.zombies[d.zid].hp > 0) {
             let fD = d.dmg, aP = r.players[socket.id];
@@ -1244,6 +1274,7 @@ function buildSync(r, now) {
     let S = SYNCS.get(r.id);
     if (!S) { S = { n: 0, p: {}, st: {}, ids: '', z: {}, zi: '', zs: {}, pu: '', tk: '', mn: '', ph: '', tdm: '', tm: 0, za: {}, zn: 0 }; SYNCS.set(r.id, S); }
     const full = S.n % TICK_RATE === 0; S.n++;
+    const stChk = full || (S.n & 3) === 0;   // «статичні» поля (ім'я, колір, екіпіровка…) змінюються рідко — перевіряємо раз на 4 тіки, а не JSON на кожен тік
     const out = {}; let any = false;
     const P = {}, ST = {}, ids = Object.keys(r.players);
     for (const id of ids) {
@@ -1251,6 +1282,7 @@ function buildSync(r, now) {
         const a = [r1(p.x), r1(p.y), r2(p.bodyAngle), r2(p.turretAngle), r1(p.hp), p.score | 0, p.buff || 0, r2(p.buffProgress || 0), p.isDisguised ? 1 : 0];
         const k = a.join(',');
         if (full || S.p[id] !== k) { S.p[id] = k; P[id] = a; any = true; }
+        if (!stChk && S.st[id] !== undefined) continue;
         const st = JSON.stringify([p.name, p.color, p.team, p.equipped, p.propType, p.level, p.ready, p.nick, p.clan]);
         if (full || S.st[id] !== st) { S.st[id] = st; ST[id] = { name: p.name, nick: p.nick, clan: p.clan, color: p.color, team: p.team, equipped: p.equipped, propType: p.propType, level: p.level, ready: p.ready }; any = true; }
     }
@@ -1433,12 +1465,12 @@ setInterval(() => {
 // Кожен файл — module.exports = function (ctx) { … }. Відсутні файли просто пропускаються.
 {
     const Events = require('./events.js');
-    const onlineSocketsOf = name => Object.keys(globalPlayers).filter(id => globalPlayers[id] === name);
+    const onlineSocketsOf = name => { const s = _sockByName.get(name); return s ? Array.from(s) : []; };
     const ctx = {
         io, rooms, dbUsers, globalPlayers, Events, GameData, MODULES, CASES, ModeInfo, Modes, MAP_DATA, MapObj, Nav, VALID_MODES, MAX_HP,
         saveUser, sendEconomy, ecoPayload, grantXp, rollDrop, playerLevel, getMaxHp, pushRooms, hashPwd, validateUser, NAME_RE, LOGIN_RE_NEW, PASS_RE_NEW,
         checkCollisionServer, getValidSpawn, processPlayerDeath, removePlayer, resetRoomToLobby, getRandomModuleFromCase,
-        hooks, displayName: nickOf, onConnection: f => connHooks.push(f), getDb: () => dbRef, onlineSocketsOf, isOnline: name => onlineSocketsOf(name).length > 0,
+        hooks, displayName: nickOf, onConnection: f => connHooks.push(f), getDb: () => dbRef, onlineSocketsOf, isOnline: name => _sockByName.has(name),
         get BANS() { return BANS; }, get TICK_RATE() { return TICK_RATE; }, get SYNCS() { return SYNCS; }, startRoomGame, collectTokenFor, emitMatchEnd, teamsOf, isTeamPvp, powerupsOn, pickMap, clampInt, BUFF_DURATION, VALID_COLORS, TDM_TEAMS
     };
     ['handles', 'progress', 'profile', 'social', 'clans', 'chat', 'playercard', 'bots'].forEach(f => {
