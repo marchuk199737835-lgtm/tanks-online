@@ -16,20 +16,27 @@
     var clamp = function (v, a, b) { return v < a ? a : v > b ? b : v; };
     function inGame() { var g = document.getElementById('game-screen'); return !!(g && !g.classList.contains('hidden') && typeof currentRoomData !== 'undefined' && currentRoomData); }
 
-    function load() {
-        var c = AC(); if (!c || loading) return; loading = true;
-        NAMES.forEach(function (n) {
-            fetch('/sfx/' + n + '.mp3').then(function (r) { return r.arrayBuffer(); }).then(function (ab) {
-                var ok = function (b) { if (!buf[n]) { buf[n] = b; loaded++; } };
-                var p = c.decodeAudioData(ab, ok, function () {}); if (p && p.then) p.then(ok, function () {});
-            }).catch(function () {});
-        });
+    // ---- завантаження: бойовий пакет тягнемо лише при вході в кімнату / старті гри (не в меню), без прелоаду ----
+    var SLOW = false, retryAt = {}, pending = {}, passShot = false;
+    try { var cn = navigator.connection; SLOW = !!(cn && (cn.saveData || /(^|-)(2g|3g)$/.test(cn.effectiveType || ''))); } catch (e) {}
+    var CORE = ['shot_cannon_1', 'shot_cannon_2', 'shot_cannon_3', 'shot_minigun_1', 'shot_minigun_2', 'shot_minigun_3', 'shot_shotgun_1', 'shot_shotgun_2', 'shot_samurai_1', 'shot_samurai_2', 'shot_boss_1', 'shot_boss_2',
+        'explosion_1', 'explosion_2', 'hit_dealt_1', 'hit_dealt_2', 'hit_dealt_3', 'hit_kill', 'hurt_t1_a', 'hurt_t3_a', 'hurt_t5_a', 'death', 'pickup_common'];   // для економного режиму; решта — за потребою
+    function urlOf(n) { var v = window.__AV && window.__AV.sfx; return '/sfx/' + n + '.mp3' + (v ? '?v=' + v : ''); }
+    function fetchOne(n) {
+        var c = AC(); if (!c || buf[n] || pending[n] || (retryAt[n] && performance.now() < retryAt[n])) return; pending[n] = 1;
+        var fail = function () { delete pending[n]; retryAt[n] = performance.now() + 15000; };    // збій мережі/декодування не ламає гру: працює синтезований звук, повтор не раніше ніж за 15 с
+        fetch(urlOf(n)).then(function (r) { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }).then(function (ab) {
+            var ok = function (b) { if (!buf[n]) { buf[n] = b; loaded++; } delete pending[n]; };
+            var p = c.decodeAudioData(ab, ok, fail); if (p && p.then) p.then(ok, fail);
+        }).catch(fail);
     }
-    ['pointerdown', 'touchstart', 'keydown', 'click'].forEach(function (ev) { document.addEventListener(ev, function once() { setTimeout(load, 250); document.removeEventListener(ev, once, true); }, true); });
+    function load() { (SLOW ? CORE : NAMES).forEach(fetchOne); }
+    function enterBattle() { setTimeout(load, 0); }
+    if (typeof socket !== 'undefined' && socket && socket.on) { socket.on('joinedRoom', enterBattle); socket.on('gameStarting', enterBattle); }
 
     function pickVar(base, n) { var i = 1 + Math.floor(Math.random() * n); if (n > 1 && i === lastVar[base]) i = i % n + 1; lastVar[base] = i; return base + '_' + i; }
     function play(name, o) {
-        o = o || {}; var c = AC(); if (!c || c.state !== 'running') return false; var b = buf[name]; if (!b) return false;
+        o = o || {}; var c = AC(); if (!c || c.state !== 'running') return false; var b = buf[name]; if (!b) { fetchOne(name); return false; }
         var now = performance.now(); if (o.gap && lastAt[name] && now - lastAt[name] < o.gap) return false; if (active >= 26 && !o.force) return false; lastAt[name] = now;
         var s = c.createBufferSource(); s.buffer = b; s.playbackRate.value = (o.rate || 1) * (1 + (Math.random() - 0.5) * (o.jit == null ? 0.07 : o.jit));
         var g = c.createGain(), gk = GAIN[name.replace(/_\d+$|_[ab]$/, '').replace(/_t\d$/, '').replace(/^(pickup|reload|drop)_.*/, '$1')] || GAIN[name.replace(/_\d+$/, '')] || 1;
@@ -48,7 +55,8 @@
             var dx = d.x - myLocalTank.x, dy = d.y - myLocalTank.y, dist = Math.hypot(dx, dy); if (dist > 1700) return true;
             att = Math.pow(1 - dist / 1700, 1.6) * 0.9; o.pan = clamp(dx / 900, -0.9, 0.9); if (att < 0.04) return true;
         }
-        o.vol = att; return play(pickVar(name, n), o);
+        o.vol = att; var nm = pickVar(name, n); if (!buf[nm]) { fetchOne(nm); passShot = true; setTimeout(function () { passShot = false; }, 0); return undefined; }   // файл ще не прийшов — game.js зіграє синтезований постріл
+        return play(nm, o);
     }
     // ---------- мої влучання по ворогу ----------
     function hitDealt() { return play(pickVar('hit_dealt', 3), { vol: 0.9 }); }
@@ -92,7 +100,7 @@
                     case 'explosion': if (play(pickVar('explosion', 2), {})) return; break;
                     case 'boss_shoot': if (play(pickVar('shot_boss', 2), { vol: 0.7 })) return; break;
                     case 'powerup': if (play('pickup_buff', {})) return; break;
-                    case 'shoot': case 'minigun': case 'samurai': return;             // постріли йдуть через SFX.shot (з відстанню)
+                    case 'shoot': case 'minigun': case 'samurai': if (passShot) { passShot = false; break; } return;             // постріли йдуть через SFX.shot (з відстанню)
                     case 'drop_warn': case 'drop_land': case 'final_loot': case 'zone': if (play(type, { force: true, jit: 0 })) return; break;
                 }
             }

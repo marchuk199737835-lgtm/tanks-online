@@ -196,13 +196,36 @@
             ctx.restore();
         });
     }
-    function drawZone(ctx, m, now) {
-        const z = m.z, mS = (MAP_DATA[cur().map] || MAP_DATA['epic_map']).size;
+    // Зона БР. Раніше: прямокутник 15000×15000 з отвором + обводка величезного кола з shadowBlur — найдорожче, що є в кадрі.
+    // Тепер: заливаємо лише видимий прямокутник (повністю в зоні — нічого, повністю поза нею — просто прямокутник),
+    // а лінію зони малюємо лише видимими дугами, світіння — шарами напівпрозорих ліній замість розмиття.
+    function drawZone(ctx, m, now, view) {
+        const z = m.z;
         const dt = Math.min(0.1, (now - lastNow) / 1000); lastNow = now;
         zr = zr == null ? z.r : zr + (z.r - zr) * Math.min(1, dt * 6);
-        ctx.save(); ctx.beginPath(); ctx.rect(-4000, -4000, mS + 8000, mS + 8000); ctx.arc(z.x, z.y, Math.max(1, zr), 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(220,38,38,.22)'; ctx.fill('evenodd');
-        ctx.beginPath(); ctx.arc(z.x, z.y, Math.max(1, zr), 0, Math.PI * 2); ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(248,113,113,.95)'; ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 20; ctx.stroke(); ctx.restore();
+        const R = Math.max(1, zr), v = view || { x0: z.x - 4000, x1: z.x + 4000, y0: z.y - 4000, y1: z.y + 4000 };
+        const nx = Math.max(v.x0, Math.min(z.x, v.x1)), ny = Math.max(v.y0, Math.min(z.y, v.y1)), dn = Math.hypot(nx - z.x, ny - z.y);
+        const df = Math.hypot(Math.max(Math.abs(v.x0 - z.x), Math.abs(v.x1 - z.x)), Math.max(Math.abs(v.y0 - z.y), Math.abs(v.y1 - z.y)));
+        if (df <= R) return;   // весь екран усередині безпечної зони
+        ctx.save();
+        ctx.fillStyle = 'rgba(220,38,38,.22)';
+        if (dn >= R) ctx.fillRect(v.x0, v.y0, v.x1 - v.x0, v.y1 - v.y0);
+        else { ctx.beginPath(); ctx.rect(v.x0, v.y0, v.x1 - v.x0, v.y1 - v.y0); ctx.arc(z.x, z.y, R, 0, Math.PI * 2); ctx.fill('evenodd'); }
+        if (dn <= R + 8) {   // лінія зони в кадрі: збираємо дуги, що потрапляють у видиму область
+            const N = 288, st = Math.PI * 2 / N, arcs = [];
+            let a0 = -1;
+            for (let k = 0; k <= N; k++) {
+                const t = k * st, x = z.x + Math.cos(t) * R, y = z.y + Math.sin(t) * R, inn = x > v.x0 - 60 && x < v.x1 + 60 && y > v.y0 - 60 && y < v.y1 + 60;
+                if (inn && a0 < 0) a0 = Math.max(0, k - 1); else if (!inn && a0 >= 0) { arcs.push([a0 * st, Math.min(N, k) * st]); a0 = -1; }
+            }
+            if (a0 >= 0) arcs.push([a0 * st, N * st]);
+            const gk = window.GFX ? (GFX.shadow ? GFX.blur : 0) : 1;
+            ctx.lineCap = 'butt';
+            const run = (w, col) => { ctx.lineWidth = w; ctx.strokeStyle = col; ctx.beginPath(); for (let i = 0; i < arcs.length; i++) { ctx.moveTo(z.x + Math.cos(arcs[i][0]) * R, z.y + Math.sin(arcs[i][0]) * R); ctx.arc(z.x, z.y, R, arcs[i][0], arcs[i][1]); } ctx.stroke(); };
+            if (gk > 0) { run(8 + 34 * gk, 'rgba(239,68,68,' + (0.06 * gk + 0.02).toFixed(3) + ')'); run(8 + 22 * gk, 'rgba(239,68,68,' + (0.09 * gk + 0.03).toFixed(3) + ')'); run(8 + 12 * gk, 'rgba(239,68,68,' + (0.15 * gk + 0.05).toFixed(3) + ')'); }
+            run(8, 'rgba(248,113,113,.95)');
+        }
+        ctx.restore();
     }
     function drawBounty(ctx, m, now) {
         if (!m.tg) return; const t = m.tg === myId ? myLocalTank : opponents[m.tg]; if (!t || t.hp <= 0) return;
@@ -239,9 +262,9 @@
         ground(ctx, now, view) { const r = cur(); if (!md || !r || md.m !== 'battle_royale' || md.m !== r.mode || !window.BRLoot) return; VIEW = view; BRLoot.ground(ctx, md.dr, now, view); },
         lootDraw(ctx, p, now, view) { if (window.BRLoot) BRLoot.drawMod(ctx, p, now, view); },
         canTake(p) { return window.BRLoot ? BRLoot.canTake(p) : true; },
-        top(ctx, now) {
+        top(ctx, now, tm, view) {
             const r = cur(); if (!md || !r || md.m !== r.mode) return;
-            if (md.m === 'battle_royale') drawZone(ctx, md, now); else if (md.m === 'bounty') drawBounty(ctx, md, now);
+            if (md.m === 'battle_royale') drawZone(ctx, md, now, view); else if (md.m === 'bounty') drawBounty(ctx, md, now);
         },
         screen(ctx, now) {
             const r = cur(); if (!md || !r || md.m !== r.mode) return;

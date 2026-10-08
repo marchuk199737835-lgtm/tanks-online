@@ -2,8 +2,9 @@
 // Мета — щоб гра йшла навіть на дуже слабких ноутбуках і телефонах, а на нормальних виглядала як раніше.
 // Що змінює рівень: внутрішня роздільна здатність полотна, тіні/світіння (shadowBlur), кількість частинок,
 // ліміт кадрів, а також важкі CSS-ефекти меню (backdrop-filter, розмиті плями, нескінченні анімації).
-// «Авто» стартує з оцінки заліза (ядра/пам'ять/тач), а далі сама знижує рівень, якщо FPS просідає
-// (і обережно піднімає, якщо запас великий). Остання вдала якість запам'ятовується між візитами.
+// «Авто» стартує з оцінки заліза (ядра/пам'ять/тач/програмний рендер), а далі сама знижує рівень, якщо FPS стабільно нижче 45
+// (або часто «рветься» довгими кадрами). Угору вона САМА НЕ піднімає — щоб гра не смикалась туди-сюди; підняти можна вручну в налаштуваннях.
+// Остання вдала якість запам'ятовується між візитами.
 (function () {
     const LS = {
         get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
@@ -11,8 +12,8 @@
     };
     const ORDER = ['low', 'medium', 'high'];
     const TIERS = {
-        high:   { rs: 1,    blur: 1,   shadow: true,  fx: 1,    partMax: 400, cap: 0 },
-        medium: { rs: 0.85, blur: 0.35, shadow: true, fx: 0.5,  partMax: 180, cap: 0 },
+        high:   { rs: 1,    blur: 1,   shadow: true,  fx: 1,    partMax: 400, cap: 60 },   // стеля 60: на екранах 120/144 Гц не гріємо відеокарту дарма
+        medium: { rs: 0.85, blur: 0.35, shadow: true, fx: 0.5,  partMax: 180, cap: 60 },
         low:    { rs: 0.65, blur: 0,   shadow: false, fx: 0.25, partMax: 70,  cap: 30 }
     };
     const NAMES = { auto: 'Авто', high: 'Висока', medium: 'Середня', low: 'Низька' };
@@ -20,8 +21,17 @@
     const ua = navigator.userAgent || '';
     const touch = !!(window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches) || /Android|iPhone|iPad|iPod/i.test(ua);
     const cores = navigator.hardwareConcurrency || 4, mem = navigator.deviceMemory || 4;
+    // програмний рендер (SwiftShader/llvmpipe/«Basic Render») — гарантовано «низька»; WebGL-контекст створюється на мить і одразу звільняється
+    function softGpu() {
+        try {
+            const c = document.createElement('canvas'), gl = c.getContext('webgl') || c.getContext('experimental-webgl'); if (!gl) return false;
+            const x = gl.getExtension('WEBGL_debug_renderer_info'), r = x ? String(gl.getParameter(x.UNMASKED_RENDERER_WEBGL) || '') : '';
+            const l = gl.getExtension('WEBGL_lose_context'); if (l) l.loseContext();
+            return /swiftshader|llvmpipe|softpipe|software|basic render/i.test(r);
+        } catch (e) { return false; }
+    }
     function guess() {
-        if (cores <= 2 || mem <= 2) return 'low';
+        if (cores <= 2 || mem <= 2 || softGpu()) return 'low';
         if ((touch && cores <= 4) || mem <= 3 || (cores <= 4 && mem <= 4)) return 'medium';
         return 'high';
     }
@@ -31,8 +41,7 @@
         rs: 1, blur: 1, shadow: true, fx: 1, partMax: 400, cap: 0,
         fps: 0, work: wk, frame: fr, attach, set, apply, label
     };
-    let ceiling = 'high';
-    if (ORDER.indexOf(LS.get('gfxMode')) < 0 && G.mode !== 'auto') G.mode = 'auto';
+        if (ORDER.indexOf(LS.get('gfxMode')) < 0 && G.mode !== 'auto') G.mode = 'auto';
     const saved = LS.get('gfxAuto');
     G.tier = G.mode === 'auto' ? (ORDER.indexOf(saved) >= 0 ? saved : guess()) : G.mode;
     if (G.mode === 'auto' && window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches && G.tier === 'high') G.tier = 'medium';
@@ -47,7 +56,7 @@
     }
     function set(mode) {
         G.mode = mode; LS.set('gfxMode', mode);
-        if (mode === 'auto') { ceiling = 'high'; G.tier = ORDER.indexOf(LS.get('gfxAuto')) >= 0 ? LS.get('gfxAuto') : guess(); } else G.tier = mode;
+        if (mode === 'auto') { G.tier = ORDER.indexOf(LS.get('gfxAuto')) >= 0 ? LS.get('gfxAuto') : guess(); } else G.tier = mode;
         resetStats(); apply();
     }
     function label() { return NAMES[G.tier]; }
@@ -62,32 +71,29 @@
     }
 
     // ---- вимірювання ----
-    let acc = 0, n = 0, winT = 0, slowWins = 0, goodWins = 0, workAcc = 0, workN = 0, tierSince = 0, warm = 0, lastUp = 0, fpsAcc = 0, fpsN = 0, fpsShown = 0;
-    function resetStats() { acc = 0; n = 0; winT = 0; slowWins = 0; goodWins = 0; workAcc = 0; workN = 0; warm = 0; }
+    let acc = 0, n = 0, winT = 0, slowWins = 0, workAcc = 0, workN = 0, warm = 0, fpsAcc = 0, fpsN = 0, fpsShown = 0, stalls = 0, stallWins = 0, sevWins = 0;
+    function resetStats() { acc = 0; n = 0; winT = 0; slowWins = 0; workAcc = 0; workN = 0; warm = 0; stalls = 0; stallWins = 0; sevWins = 0; }
     function wk(ms) { workAcc += ms; workN++; }
     let lastCall = 0;
     function fr(now, dt) {
-        if (now - lastCall > 1000) { warm = now; winT = 0; acc = 0; n = 0; }   // новий бій після меню — знову прогрів
+        if (now - lastCall > 1000) { warm = now; winT = 0; acc = 0; n = 0; stalls = 0; }   // новий бій після меню — знову прогрів
         lastCall = now;
         if (dt > 0.5) { warm = now; return; }                       // вкладка була прихована / довга пауза — не рахуємо
         if (!warm) warm = now;
-        if (now - warm < 2500) return;                               // прогрів: перші секунди після старту/перемикання
+        if (now - warm < 2000) return;                               // прогрів: перші секунди після старту/перемикання (будуються кеші)
         acc += dt; n++; fpsAcc += dt; fpsN++;
+        if (dt > 0.1) stalls++;
         if (G.showFps && now - fpsShown > 500) { fpsShown = now; G.fps = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; const e = document.getElementById('gfx-fps'); if (e) e.textContent = G.fps + ' FPS · ' + NAMES[G.tier]; }
         if (!winT) winT = now;
         if (now - winT < 1000) return;
-        const avg = acc / n, fps = 1 / avg, work = workN ? workAcc / workN : 0, target = G.cap || 60;
-        acc = 0; n = 0; winT = now; workAcc = 0; workN = 0;
+        const avg = acc / n, fps = 1 / avg, target = G.cap || 60;
+        const st = stalls; acc = 0; n = 0; winT = now; workAcc = 0; workN = 0; stalls = 0;
         if (G.mode !== 'auto') return;
-        const slow = G.cap ? fps < 22 : fps < 38;                    // «гальмує»
-        const great = fps >= target * 0.93 && work < 7;              // «є великий запас»
-        slowWins = slow ? slowWins + 1 : 0; goodWins = great ? goodWins + 1 : 0;
+        const slow = fps < target * 0.75, severe = fps < target * 0.5, stuck = st >= 4;   // «гальмує» / «дуже гальмує» / «рветься»
+        slowWins = slow ? slowWins + 1 : 0; sevWins = severe ? sevWins + 1 : 0; stallWins = stuck ? stallWins + 1 : 0;
         const i = ORDER.indexOf(G.tier);
-        if (slowWins >= 3 && i > 0) {
-            if (lastUp && now - lastUp < 60000) ceiling = G.tier;     // піднялись і одразу просіли — вище не піднімаємось
+        if ((slowWins >= 3 || sevWins >= 2 || stallWins >= 2) && i > 0) {
             G.tier = ORDER[i - 1]; LS.set('gfxAuto', G.tier); toast(); resetStats(); apply();
-        } else if (goodWins >= 30 && i < ORDER.indexOf(ceiling)) {
-            G.tier = ORDER[i + 1]; lastUp = now; LS.set('gfxAuto', G.tier); resetStats(); apply();
         }
     }
 
@@ -115,7 +121,7 @@
         refreshUI();
     }
     const HINT = {
-        auto: 'Сама підбирає якість і знижує її, якщо гра гальмує.',
+        auto: 'Сама підбирає якість і знижує її, якщо гра гальмує (назад сама не піднімає).',
         high: 'Повна якість: усі тіні, світіння та ефекти.',
         medium: 'Легші тіні й ефекти, трохи нижча чіткість. Зручно для старих ноутбуків.',
         low: 'Без тіней, мало ефектів, 30 кадрів/с. Для дуже слабких пристроїв.'

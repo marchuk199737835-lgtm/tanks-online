@@ -109,7 +109,7 @@
         }
         const rr = MI.rewardRange(r.mode, r);
         h += rule(creditIcon(20), 'Нагорода', rr.loss + '–' + rr.win) + (rr.draw != null ? rule('🤝', 'Нічия', creditAmount(rr.draw, 14)) : '');
-        $('lobby-rules').innerHTML = h;
+        const lr = $('lobby-rules'); if (lr.__h !== h) { lr.__h = h; lr.innerHTML = h; }
     }
     let lastMap = null;
     function drawMap(force) {
@@ -136,7 +136,7 @@
         const dot = MI.usesColor(r.mode) ? '<span class="lb-dot" style="background:rgb(' + pc + ')"></span>' : '';
         let acts = '';
         if (isHost && !me) acts = '<div class="lb-acts"><button type="button" class="lb-act" data-act="crown" data-id="' + esc(id) + '" title="Зробити лідером">👑</button><button type="button" class="lb-act danger" data-act="kick" data-id="' + esc(id) + '" title="Вигнати з сесії">✖</button><button type="button" class="lb-act danger" data-act="ban" data-id="' + esc(id) + '" title="Заблокувати в цій сесії">🚫</button></div>';
-        return '<div class="lb-pl' + (p.ready ? ' ready' : '') + (me ? ' me' : '') + '" style="--pc:' + pc + '">' + dot +
+        return '<div data-key="' + esc(id) + '" class="lb-pl' + (p.ready ? ' ready' : '') + (me ? ' me' : '') + '" style="--pc:' + pc + '">' + dot +
             '<span class="lb-pl-ico">' + (window.LV ? LV.icon(L, 32) : '') + '</span>' +
             '<div class="lb-pl-main"><span class="lb-pl-name">' + esc(window.dispName ? dispName(p) : p.name) + (host ? '<em>👑</em>' : '') + (me ? '<u>ВИ</u>' : '') + '</span><span class="lb-pl-lv">Рівень <b>' + L + '</b> · ' + esc(rank) + '</span>' + statLine(p) + '</div>' +
             '<span class="lb-pl-st">' + (p.ready ? 'ГОТОВИЙ' : 'ЧЕКАЄ') + '</span>' + acts + '</div>';
@@ -166,7 +166,7 @@
             $('lobby-roster-title').textContent = 'Загін'; $('lobby-roster-sub').textContent = entries.filter(([, p]) => p.ready).length + ' готові';
             h = entries.map(([id, p]) => card(r, id, p, isHost)).join('');
         }
-        $('players-list').innerHTML = h;
+        const pl = $('players-list'); if (pl.__h !== h) { pl.__h = h; if (window.DomPatch && pl.firstChild) DomPatch.html(pl, h); else pl.innerHTML = h; }   // лише змінені вузли: без блимання при готовності/вході ботів
     }
     $('players-list').addEventListener('click', e => {
         const b = e.target.closest('button'); if (!b) return; const r = cur(); if (!r) return;

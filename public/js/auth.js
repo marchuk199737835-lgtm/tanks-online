@@ -24,7 +24,8 @@
     }
     document.addEventListener('pointermove', e => aim(e.clientX, e.clientY), { passive: true });
     document.addEventListener('pointerdown', e => aim(e.clientX, e.clientY), { passive: true });
-    (function idle() { if (turret && performance.now() - idleT > 3500) turret.setAttribute('transform', 'rotate(' + (Math.sin(performance.now() / 1400) * 25).toFixed(1) + ')'); requestAnimationFrame(idle); })();
+    const loginEl = $('login-screen');
+    (function idle() { if (turret && (!loginEl || !loginEl.classList.contains('hidden')) && performance.now() - idleT > 3500) turret.setAttribute('transform', 'rotate(' + (Math.sin(performance.now() / 1400) * 25).toFixed(1) + ')'); requestAnimationFrame(idle); })();
     if (tank) tank.addEventListener('click', () => {
         if (typeof playSound === 'function') playSound('shoot');
         recoil.classList.remove('fire'); void recoil.getBoundingClientRect(); recoil.classList.add('fire');

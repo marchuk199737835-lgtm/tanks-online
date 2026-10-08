@@ -39,6 +39,7 @@
         '.sc-sec{margin:10px 4px 6px;font-size:10px;letter-spacing:.16em;color:#64748b;display:flex;align-items:center;gap:8px}.sc-sec:after{content:"";flex:1;height:1px;background:linear-gradient(90deg,rgba(100,116,139,.5),transparent)}' +
         '.sc-row{display:flex;flex-wrap:wrap;align-items:center;gap:11px;padding:10px;margin-bottom:7px;border-radius:14px;border:1px solid rgba(148,163,184,.16);background:linear-gradient(135deg,rgba(30,41,59,.62),rgba(15,23,42,.62));transition:border-color .2s,transform .2s;animation:scIn .28s both}' +
         '.sc-row:hover{border-color:rgba(96,165,250,.45)}.sc-row.off{opacity:.62}' +
+        '.sc-still .sc-row{animation:none!important}' +
         '@keyframes scIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}html.gfx-low .sc-row{animation:none}' +
         '.sc-av{position:relative;width:46px;height:46px;border-radius:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.25);box-shadow:inset 0 0 14px rgba(255,255,255,.18),0 4px 12px rgba(0,0,0,.4)}' +
         '.sc-av.off{filter:grayscale(.85) brightness(.7)}' +
@@ -80,7 +81,13 @@
         '#sc-toasts.bt .sc-tm{display:none}#sc-toasts.bt .sc-th .sc-av{width:30px;height:30px;font-size:13px;border-radius:9px}#sc-toasts.bt .sc-tt b{font-size:12px}#sc-toasts.bt .sc-tt small{font-size:8px}#sc-toasts.bt .sc-th{margin-bottom:6px}#sc-toasts.bt .sc-b{padding:5px;min-height:28px;font-size:11px}' +
         '@media (max-width:600px){.sc-panel{width:100vw;border-left:0}.sc-row{padding:9px}.sc-b{padding:7px 8px}.sc-hd h2{font-size:17px}}' +
         '@media (max-height:460px){.sc-hd{padding-top:8px;padding-bottom:4px}.sc-tabs{padding-bottom:6px}.sc-tab{padding:7px 4px}.sc-me .id{font-size:24px;margin:2px 0 6px}.sc-me{padding:10px;margin:4px 0 8px}.sc-av{width:38px;height:38px}#sc-toasts{width:min(290px,50vw)}.sc-t{padding:7px 9px 11px}.sc-tm{margin:5px 0 6px;gap:4px}.sc-tm span{padding:2px 7px;font-size:10px}.sc-th .sc-av{width:32px;height:32px;font-size:14px}.sc-tt b{font-size:13px}.sc-tb .sc-b{min-height:30px;padding:6px}#sc-toasts{gap:6px}}' +
-        '@media (max-height:460px) and (min-width:700px){.sc-panel{width:min(520px,60vw)}}';
+        '@media (max-height:460px) and (min-width:700px){.sc-panel{width:min(520px,60vw)}}' +
+        /* телефон: безпечні зони, цілі дотику ≥44px, поля ≥16px */
+        '.sc-body{overscroll-behavior:contain}.sc-panel{padding-right:env(safe-area-inset-right,0px)}.sc-hd{padding-left:max(16px,env(safe-area-inset-left,0px))}.sc-body{padding-left:max(12px,env(safe-area-inset-left,0px))}' +
+        '@media (hover:none) and (pointer:coarse){.sc-x{width:44px;height:44px}.sc-tab{min-height:44px}.sc-b{min-height:44px;min-width:44px;font-size:12px}.sc-tb .sc-b{min-height:44px}.sc-inp input{font-size:20px;min-height:48px}.sc-send{min-height:48px}.sc-dnd{min-height:44px}.sc-st,.sc-sec,.sc-lbl,.sc-tag,.sc-sec2{font-size:11px}.sc-tt small{font-size:10px}#sc-toasts.bt .sc-tt small{font-size:10px}#sc-toasts.bt .sc-b{min-height:40px}}' +
+        /* бій на телефоні: лише одне запрошення зверху під HUD, не перекриває джойстики/кнопку вогню */
+        '@media (hover:none) and (pointer:coarse){#sc-toasts.bt{top:max(48px,calc(env(safe-area-inset-top,0px) + 42px));width:min(230px,calc(100vw - 24px - env(safe-area-inset-left,0px)))}#sc-toasts.bt .sc-t:nth-child(n+2){display:none}#sc-toasts.bt .sc-t{padding:6px 8px 9px}#sc-toasts.bt .sc-th{margin-bottom:5px}#sc-toasts.bt .sc-tb .sc-b,#sc-toasts.bt .sc-b{min-height:38px;padding:4px}}' +
+        '@media (max-width:360px){.sc-row{gap:8px}.sc-hd h2{font-size:15px}.sc-dnd{padding:5px 7px}}';
 
     // ---------- допоміжне ----------
     function hue(s) { var h = 7; s = String(s); for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h % 360; }
@@ -140,9 +147,9 @@
         hdSub.textContent = S.friends.length + ' / ' + S.max + ' друзів · ' + on + ' онлайн';
         $('sc-dnd').classList.toggle('on', !!S.dnd); $('sc-dnd').setAttribute('aria-checked', S.dnd ? 'true' : 'false');
         var nIn = S.reqIn.length;
-        tabsEl.innerHTML = [['friends', 'Друзі', S.friends.length, 0], ['requests', 'Запити', nIn + S.reqOut.length, nIn], ['add', '➕ Додати', 0, 0]].map(function (t) {
+        var tabsH = [['friends', 'Друзі', S.friends.length, 0], ['requests', 'Запити', nIn + S.reqOut.length, nIn], ['add', '➕ Додати', 0, 0]].map(function (t) {
             return '<button class="sc-tab' + (tab === t[0] ? ' on' : '') + '" data-t="' + t[0] + '">' + t[1] + (t[2] ? '<b class="' + (t[3] ? 'hot' : '') + '">' + t[2] + '</b>' : '') + '</button>';
-        }).join('');
+        }).join(''); if (tabsEl.__h !== tabsH) { tabsEl.__h = tabsH; tabsEl.innerHTML = tabsH; }
     }
     function renderAll() {
         if (!built) { badge(); return; }
@@ -169,7 +176,7 @@
         }
         if (window.Profile && Profile.open) acts += '<button class="sc-b ic" data-a="prof" data-l="' + esc(f.login) + '" title="Профіль">👤</button>';
         acts += '<button class="sc-b ico no" data-a="del" data-l="' + esc(f.login) + '" title="Видалити з друзів">✕</button>';
-        return '<div class="sc-row' + (f.online ? '' : ' off') + '" style="animation-delay:' + Math.min(i, 8) * 25 + 'ms">' + avatar(f, f.online ? '' : ' off', '<i class="sc-dot ' + si.dot + '' + '"></i>') +
+        return '<div data-key="' + esc(f.login) + '" class="sc-row' + (f.online ? '' : ' off') + '" style="animation-delay:' + Math.min(i, 8) * 25 + 'ms">' + avatar(f, f.online ? '' : ' off', '<i class="sc-dot ' + si.dot + '' + '"></i>') +
             '<div class="sc-info"><div class="sc-nm">' + nameHtml(f) + '</div><div class="sc-st ' + si.cls + '">' + esc(si.txt) + '</div></div><div class="sc-acts">' + acts + '</div></div>';
     }
     function renderList() {
@@ -187,15 +194,21 @@
         } else {
             if (!S.reqIn.length && !S.reqOut.length) h = '<div class="sc-empty"><big>📭</big>Немає активних запитів.</div>';
             if (S.reqIn.length) h += '<div class="sc-sec">ВХІДНІ · ' + S.reqIn.length + '</div>' + S.reqIn.map(function (f, i) {
-                return '<div class="sc-row" style="animation-delay:' + Math.min(i, 8) * 25 + 'ms">' + avatar(f, '') + '<div class="sc-info"><div class="sc-nm">' + nameHtml(f) + '</div><div class="sc-st">хоче дружити з вами</div></div><div class="sc-acts"><button class="sc-b go" data-a="acc" data-l="' + esc(f.login) + '">Прийняти</button><button class="sc-b no" data-a="dec" data-l="' + esc(f.login) + '">Відхилити</button></div></div>';
+                return '<div data-key="in:' + esc(f.login) + '" class="sc-row" style="animation-delay:' + Math.min(i, 8) * 25 + 'ms">' + avatar(f, '') + '<div class="sc-info"><div class="sc-nm">' + nameHtml(f) + '</div><div class="sc-st">хоче дружити з вами</div></div><div class="sc-acts"><button class="sc-b go" data-a="acc" data-l="' + esc(f.login) + '">Прийняти</button><button class="sc-b no" data-a="dec" data-l="' + esc(f.login) + '">Відхилити</button></div></div>';
             }).join('');
             if (S.reqOut.length) h += '<div class="sc-sec">ВИХІДНІ · ' + S.reqOut.length + '</div>' + S.reqOut.map(function (f, i) {
-                return '<div class="sc-row" style="animation-delay:' + Math.min(i, 8) * 25 + 'ms">' + avatar(f, '') + '<div class="sc-info"><div class="sc-nm">' + nameHtml(f) + '</div><div class="sc-st">очікує підтвердження…</div></div><div class="sc-acts"><button class="sc-b no" data-a="can" data-l="' + esc(f.login) + '">Скасувати</button></div></div>';
+                return '<div data-key="out:' + esc(f.login) + '" class="sc-row" style="animation-delay:' + Math.min(i, 8) * 25 + 'ms">' + avatar(f, '') + '<div class="sc-info"><div class="sc-nm">' + nameHtml(f) + '</div><div class="sc-st">очікує підтвердження…</div></div><div class="sc-acts"><button class="sc-b no" data-a="can" data-l="' + esc(f.login) + '">Скасувати</button></div></div>';
             }).join('');
         }
-        body.innerHTML = h; body.scrollTop = keep;
+        var sameTab = body.__tab === tab; body.classList.toggle('sc-still', sameTab); body.__tab = tab;
+        if (body.__h !== h || !body.firstChild) {
+            body.__h = h;
+            if (sameTab && window.DomPatch && body.firstChild) DomPatch.html(body, h);   // фонове оновлення: лише змінені вузли (без блимання, збереження hover/прокрутки)
+            else { body.innerHTML = h; body.scrollTop = keep; }
+        }
     }
     function renderAdd() {
+        body.__tab = null; body.__h = null;
         body.innerHTML = '<div class="sc-add"><div class="sc-me"><small>ВАШ ІГРОВИЙ ID</small><div class="id" id="sc-myid">' + (S.pid || '…') + '</div><button class="sc-b" id="sc-copy" data-a="copy">📋 Скопіювати ID</button></div>' +
             '<div class="sc-lbl">ID ГРАВЦЯ, ЯКОГО ХОЧЕТЕ ДОДАТИ</div><div class="sc-inp"><input id="sc-pid" inputmode="numeric" autocomplete="off" maxlength="9" placeholder="0000000" aria-label="ID гравця"><button class="sc-send" id="sc-go" data-a="send">Надіслати запит</button></div>' +
             '<div class="sc-msg" id="sc-msg" role="status" aria-live="polite"></div><div class="sc-hint">ID складається з 7 цифр. Гравець побачить ваш запит одразу (або при наступному вході в гру). Максимум друзів: ' + S.max + '.</div></div>';
@@ -234,7 +247,7 @@
             var f = S.friends.filter(function (x) { return x.login === l; })[0];
             var go = function () { emit('socialRemove', { login: l }); };
             if (window.uiDialog && uiDialog.confirm) uiDialog.confirm({ kind: 'danger', icon: '💔', title: 'Видалити з друзів?', text: (f ? dname(f) : l) + ' зникне зі списку ваших друзів. Дружба скасується з обох боків.', okText: 'Видалити', danger: true }).then(function (ok) { if (ok) go(); });
-            else if (confirm('Видалити з друзів?')) go();
+            else if (confirm(window.I18N && I18N.t ? I18N.t('Видалити з друзів?') : 'Видалити з друзів?')) go();
         }
     }
     function invite(l, btn) {

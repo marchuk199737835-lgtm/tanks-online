@@ -15,19 +15,25 @@
     var now = function () { return performance.now(); };
     function inGame() { var g = document.getElementById('game-screen'); return !!(g && !g.classList.contains('hidden') && typeof currentRoomData !== 'undefined' && currentRoomData); }
 
-    function load() {
-        var c = AC(); if (!c || loading) return; loading = true;
-        NAMES.forEach(function (n) {
-            fetch('/sfx/' + n + '.mp3').then(function (r) { return r.arrayBuffer(); }).then(function (ab) {
-                var ok = function (b) { if (!buf[n]) { buf[n] = b; loaded++; } };
-                var p = c.decodeAudioData(ab, ok, function () {}); if (p && p.then) p.then(ok, function () {});
-            }).catch(function () {});
-        });
+    // ---- завантаження: меню-пакет після першого жесту; в економному режимі (saveData / 2g / 3g) — лише найнеобхідніше, решта за потребою ----
+    var SLOW = false, retryAt = {}, pending = {};
+    try { var cn = navigator.connection; SLOW = !!(cn && (cn.saveData || /(^|-)(2g|3g)$/.test(cn.effectiveType || ''))); } catch (e) {}
+    var ESSENTIAL = ['ui_click', 'ui_back', 'ui_confirm', 'ui_error', 'ui_buy', 'ui_notify', 'ui_invite', 'ui_friend', 'ui_open', 'ui_close'];
+    function urlOf(n) { var v = window.__AV && window.__AV.sfx; return '/sfx/' + n + '.mp3' + (v ? '?v=' + v : ''); }
+    function fetchOne(n) {
+        var c = AC(); if (!c || buf[n] || pending[n] || (retryAt[n] && performance.now() < retryAt[n])) return; pending[n] = 1;
+        var fail = function () { delete pending[n]; retryAt[n] = performance.now() + 15000; };      // збій не критичний: працюють старі синтезовані звуки
+        fetch(urlOf(n)).then(function (r) { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }).then(function (ab) {
+            var ok = function (b) { if (!buf[n]) { buf[n] = b; loaded++; } delete pending[n]; };
+            var p = c.decodeAudioData(ab, ok, fail); if (p && p.then) p.then(ok, fail);
+        }).catch(fail);
     }
+    function bundleReady(list) { if (!SLOW) return true; var ok = true; list.forEach(function (n) { if (!buf[n]) { ok = false; fetchOne(n); } }); return ok; }   // економний режим: набір підтягується при першому використанні, а цього разу грає синтезований звук
+    function load() { loading = true; (SLOW ? ESSENTIAL : NAMES).forEach(fetchOne); }
     ['pointerdown', 'touchstart', 'keydown', 'click'].forEach(function (ev) { document.addEventListener(ev, function once() { setTimeout(load, 200); document.removeEventListener(ev, once, true); }, true); });
 
     function play(name, o) {
-        o = o || {}; var c = AC(); if (!c || c.state !== 'running') return null; var b = buf[name]; if (!b) return null;
+        o = o || {}; var c = AC(); if (!c || c.state !== 'running') return null; var b = buf[name]; if (!b) { if (SLOW && NAMES.indexOf(name) >= 0) fetchOne(name); return null; }
         var t = now(); if (o.gap && lastAt[name] && t - lastAt[name] < o.gap) return null; if (active >= 20 && !o.force) return null; lastAt[name] = t; lastAny = t;
         var s = c.createBufferSource(); s.buffer = b; s.playbackRate.value = (o.rate || 1) * (1 + (Math.random() - 0.5) * (o.jit == null ? 0.03 : o.jit));
         var base = name.replace(/_\d+$/, ''), g = c.createGain(), gk = GAIN[base] != null ? GAIN[base] : (GAIN[name.replace(/_.*$/, '')] || 0.7);
@@ -107,7 +113,7 @@
     function stopLoops() { loops.forEach(function (f) { f(); }); loops = []; cancelAnimationFrame(raf); }
     function curX(el) { try { var m = new DOMMatrix(getComputedStyle(el).transform); return m.m41; } catch (e) { return 0; } }
     function roll(tape) {
-        if (!loaded) return false; stopLoops(); play('roll_start', { force: true, jit: 0 });
+        if (!loaded || !bundleReady(['roll_start', 'roll_tick_1', 'roll_tick_2', 'roll_tick_3', 'roll_stop'])) return false; stopLoops(); play('roll_start', { force: true, jit: 0 });
         var itemW = (tape.firstElementChild && tape.firstElementChild.offsetWidth) || 60, cw = (tape.parentElement && tape.parentElement.offsetWidth) || 600;
         var lastIdx = -1, lastX = 0, lastT = now(), t0 = lastT, still = 0, stopped = false, stopT = 0;
         function stopSnd() { if (stopped) return; stopped = true; play('roll_stop', { force: true, jit: 0 }); }
@@ -124,13 +130,13 @@
         }
         raf = requestAnimationFrame(step); loops.push(function () { stopped = true; }); return true;
     }
-    function reveal(rar) { if (!loaded) return false; var n = ['common', 'rare', 'epic', 'legendary', 'mythic'].indexOf(rar) >= 0 ? rar : 'common'; return !!play('reveal_' + n, { force: true, jit: 0 }); }
+    function reveal(rar) { if (!loaded) return false; var n = ['common', 'rare', 'epic', 'legendary', 'mythic'].indexOf(rar) >= 0 ? rar : 'common'; if (!bundleReady(['reveal_' + n])) return false; return !!play('reveal_' + n, { force: true, jit: 0 }); }
     function caseConfirm() { return !!play('case_confirm', { force: true, jit: 0 }); }
 
     // ---------- апгрейдер ----------
     function upgStart() { return !!play('upg_start', { force: true, jit: 0 }); }
     function upgRun(pointer) {
-        if (!loaded) return false; stopLoops(); var ch = play('upg_charge', { force: true, jit: 0 });
+        if (!loaded || !bundleReady(['upg_charge', 'upg_tick_1', 'upg_tick_2', 'upg_stop'])) return false; stopLoops(); var ch = play('upg_charge', { force: true, jit: 0 });
         var par = pointer.parentElement, W = (par && par.offsetWidth) || 1, lastBin = -1, lastX = 0, lastT = now(), t0 = lastT, still = 0, stopped = false;
         function step() {
             var left = pointer.getBoundingClientRect().left - (par ? par.getBoundingClientRect().left : 0), p = clamp(left / W, 0, 1), t = now(), dt = Math.max(1, t - lastT), v = Math.abs(left - lastX) / dt;
@@ -142,7 +148,7 @@
         }
         raf = requestAnimationFrame(step); loops.push(function () { stopped = true; fadeStop(ch, 60); }); return true;
     }
-    function upgWin(rar) { if (!loaded) return false; stopLoops(); play('upg_win', { force: true, jit: 0 }); if (rar === 'legendary' || rar === 'mythic') setTimeout(function () { play('reveal_' + rar, { force: true, jit: 0, vol: 0.55 }); }, 450); return true; }
+    function upgWin(rar) { if (!loaded || !bundleReady(['upg_win'])) return false; stopLoops(); play('upg_win', { force: true, jit: 0 }); if (rar === 'legendary' || rar === 'mythic') setTimeout(function () { play('reveal_' + rar, { force: true, jit: 0, vol: 0.55 }); }, 450); return true; }
     function upgFail() { if (!loaded) return false; stopLoops(); return !!play('upg_fail', { force: true, jit: 0 }); }
 
     // ---------- перехоплення playSound() ----------

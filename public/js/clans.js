@@ -44,7 +44,7 @@
     function emblem(icon, c1, c2, size, cls) {
         if (!GL[icon]) icon = 'tank';
         c1 = /^#[0-9a-f]{6}$/i.test(c1) ? c1 : '#f59e0b'; c2 = /^#[0-9a-f]{6}$/i.test(c2) ? c2 : '#b45309';
-        var u = 'cle' + (++eid), g = GL[icon];
+        var u = 'cle' + c1.slice(1) + c2.slice(1), g = GL[icon];   // id детермінований за кольорами: однакові дані дають однаковий HTML (без зайвих змін DOM)
         return '<svg class="cl-emb ' + (cls || '') + '" width="' + size + '" height="' + size + '" viewBox="0 0 64 64" style="--e1:' + c1 + ';--e2:' + c2 + '" aria-hidden="true" focusable="false"><defs>' +
             '<linearGradient id="' + u + 'a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + c1 + '"/><stop offset="1" stop-color="' + c2 + '"/></linearGradient>' +
             '<linearGradient id="' + u + 'b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".5" stop-color="' + c1 + '"/><stop offset="1" stop-color="' + c2 + '"/></linearGradient>' +
@@ -131,7 +131,7 @@
         '.cl-b-lv strong{font-weight:400;color:#fde68a;font-size:14px}.cl-bar{position:relative;flex:1;min-width:120px;height:10px;border-radius:6px;background:rgba(2,6,23,.7);border:1px solid rgba(148,163,184,.25);overflow:hidden}.cl-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:linear-gradient(90deg,var(--e2),var(--e1),#fff);box-shadow:0 0 12px var(--e1);transition:width .6s}' +
         '.cl-stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.cl-st{padding:7px 12px;border-radius:12px;background:rgba(2,6,23,.55);border:1px solid rgba(148,163,184,.22);font-size:11px;color:#94a3b8;letter-spacing:.05em;min-width:84px}.cl-st b{display:block;font-size:17px;font-weight:400;color:#fff;letter-spacing:0;margin-top:1px}.cl-st b.gold{color:#fde68a}' +
         // панелі
-        '.cl-pn{animation:clIn .35s both}.cl-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}' +
+        '.cl-still .cl-pn,.cl-still .cl-card,.cl-still .cl-row{animation:none!important}.cl-pn{animation:clIn .35s both}.cl-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}' +
         '.cl-box{border-radius:18px;padding:14px 16px;border:1px solid rgba(148,163,184,.2);background:linear-gradient(145deg,rgba(30,41,59,.6),rgba(8,13,28,.85));margin-bottom:14px}' +
         '.cl-box h3{margin:0 0 10px;font-size:12px;letter-spacing:.16em;color:#94a3b8;font-weight:400;display:flex;align-items:center;gap:8px}.cl-box h3:after{content:"";flex:1;height:1px;background:linear-gradient(90deg,rgba(100,116,139,.5),transparent)}' +
         '.cl-day{display:flex;align-items:center;gap:14px}.cl-ring{--p:0;position:relative;width:82px;height:82px;border-radius:50%;flex-shrink:0;background:conic-gradient(#fbbf24 calc(var(--p)*1%),rgba(51,65,85,.7) 0);display:grid;place-items:center;box-shadow:0 0 22px rgba(251,191,36,.2)}.cl-ring:before{content:"";position:absolute;inset:7px;border-radius:50%;background:#0b1226}.cl-ring b{position:relative;font-size:18px;font-weight:400;color:#fde68a}' +
@@ -184,6 +184,12 @@
         '@media (max-width:860px){.cl-prev>.cl-card{display:none}.cl-prev .cl-banner{padding:12px;flex-direction:row;text-align:left;gap:12px}.cl-prev .cl-b-emb{width:96px;height:96px}.cl-prev .cl-b-emb .cl-emb{width:80px;height:80px}.cl-prev .cl-chips{justify-content:flex-start}.cl-prev .cl-desc{text-align:left!important}.cl-prev .cl-b-in h2{font-size:19px}}@media (max-width:640px){.cl-top h1{font-size:18px}.cl-bal{padding:6px 10px;font-size:13px}.cl-banner{flex-direction:column;text-align:center;padding:18px 14px;gap:12px}.cl-b-emb{width:120px;height:120px}.cl-b-in h2{font-size:23px}.cl-b-lv,.cl-stats{justify-content:center}.cl-st{flex:1;min-width:72px}' +
         '.cl-grid{grid-template-columns:1fr}.cl-hero h2{font-size:21px}.cl-how{grid-template-columns:1fr 1fr}.cl-row{gap:8px;padding:8px}.cl-mem{flex-wrap:wrap}.cl-mem .cl-acts{width:100%;justify-content:flex-end}.cl-lv{display:none}.cl-pd .cl-emb{width:54px;height:54px}.cl-pd b{font-size:12px}.cl-pod{gap:6px}.cl-cta{width:100%;justify-content:center}.cl-main{padding-left:12px;padding-right:12px}}' +
         '@media (max-height:480px){.cl-top{padding-top:6px}.cl-banner{flex-direction:row;text-align:left;padding:12px 16px;gap:16px}.cl-b-emb{width:96px;height:96px}.cl-b-emb .cl-emb{width:80px;height:80px}.cl-b-in h2{font-size:21px}.cl-b-lv,.cl-stats{justify-content:flex-start}.cl-hero{padding:12px 16px}.cl-hero p{display:none}.cl-prev .cl-b-emb{width:90px;height:90px}}' +
+        /* телефон: безпечні зони, шапка не виштовхує «✕», цілі дотику ≥44px, поля ≥16px */
+        '.cl-top{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}.cl-main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}' +
+        '.cl-main,.cl-wgrid,.cl-msgs{overscroll-behavior:contain}.cl-top h1{min-width:0}.cl-bal{white-space:nowrap;flex-shrink:0}' +
+        '@media (max-width:400px){.cl-top{gap:8px;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}.cl-top h1{font-size:17px;letter-spacing:.1em;white-space:normal;line-height:1.1}.cl-top h1 small{font-size:9px;letter-spacing:.06em;white-space:normal}.cl-bal{padding:6px 9px;font-size:13px}.cl-main{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}}' +
+        '@media (max-width:400px){.cl-wft{padding:8px 12px max(10px,env(safe-area-inset-bottom));gap:8px}.cl-money{flex-direction:row;flex-wrap:wrap;gap:4px 10px}}@media (max-height:480px){.cl-top h1 small{display:none}.cl-wft{padding-top:6px;padding-bottom:max(6px,env(safe-area-inset-bottom))}}' +
+        '@media (hover:none) and (pointer:coarse){.cl-x{width:44px;height:44px}.cl-bal{min-height:44px}.cl-tab{min-height:44px}.cl-btn{min-height:44px}.cl-search input,.cl-send input,.cl-f input,.cl-f textarea,.cl-f select{font-size:16px;min-height:44px}.cl-f textarea{min-height:70px}.cl-sw button{width:36px;height:36px}.cl-seg button{min-height:44px}.cl-chat{height:min(58dvh,520px)}.cl-note,.cl-hint,.cl-chip,.cl-role,.cl-td,.cl-pts small,.cl-tag{font-size:11px}}' +
         'html.gfx-low .cl-ov{-webkit-backdrop-filter:none;backdrop-filter:none}' +
         'html.gfx-low .cl-ov *,html.gfx-low .cl-ov *:before,html.gfx-low .cl-ov *:after{animation:none!important}html.gfx-low .cl-emb{filter:none}' +
         '@media (prefers-reduced-motion:reduce){.cl-ov *,.cl-ov *:before,.cl-ov *:after{animation:none!important}}';
@@ -258,7 +264,7 @@
         isOpen = true; lastFocus = document.activeElement;
         root.classList.add('on'); void root.offsetWidth; root.classList.add('show');
         if (tab === 'top') hometab = 'top';
-        render(); refreshBal();
+        sigState = sigList = ''; still(false); render(); refreshBal();
         emit('clanGet'); emit('clanList', { q: '' });
         pollT = setInterval(function () { if (!isOpen) return; refreshBal(); if (S.mine && ctab !== 'chat' && ctab !== 'set') emit('clanGet'); if (ctab === 'top' || (!S.mine && hometab === 'top') || !S.mine) emit('clanList', { q: S.q }); }, 15000);
         snd('ui_click');
@@ -269,7 +275,12 @@
         root.classList.remove('show'); setTimeout(function () { if (!isOpen) root.classList.remove('on'); }, 230);
         snd('ui_click'); try { if (lastFocus && lastFocus.focus) lastFocus.focus(); } catch (e) {}
     }
-    function go(t) { if (S.mine) ctab = t; else hometab = t; render(); }
+    // фонові оновлення (поллінг) не програють анімацію появи заново; користувацька навігація — програє
+    // фонові оновлення «вливаємо» в існуючий DOM (вузли зберігаються, анімації/прокрутка/фокус не збиваються); навігація — повний рендер з анімацією
+    function put(el, h) { if (!el) return; if (window.DomPatch && root && root.classList.contains('cl-still')) DomPatch.html(el, h); else el.innerHTML = h; }
+    function still(on) { if (root) root.classList.toggle('cl-still', !!on); }
+    var sigState = '', sigList = '';
+    function go(t) { still(false); if (S.mine) ctab = t; else hometab = t; render(); }
     function refreshBal() { var b = $('cl-bal'); if (b) b.innerHTML = cr(fmt(bucks()), 18); }
 
     // ---------- Вітрина (без клану) ----------
@@ -281,8 +292,8 @@
             '<button type="button" class="cl-cta' + (poor ? ' poor' : '') + '" data-a="wiz"' + (poor ? ' aria-disabled="true"' : '') + '>🛡️ Створити клан <b>' + cr(S.cost, 16) + '</b>' + (poor ? '<small>Бракує ' + (S.cost - b) + '</small>' : '') + '</button></div>' +
             '<div class="cl-deco" aria-hidden="true">' + emblem('crown', '#fbbf24', '#b45309', 96, 'bob') + emblem('swords', '#ef4444', '#7f1d1d', 70, 'pulse') + emblem('bolt', '#38bdf8', '#4338ca', 62, 'bob') + '</div></section>';
         var tabs = '<div class="cl-tabs" role="tablist"><button type="button" class="cl-tab' + (hometab === 'browse' ? ' on' : '') + '" role="tab" data-tab="browse">🔎 Усі клани</button><button type="button" class="cl-tab' + (hometab === 'top' ? ' on' : '') + '" role="tab" data-tab="top">🏆 Рейтинг кланів</button></div>';
-        var body = hometab === 'top' ? '<div id="cl-top-body"></div>' :
-            '<div class="cl-search"><input id="cl-q" type="search" maxlength="30" placeholder="Пошук за назвою або тегом" autocomplete="off" value="' + esc(S.q) + '"></div><div class="cl-grid" id="cl-grid"></div>';
+        var body = hometab === 'top' ? '<div id="cl-top-body" data-dp-skip="1"></div>' :
+            '<div class="cl-search"><input id="cl-q" type="search" maxlength="30" placeholder="Пошук за назвою або тегом" autocomplete="off" value="' + esc(S.q) + '"></div><div class="cl-grid" id="cl-grid" data-dp-skip="1"></div>';
         return hero + tabs + body;
     }
     function joinBtn(c) {
@@ -302,9 +313,9 @@
     function renderGrid() {
         var g = $('cl-grid'); if (!g) return;
         var L = S.list && S.list.list;
-        if (!L) { g.innerHTML = '<div class="cl-empty" style="grid-column:1/-1"><i>⏳</i>Завантаження…</div>'; return; }
-        if (!L.length) { g.innerHTML = '<div class="cl-empty" style="grid-column:1/-1"><i>🛡️</i>' + (S.q ? 'За запитом «' + esc(S.q) + '» нічого не знайдено' : 'Кланів ще немає — станьте першими!<br>Створіть свій клан і запросіть друзів') + '</div>'; return; }
-        g.innerHTML = L.map(card).join('');
+        if (!L) { put(g, '<div class="cl-empty" style="grid-column:1/-1"><i>⏳</i>Завантаження…</div>'); return; }
+        if (!L.length) { put(g, '<div class="cl-empty" style="grid-column:1/-1"><i>🛡️</i>' + (S.q ? 'За запитом «' + esc(S.q) + '» нічого не знайдено' : 'Кланів ще немає — станьте першими!<br>Створіть свій клан і запросіть друзів') + '</div>'); return; }
+        put(g, L.map(card).join(''));
     }
 
     // ---------- Рейтинг ----------
@@ -339,11 +350,12 @@
         var c = S.mine, staff = c.myRole !== 'member';
         var tabs = [['ov', '📋 Огляд'], ['mem', '👥 Учасники (' + c.count + ')'], staff ? ['req', '✉ Заявки' + (c.reqCount ? ' <b>' + c.reqCount + '</b>' : '')] : null, ['top', '🏆 Рейтинг'], ['chat', '💬 Чат'], c.myRole === 'leader' ? ['set', '⚙ Налаштування'] : null].filter(Boolean);
         if (!tabs.some(function (t) { return t[0] === ctab; })) ctab = 'ov';
-        return banner(c) + '<div class="cl-tabs" role="tablist">' + tabs.map(function (t) { return '<button type="button" class="cl-tab' + (ctab === t[0] ? ' on' : '') + '" role="tab" data-tab="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div><div id="cl-pn" class="cl-pn"></div>';
+        return banner(c) + '<div class="cl-tabs" role="tablist">' + tabs.map(function (t) { return '<button type="button" class="cl-tab' + (ctab === t[0] ? ' on' : '') + '" role="tab" data-tab="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div><div id="cl-pn" class="cl-pn" data-dp-skip="1"></div>';
     }
     function panel() {
         var c = S.mine, pn = $('cl-pn'); if (!pn || !c) return;
-        pn.className = 'cl-pn'; pn.innerHTML = ({ ov: pOv, mem: pMem, req: pReq, top: function () { return renderTop(); }, chat: pChat, set: pSet })[ctab](c);
+        var soft = window.DomPatch && root.classList.contains('cl-still') && pn.__tab === ctab && ctab !== 'chat' && ctab !== 'set', h = ({ ov: pOv, mem: pMem, req: pReq, top: function () { return renderTop(); }, chat: pChat, set: pSet })[ctab](c);
+        pn.__tab = ctab; if (pn.className !== 'cl-pn') pn.className = 'cl-pn'; if (soft) DomPatch.html(pn, h); else pn.innerHTML = h;
         if (ctab === 'chat') { var m = $('cl-msgs'); if (m) m.scrollTop = m.scrollHeight; }
         if (ctab === 'set') initSettings(c);
     }
@@ -370,7 +382,7 @@
                     acts += '<button type="button" class="cl-ia" title="Передати лідерство" data-a="transfer" data-l="' + esc(m.login) + '" data-n="' + esc(dn(m)) + '">👑</button><button type="button" class="cl-ia bad" title="Вигнати" data-a="kick" data-l="' + esc(m.login) + '" data-n="' + esc(dn(m)) + '">✕</button>';
                 } else if (role === 'officer' && m.role === 'member') acts = '<button type="button" class="cl-ia bad" title="Вигнати" data-a="kick" data-l="' + esc(m.login) + '" data-n="' + esc(dn(m)) + '">✕</button>';
             }
-            return '<div class="cl-row cl-mem' + (m.today > 0 ? ' hot' : '') + (me ? ' me' : '') + '" style="animation-delay:' + Math.min(i, 12) * 28 + 'ms">' + avatar(m.login, m.nick, m.online) +
+            return '<div data-key="' + esc(m.login) + '" class="cl-row cl-mem' + (m.today > 0 ? ' hot' : '') + (me ? ' me' : '') + '" style="animation-delay:' + Math.min(i, 12) * 28 + 'ms">' + avatar(m.login, m.nick, m.online) +
                 '<div class="cl-info"><b>' + esc(dn(m)) + '<span class="cl-role ' + m.role + '">' + ROLE_ICO[m.role] + ' ' + ROLE_NAME[m.role] + '</span>' + (m.today > 0 ? '<span class="cl-td">+' + m.today + ' сьогодні</span>' : '') + '</b><small>' + (m.online ? '🟢 онлайн' : 'офлайн') + ' · у клані ' + ago(m.joinedAt).replace(' тому', '') + '</small></div>' +
                 '<div class="cl-lv">' + lvIcon(m.level, 32) + '</div><div class="cl-pts">' + fmt(m.points) + '<small>ЗА СЕЗОН</small></div>' + (acts ? '<div class="cl-acts">' + acts + '</div>' : '') + '</div>';
         }).join('');
@@ -378,7 +390,7 @@
     function pReq(c) {
         if (!c.requests.length) return '<div class="cl-empty"><i>📭</i>Нових заявок немає' + (c.join === 'request' ? '' : '<br><span style="font-size:12px">Тип вступу зараз — «' + JOIN_NAME[c.join] + '»</span>') + '</div>';
         return c.requests.map(function (r, i) {
-            return '<div class="cl-row" style="animation-delay:' + i * 30 + 'ms">' + avatar(r.login, r.nick) + '<div class="cl-info"><b>' + esc(dn(r)) + '</b><small>Хоче приєднатися</small></div><div class="cl-lv">' + lvIcon(r.level, 32) + '</div>' +
+            return '<div data-key="' + esc(r.login) + '" class="cl-row" style="animation-delay:' + i * 30 + 'ms">' + avatar(r.login, r.nick) + '<div class="cl-info"><b>' + esc(dn(r)) + '</b><small>Хоче приєднатися</small></div><div class="cl-lv">' + lvIcon(r.level, 32) + '</div>' +
                 '<div class="cl-acts"><button type="button" class="cl-btn green sm" data-a="accept" data-l="' + esc(r.login) + '">Прийняти</button><button type="button" class="cl-btn red sm" data-a="reject" data-l="' + esc(r.login) + '">Відхилити</button></div></div>';
         }).join('');
     }
@@ -501,15 +513,15 @@
         if (!root) return; var m = $('cl-main'); if (!m) return;
         var sc = m.scrollTop;
         if (!S.got) { m.innerHTML = '<div class="cl-empty"><i>⏳</i>Завантаження…</div>'; return; }
-        if (S.mine) { m.innerHTML = renderClan(); panel(); }
-        else { m.innerHTML = renderHome(); if (hometab === 'top') { var tb = $('cl-top-body'); if (tb) tb.innerHTML = renderTop(); } else renderGrid(); }
+        if (S.mine) { put(m, renderClan()); panel(); }
+        else { put(m, renderHome()); if (hometab === 'top') put($('cl-top-body'), renderTop()); else renderGrid(); }
         m.scrollTop = sc; refreshBal();
     }
     // м’яке оновлення шапки клану без скидання введення (чат/налаштування)
     function softUpdate() {
-        var m = $('cl-main'); if (!m || !S.mine) return;
-        var b = m.querySelector('.cl-banner'); if (b) { var t = document.createElement('div'); t.innerHTML = banner(S.mine); b.replaceWith(t.firstChild); }
-        var rq = m.querySelector('[data-tab="req"]'); if (rq) { var n = S.mine.reqCount; rq.innerHTML = '✉ Заявки' + (n ? ' <b>' + n + '</b>' : ''); }
+        var m = $('cl-main'); if (!m || !S.mine) return; still(true);
+        var b = m.querySelector('.cl-banner'); if (b) { if (window.DomPatch) DomPatch.el(b, banner(S.mine)); else { var t = document.createElement('div'); t.innerHTML = banner(S.mine); b.replaceWith(t.firstChild); } }
+        var rq = m.querySelector('[data-tab="req"]'); if (rq) { var n = S.mine.reqCount; put(rq, '✉ Заявки' + (n ? ' <b>' + n + '</b>' : '')); }
     }
 
     // ---------- Дії ----------
@@ -521,7 +533,7 @@
         var t = e.target.closest && e.target.closest('[data-a],[data-tab],#cl-x,#cl-bal'); if (!t || !root.contains(t)) return;
         if (t.id === 'cl-x') return close();
         if (t.id === 'cl-bal') return openWallet();
-        var tab = t.getAttribute('data-tab'); if (tab) { snd('ui_click'); if (S.mine) { ctab = tab; render(); if (tab === 'top') emit('clanList', { q: '' }); if (tab === 'req' || tab === 'mem') emit('clanGet'); } else { hometab = tab; render(); if (tab === 'top') emit('clanList', { q: '' }); } return; }
+        var tab = t.getAttribute('data-tab'); if (tab) { snd('ui_click'); still(false); if (S.mine) { ctab = tab; render(); if (tab === 'top') emit('clanList', { q: '' }); if (tab === 'req' || tab === 'mem') emit('clanGet'); } else { hometab = tab; render(); if (tab === 'top') emit('clanList', { q: '' }); } return; }
         var a = t.getAttribute('data-a'), id = t.getAttribute('data-id'), l = t.getAttribute('data-l'), n = t.getAttribute('data-n');
         if (t.disabled) return;
         if (a === 'peek') { if (e.target.closest('button[data-a]:not([data-a="peek"])')) return; emit('clanPeek', { id: id }); return; }
@@ -571,15 +583,16 @@
     function bindSocket() {
         if (typeof socket === 'undefined' || !socket || bindSocket.done) return; bindSocket.done = true;
         socket.on('clanState', function (d) {
-            if (!d) return; var prev = S.mine; S.got = true; S.mine = d.mine; S.cost = d.cost || COST;
+            if (!d) return; var sg = JSON.stringify([d.mine, d.cost]); if (S.got && sg === sigState) { if (!isOpen) updBadge(); return; } sigState = sg;
+            var prev = S.mine; S.got = true; S.mine = d.mine; S.cost = d.cost || COST;
             if (typeof d.bucks === 'number') { try { if (typeof myBucks !== 'undefined' && d.bucks !== myBucks) { /* баланс веде economyUpdate */ } } catch (e) {} }
             updBadge(); if (!isOpen) return;
             if (S.mine && prev && prev.id === S.mine.id && (ctab === 'chat' || ctab === 'set') && !$('cl-wiz').classList.contains('on')) { softUpdate(); if (S.mine.chat.length !== prev.chat.length && ctab === 'chat') { var m = $('cl-msgs'); } return; }
             if (S.mine && !prev) ctab = 'ov';
             if (W && S.mine) closeWiz(true);
-            render(); if (W) wizBal();
+            still(true); render(); if (W) wizBal();
         });
-        socket.on('clanList', function (d) { if (!d) return; S.list = d; if (!isOpen) return; if (S.mine) { if (ctab === 'top') panel(); } else if (hometab === 'top') { var tb = $('cl-top-body'); if (tb) tb.innerHTML = renderTop(); } else renderGrid(); });
+        socket.on('clanList', function (d) { if (!d) return; var sg = JSON.stringify(d); if (S.list && sg === sigList) return; sigList = sg; S.list = d; if (!isOpen) return; still(true); if (S.mine) { if (ctab === 'top') panel(); } else if (hometab === 'top') { put($('cl-top-body'), renderTop()); } else renderGrid(); });
         socket.on('clanPeek', function (d) { if (d && d.clan && isOpen) showPeek(d.clan); });
         socket.on('clanChatMsg', function (m) {
             if (!m || !S.mine) return; S.mine.chat.push(m); if (S.mine.chat.length > 50) S.mine.chat.shift();

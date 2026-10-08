@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Jura:wght@400;700;900&family=Russo+One&display=swap');
+/* шрифти Jura / Russo One підключає index.html неблокуючим <link> (раніше @import тут затримував показ сторінки на додатковий запит до Google) */
 
 body { font-family: 'Jura', sans-serif; background-color: #020617; color: white; overflow: hidden; touch-action: none; margin: 0; padding: 0; user-select: none; }
 h1, h2, h3, .font-russo { font-family: 'Russo One', sans-serif; }
@@ -427,6 +427,7 @@ canvas { display: block; cursor: crosshair; }
 .lb-pl-lv { font-size: 9px; font-weight: 800; letter-spacing: .06em; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
 .lb-pl-lv b { color: #fbbf24; font-family: 'Russo One', sans-serif; }
 .lb-pl-stat { color: #64748b; font-weight: 700; } .lb-pl-stat b { color: #cbd5e1; }
+@media (hover: none) and (pointer: coarse) { .lb-pl-lv { font-size: clamp(9px, calc(10px / var(--ui-zoom, 1)), 13px); } }
 .lb-dot { width: 12px; height: 12px; border-radius: 4px; flex-shrink: 0; border: 1px solid rgba(255,255,255,.4); }
 .lb-pl-st { flex-shrink: 0; padding: 3px 7px; border-radius: 8px; font-size: 8px; font-weight: 900; letter-spacing: .08em; background: rgba(51,65,85,.6); color: #94a3b8; border: 1px solid rgba(71,85,105,.7); }
 .lb-pl.ready .lb-pl-st { color: #34d399; background: rgba(16,185,129,.18); border-color: rgba(16,185,129,.5); }
@@ -642,7 +643,8 @@ button.up-pill:hover { background: #1d4ed8; color: #fff; }
 .rb-live { display: flex; align-items: center; gap: 6px; flex-shrink: 0; font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #64748b; } .rb-live b { font-family: 'Russo One', sans-serif; font-size: 12px; color: #34d399; }
 .rb-live i { width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981; animation: claim-pulse 1.6s ease-in-out infinite; }
 .rb-list { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-auto-rows: max-content; grid-template-columns: 1fr; gap: 8px; padding: 2px 12px 14px; align-content: start; }
-.rb-card { --c: 59,130,246; position: relative; overflow: hidden; display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 10px; border-radius: 18px; background: linear-gradient(110deg, rgba(var(--c),.22), rgba(15,23,42,.8) 55%); border: 1px solid rgba(var(--c),.4); transition: transform .2s, box-shadow .2s, border-color .2s; animation: fade-in .35s both; }
+.rb-card { --c: 59,130,246; position: relative; overflow: hidden; display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 10px; border-radius: 18px; background: linear-gradient(110deg, rgba(var(--c),.22), rgba(15,23,42,.8) 55%); border: 1px solid rgba(var(--c),.4); transition: transform .2s, box-shadow .2s, border-color .2s; }
+.rb-card.rb-new { animation: fade-in .35s both; }
 .rb-card:hover { transform: translateY(-2px); border-color: rgb(var(--c)); box-shadow: 0 8px 24px rgba(var(--c),.35); }
 .rb-card.busy { opacity: .72; }
 .rb-ico { width: 46px; height: 46px; flex-shrink: 0; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 24px; background: linear-gradient(145deg, rgba(var(--c),.5), rgba(2,6,23,.85)); border: 1px solid rgba(var(--c),.8); box-shadow: 0 0 16px rgba(var(--c),.4); }
@@ -776,6 +778,10 @@ html.gfx-low .mm-grid, html.gfx-low .au-grid { animation: none !important; }
 html.gfx-low .sh-card, html.gfx-low .rb-card, html.gfx-low .hg-eq, html.gfx-low .up-card, html.gfx-low .mm-card { box-shadow: none !important; }
 html.gfx-low .sh-ico svg, html.gfx-low .mm-card-ico { filter: none !important; }
 @media (prefers-reduced-motion: reduce) { .mm-glow, .au-orb, .au-spark, .mm-grid, .au-grid, .hg-ring { animation: none !important; } }
+/* У БОЮ (на будь-якій якості): полотно оновлюється щокадру, тож backdrop-filter під панелями змушує GPU щокадру заново розмивати все під ними —
+   це найдорожчий ефект гри (вимірювано: 49 → 60 FPS лише від кількох маленьких HUD-панелей). Замінюємо розмиття трохи щільнішим тлом. */
+#game-screen *, body:has(#game-screen:not(.hidden)) .modal, body:has(#game-screen:not(.hidden)) [class*="backdrop-blur"], body:has(#game-screen:not(.hidden)) .dlg { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+#game-screen .glass-panel { background: rgba(15,23,42,.76); }
 #settings-modal > div { max-height: calc(var(--uvh, 1dvh) * 94); overflow-y: auto; }
 
 /* ===== Вікна гри (uiDialog) замість alert/confirm ===== */

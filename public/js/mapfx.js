@@ -393,18 +393,24 @@ var MapFX = (function () {
     }
 
     // ---------- ВОДА і ДОРОГИ ----------
+    // opt.part: 'base' — лише заливка й глибина (для кешу землі), 'anim' — хвилі, відблиски й берегова піна (поверх кешу); без part — усе разом (як раніше)
     function drawWater(c, o, th, tm, view, opt) {
         th = objTheme(o, th);
         const col = (th && th.water) || ['#0b5f86', '#38a3c8', '#d9f4ff'];
-        const curve = o.type === 'water_curve';
-        c.beginPath(); if (curve) c.roundRect(o.x, o.y, o.w, o.h, Math.min(o.w, o.h) / 2); else c.rect(o.x, o.y, o.w, o.h);
-        const gr = c.createLinearGradient(o.x, o.y, o.x + o.w * 0.4, o.y + o.h); gr.addColorStop(0, col[1]); gr.addColorStop(0.5, col[0]); gr.addColorStop(1, col[0]);
-        c.fillStyle = gr; c.fill(); c.save(); c.clip();
-        // темніша глибина всередині (мілина по краях)
-        c.strokeStyle = 'rgba(0,0,0,0.0)';
-        c.lineWidth = 34; c.strokeStyle = rgba(col[1], 0.45); c.beginPath(); if (curve) c.roundRect(o.x, o.y, o.w, o.h, Math.min(o.w, o.h) / 2); else c.rect(o.x, o.y, o.w, o.h); c.stroke();
-        c.lineWidth = 12; c.strokeStyle = rgba(col[1], 0.55); c.stroke();
-        if (!(opt && opt.low)) {
+        const curve = o.type === 'water_curve', part = opt && opt.part, doBase = part !== 'anim', doAnim = part !== 'base';
+        const path = (g) => { c.beginPath(); if (curve) c.roundRect(o.x - g, o.y - g, o.w + g * 2, o.h + g * 2, Math.min(o.w, o.h) / 2); else c.rect(o.x - g, o.y - g, o.w + g * 2, o.h + g * 2); };
+        path(0);
+        if (doBase) {
+            const gr = c.createLinearGradient(o.x, o.y, o.x + o.w * 0.4, o.y + o.h); gr.addColorStop(0, col[1]); gr.addColorStop(0.5, col[0]); gr.addColorStop(1, col[0]);
+            c.fillStyle = gr; c.fill();
+        }
+        c.save(); c.clip();
+        if (doBase) {
+            // темніша глибина всередині (мілина по краях)
+            c.lineWidth = 34; c.strokeStyle = rgba(col[1], 0.45); path(0); c.stroke();
+            c.lineWidth = 12; c.strokeStyle = rgba(col[1], 0.55); c.stroke();
+        }
+        if (doAnim && !(opt && opt.low)) {
             const y0 = Math.max(o.y, view ? view[2] : o.y), y1 = Math.min(o.y + o.h, view ? view[3] : o.y + o.h), x0 = Math.max(o.x, view ? view[0] : o.x), x1 = Math.min(o.x + o.w, view ? view[1] : o.x + o.w);
             c.lineWidth = 2; c.lineCap = 'round';
             for (let wy = Math.ceil((y0 - o.y) / 38) * 38 + o.y; wy < y1; wy += 38) {
@@ -417,10 +423,14 @@ var MapFX = (function () {
             c.globalAlpha = 1;
         }
         c.restore();
-        // берегова піна
-        c.strokeStyle = rgba(col[2], 0.55); c.lineWidth = 3; c.beginPath(); if (curve) c.roundRect(o.x, o.y, o.w, o.h, Math.min(o.w, o.h) / 2); else c.rect(o.x, o.y, o.w, o.h); c.stroke();
-        c.strokeStyle = 'rgba(0,0,0,0.25)'; c.lineWidth = 1; c.beginPath(); if (curve) c.roundRect(o.x - 2, o.y - 2, o.w + 4, o.h + 4, Math.min(o.w, o.h) / 2); else c.rect(o.x - 2, o.y - 2, o.w + 4, o.h + 4); c.stroke();
+        if (doAnim) {
+            // берегова піна
+            c.strokeStyle = rgba(col[2], 0.55); c.lineWidth = 3; path(0); c.stroke();
+            c.strokeStyle = 'rgba(0,0,0,0.25)'; c.lineWidth = 1; path(2); c.stroke();
+        }
     }
+    // додає в поточний шлях контур водойми (без beginPath) — для вирізання перекритих частин хвиль/піни
+    function waterPath(c, o) { if (o.type === 'water_curve') c.roundRect(o.x, o.y, o.w, o.h, Math.min(o.w, o.h) / 2); else c.rect(o.x, o.y, o.w, o.h); }
     function drawLine(c, o) {
         const p = o.points; if (!p || p.length < 2) return;
         const path = () => { c.beginPath(); c.moveTo(p[0].x, p[0].y); for (let i = 1; i < p.length; i++) c.lineTo(p[i].x, p[i].y); };
@@ -471,9 +481,25 @@ var MapFX = (function () {
         }
         return e.list;
     }
+    // Дах — це готовий спрайт (його складний малюнок з черепицею/снігом робиться один раз на масштаб); кадр = один drawImage з прозорістю
+    const _roofSp = new Map(); let _roofPx = 0;
+    function roofSprite(o, sc) {
+        let e = _roofSp.get(o);
+        if (e && e.sc === sc && e.ow === o.w && e.oh === o.h) { _roofSp.delete(o); _roofSp.set(o, e); return e; }
+        if (e) { _roofPx -= e.pw * e.ph; _roofSp.delete(o); }
+        const w = o.w || 50, h = o.h || 50, m = Math.min(w, h), sx = Math.min(26, m * 0.14), sy = Math.min(34, m * 0.18), pad = 6;
+        const bx = o.x - pad, by = o.y - pad, pw = Math.ceil((w + sx + pad * 2) * sc), ph = Math.ceil((h + sy + pad * 2) * sc);
+        if (pw * ph > 5e6 || pw < 1 || ph < 1) return null;
+        const cv = mkCanvas(pw, ph), g = cv.getContext('2d'); g.setTransform(sc, 0, 0, sc, -bx * sc, -by * sc);
+        const o2 = Object.assign({}, o); o2._a = undefined; MO.drawProp(g, o2, 0);
+        e = { cv, sc, bx, by, pw, ph, w: pw / sc, h: ph / sc, ow: o.w, oh: o.h }; _roofSp.set(o, e); _roofPx += pw * ph;
+        while (_roofPx > 14e6 && _roofSp.size > 1) { const k0 = _roofSp.keys().next().value, e0 = _roofSp.get(k0); _roofSp.delete(k0); _roofPx -= e0.pw * e0.ph; }
+        return e;
+    }
     // view {x0,x1,y0,y1}; (px,py) — центр локального танка (або камери, якщо мертвий); dt — секунди
     function drawRoofs(c, solids, view, px, py, dt) {
         const list = roofsOf(solids), k = Math.min(1, (dt || 0.016) * 7);
+        const T = c.getTransform(), sc = Math.round(T.a * 10000) / 10000, flat = !T.b && !T.c && T.a === T.d;
         for (let i = 0; i < list.length; i++) {
             const o = list[i], w = o.w || 50, h = o.h || 50;
             const cx = o.x + w / 2, cy = o.y + h / 2, rr = Math.hypot(w, h) / 2 + 60;
@@ -484,9 +510,14 @@ var MapFX = (function () {
             a = a < tgt ? Math.min(tgt, a + k) : Math.max(tgt, a - k);
             o._a = a;
             if (a < 0.02) continue;
-            c.save(); MO.applyRot(c, o); MO.drawProp(c, o, 0); c.restore();
+            const sp = roofSprite(o, sc);
+            if (!sp) { c.save(); MO.applyRot(c, o); MO.drawProp(c, o, 0); c.restore(); continue; }   // надвеликий дах — як раніше, наживо
+            if (a < 0.999) c.globalAlpha = a;
+            if (o.rot || !flat) { c.save(); MO.applyRot(c, o); c.drawImage(sp.cv, sp.bx, sp.by, sp.w, sp.h); c.restore(); }
+            else { c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(sp.cv, Math.round(T.e + sc * sp.bx), Math.round(T.f + sc * sp.by)); c.setTransform(T); }   // 1:1 по пікселях — без розмиття
+            c.globalAlpha = 1;
         }
     }
-    return { THEMES, DEFBG, themeAt, drawRoofs, themeOf, shade, rgba, drawGround, drawEdges, drawBlock, drawTree, drawWater, drawLine, propShadow, solidKind, groundTile, treeSprite };
+    return { THEMES, DEFBG, themeAt, drawRoofs, themeOf, shade, rgba, drawGround, drawEdges, drawBlock, drawTree, drawWater, waterPath, drawLine, propShadow, solidKind, groundTile, treeSprite };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = MapFX;

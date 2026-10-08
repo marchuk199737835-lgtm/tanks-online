@@ -290,10 +290,16 @@ var MapObj = (function () {
         return false;
     }
     // Анімація дверей на клієнті (стан у o._open)
+    const _doorList = new WeakMap();   // список дверей мапи (раніше щокадру перебирали усі ~2000 об'єктів із перевіркою рядка)
+    function doorsOf(arr) {
+        let e = _doorList.get(arr);
+        if (!e || e.n !== arr.length || e.last !== arr[arr.length - 1]) { const l = []; for (let i = 0; i < arr.length; i++) if (isDoor(arr[i])) l.push(arr[i]); e = { n: arr.length, last: arr[arr.length - 1], l }; _doorList.set(arr, e); }
+        return e.l;
+    }
     function updateDoors(map, actors, dt) {
-        const arr = map.solids;
+        const arr = doorsOf(map.solids);
         for (let i = 0; i < arr.length; i++) {
-            const o = arr[i]; if (!isDoor(o)) continue;
+            const o = arr[i];
             const target = doorNear(o, actors) ? 1 : 0, cur = o._open || 0;
             o._open = target > cur ? Math.min(1, cur + dt * 3.2) : Math.max(0, cur - dt * 2.4);
         }

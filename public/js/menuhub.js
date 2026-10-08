@@ -11,6 +11,7 @@
         '.mh-badge{position:absolute;top:8px;right:10px;z-index:3;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#ef4444;color:#fff;font:800 11px/20px "Russo One",Arial,sans-serif;text-align:center;box-shadow:0 0 0 2px rgba(15,23,42,.9),0 0 14px rgba(239,68,68,.7);animation:mhPulse 1.8s ease-in-out infinite}' +
         '.mh-badge.dot{min-width:12px;width:12px;height:12px;padding:0;top:10px;right:12px}.mh-top{position:relative}.mh-top .mh-badge{top:-4px;right:-4px;min-width:18px;height:18px;line-height:18px;font-size:10px}' +
         '@keyframes mhPulse{50%{transform:scale(1.14)}}' +
+        '@media (hover:none) and (pointer:coarse){.mm-round.mh-top{min-width:clamp(34px,calc(44px / var(--ui-zoom,1)),56px);min-height:clamp(34px,calc(44px / var(--ui-zoom,1)),56px)}}' +
         '.mm-grid-nav.many{gap:8px}.mm-grid-nav.many .mm-card{padding:8px 6px;gap:2px}.mm-grid-nav.many .mm-card-ico{font-size:clamp(26px,5.6vh,40px)}.mm-grid-nav.many .mm-card h2{font-size:clamp(13px,2.4vh,18px)}.mm-grid-nav.many .mm-card p{font-size:clamp(9px,1.6vh,12px)}' +
         '@media (orientation:landscape) and (max-height:520px){.mm-grid-nav.many .mm-card p{display:none}}';
     var st = document.createElement('style'); st.id = 'menuhub-css'; st.textContent = css; document.head.appendChild(st);

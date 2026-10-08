@@ -12,7 +12,7 @@ let VS = 1; // множник «одиниця світу -> піксель ек
 let GW = window.innerWidth, GH = window.innerHeight, RS = 1; // GW/GH — логічний розмір (CSS-пікселі), RS — масштаб внутрішнього розширення полотна (налаштування графіки)
 function fitCanvas() {
     RS = (window.GFX && GFX.rs) || 1; GW = window.innerWidth; GH = window.innerHeight;
-    canvas.width = Math.max(1, Math.round(GW * RS)); canvas.height = Math.max(1, Math.round(GH * RS));
+    { const w = Math.max(1, Math.round(GW * RS)), h = Math.max(1, Math.round(GH * RS)); if (canvas.width !== w) canvas.width = w; if (canvas.height !== h) canvas.height = h; }   // без зайвого перевиділення полотна
     const touch = window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches, VH = touch ? VIEW_H_TOUCH * viewZoom : VIEW_H_DESKTOP;
     VS = Math.max(GH / VH, GW / (VH * VIEW_MAX_ASPECT)); // надширокі екрани не бачать більше, ніж 2:1
     VS = Math.min(VS, GW / (VH * 0.9)); // вузький портретний екран не стискаємо до смужки
@@ -213,8 +213,8 @@ function updatePhys(now, dt) {
             joysticks.right.released = false;
         }
         
-        for (let pid in powerups) if (Math.hypot(powerups[pid].x - myLocalTank.x, powerups[pid].y - myLocalTank.y) < myHitRad + 30 && (!powerups[pid].mod || !window.ModesFX || ModesFX.canTake(powerups[pid]))) socket.emit('collectPowerup', { roomId: currentRoomId, pid: pid });
-        for (let tid in tokens) if (Math.hypot(tokens[tid].x - myLocalTank.x, tokens[tid].y - myLocalTank.y) < myHitRad + 25) socket.emit('collectToken', { roomId: currentRoomId, tid: tid });
+        for (let pid in powerups) if (((powerups[pid].x - myLocalTank.x) ** 2 + (powerups[pid].y - myLocalTank.y) ** 2) < (myHitRad + 30) ** 2 && (!powerups[pid].mod || !window.ModesFX || ModesFX.canTake(powerups[pid]))) socket.emit('collectPowerup', { roomId: currentRoomId, pid: pid });
+        for (let tid in tokens) if (((tokens[tid].x - myLocalTank.x) ** 2 + (tokens[tid].y - myLocalTank.y) ** 2) < (myHitRad + 25) ** 2) socket.emit('collectToken', { roomId: currentRoomId, tid: tid });
         
         camera.x += (myLocalTank.x - camera.x) * 5 * dt;
         camera.y += (myLocalTank.y - camera.y) * 5 * dt;
@@ -224,7 +224,7 @@ function updatePhys(now, dt) {
     for (let id in opponents) {
         let o = opponents[id];
         if (o.targetX !== undefined) {
-            if (Math.hypot(o.targetX - o.x, o.targetY - o.y) > 150) { o.x = o.targetX; o.y = o.targetY; } 
+            if ((o.targetX - o.x) ** 2 + (o.targetY - o.y) ** 2 > 22500) { o.x = o.targetX; o.y = o.targetY; } 
             else { o.x += (o.targetX - o.x) * Math.min(1, 15 * dt); o.y += (o.targetY - o.y) * Math.min(1, 15 * dt); }
             let db = o.targetBody - o.bodyAngle;
             while (db > Math.PI) db -= Math.PI * 2; while (db < -Math.PI) db += Math.PI * 2;
@@ -256,11 +256,14 @@ function updatePhys(now, dt) {
         let actualDmg = b.dmgOverride || bulletBaseDmg;
         if (myLocalTank.buff === 'double_dmg') actualDmg *= 2; // Підтримка бафу на подвійний урон
         
+        const _ally = isS && b.owner !== 'zombie';   // кооп/PvE: снаряди гравців НЕ зачіпають союзників (ні візуально, ні по шкоді)
         for (let oid in opponents) {
+            if (_ally) break;
             let op = opponents[oid];
             if (op.hp > 0 && op.buff !== 'shield') {
                 let oR = op.buff === 'boss' ? 75 : 24, hD = b.type === 'samurai' ? oR + 30 : oR + 4;
-                if (Math.hypot(b.x - op.x, b.y - op.y) < hD) {
+                const _dx = b.x - op.x, _dy = b.y - op.y;
+                if (_dx * _dx + _dy * _dy < hD * hD) {
                     hP = true;
                     if (b.owner === myId) {
                         if (isTeamM(currentRoomData.mode) && myLocalTank.team === op.team) continue;
@@ -272,9 +275,10 @@ function updatePhys(now, dt) {
             }
         }
         
-        if (!hP && myLocalTank.hp > 0 && myLocalTank.buff !== 'shield' && b.owner !== myId && b.owner !== 'zombie') {
+        if (!hP && !_ally && myLocalTank.hp > 0 && myLocalTank.buff !== 'shield' && b.owner !== myId && b.owner !== 'zombie') {
             let mR = myLocalTank.buff === 'boss' ? 75 : 24, hD = b.type === 'samurai' ? mR + 30 : mR + 4;
-            if (Math.hypot(b.x - myLocalTank.x, b.y - myLocalTank.y) < hD) {
+            const _dx = b.x - myLocalTank.x, _dy = b.y - myLocalTank.y;
+            if (_dx * _dx + _dy * _dy < hD * hD) {
                 if (isTeamM(currentRoomData.mode) && opponents[b.owner] && opponents[b.owner].team === myLocalTank.team) { } 
                 else {
                     hP = true;
@@ -289,7 +293,8 @@ function updatePhys(now, dt) {
         if (!hP && isS && b.owner !== 'zombie') {      // снаряди зомбі/босів не б'ють самих зомбі
             for (let zid in zombies) {
                 let z = zombies[zid], zD = b.type === 'samurai' ? zType(z.type).radius + 35 : zType(z.type).radius + 10;
-                if (Math.hypot(b.x - z.x, b.y - z.y) < zD) {
+                const _dx = b.x - z.x, _dy = b.y - z.y;
+                if (_dx * _dx + _dy * _dy < zD * zD) {
                     hZ = true;
                     if (b.owner === myId) {
                         socket.emit('zombieHit', { roomId: currentRoomId, zid: zid, dmg: actualDmg, type: b.type });
@@ -333,10 +338,9 @@ function updatePhys(now, dt) {
     }
     
     for (let i = particles.length - 1; i >= 0; i--) {
-        particles[i].life -= dt;
-        particles[i].x += particles[i].vx * dt;
-        particles[i].y += particles[i].vy * dt;
-        if (particles[i].life <= 0) particles.splice(i, 1);
+        const p = particles[i];
+        p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt;
+        if (p.life <= 0) { const l = particles.pop(); if (i < particles.length) particles[i] = l; }   // видалення без зсуву масиву
     }
     
     for (let i = lasers.length - 1; i >= 0; i--) {
@@ -378,6 +382,96 @@ function fireBull(now, mR, fC, tR) {
     socket.emit('shoot', sh);
 }
 
+// кулі: світіння (shadowBlur) на кожну кулю кожного кадру — дорого; тепер готовий спрайт «куля + ореол» на тип
+const _bsp = new Map(); let _bspKey = '';
+function bulletSprite(type) {
+    const gf = window.GFX, k0 = _curS.toFixed(3) + '|' + (gf ? gf.tier + gf.blur : '');
+    if (k0 !== _bspKey) { _bspKey = k0; _bsp.clear(); }
+    let e = _bsp.get(type); if (e) return e;
+    const s = _curS, tri = type === 'piercing' || type === 'fast' || type === 'minigun' || type === 'homing', r = tri ? 0 : type === 'acid' ? 8 : type === 'boss_proj' ? 10 : 6;
+    const col = type === 'fast' || type === 'minigun' ? '#38bdf8' : type === 'explosive' || type === 'boss_proj' ? '#fb923c' : type === 'incendiary' ? '#ef4444' : type === 'piercing' ? '#d946ef' : type === 'acid' ? '#a3e635' : type === 'shotgun' ? '#f8fafc' : type === 'homing' ? '#10b981' : type === 'hunter_gun' ? '#ef4444' : '#fef08a';
+    const bx0 = tri ? 0 : -r, bx1 = tri ? 20 : r, by0 = tri ? -4 : -r, by1 = tri ? 4 : r, blur = gf ? (gf.shadow ? 10 * gf.blur : 0) : 10;
+    const pad = Math.ceil(blur * 1.5) + 2, W = Math.ceil((bx1 - bx0) * s) + pad * 2, H = Math.ceil((by1 - by0) * s) + pad * 2;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
+    g.setTransform(s, 0, 0, s, pad - bx0 * s, pad - by0 * s);
+    g.beginPath();
+    if (tri) { g.moveTo(0, -4); g.lineTo(20, 0); g.lineTo(0, 4); } else g.arc(0, 0, r, 0, Math.PI * 2);
+    g.fillStyle = col; if (blur) { g.shadowColor = col; g.shadowBlur = blur; } g.fill();
+    e = { cv, x: bx0 - pad / s, y: by0 - pad / s, w: W / s, h: H / s }; _bsp.set(type, e); return e;
+}
+
+// ===== Готові спрайти частин танка й підписів =====
+// Модулі з світінням (епічні й вище) малювались через shadowBlur — по кілька розмитих проходів на кожен танк у кожному кадрі.
+// Тепер кожна частина (гусениці, корпус, гармата, башта) малюється один раз у спрайт (з супер-семплінгом), далі кадр = drawImage із поворотом.
+// «Дихання» світіння легендарних/міфічних: два спрайти (слабке/сильне світіння), що плавно змішуються по alpha.
+let _curS = 1, _curOx = 0, _curOy = 0;   // масштаб полотна (RS*VS) і піксельний зсув світу — виставляє draw()
+const _msp = new Map(); let _mspKey = '';
+// parts: [[тип, модуль], ...] — які частини об'єднуємо в один спрайт (гусениці+корпус, гармата+башта)
+function _modSprite(parts) {
+    const gf = window.GFX, k0 = _curS.toFixed(3) + '|' + (gf ? gf.tier + gf.blur : '');
+    if (k0 !== _mspKey) { _mspKey = k0; _msp.clear(); }
+    let id = ''; for (const q of parts) id += q[0] + ':' + (q[1] ? q[1].id : '') + '|';
+    let e = _msp.get(id); if (e !== undefined) return e;
+    e = null;
+    try {
+        const s = _curS, rho = Math.min(3, Math.max(1, Math.round(s * 1.5 * 4) / 4));   // густина пікселів спрайта (трохи вища за екранну: гарне згладжування при зменшенні)
+        let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, tier = 0, anyGlow = false;
+        const ex = (x, y) => { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; };
+        for (const q of parts) {
+            const pal = modPalette(q[1] ? q[1].rarity : null);
+            for (const sh of modShapes(q[0], q[1] || null)) {
+                if (sh.g && pal.tier >= 2) { anyGlow = true; if (pal.tier > tier) tier = pal.tier; }
+                if (sh.k === 'r') { ex(sh.x, sh.y); ex(sh.x + sh.w, sh.y + sh.h); } else if (sh.k === 'p') sh.p.forEach(z => ex(z[0], z[1])); else if (sh.k === 'c') { ex(sh.x - sh.r, sh.y - sh.r); ex(sh.x + sh.r, sh.y + sh.r); } else if (sh.k === 'l') { ex(sh.x1, sh.y1); ex(sh.x2, sh.y2); }
+            }
+        }
+        if (x0 > x1) { _msp.set(id, null); return null; }
+        const blurK = gf ? (gf.shadow ? gf.blur : 0) : 1, maxBlur = anyGlow ? (tier === 4 ? 16 : tier === 3 ? 11 : 4) * blurK : 0;
+        const pad = Math.ceil(maxBlur * 1.4 / s) + 3;
+        const W = Math.ceil((x1 - x0 + pad * 2) * rho), H = Math.ceil((y1 - y0 + pad * 2) * rho);
+        if (W * H > 700000) { _msp.set(id, null); return null; }
+        const omega = (anyGlow && tier >= 3 && (!gf || gf.tier === 'high')) ? (tier === 4 ? 3 : 2.2) : 0;   // «дихання» світіння — лише на високій якості
+        const mk = (T) => {
+            const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
+            if (gf) gf.attach(g);
+            // shadowBlur у GFX.attach — у пікселях полотна; у спрайті потрібно rho/s разів більше, щоб після зменшення світіння було те саме
+            const dB = Object.getOwnPropertyDescriptor(g, 'shadowBlur'), kk = rho / s;
+            if (dB && dB.set) Object.defineProperty(g, 'shadowBlur', { configurable: true, get: dB.get, set(v) { dB.set.call(g, v * kk); } });
+            g.setTransform(rho, 0, 0, rho, (pad - x0) * rho, (pad - y0) * rho);
+            for (const q of parts) drawModVis(g, q[0], q[1] || null, T);
+            return cv;
+        };
+        e = { a: mk(omega ? -Math.PI / 2 / omega : (tier === 4 ? 0.0 : 0)), b: omega ? mk(Math.PI / 2 / omega) : null, omega, x: x0 - pad, y: y0 - pad, w: W / rho, h: H / rho };
+    } catch (err) { e = null; }
+    _msp.set(id, e); return e;
+}
+const _pp0 = [['tracks', null], ['hull', null]], _pp1 = [['cannon', null], ['turret', null]];
+function drModPair(arr, ta, a, tb, b, T, raw) {
+    const ma = typeof a === 'string' ? MODULES[a] : a, mb = typeof b === 'string' ? MODULES[b] : b;
+    arr[0][0] = ta; arr[0][1] = ma || null; arr[1][0] = tb; arr[1][1] = mb || null;
+    const e = raw ? null : _modSprite(arr);
+    if (!e) { drawModVis(ctx, ta, a, T); drawModVis(ctx, tb, b, T); return; }
+    ctx.drawImage(e.a, e.x, e.y, e.w, e.h);
+    if (e.b && ctx.globalAlpha === 1) { ctx.globalAlpha = (Math.sin(T * e.omega) + 1) / 2; ctx.drawImage(e.b, e.x, e.y, e.w, e.h); ctx.globalAlpha = 1; }
+}
+// підпис танка: готовий спрайт тексту (шрифт Russo One підвантажується — після його появи кеш скидається)
+const _lbl = new Map(); let _lblKey = '';
+try { if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => _lbl.clear()); } catch (e) { }
+function drLabel(nm, cH, x, y) {
+    const k0 = _curS.toFixed(3); if (k0 !== _lblKey) { _lblKey = k0; _lbl.clear(); }
+    const id = cH + '|' + nm; let e = _lbl.get(id);
+    if (e === undefined) {
+        const s = _curS, f = '14px Russo One';
+        ctx.font = f; const tw = Math.ceil(ctx.measureText(nm).width) + 8, ww = Math.min(400, tw), hh = 24;
+        const cv = document.createElement('canvas'); cv.width = Math.ceil(ww * s); cv.height = Math.ceil(hh * s);
+        const g = cv.getContext('2d'); g.setTransform(s, 0, 0, s, 0, 0); g.fillStyle = cH; g.font = f; g.textAlign = 'center'; g.fillText(nm, ww / 2, 17);
+        e = { cv, w: cv.width / s, h: cv.height / s, hw: ww / 2 };
+        if (_lbl.size > 160) _lbl.clear(); _lbl.set(id, e);
+    }
+    // без дробового зсуву: підпис лягає на цілі пікселі полотна (інакше растровий текст розмивається при плавному русі танка)
+    const s = _curS, dx = Math.round(s * (x - e.hw) + _curOx), dy = Math.round(s * (y - 62) + _curOy);
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(e.cv, dx, dy); ctx.setTransform(s, 0, 0, s, _curOx + s * x, _curOy + s * y);
+}
+
 function drTnk(x, y, bA, tA, cH, nm, iM, hp, bf, eq, dN = true) {
     if (hp <= 0) return;
     ctx.save();
@@ -388,10 +482,8 @@ function drTnk(x, y, bA, tA, cH, nm, iM, hp, bf, eq, dN = true) {
     ctx.shadowColor = 'transparent';
     
     if (dN && (bf !== 'invisible' || iM)) {
-        ctx.fillStyle = cH;
-        ctx.font = '14px Russo One';
-        ctx.textAlign = 'center';
-        ctx.fillText(nm, 0, -45);
+        if (sc === 1) drLabel(nm, cH, x, y);
+        else { ctx.fillStyle = cH; ctx.font = '14px Russo One'; ctx.textAlign = 'center'; ctx.fillText(nm, 0, -45); }
     }
     
     if (bf === 'shield') {
@@ -407,14 +499,12 @@ function drTnk(x, y, bA, tA, cH, nm, iM, hp, bf, eq, dN = true) {
     let T = performance.now() / 1000;
     ctx.save();
     ctx.rotate(bA);
-    drawModVis(ctx, 'tracks', eq && eq.tracks, T);
-    drawModVis(ctx, 'hull', eq && eq.hull, T);
+    drModPair(_pp0, 'tracks', eq && eq.tracks, 'hull', eq && eq.hull, T, sc !== 1);
     ctx.restore();
 
     ctx.save();
     ctx.rotate(tA);
-    drawModVis(ctx, 'cannon', eq && eq.cannon, T);
-    drawModVis(ctx, 'turret', eq && eq.turret, T);
+    drModPair(_pp1, 'cannon', eq && eq.cannon, 'turret', eq && eq.turret, T, sc !== 1);
     ctx.restore();
     ctx.restore();
 }
@@ -695,74 +785,304 @@ function solidInView(o, X0, X1, Y0, Y1) {
     return !(cx + r < X0 || cx - r > X1 || cy + r < Y0 || cy - r > Y1);
 }
 
+// ===== Кеш статичного світу («чанки») =====
+// Земля, дороги, будинки, дерева, стіни й нерухомий декор не змінюються між кадрами, тому раніше їх
+// перемальовували щокадру (сотні шляхів, градієнтів, кліпів). Тепер світ ділиться на плитки 256×256 px у масштабі екрана
+// й кожна малюється ОДИН раз у два шари: «під» (земля, дороги, дно води) і «над» (об'єми стін, дерева, декор).
+// Кожен кадр — лише кілька drawImage. Те, що рухається (хвилі води, двері, вогнище, радар, неон, дахи), малюється наживо між шарами.
+// Чанки лінійно добудовуються наперед (за напрямком руху), старі — витісняються (LRU). Вимкнути: WC.on = false (повертає старий «живий» режим).
+const WC = (function () {
+    const P = 256, M = 70, G = 256;
+    let an = null, S = 0, tk = '';
+    const store = new Map(), pool = [];
+    let tick = 0, maxN = 0, lastWarm = '', nEmpty = 0;
+    const api = { on: true, built: 0, buildMs: 0, hits: 0 };
+    const EMPTY = {};
+    const dynMemo = Object.create(null);
+
+    // ---- чи змінюється вигляд декору з часом (порівнюємо журнали викликів canvas при різних t) ----
+    function sigOf(o, t) {
+        const log = [], st = { globalAlpha: 1, lineWidth: 1, shadowBlur: 0, canvas: { width: 64, height: 64 }, font: '', globalCompositeOperation: 'source-over' };
+        const fmt = a => typeof a === 'number' ? Math.round(a * 1000) / 1000 : (a && a.__g) ? '[g' + a.__g + ']' : String(a);
+        const px = new Proxy(st, {
+            get(tg, k) {
+                if (k in st) return st[k]; if (typeof k === 'symbol') return undefined;
+                return (st[k] = function () {
+                    let s = k + '('; for (let i = 0; i < arguments.length; i++) s += fmt(arguments[i]) + ','; log.push(s);
+                    if (k === 'createLinearGradient' || k === 'createRadialGradient' || k === 'createPattern') { const id = log.length; return { __g: id, addColorStop() { log.push('cs' + Array.prototype.join.call(arguments)); } }; }
+                    if (k === 'measureText') return { width: 10 };
+                });
+            },
+            set(tg, k, v) { log.push(k + '=' + fmt(v)); st[k] = v; return true; }
+        });
+        MapObj.drawProp(px, o, t); return log.join(';');
+    }
+    function isDynProp(o) {
+        const t = o.type; if (t in dynMemo) return dynMemo[t];
+        let d = true;
+        try { const a = sigOf(o, 0), b = sigOf(o, 0), c = sigOf(o, 1.234), e = sigOf(o, 7.77); d = !(a === b && a === c && a === e); } catch (err) { d = true; }
+        return (dynMemo[t] = d);
+    }
+
+    // ---- аналіз мапи: межі, шари, динамічні об'єкти, сітка для швидкого пошуку ----
+    function analyze(map) {
+        const so = map.solids, n = so.length, nx = Math.ceil(map.size / G) + 1;
+        const A = { map, n, nx, bb: new Float64Array(n * 4), pc: new Uint8Array(n), dy: new Uint8Array(n), ow: new Uint8Array(n), stamp: new Int32Array(n), st: 0, d1: [], d2: [], d3: [], grid: new Array(nx * nx), roofs: [] };
+        for (let i = 0; i < n; i++) {
+            const o = so[i], t = o.type || '';
+            if (t.indexOf('spawn') >= 0) continue;
+            let x0, y0, x1, y1;
+            if (t === 'line') {
+                if (!o.points || !o.points.length) continue;
+                x0 = 1e9; y0 = 1e9; x1 = -1e9; y1 = -1e9; for (const q of o.points) { if (q.x < x0) x0 = q.x; if (q.x > x1) x1 = q.x; if (q.y < y0) y0 = q.y; if (q.y > y1) y1 = q.y; }
+                const w = (o.width || 10) / 2 + 4; x0 -= w; y0 -= w; x1 += w; y1 += w;
+            } else if (o.w === undefined && o.h === undefined) { const r = (o.r || 30) + 40; x0 = o.x - r; x1 = o.x + r; y0 = o.y - r; y1 = o.y + r; }
+            else { const w = o.w || 0, h = o.h || 0, cx = o.x + w / 2, cy = o.y + h / 2, r = Math.hypot(w, h) / 2 + 40; x0 = cx - r; x1 = cx + r; y0 = cy - r; y1 = cy + r; }
+            A.bb[i * 4] = x0; A.bb[i * 4 + 1] = y0; A.bb[i * 4 + 2] = x1; A.bb[i * 4 + 3] = y1;
+            const water = t.indexOf('water') >= 0;
+            let pc = 0, dy = 0;
+            if (t === 'line' || water || t === 'prop_puddle' || t === 'prop_crater' || t === 'prop_floor') {
+                pc = 1; if (water) dy = 2; else if (t !== 'line') dy = isDynProp(o) ? 1 : 0;
+            } else if (t === 'prop_roof') { A.roofs.push(i); continue; }
+            else if (MapFX.solidKind(o)) pc = 2;
+            else if (t.indexOf('prop_') >= 0) { pc = 2; dy = (t.indexOf('prop_door_') === 0 || isDynProp(o)) ? 1 : 0; }
+            else if (t.indexOf('neon') >= 0) { pc = 3; dy = 1; }
+            else continue;
+            A.pc[i] = pc; A.dy[i] = dy;
+            if (dy === 1) (pc === 1 ? A.d1 : pc === 2 ? A.d2 : A.d3).push(i);
+            else if (dy === 2) A.d1.push(i);
+            // сітка
+            const gx0 = Math.max(0, Math.floor(x0 / G)), gx1 = Math.min(nx - 1, Math.floor(x1 / G)), gy0 = Math.max(0, Math.floor(y0 / G)), gy1 = Math.min(nx - 1, Math.floor(y1 / G));
+            for (let gy = gy0; gy <= gy1; gy++) for (let gx = gx0; gx <= gx1; gx++) { const k = gy * nx + gx; (A.grid[k] || (A.grid[k] = [])).push(i); }
+        }
+        // статичні об'єкти нижнього шару, що лежать ПОВЕРХ води в порядку малювання (мости, підлога), переходять у верхній шар, щоб хвилі не лягали на них
+        for (let w = 0; w < n; w++) {
+            if (A.dy[w] !== 2) continue;
+            const wx0 = A.bb[w * 4], wy0 = A.bb[w * 4 + 1], wx1 = A.bb[w * 4 + 2], wy1 = A.bb[w * 4 + 3];
+            for (let j = w + 1; j < n; j++) {
+                if (A.pc[j] !== 1 || A.dy[j] === 2) continue;
+                if (A.bb[j * 4 + 2] < wx0 || A.bb[j * 4] > wx1 || A.bb[j * 4 + 3] < wy0 || A.bb[j * 4 + 1] > wy1) continue;
+                if (A.dy[j] === 0) A.ow[j] = 1;
+            }
+        }
+        // водойми, що перекривають одна одну: піну/хвилі раніших закривають пізніші (в порядку малювання), тож вирізаємо їх із живого шару
+        A.excl = Object.create(null);
+        for (let w = 0; w < n; w++) {
+            if (A.dy[w] !== 2) continue;
+            for (let j = w + 1; j < n; j++) {
+                if (A.dy[j] !== 2 || A.bb[j * 4 + 2] < A.bb[w * 4] || A.bb[j * 4] > A.bb[w * 4 + 2] || A.bb[j * 4 + 3] < A.bb[w * 4 + 1] || A.bb[j * 4 + 1] > A.bb[w * 4 + 3]) continue;
+                (A.excl[w] || (A.excl[w] = [])).push(so[j]);
+            }
+        }
+        return A;
+    }
+    function query(R, out) {   // індекси об'єктів, що перетинають прямокутник, за зростанням (порядок малювання)
+        out.length = 0; const nx = an.nx, st = ++an.st;
+        const gx0 = Math.max(0, Math.floor(R.x0 / G)), gx1 = Math.min(nx - 1, Math.floor(R.x1 / G)), gy0 = Math.max(0, Math.floor(R.y0 / G)), gy1 = Math.min(nx - 1, Math.floor(R.y1 / G));
+        for (let gy = gy0; gy <= gy1; gy++) for (let gx = gx0; gx <= gx1; gx++) {
+            const cell = an.grid[gy * nx + gx]; if (!cell) continue;
+            for (let k = 0; k < cell.length; k++) { const i = cell[k]; if (an.stamp[i] === st) continue; an.stamp[i] = st; const b = an.bb; if (b[i * 4 + 2] < R.x0 || b[i * 4] > R.x1 || b[i * 4 + 3] < R.y0 || b[i * 4 + 1] > R.y1) continue; out.push(i); }
+        }
+        out.sort((a, b) => a - b); return out;
+    }
+
+    // ---- малювання шарів (mode 0 — усе наживо, як раніше; mode 1 — статична частина для чанка) ----
+    function obj1(c, o, tm, th, low, view, full) {   // нижній шар: дороги, вода, підлога
+        c.save(); MapObj.applyRot(c, o);
+        if (o.type === 'line') MapFX.drawLine(c, o);
+        else if (o.type.indexOf('water') >= 0) MapFX.drawWater(c, o, th, tm, view, full ? { low } : { low, part: 'base' });
+        else drPrp(c, o, tm);
+        c.restore();
+    }
+    function obj2(c, o, tm, th, low) {               // верхній шар: стіни, дерева, декор (з тінню)
+        c.save(); MapObj.applyRot(c, o);
+        const k = MapFX.solidKind(o);
+        if (k === 'block') MapFX.drawBlock(c, o, th, { low });
+        else if (k === 'tree') MapFX.drawTree(c, o, th, { low });
+        else { MapFX.propShadow(c, o); drPrp(c, o, tm); }
+        c.restore();
+    }
+    function obj3(c, o, tm) {                         // неонові фігури (пульсують)
+        c.save(); MapObj.applyRot(c, o);
+        c.strokeStyle = o.color || '#3b82f6'; c.lineWidth = 4; c.shadowColor = o.color || '#3b82f6'; c.shadowBlur = 15 + Math.sin(tm * 5) * 5;
+        if (o.type === 'neon_wall') c.strokeRect(o.x, o.y, o.w, o.h);
+        else if (o.type === 'neon_circle') { c.beginPath(); c.arc(o.x + o.w / 2, o.y + o.h / 2, Math.min(o.w, o.h) / 2, 0, Math.PI * 2); c.stroke(); }
+        else if (o.type === 'neon_cross') { c.beginPath(); c.moveTo(o.x, o.y); c.lineTo(o.x + o.w, o.y + o.h); c.moveTo(o.x + o.w, o.y); c.lineTo(o.x, o.y + o.h); c.stroke(); }
+        else if (o.type === 'neon_triangle') { c.beginPath(); c.moveTo(o.x + o.w / 2, o.y); c.lineTo(o.x + o.w, o.y + o.h); c.lineTo(o.x, o.y + o.h); c.closePath(); c.stroke(); }
+        else if (o.type === 'neon_diamond') { c.beginPath(); c.moveTo(o.x + o.w / 2, o.y); c.lineTo(o.x + o.w, o.y + o.h / 2); c.lineTo(o.x + o.w / 2, o.y + o.h); c.lineTo(o.x, o.y + o.h / 2); c.closePath(); c.stroke(); }
+        else if (o.type === 'neon_arch') { c.beginPath(); c.moveTo(o.x, o.y + o.h); c.lineTo(o.x, o.y + o.h / 2); c.arc(o.x + o.w / 2, o.y + o.h / 2, o.w / 2, Math.PI, 0); c.lineTo(o.x + o.w, o.y + o.h); c.stroke(); }
+        else if (o.type === 'neon_pillar') { c.beginPath(); c.ellipse(o.x + o.w / 2, o.y + o.h / 2, o.w / 2, o.h / 2, 0, 0, Math.PI * 2); c.stroke(); }
+        c.fillStyle = o.color || '#3b82f6'; c.globalAlpha = 0.2; c.fillRect(o.x, o.y, o.w, o.h); c.globalAlpha = 1.0;
+        c.restore();
+    }
+    const _ids = [];
+    function ground(c, R) {
+        const mp = an.map, mS = mp.size, th = MapFX.themeOf(mp), sh = MapObj.hasShape(mp);
+        const gx0 = Math.max(0, R.x0), gy0 = Math.max(0, R.y0), gx1 = Math.min(mS, R.x1), gy1 = Math.min(mS, R.y1);
+        if (gx1 <= gx0 || gy1 <= gy0) return;
+        if (sh) { // фігурна мапа: все поза контуром — порожнеча
+            c.fillStyle = th ? MapFX.shade(mp.bg || '#222', 0.16) : '#000'; c.fillRect(gx0, gy0, gx1 - gx0, gy1 - gy0);
+            c.save(); c.beginPath(); mp.shape.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.closePath(); c.clip();
+        }
+        MapFX.drawGround(c, mp, gx0, gy0, gx1, gy1, th ? 0 : 1);
+        if (th) MapFX.drawEdges(c, mp, gx0, gy0, gx1, gy1);
+        if (sh) {
+            c.restore();
+            c.save(); c.beginPath(); mp.shape.forEach((p, i) => i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)); c.closePath();
+            if (th) { c.lineJoin = 'round'; c.strokeStyle = MapFX.shade(mp.bg || '#222', 0.28); c.lineWidth = 30; c.stroke(); c.strokeStyle = MapFX.shade(mp.bg || '#222', 0.5); c.lineWidth = 10; c.stroke(); c.strokeStyle = 'rgba(255,255,255,0.18)'; c.lineWidth = 3; c.stroke(); }
+            else { c.strokeStyle = '#38bdf8'; c.lineWidth = 6; c.lineJoin = 'round'; c.shadowColor = '#38bdf8'; c.shadowBlur = 18; c.stroke(); }
+            c.restore();
+        }
+    }
+    // mode 0: земля + весь нижній шар наживо; mode 1: земля + статичний нижній шар (для чанка)
+    function paintUnder(c, R, mode, tm, th, low, view) {
+        ground(c, R);
+        const ids = query({ x0: R.x0 - M, x1: R.x1 + M, y0: R.y0 - M, y1: R.y1 + M }, _ids), so = an.map.solids; let n = 0;
+        for (let k = 0; k < ids.length; k++) {
+            const i = ids[k]; if (an.pc[i] !== 1) continue;
+            if (mode === 1 && (an.dy[i] === 1 || an.ow[i])) continue;
+            obj1(c, so[i], tm, th, low, view, mode === 0); n++;
+        }
+        return n;
+    }
+    // mode 0: усе верхнє наживо (нижній шар вже намальовано); mode 1: статичне (для чанка) — спершу «підняті» об'єкти над водою
+    function paintOver(c, R, mode, tm, th, low) {
+        const ids = query({ x0: R.x0 - M, x1: R.x1 + M, y0: R.y0 - M, y1: R.y1 + M }, _ids), so = an.map.solids; let n = 0;
+        if (mode === 1) for (let k = 0; k < ids.length; k++) { const i = ids[k]; if (an.pc[i] === 1 && an.ow[i]) { obj1(c, so[i], tm, th, low, null, false); n++; } }
+        for (let k = 0; k < ids.length; k++) { const i = ids[k]; if (an.pc[i] !== 2 || (mode === 1 && an.dy[i])) continue; obj2(c, so[i], tm, th, low); n++; }
+        if (mode === 0) for (let k = 0; k < ids.length; k++) { const i = ids[k]; if (an.pc[i] === 3) obj3(c, so[i], tm); }
+        return n;
+    }
+
+    // ---- чанки ----
+    function build(layer, i, j) {
+        const t0 = performance.now();
+        let e = pool.pop();
+        if (!e) { const cv = document.createElement('canvas'); cv.width = P; cv.height = P; const c = cv.getContext('2d'); if (window.GFX) GFX.attach(c); e = { cv, c, used: 0 }; }
+        const c = e.c, th = MapFX.themeOf(an.map), low = !!(window.GFX && GFX.tier === 'low');
+        c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, P, P); c.globalAlpha = 1; c.shadowColor = 'transparent'; c.shadowBlur = 0;
+        c.setTransform(S, 0, 0, S, -i * P, -j * P);
+        const ex = 1 / S, R = { x0: i * P / S - ex, y0: j * P / S - ex, x1: (i + 1) * P / S + ex, y1: (j + 1) * P / S + ex };
+        c.save();
+        let n;
+        if (layer === 0) n = paintUnder(c, R, 1, 0, th, low, null) + 1; else n = paintOver(c, R, 1, 0, th, low);
+        c.restore(); c.setTransform(1, 0, 0, 1, 0, 0);
+        api.built++; api.buildMs += performance.now() - t0;
+        if (!n) { pool.push(e); return EMPTY; }
+        return e;
+    }
+    function get(layer, i, j, mustHave) {
+        const k = (layer * 4096 + i) * 4096 + j; let e = store.get(k);
+        if (e === undefined) {
+            if (!mustHave) return null;
+            e = build(layer, i, j); store.set(k, e);
+            if (e === EMPTY) nEmpty++; else if (store.size - nEmpty > maxN) evict();
+        }
+        if (e !== EMPTY) e.used = tick;
+        return e;
+    }
+    function evict() {
+        let n = store.size - nEmpty - maxN;
+        while (n-- > 0) {
+            let bk = -1, bu = 1e18;
+            for (const [k, e] of store) { if (e === EMPTY) continue; if (e.used < bu) { bu = e.used; bk = k; } }
+            if (bk < 0 || bu >= tick) break;
+            const e = store.get(bk); store.delete(bk); pool.push(e);
+        }
+    }
+    function reset() { for (const e of store.values()) if (e !== EMPTY) pool.push(e); store.clear(); nEmpty = 0; }
+    function prepare(mp, name, s, now) {
+        const low = window.GFX && GFX.tier === 'low' ? 1 : 0, key = name + '|' + s.toFixed(4) + '|' + low + '|' + (window.GFX ? GFX.blur : 1);
+        if (!an || an.map !== mp || an.n !== mp.solids.length) { an = analyze(mp); reset(); tk = ''; }
+        if (key !== tk) { tk = key; S = s; reset(); lastWarm = ''; }
+        maxN = (typeof isMobile !== 'undefined' && isMobile) ? 224 : 360;   // ≈14–24 МБ пікселів на шар
+        tick++;
+    }
+
+    // ---- API для draw() ----
+    // Малює шар (0 — під, 1 — над) чанками, що перетинають видиму область. Координати: (ox,oy) — зсув світу в пікселях полотна (цілі).
+    function blit(c, layer, vx0, vx1, vy0, vy1, ox, oy) {
+        const mS = an.map.size, ni = Math.ceil(mS * S / P) - 1;
+        const i0 = Math.max(0, Math.floor(vx0 * S / P)), i1 = Math.min(ni, Math.floor(vx1 * S / P)), j0 = Math.max(0, Math.floor(vy0 * S / P)), j1 = Math.min(ni, Math.floor(vy1 * S / P));
+        for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+            const e = get(layer, i, j, true); if (e === EMPTY) continue;
+            c.drawImage(e.cv, i * P + ox, j * P + oy);
+        }
+    }
+    // Підбудова наперед: по одному шару за кадр у кільці навколо видимої області (ближчі — першими)
+    function prefetch(cx, cy, hw, hh, budgetMs) {
+        const t0 = performance.now(), mS = an.map.size, ni = Math.ceil(mS * S / P) - 1, pw = P / S;
+        const i0 = Math.max(0, Math.floor((cx - hw - pw) / pw)), i1 = Math.min(ni, Math.floor((cx + hw + pw) / pw)), j0 = Math.max(0, Math.floor((cy - hh - pw) / pw)), j1 = Math.min(ni, Math.floor((cy + hh + pw) / pw));
+        for (;;) {
+            let bl = -1, bi = 0, bj = 0, bd = 1e18;
+            for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) for (let l = 0; l < 2; l++) {
+                if (store.has((l * 4096 + i) * 4096 + j)) continue;
+                const dx = (i + 0.5) * pw - cx, dy = (j + 0.5) * pw - cy, d = dx * dx + dy * dy; if (d < bd) { bd = d; bl = l; bi = i; bj = j; }
+            }
+            if (bl < 0) return true;
+            get(bl, bi, bj, true);
+            if (performance.now() - t0 > budgetMs) return false;
+        }
+    }
+    return Object.assign(api, {
+        prepare, blit, prefetch, get, get an() { return an; },
+        paintUnder, paintOver, obj1, obj3, query,
+        drawDyn(c, pass, view, tm, th, low) {   // нерухомі в чанках об'єкти, що живуть: вода (хвилі), двері, вогнище, радар, неон
+            const list = pass === 1 ? an.d1 : pass === 2 ? an.d2 : an.d3, so = an.map.solids, b = an.bb;
+            for (let k = 0; k < list.length; k++) {
+                const i = list[k]; if (b[i * 4 + 2] < view[0] || b[i * 4] > view[1] || b[i * 4 + 3] < view[2] || b[i * 4 + 1] > view[3]) continue;
+                const o = so[i];
+                if (pass === 1) {
+                    if (an.dy[i] === 2) {
+                        c.save();
+                        const ex = an.excl[i];
+                        if (ex) {   // пізніші водойми, що перекривають цю, закривають її хвилі й піну (як у порядку малювання раніше)
+                            c.beginPath(); c.rect(b[i * 4] - 60, b[i * 4 + 1] - 60, b[i * 4 + 2] - b[i * 4] + 120, b[i * 4 + 3] - b[i * 4 + 1] + 120);
+                            for (let q = 0; q < ex.length; q++) { c.save(); MapObj.applyRot(c, ex[q]); MapFX.waterPath(c, ex[q]); c.restore(); }
+                            c.clip('evenodd');
+                        }
+                        MapObj.applyRot(c, o); MapFX.drawWater(c, o, th, tm, view, { low, part: 'anim' }); c.restore();
+                    }
+                    else obj1(c, o, tm, th, low, view, true);
+                } else if (pass === 2) obj2(c, o, tm, th, low); else obj3(c, o, tm);
+            }
+        },
+        reset
+    });
+})();
+
+const _viewA = [0, 0, 0, 0], _RV = { x0: 0, x1: 0, y0: 0, y1: 0 }; let _PF = 0, _PFok = false;
+
 function draw(now) {
     if (!currentRoomData) return;
     ctx.setTransform(RS, 0, 0, RS, 0, 0); ctx.clearRect(0, 0, GW, GH);
     ctx.save();
     let shX = 0, shY = 0;
     if (shakeTime > 0) { shX = (Math.random() - 0.5) * 20; shY = (Math.random() - 0.5) * 20; shakeTime -= 0.03; }
-    ctx.scale(VS, VS);
-    ctx.translate(GW / VS / 2 - camera.x + shX, GH / VS / 2 - camera.y + shY);
-    
-    let cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'epic_map', mS = MAP_DATA[cMap].size;
-    const _mp = MAP_DATA[cMap], _sh = MapObj.hasShape(_mp);
-    const _vth = typeof MapFX !== 'undefined' && MapFX.themeOf(_mp);
-    if (_sh) { // фігурна мапа: все поза контуром — порожнеча
-        ctx.fillStyle = _vth ? MapFX.shade(_mp.bg || '#222', 0.16) : '#000'; ctx.fillRect(0, 0, mS, mS);
-        ctx.save(); ctx.beginPath(); _mp.shape.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); ctx.clip();
-    }
+    const _s = RS * VS; _curS = _s; const _ox = Math.round(GW * RS / 2 - _s * (camera.x - shX)), _oy = Math.round(GH * RS / 2 - _s * (camera.y - shY)); _curOx = _ox; _curOy = _oy;   // цілий піксельний зсув: чанки й живі об'єкти лягають без розмиття
+    ctx.setTransform(_s, 0, 0, _s, _ox, _oy);
+
+    const cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'epic_map', _mp = MAP_DATA[cMap];
     // видима область у координатах світу (із запасом на тінь/світіння)
     const _vw = GW / VS / 2 + 70, _vh = GH / VS / 2 + 70, VX0 = camera.x - _vw, VX1 = camera.x + _vw, VY0 = camera.y - _vh, VY1 = camera.y + _vh;
     const _fx = typeof MapFX !== 'undefined', _th = _fx ? MapFX.themeOf(_mp) : null, _low = !!(window.GFX && GFX.tier === 'low');
-    if (_fx) {
-        const gx0 = Math.max(0, VX0), gy0 = Math.max(0, VY0), gx1 = Math.min(mS, VX1), gy1 = Math.min(mS, VY1);
-        MapFX.drawGround(ctx, _mp, gx0, gy0, gx1, gy1, _th ? 0 : 1);
-        if (_th) MapFX.drawEdges(ctx, _mp, gx0, gy0, gx1, gy1);
-    } else {
-        ctx.fillStyle = MAP_DATA[cMap].bg || '#020617'; ctx.fillRect(0, 0, mS, mS);
-        ctx.strokeStyle = MAP_DATA[cMap].grid || '#1e293b'; ctx.lineWidth = 1;
-        const gx0 = Math.max(0, Math.floor(VX0 / 50) * 50), gx1 = Math.min(mS, Math.ceil(VX1 / 50) * 50), gy0 = Math.max(0, Math.floor(VY0 / 50) * 50), gy1 = Math.min(mS, Math.ceil(VY1 / 50) * 50);
-        ctx.beginPath();
-        for (let x = gx0; x <= gx1; x += 50) { ctx.moveTo(x, gy0); ctx.lineTo(x, gy1); }
-        for (let y = gy0; y <= gy1; y += 50) { ctx.moveTo(gx0, y); ctx.lineTo(gx1, y); }
-        ctx.stroke();
-    }
-    if (_sh) {
-        ctx.restore();
-        ctx.save(); ctx.beginPath(); _mp.shape.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath();
-        if (_vth) { ctx.lineJoin = 'round'; ctx.strokeStyle = MapFX.shade(_mp.bg || '#222', 0.28); ctx.lineWidth = 30; ctx.stroke(); ctx.strokeStyle = MapFX.shade(_mp.bg || '#222', 0.5); ctx.lineWidth = 10; ctx.stroke(); ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 3; ctx.stroke(); }
-        else { ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 6; ctx.lineJoin = 'round'; ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 18; ctx.stroke(); }
-        ctx.restore();
-    }
-    
     let tm = Date.now() / 1000;
-    
-    MAP_DATA[cMap].solids.forEach(o => {
-        if (o.type.includes('spawn')) return;
-        if (!solidInView(o, VX0, VX1, VY0, VY1)) return;
-        ctx.save();
-        MapObj.applyRot(ctx, o);
-        if (o.type === 'line' && _fx) { MapFX.drawLine(ctx, o); }
-        else if (o.type.includes('water') && _fx) { MapFX.drawWater(ctx, o, _th, tm, [VX0, VX1, VY0, VY1], { low: _low }); }
-        else if (o.type === 'line') {
-            ctx.strokeStyle = o.color; ctx.lineWidth = o.width; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-            ctx.beginPath(); ctx.moveTo(o.points[0].x, o.points[0].y);
-            for (let i = 1; i < o.points.length; i++) ctx.lineTo(o.points[i].x, o.points[i].y);
-            ctx.stroke();
-        } else if (o.type.includes('water')) {
-            ctx.fillStyle = '#0369a1'; ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 2;
-            if (o.type === 'water_curve') {
-                ctx.beginPath(); ctx.roundRect(o.x, o.y, o.w, o.h, Math.min(o.w, o.h) / 2); ctx.fill(); ctx.clip();
-            } else {
-                ctx.fillRect(o.x, o.y, o.w, o.h); ctx.beginPath(); ctx.rect(o.x, o.y, o.w, o.h); ctx.clip();
-            }
-            ctx.setLineDash([20, 20]); ctx.lineDashOffset = -tm * 20;
-            for (let wy = o.y + 10; wy < o.y + o.h; wy += 30) { ctx.beginPath(); ctx.moveTo(o.x, wy); ctx.lineTo(o.x + o.w, wy); ctx.stroke(); }
-            ctx.setLineDash([]);
-        } else if (o.type === 'prop_puddle' || o.type === 'prop_crater' || o.type === 'prop_floor') drPrp(ctx, o, tm);
-        ctx.restore();
-    });
-    
+    const _view = _viewA; _view[0] = VX0; _view[1] = VX1; _view[2] = VY0; _view[3] = VY1;
+    let _cached = false;
+    if (_fx) {
+        const _R = _RV; _R.x0 = camera.x - GW / VS / 2 - 24; _R.x1 = camera.x + GW / VS / 2 + 24; _R.y0 = camera.y - GH / VS / 2 - 24; _R.y1 = camera.y + GH / VS / 2 + 24;   // +24 — запас на тряску камери
+        if (WC.on) {
+            try {
+                WC.prepare(_mp, cMap, _s, now); _cached = true;
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                WC.blit(ctx, 0, _R.x0, _R.x1, _R.y0, _R.y1, _ox, _oy);
+                ctx.setTransform(_s, 0, 0, _s, _ox, _oy);
+                WC.drawDyn(ctx, 1, _view, tm, _th, _low);
+            } catch (err) { console.error('WC:', err); WC.on = false; WC.reset(); _cached = false; ctx.setTransform(_s, 0, 0, _s, _ox, _oy); }
+        }
+        if (!_cached) { WC.prepare(_mp, cMap, _s, now); WC.paintUnder(ctx, _R, 0, tm, _th, _low, _view); }
+    }
+
     for (let tid in tokens) {
         const tkn = tokens[tid]; ctx.save(); ctx.translate(tkn.x, tkn.y + Math.sin(now / 200) * 10);
         const cH = tkn.color === 'white' ? '#f8fafc' : tkn.color === 'black' ? '#1e293b' : tkn.color === 'red' ? '#ef4444' : tkn.color === 'blue' ? '#3b82f6' : tkn.color === 'brown' ? '#78350f' : '#9333ea';
@@ -771,53 +1091,17 @@ function draw(now) {
         ctx.lineWidth = 4; ctx.strokeStyle = cH; ctx.stroke();
         ctx.fillStyle = cH; ctx.font = '16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('★', 0, 1); ctx.restore();
     }
-    
-    if (!_fx) { ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 15; ctx.shadowOffsetX = 8; ctx.shadowOffsetY = 12; }
-    MAP_DATA[cMap].solids.forEach(o => {
-        if (o.type.includes('spawn') || o.type.includes('water') || o.type === 'line' || o.type === 'prop_puddle' || o.type === 'prop_crater' || o.type === 'prop_floor' || o.type === 'prop_roof') return;
-        if (!solidInView(o, VX0, VX1, VY0, VY1)) return;
-        ctx.save(); MapObj.applyRot(ctx, o);
-        const _k = _fx ? MapFX.solidKind(o) : null;
-        if (_k === 'block') MapFX.drawBlock(ctx, o, _th, { low: _low });
-        else if (_k === 'tree') MapFX.drawTree(ctx, o, _th, { low: _low });
-        else if (o.type === 'shape_triangle') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w / 2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
-        else if (o.type === 'shape_rhombus') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w / 2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h / 2); ctx.lineTo(o.x + o.w / 2, o.y + o.h); ctx.lineTo(o.x, o.y + o.h / 2); ctx.fill(); }
-        else if (o.type === 'shape_parallelepiped') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w * 0.2, o.y); ctx.lineTo(o.x + o.w, o.y); ctx.lineTo(o.x + o.w * 0.8, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
-        else if (o.type === 'wall' || o.type === 'wall_square') { ctx.fillStyle = o.color || '#1e293b'; ctx.fillRect(o.x, o.y, o.w, o.h); }
-        else if (o.type === 'tree') { ctx.beginPath(); ctx.arc(o.x, o.y, o.r || 30, 0, Math.PI * 2); ctx.fill(); }
-        else if (o.type.includes('prop_')) { if (_fx) MapFX.propShadow(ctx, o); drPrp(ctx, o, tm); }
-        ctx.restore();
-    });
-    ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
-    
-    MAP_DATA[cMap].solids.forEach(o => {
-        if (o.type.includes('spawn') || o.type.includes('water') || o.type === 'line' || o.type.includes('prop_')) return;
-        if (_fx && MapFX.solidKind(o)) return;   // стіни/дерева/фігури вже повністю намальовані з об'ємом
-        if (!solidInView(o, VX0, VX1, VY0, VY1)) return;
-        ctx.save(); MapObj.applyRot(ctx, o);
-        if (o.type === 'shape_triangle') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w / 2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
-        else if (o.type === 'shape_rhombus') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w / 2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h / 2); ctx.lineTo(o.x + o.w / 2, o.y + o.h); ctx.lineTo(o.x, o.y + o.h / 2); ctx.fill(); }
-        else if (o.type === 'shape_parallelepiped') { ctx.fillStyle = o.color || '#333'; ctx.beginPath(); ctx.moveTo(o.x + o.w * 0.2, o.y); ctx.lineTo(o.x + o.w, o.y); ctx.lineTo(o.x + o.w * 0.8, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.fill(); }
-        else if (o.type === 'wall' || o.type === 'wall_square') {
-            if (o.neon) { ctx.strokeStyle = o.neon; ctx.lineWidth = 2; ctx.strokeRect(o.x, o.y, o.w, o.h); ctx.fillStyle = o.neon; ctx.globalAlpha = 0.2; ctx.fillRect(o.x, o.y, o.w, o.h); ctx.globalAlpha = 1.0; }
-            if (o.stripe) { ctx.fillStyle = o.stripe; ctx.fillRect(o.x, o.y + o.h / 2 - 10, o.w, 20); }
-            if (!o.neon && !o.stripe) { ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(o.x, o.y, o.w, 5); }
-        } else if (o.type === 'tree') {
-            ctx.fillStyle = 'rgba(22, 163, 74, 0.4)'; ctx.beginPath(); ctx.arc(o.x + 5, o.y + 5, Math.max(5, (o.r || 30) - 10), 0, Math.PI * 2); ctx.fill();
-        } else if (o.type.includes('neon')) {
-            ctx.strokeStyle = o.color || '#3b82f6'; ctx.lineWidth = 4; ctx.shadowColor = o.color || '#3b82f6'; ctx.shadowBlur = 15 + Math.sin(tm * 5) * 5;
-            if (o.type === 'neon_wall') ctx.strokeRect(o.x, o.y, o.w, o.h);
-            else if (o.type === 'neon_circle') { ctx.beginPath(); ctx.arc(o.x + o.w / 2, o.y + o.h / 2, Math.min(o.w, o.h) / 2, 0, Math.PI * 2); ctx.stroke(); }
-            else if (o.type === 'neon_cross') { ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.moveTo(o.x + o.w, o.y); ctx.lineTo(o.x, o.y + o.h); ctx.stroke(); }
-            else if (o.type === 'neon_triangle') { ctx.beginPath(); ctx.moveTo(o.x + o.w / 2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.lineTo(o.x, o.y + o.h); ctx.closePath(); ctx.stroke(); }
-            else if (o.type === 'neon_diamond') { ctx.beginPath(); ctx.moveTo(o.x + o.w / 2, o.y); ctx.lineTo(o.x + o.w, o.y + o.h / 2); ctx.lineTo(o.x + o.w / 2, o.y + o.h); ctx.lineTo(o.x, o.y + o.h / 2); ctx.closePath(); ctx.stroke(); }
-            else if (o.type === 'neon_arch') { ctx.beginPath(); ctx.moveTo(o.x, o.y + o.h); ctx.lineTo(o.x, o.y + o.h / 2); ctx.arc(o.x + o.w / 2, o.y + o.h / 2, o.w / 2, Math.PI, 0); ctx.lineTo(o.x + o.w, o.y + o.h); ctx.stroke(); }
-            else if (o.type === 'neon_pillar') { ctx.beginPath(); ctx.ellipse(o.x + o.w / 2, o.y + o.h / 2, o.w / 2, o.h / 2, 0, 0, Math.PI * 2); ctx.stroke(); }
-            ctx.fillStyle = o.color || '#3b82f6'; ctx.globalAlpha = 0.2; ctx.fillRect(o.x, o.y, o.w, o.h); ctx.globalAlpha = 1.0;
-        }
-        ctx.restore();
-    });
-    
+
+    if (_fx) {
+        if (_cached) {
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            WC.blit(ctx, 1, _RV.x0, _RV.x1, _RV.y0, _RV.y1, _ox, _oy);
+            ctx.setTransform(_s, 0, 0, _s, _ox, _oy);
+            WC.drawDyn(ctx, 2, _view, tm, _th, _low); WC.drawDyn(ctx, 3, _view, tm, _th, _low);
+            if (_PF++ % 2 === 0 || !_PFok) { const _hw = GW / VS / 2, _hh = GH / VS / 2; _PFok = WC.prefetch(camera.x, camera.y, _hw, _hh, 2.5); }
+        } else WC.paintOver(ctx, _RV, 0, tm, _th, _low);
+    }
+
     const _pv = _PV; _pv.x0 = VX0; _pv.x1 = VX1; _pv.y0 = VY0; _pv.y1 = VY1;   // один об'єкт на всі виклики (без виділень на кадр)
     if (window.ModesFX && ModesFX.ground) ModesFX.ground(ctx, now, _pv);   // аірдроп (королівський бій): нижній шар
     for (let pid in powerups) {
@@ -841,6 +1125,7 @@ function draw(now) {
     
     for (let id in opponents) {
         const p = opponents[id], sn = currentRoomData.players[id]; if (!sn) { delete opponents[id]; continue; }
+        if (p.x < VX0 - 140 || p.x > VX1 + 140 || p.y < VY0 - 140 || p.y > VY1 + 140) continue;   // поза екраном (із запасом на підпис/щит)
         const cH = sn.color ? (sn.color === 'white' ? '#f8fafc' : sn.color === 'black' ? '#1e293b' : sn.color === 'red' ? '#ef4444' : sn.color === 'blue' ? '#3b82f6' : sn.color === 'brown' ? '#78350f' : '#9333ea') : '#ef4444';
         if (p.isDisguised) MapObj.drawDisguise(ctx, { type: p.propType, x: p.x - 25, y: p.y - 25, w: 50, h: 50, r: 25 }, tm);
         else drTnk(p.x, p.y, p.bodyAngle, p.turretAngle, cH, (window.dispName ? dispName(sn) : sn.name), false, p.hp, p.buff, sn.equipped, true);
@@ -867,30 +1152,29 @@ function draw(now) {
     }
     
     ctx.shadowColor = 'transparent';
-    bullets.forEach(b => {
+    for (let _bi = 0; _bi < bullets.length; _bi++) {
+        const b = bullets[_bi];
+        if (b.x < VX0 - 40 || b.x > VX1 + 40 || b.y < VY0 - 40 || b.y > VY1 + 40) continue;   // поза екраном
         if (b.type === 'samurai') {
-            ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(Math.atan2(b.vy, b.vx)); ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 10; ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(0, 0, 25, -Math.PI / 1.5, Math.PI / 1.5); ctx.stroke(); ctx.restore(); return;
+            ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(Math.atan2(b.vy, b.vx)); ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 10; ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(0, 0, 25, -Math.PI / 1.5, Math.PI / 1.5); ctx.stroke(); ctx.restore(); continue;
         }
-        ctx.beginPath();
-        if (b.type === 'piercing' || b.type === 'fast' || b.type === 'minigun' || b.type === 'homing') { ctx.moveTo(b.x, b.y - 4); ctx.lineTo(b.x + 20, b.y); ctx.lineTo(b.x, b.y + 4); }
-        else if (b.type === 'acid') ctx.arc(b.x, b.y, 8, 0, Math.PI * 2);
-        else if (b.type === 'boss_proj') ctx.arc(b.x, b.y, 10, 0, Math.PI * 2);
-        else ctx.arc(b.x, b.y, 6, 0, Math.PI * 2);
-        
-        let bCol = b.type === 'fast' || b.type === 'minigun' ? '#38bdf8' : b.type === 'explosive' || b.type === 'boss_proj' ? '#fb923c' : b.type === 'incendiary' ? '#ef4444' : b.type === 'piercing' ? '#d946ef' : b.type === 'acid' ? '#a3e635' : b.type === 'shotgun' ? '#f8fafc' : b.type === 'homing' ? '#10b981' : b.type === 'hunter_gun' ? '#ef4444' : '#fef08a';
-        ctx.fillStyle = bCol; ctx.shadowColor = bCol; ctx.shadowBlur = 10; ctx.fill(); ctx.shadowBlur = 0;
-    });
+        const e = bulletSprite(b.type);
+        ctx.drawImage(e.cv, b.x + e.x, b.y + e.y, e.w, e.h);
+    }
     
     if (_fx) {   // дахи будівель: прозорі лише для локального гравця всередині (інші танки під дахом не видно)
         const _rdt = Math.min(0.1, Math.max(0, (now - (draw._rt || now)) / 1000)); draw._rt = now;
         const _alive = myLocalTank.hp > 0;
         MapFX.drawRoofs(ctx, MAP_DATA[cMap].solids, { x0: VX0, x1: VX1, y0: VY0, y1: VY1 }, _alive ? myLocalTank.x : camera.x, _alive ? myLocalTank.y : camera.y, _rdt);
     }
-    if (window.ModesFX) ModesFX.top(ctx, now, tm);
-    particles.forEach(p => {
-        ctx.fillStyle = p.color; ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 2.5));
-        ctx.beginPath(); ctx.arc(p.x, p.y, Math.random() * 4 + 2, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1.0;
-    });
+    if (window.ModesFX) ModesFX.top(ctx, now, tm, _pv);
+    for (let _pi = 0; _pi < particles.length; _pi++) {
+        const p = particles[_pi];
+        if (p.x < VX0 || p.x > VX1 || p.y < VY0 || p.y > VY1) continue;
+        ctx.fillStyle = p.color; ctx.globalAlpha = p.life >= 0.4 ? 1 : p.life * 2.5;
+        ctx.beginPath(); ctx.arc(p.x, p.y, Math.random() * 4 + 2, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1.0;
     ctx.restore();
     
     let tCd = 1.0, cd = BASE_RELOAD;
@@ -903,23 +1187,28 @@ function draw(now) {
     }
     
     let b = document.getElementById('cooldown-bar'), mB = document.getElementById('cooldown-bar-mob');
-    if (now - lastShootTime < cd) {
-        let pc = ((now - lastShootTime) / cd * 100) + '%';
-        if (b) { b.style.transition = 'none'; b.style.width = pc; }
-        if (mB) { mB.style.transition = 'none'; mB.style.width = pc; }
-    } else {
-        if (b) b.style.width = '100%';
-        if (mB) mB.style.width = '100%';
+    {   // полоса перезарядки: пишемо в DOM лише коли ціле значення % змінилось (раніше — 2 стилі щокадру)
+        const pc = now - lastShootTime < cd ? Math.round((now - lastShootTime) / cd * 100) : 100;
+        if (pc !== draw._cd) {
+            draw._cd = pc; const w = pc + '%';
+            if (b) { if (pc < 100) b.style.transition = 'none'; b.style.width = w; }
+            if (mB) { if (pc < 100) mB.style.transition = 'none'; mB.style.width = w; }
+        }
     }
     
     const tC = document.getElementById('buff-timer-container');
     if (myLocalTank.buff && myLocalTank.buffProgress > 0) {
-        tC.classList.remove('hidden');
-        document.getElementById('buff-timer-icon').innerText = window.BUFF_ICONS[myLocalTank.buff] || '✨';
-        document.getElementById('buff-timer-name').innerText = window.BUFF_NAMES[myLocalTank.buff] || 'ЕФЕКТ';
-        document.getElementById('buff-timer-name').style.color = '#cbd5e1';
-        document.getElementById('buff-timer-bar').style.width = (myLocalTank.buffProgress * 100) + '%';
-    } else tC.classList.add('hidden');
+        _hid(tC, false);
+        const _bi = window.BUFF_ICONS[myLocalTank.buff] || '✨', _bn = window.BUFF_NAMES[myLocalTank.buff] || 'ЕФЕКТ';
+        if (draw._bk !== myLocalTank.buff) {   // іконка/назва змінюються лише разом із ефектом, а не щокадру
+            draw._bk = myLocalTank.buff;
+            document.getElementById('buff-timer-icon').innerText = _bi;
+            document.getElementById('buff-timer-name').innerText = _bn;
+            document.getElementById('buff-timer-name').style.color = '#cbd5e1';
+        }
+        const _bw = Math.round(myLocalTank.buffProgress * 1000) / 10;
+        if (draw._bw !== _bw) { draw._bw = _bw; document.getElementById('buff-timer-bar').style.width = _bw + '%'; }
+    } else { _hid(tC, true); draw._bk = null; }
     
     if (myLocalTank.hp <= 0 && spectatingId && opponents[spectatingId]) {
         let sN = currentRoomData.players[spectatingId] ? (window.dispName ? dispName(currentRoomData.players[spectatingId]) : currentRoomData.players[spectatingId].name) : 'ГРАВЕЦЬ', sT = opponents[spectatingId];
@@ -933,93 +1222,101 @@ function draw(now) {
     drJ();
 }
 
+// записи в DOM лише при зміні (кожен запис — мутація для спостерігачів і перерахунок стилів)
+function _hid(el, h) { if (el && el.classList.contains('hidden') !== h) el.classList.toggle('hidden', h); }
+function _sw(el, w) { if (el && el._w !== w) { el._w = w; el.style.width = w; } }
+function _tx(el, v) { if (el && el._v !== v) { el._v = v; el.innerText = v; } }
+function _cl(el, c) { if (el && el._cn !== c) { el._cn = c; el.className = c; } }
 window.updateHUD = function() {
     if (!currentRoomData || currentRoomData.status !== 'playing') return;
     let mHp = typeof MAX_HP !== 'undefined' ? MAX_HP : 500;
     mHp *= GameData.statMult(myEquipped, 'hp');
     mHp = Math.round(mHp);
     let pct = Math.max(0, Math.min(100, (myLocalTank.hp / mHp) * 100)), bC = myLocalTank.hp < mHp * 0.3 ? 'h-full bg-gradient-to-r from-red-600 to-red-400 w-full transition-all duration-300 shadow-[0_0_15px_rgba(239,68,68,0.8)]' : 'h-full bg-gradient-to-r from-green-500 to-emerald-400 w-full transition-all duration-300 shadow-[0_0_10px_rgba(34,197,94,0.5)]', hpB = document.getElementById('hp-bar'), hpT = document.getElementById('hp-text');
-    if (hpB) { hpB.style.width = pct + '%'; if (hpB._c !== bC) { hpB.className = bC; hpB._c = bC; } }
-    if (hpT) hpT.innerText = `${Math.ceil(myLocalTank.hp)}/${mHp}`;
+    if (hpB) { _sw(hpB, pct + '%'); if (hpB._c !== bC) { hpB.className = bC; hpB._c = bC; } }
+    if (hpT) _tx(hpT, `${Math.ceil(myLocalTank.hp)}/${mHp}`);
     let hpBM = document.getElementById('hp-bar-mob'), hpTM = document.getElementById('hp-text-mob');
-    if (hpBM) { hpBM.style.width = pct + '%'; if (hpBM._c !== bC) { hpBM.className = bC; hpBM._c = bC; } }
-    if (hpTM) hpTM.innerText = `${Math.ceil(myLocalTank.hp)}/${mHp}`;
+    if (hpBM) { _sw(hpBM, pct + '%'); if (hpBM._c !== bC) { hpBM.className = bC; hpBM._c = bC; } }
+    if (hpTM) _tx(hpTM, `${Math.ceil(myLocalTank.hp)}/${mHp}`);
     
     let vO = 0;
     if (myLocalTank.hp < mHp) vO = (1 - (myLocalTank.hp / mHp)) * 0.85;
-    document.getElementById('damage-vignette').style.opacity = vO;
+    { const _dv = document.getElementById('damage-vignette'), _vq = Math.round(vO * 100) / 100; if (_dv && _dv._o !== _vq) { _dv._o = _vq; _dv.style.opacity = _vq; } }
     
     const buffWrap = document.getElementById('active-buff-wrap'), buffIcon = document.getElementById('active-buff-icon'), buffName = document.getElementById('active-buff-name'), buffBar = document.getElementById('active-buff-bar');
     if (myLocalTank.buff && myLocalTank.buffProgress > 0) {
-        if (buffWrap) buffWrap.classList.remove('hidden');
-        if (buffIcon) buffIcon.innerText = window.BUFF_ICONS[myLocalTank.buff] || '✨';
-        if (buffName) buffName.innerText = window.BUFF_NAMES[myLocalTank.buff] || 'ЕФЕКТ';
-        if (buffBar) buffBar.style.width = `${myLocalTank.buffProgress * 100}%`;
+        if (buffWrap) _hid(buffWrap, false);
+        if (buffIcon) _tx(buffIcon, window.BUFF_ICONS[myLocalTank.buff] || '✨');
+        if (buffName) _tx(buffName, window.BUFF_NAMES[myLocalTank.buff] || 'ЕФЕКТ');
+        if (buffBar) _sw(buffBar, `${Math.round(myLocalTank.buffProgress * 1000) / 10}%`);
     } else {
-        if (buffWrap) buffWrap.classList.add('hidden');
+        if (buffWrap) _hid(buffWrap, true);
     }
     
     const scEl = document.getElementById('hud-score');
-    if (scEl) scEl.innerText = myLocalTank.score || 0;
+    if (scEl) _tx(scEl, myLocalTank.score || 0);
     const tU = document.getElementById('homing-target-ui');
-    if (myLocalTank.buff === 'homing' || myLocalTank.buff === 'autolaser') tU.classList.remove('hidden'); else tU.classList.add('hidden');
+    if (myLocalTank.buff === 'homing' || myLocalTank.buff === 'autolaser') _hid(tU, false); else _hid(tU, true);
     
     const dH = document.getElementById('deathmatch-score-hud'), sH = document.getElementById('survival-hud'), pC = document.getElementById('pc-cd-container'), mC = document.getElementById('mob-cd-container'), sl = document.getElementById('score-list'), tdmH = document.getElementById('tdm-hud');
     if (window.ModesFX) ModesFX.toggle(currentRoomData.mode);
     if (window.ModesFX && ModesFX.active(currentRoomData.mode)) {
-        dH.classList.add('hidden'); sH.classList.add('hidden'); if (tdmH) tdmH.classList.add('hidden');
-        if (pC) pC.classList.remove('hidden'); if (mC) mC.classList.remove('hidden');
+        _hid(dH, true); _hid(sH, true); if (tdmH) _hid(tdmH, true);
+        if (pC) _hid(pC, false); if (mC) _hid(mC, false);
         ModesFX.hud();
     } else if (currentRoomData.mode === 'prophunt') {
-        dH.classList.add('hidden'); sH.classList.add('hidden'); if (tdmH) tdmH.classList.add('hidden');
-        if (myLocalTank.team === 'hider') { if (pC) pC.classList.add('hidden'); if (mC) mC.classList.add('hidden'); } 
-        else { if (pC) pC.classList.remove('hidden'); if (mC) mC.classList.remove('hidden'); }
+        _hid(dH, true); _hid(sH, true); if (tdmH) _hid(tdmH, true);
+        if (myLocalTank.team === 'hider') { if (pC) _hid(pC, true); if (mC) _hid(mC, true); } 
+        else { if (pC) _hid(pC, false); if (mC) _hid(mC, false); }
     } else if (currentRoomData.mode === 'survival') {
-        dH.classList.add('hidden'); if (tdmH) tdmH.classList.add('hidden'); sH.classList.remove('hidden');
-        if (pC) pC.classList.remove('hidden'); if (mC) mC.classList.remove('hidden');
+        _hid(dH, true); if (tdmH) _hid(tdmH, true); _hid(sH, false);
+        if (pC) _hid(pC, false); if (mC) _hid(mC, false);
         const wN = document.getElementById('survival-wave-number'), wB = document.getElementById('survival-wave-box');
-        wN.innerText = currentRoomData.wave;
+        _tx(wN, currentRoomData.wave);
         if (isBossIncoming) {
-            wB.className = "glass-panel px-4 lg:px-10 py-1 lg:py-2 rounded-xl lg:rounded-2xl border flex flex-col items-center transition-colors duration-300 border-red-500 bg-red-900/40 shadow-[0_0_20px_rgba(239,68,68,0.5)]";
-            wN.className = "text-xl lg:text-4xl font-russo drop-shadow-md text-red-500 leading-none";
+            _cl(wB, "glass-panel px-4 lg:px-10 py-1 lg:py-2 rounded-xl lg:rounded-2xl border flex flex-col items-center transition-colors duration-300 border-red-500 bg-red-900/40 shadow-[0_0_20px_rgba(239,68,68,0.5)]");
+            _cl(wN, "text-xl lg:text-4xl font-russo drop-shadow-md text-red-500 leading-none");
         } else {
-            wB.className = "glass-panel px-4 lg:px-10 py-1 lg:py-2 rounded-xl lg:rounded-2xl border border-slate-600 flex flex-col items-center transition-colors duration-500 shadow-[0_0_15px_rgba(0,0,0,0.5)] bg-slate-900/80";
-            wN.className = "text-xl lg:text-4xl font-russo text-white drop-shadow-md leading-none";
+            _cl(wB, "glass-panel px-4 lg:px-10 py-1 lg:py-2 rounded-xl lg:rounded-2xl border border-slate-600 flex flex-col items-center transition-colors duration-500 shadow-[0_0_15px_rgba(0,0,0,0.5)] bg-slate-900/80");
+            _cl(wN, "text-xl lg:text-4xl font-russo text-white drop-shadow-md leading-none");
         }
     } else if (currentRoomData.mode === 'team_deathmatch') {
-        dH.classList.add('hidden'); sH.classList.add('hidden'); if (tdmH) tdmH.classList.remove('hidden');
-        if (pC) pC.classList.remove('hidden'); if (mC) mC.classList.remove('hidden');
+        _hid(dH, true); _hid(sH, true); if (tdmH) _hid(tdmH, false);
+        if (pC) _hid(pC, false); if (mC) _hid(mC, false);
         let scC = document.getElementById('tdm-scores-container');
         if (scC && currentRoomData.teamScores) {
-            scC.innerHTML = '';
             const tC = { 'red': '#ef4444', 'blue': '#3b82f6', 'green': '#22c55e', 'yellow': '#eab308' };
-            for (let t in currentRoomData.teamScores) scC.innerHTML += `<span style="color:${tC[t] || '#fff'}">${currentRoomData.teamScores[t]}</span>`;
+            let _h = ''; for (let t in currentRoomData.teamScores) _h += `<span style="color:${tC[t] || '#fff'}">${currentRoomData.teamScores[t]}</span>`;
+            if (scC._h !== _h) { scC._h = _h; scC.innerHTML = _h; }
         }
         let tT = document.getElementById('tdm-timer');
         if (tT && currentRoomData.timeEndTime) {
             let tl = Math.max(0, Math.ceil(((currentRoomData.tdmEndLocal || currentRoomData.timeEndTime) - Date.now()) / 1000)), m = Math.floor(tl / 60), s = tl % 60;
-            tT.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            _tx(tT, `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
         }
     } else {
-        dH.classList.remove('hidden'); sH.classList.add('hidden'); if (tdmH) tdmH.classList.add('hidden');
-        if (pC) pC.classList.remove('hidden'); if (mC) mC.classList.remove('hidden');
-        sl.innerHTML = '';
+        _hid(dH, false); _hid(sH, true); if (tdmH) _hid(tdmH, true);
+        if (pC) _hid(pC, false); if (mC) _hid(mC, false);
+        let _h = '';
         Object.values(currentRoomData.players).sort((a, b) => b.score - a.score).forEach(p => {
-            sl.innerHTML += `<div class="flex justify-between w-full ${p.id === myId ? 'text-blue-400' : 'text-slate-300'} border-b border-slate-700/50 pb-1 ${p.hp <= 0 ? 'opacity-30 line-through' : ''}"><span>${window.dispName ? dispName(p) : p.name}</span><span class="font-bold">${p.score}</span></div>`;
+            _h += `<div class="flex justify-between w-full ${p.id === myId ? 'text-blue-400' : 'text-slate-300'} border-b border-slate-700/50 pb-1 ${p.hp <= 0 ? 'opacity-30 line-through' : ''}"><span>${window.dispName ? dispName(p) : p.name}</span><span class="font-bold">${p.score}</span></div>`;
         });
+        if (sl._h !== _h) { sl._h = _h; sl.innerHTML = _h; }   // таблицю перебудовуємо лише коли змінились очки/склад
     }
     
     if (isMobile) {
-        if ((myLocalTank.buff === 'homing' || myLocalTank.buff === 'autolaser') && myLocalTank.hp > 0) document.getElementById('mobile-target-btn').classList.remove('hidden');
-        else document.getElementById('mobile-target-btn').classList.add('hidden');
+        if ((myLocalTank.buff === 'homing' || myLocalTank.buff === 'autolaser') && myLocalTank.hp > 0) _hid(document.getElementById('mobile-target-btn'), false);
+        else _hid(document.getElementById('mobile-target-btn'), true);
         
         if (myLocalTank.hp <= 0 && canSpecM(currentRoomData.mode)) {
-            document.getElementById('mobile-spec-prev').classList.remove('hidden'); document.getElementById('mobile-spec-next').classList.remove('hidden');
+            _hid(document.getElementById('mobile-spec-prev'), false); _hid(document.getElementById('mobile-spec-next'), false);
         } else {
-            document.getElementById('mobile-spec-prev').classList.add('hidden'); document.getElementById('mobile-spec-next').classList.add('hidden');
+            _hid(document.getElementById('mobile-spec-prev'), true); _hid(document.getElementById('mobile-spec-next'), true);
         }
     }
 };
+
+document.addEventListener('visibilitychange', () => { if (!document.hidden) lastTime = performance.now(); });   // після повернення на вкладку — без стрибка dt
 
 function startGameLoop() {
     if (gameLoopId) cancelAnimationFrame(gameLoopId);
@@ -1027,9 +1324,24 @@ function startGameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
+// Заздалегідь будуємо кеш світу навколо камери (до старту бою), по кілька мс за кадр — щоб перший кадр бою не «завис»
+let _warmKey = '';
+function warmWorld() {
+    if (!WC.on || typeof MapFX === 'undefined') return;
+    const gs = document.getElementById('game-screen'); if (!gs || gs.classList.contains('hidden')) return;
+    const cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'epic_map', mp = MAP_DATA[cMap]; if (!mp) return;
+    const s = RS * VS, key = cMap + '|' + s.toFixed(4) + '|' + (camera.x | 0) + '|' + (camera.y | 0) + '|' + (window.GFX ? GFX.tier : '');
+    if (key === _warmKey) return;
+    WC.prepare(mp, cMap, s, 0);
+    if (WC.prefetch(camera.x, camera.y, GW / VS / 2, GH / VS / 2, 5)) _warmKey = key;
+}
+
 function gameLoop(now) {
+    if (gameLoop._rp === undefined) gameLoop._rp = 16.7;
     // обмеження частоти кадрів для слабких пристроїв (час між кадрами накопичується в dt, тож швидкість гри не змінюється)
-    if (window.GFX && GFX.cap && now - lastTime < 1000 / GFX.cap - 2) { gameLoopId = requestAnimationFrame(gameLoop); return; }
+    // оцінка періоду оновлення екрана (мінімум із останніх інтервалів rAF) — щоб обмежувач кадрів не «з'їдав» кадри на 120/144 Гц
+    { const _d = now - (gameLoop._t || now); gameLoop._t = now; if (_d > 3 && _d < gameLoop._rp) gameLoop._rp = _d; else gameLoop._rp = Math.min(34, gameLoop._rp * 1.002); }
+    if (window.GFX && GFX.cap && now - lastTime < 1000 / GFX.cap - gameLoop._rp * 0.5) { gameLoopId = requestAnimationFrame(gameLoop); return; }
     const dt = Math.min((now - lastTime) / 1000, 0.1);
     const _raw = (now - lastTime) / 1000;
     lastTime = now;
@@ -1042,6 +1354,8 @@ function gameLoop(now) {
             if (now - (window.__loopErrAt || 0) > 2000) { window.__loopErrAt = now; console.error('Помилка ігрового циклу (цикл продовжує працювати):', err); }
             try { ctx.setTransform(RS, 0, 0, RS, 0, 0); ctx.globalAlpha = 1; ctx.shadowColor = 'transparent'; } catch (e) {}
         }
+    } else if (currentRoomData && currentRoomData.map) {
+        try { warmWorld(); } catch (e) {}   // зворотний відлік / очікування: поки екран стоїть, заздалегідь будуємо чанки навколо точки спавну
     }
     gameLoopId = requestAnimationFrame(gameLoop);
 }
@@ -1056,7 +1370,7 @@ window.addEventListener('keydown', e => {
     if (e.key === 'Tab') {
         e.preventDefault();
         if (myLocalTank.buff === 'homing' || myLocalTank.buff === 'autolaser') {
-            let vO = Object.keys(opponents).filter(id => opponents[id].hp > 0 && Math.hypot(opponents[id].x - myLocalTank.x, opponents[id].y - myLocalTank.y) < 1500);
+            let vO = Object.keys(opponents).filter(id => opponents[id].hp > 0 && !(isPveM(currentRoomData.mode) || (isTeamM(currentRoomData.mode) && opponents[id].team === myLocalTank.team)) && Math.hypot(opponents[id].x - myLocalTank.x, opponents[id].y - myLocalTank.y) < 1500);
             if (vO.length > 0) {
                 playSound('hitmarker');
                 if (!homingTargetId || !vO.includes(homingTargetId)) homingTargetId = vO[0];
@@ -1141,7 +1455,7 @@ const tgBtn = document.getElementById('mobile-target-btn');
 if (tgBtn) tgBtn.addEventListener('touchstart', (e) => {
     e.preventDefault(); e.stopPropagation();
     if (myLocalTank.buff === 'homing' || myLocalTank.buff === 'autolaser') {
-        let vO = Object.keys(opponents).filter(id => opponents[id].hp > 0 && Math.hypot(opponents[id].x - myLocalTank.x, opponents[id].y - myLocalTank.y) < 1500);
+        let vO = Object.keys(opponents).filter(id => opponents[id].hp > 0 && !(isPveM(currentRoomData.mode) || (isTeamM(currentRoomData.mode) && opponents[id].team === myLocalTank.team)) && Math.hypot(opponents[id].x - myLocalTank.x, opponents[id].y - myLocalTank.y) < 1500);
         if (vO.length > 0) {
             playSound('hitmarker');
             if (!homingTargetId || !vO.includes(homingTargetId)) homingTargetId = vO[0];

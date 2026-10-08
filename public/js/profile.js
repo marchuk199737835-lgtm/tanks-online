@@ -69,7 +69,7 @@
     //  CSS
     // =====================================================================================
     var css = [
-        '.pf-ov{position:fixed;inset:0;z-index:78;display:flex;align-items:center;justify-content:center;padding:10px;background:rgba(2,6,23,.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);zoom:var(--ui-zoom,1);opacity:0;pointer-events:none;transition:opacity .22s}',
+        '.pf-ov{position:fixed;inset:0;z-index:78;display:flex;align-items:center;justify-content:center;padding:10px;background:rgba(2,6,23,.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);zoom:var(--ui-wz,var(--ui-zoom,1));--uvh:var(--uvh-w,1dvh);opacity:0;pointer-events:none;transition:opacity .22s}',
         '.pf-ov *,.pf-ov *::before,.pf-ov *::after{box-sizing:border-box}',
         '.pf-ov.on{opacity:1;pointer-events:auto}.pf-ov.hidden{display:none}',
         '.pf-panel{position:relative;width:min(1020px,100%);max-height:calc(var(--uvh,1vh)*96);display:flex;flex-direction:column;border-radius:26px;background:linear-gradient(165deg,rgba(30,41,59,.96),rgba(8,15,32,.97));border:1px solid rgba(96,165,250,.38);box-shadow:0 0 60px rgba(37,99,235,.28),inset 0 1px 0 rgba(255,255,255,.07);overflow:hidden;transform:translateY(18px) scale(.97);transition:transform .35s cubic-bezier(.16,1,.3,1)}',
@@ -207,6 +207,16 @@
         '.ps-conf{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0}.ps-conf i{position:absolute;top:-14px;width:7px;height:12px;border-radius:2px;opacity:0;animation:psfall linear forwards}',
         '@keyframes psfall{0%{opacity:1;transform:translateY(0) rotate(0)}100%{opacity:0;transform:translateY(520px) rotate(540deg)}}',
         '@media (max-height:560px){#winner-modal.ps-on #back-to-room-lobby-btn{position:static;box-shadow:none}.ps{gap:6px;margin-bottom:8px}.ps-t{padding:5px 2px}.ps-t b{font-size:17px}.ps-board{display:none}.ps-next{font-size:12px}}',
+        // телефон: безпечні зони, цілі дотику ≥44px, поля ≥16px (iOS не масштабує сторінку при фокусі)
+        '.pf-ov{padding-left:max(10px,calc(env(safe-area-inset-left,0px)/var(--ui-wz,1)));padding-right:max(10px,calc(env(safe-area-inset-right,0px)/var(--ui-wz,1)));padding-top:max(10px,calc(env(safe-area-inset-top,0px)/var(--ui-wz,1)));padding-bottom:max(10px,calc(env(safe-area-inset-bottom,0px)/var(--ui-wz,1)))}.pf-scroll,.rk-body{overscroll-behavior:contain}.pf-nick{padding-right:52px}',
+        '@media (max-height:480px){.pf-ov{padding-top:max(4px,calc(env(safe-area-inset-top,0px)/var(--ui-wz,1)));padding-bottom:max(4px,calc(env(safe-area-inset-bottom,0px)/var(--ui-wz,1)))}}',
+        '@media (max-width:760px){.pf-tl{white-space:normal;line-height:1.15;overflow:visible;overflow-wrap:break-word}.rk-top{padding-right:64px!important}}',
+        '#winner-modal.ps-on{padding:max(8px,env(safe-area-inset-top,0px)) max(8px,env(safe-area-inset-right,0px)) max(8px,env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}#winner-modal.ps-on>div{max-height:calc(var(--uvh,1vh)*100 - 20px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}',
+        '@media (max-height:560px){#winner-modal.ps-on #back-to-room-lobby-btn{position:sticky;bottom:-6px;box-shadow:0 -10px 18px rgba(8,15,32,.9),0 0 20px rgba(37,99,235,.4)}}',
+        '@media (max-height:480px) and (max-width:760px){.pf-grid{grid-template-columns:1fr}.pf-grid>.pf-card:first-child{order:2}.rk-me{padding:6px 10px}}',
+        '@media (max-width:380px){.pf-tiles{gap:7px}.pf-tile{padding:8px 7px;gap:7px}.pf-ti{width:30px;height:30px;font-size:16px}.pf-tv{font-size:15px}.pf-hero{gap:10px}.pf-hero .pf-av{width:58px!important;height:58px!important;font-size:27px!important}.pf-nick{font-size:19px;word-break:normal;overflow-wrap:anywhere}.pf-form{padding:10px}.pf-acts .pf-btn{flex:1 1 100%;justify-content:center}}',
+        '@media (hover:none) and (pointer:coarse){.pf-x{width:44px;height:44px}.pf-btn{min-height:44px}.pf-in{font-size:16px;min-height:44px}.pf-copy{min-height:32px;padding:5px 11px}.pf-i{width:38px;height:38px}.rk-tabs button{min-height:44px}.pf-tl,.pf-mr,.ps-t i,.ps-t small,.pf-ts,.pf-view{font-size:11px}.pf-lv-t{font-size:12px}#winner-modal.ps-on #back-to-room-lobby-btn{min-height:48px}}',
+        '@media (hover:none) and (pointer:coarse) and (max-height:480px){.pf-x{width:48px;height:48px}}',
         'html.gfx-low .ps-conf{display:none}'
     ].join('\n');
     var st = document.createElement('style'); st.id = 'pf-css'; st.textContent = css; document.head.appendChild(st);
@@ -403,7 +413,7 @@
     // =====================================================================================
     //  РЕЙТИНГ
     // =====================================================================================
-    var rkEl = null, rkTab = 'kills', rkData = null, rkTimer = 0, rkPoll = 0, rkSkew = 0;
+    var rkEl = null, rkTab = 'kills', rkData = null, rkTimer = 0, rkPoll = 0, rkSkew = 0, rkSig = '';
     function buildRk() {
         if (rkEl) return;
         rkEl = mkOverlay('rk-modal', '', 'rk-panel', '<button class="pf-x" type="button" aria-label="Закрити">✕</button>' +
@@ -418,8 +428,8 @@
     }
     function syncTabs() { var t = $('rk-tabs'); t.dataset.t = rkTab; t.querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b.dataset.t === rkTab); }); }
     function openRanking() {
-        buildRk(); rkData = null; syncTabs();
-        $('rk-body').innerHTML = '<div class="pf-load"><i></i>Завантаження рейтингу…</div>'; $('rk-mine').innerHTML = '';
+        buildRk(); rkData = null; rkSig = ''; syncTabs();
+        $('rk-body').innerHTML = '<div class="pf-load"><i></i>Завантаження рейтингу…</div>'; $('rk-body').__tabk = null; $('rk-mine').innerHTML = '';
         show(rkEl); socket.emit('getRanking');
         clearInterval(rkPoll); rkPoll = setInterval(function () { if (isOpen(rkEl)) socket.emit('getRanking'); }, 15000);
         clearInterval(rkTimer); rkTimer = setInterval(tickTimer, 1000); tickTimer();
@@ -438,8 +448,11 @@
         $('rk-sn').textContent = 'Сезон · ' + seasonLabel(rkData.season.id);
         var rw = rkData.rewards || [], lab = ['🥇', '🥈', '🥉'], rh = '', prev = 0;
         rw.forEach(function (x) { rh += '<span>' + (x.upTo <= 3 ? lab[x.upTo - 1] : (prev + 1) + '–' + x.upTo + ' місце') + ' ' + (window.creditIcon ? creditIcon(13) : '') + x.credits + '</span>'; prev = x.upTo; });
-        $('rk-rw').innerHTML = rh;
-        if (!rows.length) { body.innerHTML = '<div class="rk-empty">🏁 Сезон щойно почався — нікого ще немає в таблиці.<br>Станьте першим!</div>'; }
+        if (window.DomPatch) DomPatch.html($('rk-rw'), rh); else $('rk-rw').innerHTML = rh;
+        // фонове оновлення тієї ж вкладки — лише змінені вузли (без блимання й перезапуску анімацій); перемикання вкладки/відкриття — повний рендер
+        var soft = !!(window.DomPatch && body.__tabk === rkTab && body.firstChild); body.__tabk = rkTab;
+        var put = function (el, html) { if (soft) DomPatch.html(el, html); else el.innerHTML = html; };
+        if (!rows.length) { put(body, '<div class="rk-empty">🏁 Сезон щойно почався — нікого ще немає в таблиці.<br>Станьте першим!</div>'); }
         else {
             var h = '<div class="rk-pod">', ord = [2, 1, 3], dl = { 1: '.35s', 2: '.15s', 3: '0s' };
             ord.forEach(function (pl) {
@@ -452,12 +465,12 @@
                 var isMe = r.login === myLogin(), lv = window.LV ? LV.icon(r.level || 1, 18) : '';
                 h += '<div class="rk-row' + (isMe ? ' me' : '') + (r.place <= 10 ? ' top10' : '') + '" data-l="' + esc(r.login) + '" style="--i:' + i + '"><div class="rk-pl">' + r.place + '</div>' + avatar(r.login, 36) + '<div class="rk-mid"><div class="rk-mn">' + rowName(r) + '</div><div class="rk-ml">' + lv + ' рівень ' + (r.level || 1) + '</div></div><div class="rk-v">' + num(r.value) + '</div></div>';
             });
-            body.innerHTML = h + '</div>';
+            put(body, h + '</div>');
             body.querySelectorAll('[data-l]').forEach(function (e) { e.onclick = function () { snd('ui_click'); openProfile(e.dataset.l); }; });
         }
         var mine = $('rk-mine');
-        if (me.place) mine.innerHTML = '<div class="rk-me" id="rk-me"><div class="big">#' + me.place + '</div>' + avatar(myLogin(), 38) + '<div class="tx">Ваше місце · <b>' + num(me.value) + '</b> ' + unit + (me.place > 50 ? '<br>Ви поза топ-50' : '') + '</div></div>';
-        else mine.innerHTML = '<div class="rk-me" id="rk-me"><div class="big">—</div>' + avatar(myLogin(), 38) + '<div class="tx">' + (rkTab === 'kills' ? 'Знищте першого ворога цього сезону, щоб потрапити до рейтингу' : 'Вигравайте королівські бої, щоб потрапити до рейтингу') + '</div></div>';
+        if (me.place) put(mine, '<div class="rk-me" id="rk-me"><div class="big">#' + me.place + '</div>' + avatar(myLogin(), 38) + '<div class="tx">Ваше місце · <b>' + num(me.value) + '</b> ' + unit + (me.place > 50 ? '<br>Ви поза топ-50' : '') + '</div></div>');
+        else put(mine, '<div class="rk-me" id="rk-me"><div class="big">—</div>' + avatar(myLogin(), 38) + '<div class="tx">' + (rkTab === 'kills' ? 'Знищте першого ворога цього сезону, щоб потрапити до рейтингу' : 'Вигравайте королівські бої, щоб потрапити до рейтингу') + '</div></div>');
         var mm = $('rk-me'); if (mm) mm.onclick = function () { snd('ui_click'); openProfile(); };
         tickTimer();
     }
@@ -541,7 +554,7 @@
         (function tick(now) { var k = Math.min(1, (now - t0) / 1300); nx.innerHTML = nextTxt(Math.round(gain * (1 - Math.pow(1 - k, 3)))); if (k < 1 && nx.isConnected) requestAnimationFrame(tick); })(t0);
         // зайві рядки від режимів, що дублюють плитки
         var mf = $('mfx-sum');
-        if (mf) { Array.prototype.forEach.call(mf.children, function (r) { var l = r.firstElementChild && r.firstElementChild.textContent; if (l === 'Ваші вбивства' || l === 'Ваше місце') r.remove(); }); if (!mf.children.length) mf.style.display = 'none'; }
+        if (mf) { Array.prototype.forEach.call(mf.children, function (r) { var l = r.firstElementChild && r.firstElementChild.textContent; var T = function (x) { return window.I18N && I18N.t ? I18N.t(x) : x; }; if (l === 'Ваші вбивства' || l === 'Ваше місце' || l === T('Ваші вбивства') || l === T('Ваше місце')) r.remove(); }); if (!mf.children.length) mf.style.display = 'none'; }
         // конфеті для перемоги
         var old = wm.querySelector('.ps-conf'); if (old) old.remove();
         if (s.outcome === 'win' && !low()) {
@@ -597,7 +610,7 @@
             msg('pf-pw-err', ''); msg('pf-pw-ok', 'Пароль змінено. Сесію оновлено.');
         });
         socket.on('profileToken', function (d) { if (d && d.token) lsSet('tankToken', d.token); });
-        socket.on('ranking', function (d) { if (!d || !d.season) return; rkData = d; rkSkew = Date.now() - d.season.now; if (isOpen(rkEl)) renderRanking(); });
+        socket.on('ranking', function (d) { if (!d || !d.season) return; var sg = JSON.stringify([d.season.id, d.season.endsAt, d.kills, d.br, d.rewards]), same = rkData && sg === rkSig; rkSig = sg; rkData = d; rkSkew = Date.now() - d.season.now; if (same && isOpen(rkEl)) return; if (isOpen(rkEl)) renderRanking(); });
         socket.on('seasonReward', function (d) { if (d && d.total > 0) { srQ.push(d); srNext(); } });
         socket.on('matchSummary', function (s) {
             if (!s) return;

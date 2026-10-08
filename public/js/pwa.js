@@ -9,7 +9,7 @@
     const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
     let deferred = null;
 
-    if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+    if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {}));
     window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; refresh(); });
     window.addEventListener('appinstalled', () => { deferred = null; store.set('pwaInstalled', '1'); refresh(); });
 
