@@ -49,13 +49,19 @@
                     a(t.url, 'Трек') + a(t.profile, 'Автор', true) + '</div>';
             });
         });
-        h += '<div class="cr-note">Назви треків і імена авторів наведено мовою оригіналу.</div></div>' +
+        h += '<div class="cr-note">Назви треків і імена авторів наведено мовою оригіналу.<br><span class="cr-st"></span></div></div>' +
             '<div class="cr-ft">' + a(LICENSE, 'Ліцензія Pixabay') + a(TERMS, 'Умови використання', true) + a(SITE, 'Музика на Pixabay', true) + '</div></div>';
         ov.innerHTML = h; document.body.appendChild(ov);
         ov.addEventListener('click', function (e) { if (e.target === ov || e.target.closest('.cr-x')) close(); });
     }
     function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-    function open() { if (!ov) build(); ov.classList.add('on'); try { ov.querySelector('.cr-x').focus(); } catch (e) {} }
+    function status() {
+        var el = ov && ov.querySelector('.cr-st'); if (!el) return;
+        var pl = (typeof myMusicPlaylists !== 'undefined' && myMusicPlaylists) || {}, m = (pl.main || []).length, l = (pl.loby || []).length;
+        el.textContent = 'Треків на сервері: меню ' + m + ', лобі ' + l; el.classList.add('i18n-skip');
+        if (window.I18N && I18N.lang !== 'uk') el.textContent = 'Tracks on server: menu ' + m + ', lobby ' + l;
+    }
+    function open() { if (!ov) build(); ov.classList.add('on'); status(); try { ov.querySelector('.cr-x').focus(); } catch (e) {} }
     function close() { if (ov) ov.classList.remove('on'); }
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && ov && ov.classList.contains('on')) close(); });
     window.Credits = { open: open, close: close, tracks: TRACKS };

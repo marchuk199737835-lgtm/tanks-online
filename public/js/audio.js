@@ -95,6 +95,14 @@ function playCurrentTrack() {
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(hook, 0)); else setTimeout(hook, 0);
 })();
+// битий/відсутній файл — не зависаємо в тиші, а пробуємо наступний трек (не більше одного кола)
+let musicErrRun = 0;
+bgMusic.addEventListener('error', () => {
+    console.warn('Музика: не вдалося завантажити', bgMusic.src);
+    if (!musicWanted || activePlaylist.length === 0 || ++musicErrRun > activePlaylist.length) return;
+    currentTrackIndex = (currentTrackIndex + 1) % activePlaylist.length; playCurrentTrack();
+});
+bgMusic.addEventListener('playing', () => { musicErrRun = 0; });
 bgMusic.addEventListener('ended', () => { if (activePlaylist.length > 0) { currentTrackIndex = (currentTrackIndex + 1) % activePlaylist.length; playCurrentTrack(); } });
 
 function playSound(type) {

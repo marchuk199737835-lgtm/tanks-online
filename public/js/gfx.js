@@ -83,7 +83,7 @@
         if (now - warm < 2000) return;                               // прогрів: перші секунди після старту/перемикання (будуються кеші)
         acc += dt; n++; fpsAcc += dt; fpsN++;
         if (dt > 0.1) stalls++;
-        if (G.showFps && now - fpsShown > 500) { fpsShown = now; G.fps = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; const e = document.getElementById('gfx-fps'); if (e) e.textContent = G.fps + ' FPS · ' + NAMES[G.tier]; }
+        
         if (!winT) winT = now;
         if (now - winT < 1000) return;
         const avg = acc / n, fps = 1 / avg, target = G.cap || 60;
@@ -134,10 +134,23 @@
         });
         const h = document.getElementById('gfx-hint'); if (h) h.textContent = HINT[G.mode] || '';
     }
+    // Лічильник FPS живе власним rAF-циклом — працює і в меню, і в бою (раніше оновлювався лише з ігрового циклу, тож у меню був порожній)
+    let fpsRaf = 0, fpsLast = 0, fpsFr = 0, fpsT0 = 0;
+    function fpsTick(now) {
+        fpsRaf = 0; if (!G.showFps) return;
+        fpsFr++; if (!fpsT0) fpsT0 = now;
+        if (now - fpsT0 >= 500) {
+            G.fps = Math.round(fpsFr * 1000 / (now - fpsT0)); fpsFr = 0; fpsT0 = now;
+            const e = document.getElementById('gfx-fps'); if (e) e.textContent = G.fps + ' FPS · ' + NAMES[G.tier];
+        }
+        fpsRaf = requestAnimationFrame(fpsTick);
+    }
     function fpsEl() {
         let e = document.getElementById('gfx-fps');
-        if (G.showFps) { if (!e) { e = document.createElement('div'); e.id = 'gfx-fps'; e.className = 'gfx-fps'; document.body.appendChild(e); } }
-        else if (e) e.remove();
+        if (G.showFps) {
+            if (!e) { e = document.createElement('div'); e.id = 'gfx-fps'; e.className = 'gfx-fps'; e.textContent = '… FPS'; document.body.appendChild(e); }
+            if (!fpsRaf) { fpsFr = 0; fpsT0 = 0; fpsRaf = requestAnimationFrame(fpsTick); }
+        } else { if (e) e.remove(); if (fpsRaf) { cancelAnimationFrame(fpsRaf); fpsRaf = 0; } }
     }
     buildUI(); fpsEl(); apply();
 })();
