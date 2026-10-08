@@ -39,6 +39,11 @@ function scanMusic() {
     });
 }
 scanMusic();
+console.log('[music] папка:', musicDir, '| main:', musicData.main.length, '| loby:', musicData.loby.length);
+// перескан не частіше ніж раз на 20 с (нові треки підхоплюються без перезапуску), і JSON-діагностика: /music-status
+let lastMusicScan = Date.now();
+function rescanMusicSoon() { if (Date.now() - lastMusicScan > 20000) { lastMusicScan = Date.now(); try { scanMusic(); } catch (e) {} } }
+app.get('/music-status', (req, res) => { scanMusic(); res.json({ dir: musicDir, exists: fs.existsSync(musicDir), main: musicData.main, loby: musicData.loby }); });
 app.use('/music', express.static(musicDir, { maxAge: '1d' }));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
@@ -566,6 +571,7 @@ function collectTokenFor(roomId, sockId, tid) {
 
 io.on('connection', (socket) => {
     connHooks.forEach(f => { try { f(socket); } catch (e) { console.error('❌ connHook', e && e.message); } });
+    rescanMusicSoon();
     socket.emit('initMusic', musicData);
     socket.emit('initZombies', Z_TYPES_CLIENT);
     
