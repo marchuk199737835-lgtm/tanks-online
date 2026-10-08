@@ -9,7 +9,7 @@ const GD = require('./public/js/gamedata.js');
 
 module.exports = function createModes(D) {
     const { io, rooms, dbUsers, MAP_DATA, MapObj, Nav, Z_TYPES, waveScale, getValidSpawn, getValidEdgeSpawn, checkCollisionServer, getMaxHp,
-        grantXp, rollDrop, saveUser, ecoPayload, pushRooms, zombieTick, ZOMBIE_CAP, ZOMBIE_SPAWN_BASE, ZOMBIE_SPAWN_STEP } = D;
+        grantXp, rollDrop, saveUser, ecoPayload, pushRooms, zombieTick, emitMatchEnd, ZOMBIE_CAP, ZOMBIE_SPAWN_BASE, ZOMBIE_SPAWN_STEP } = D;
     const MS = new Map();
     const NEW = new Set(ModeInfo.NEW);
     const has = mode => NEW.has(mode);
@@ -89,18 +89,21 @@ module.exports = function createModes(D) {
     // o: { outcomes:{id:'win'|'loss'|'draw'}, ctx:(p)=>{...}, winner, name, msg, lines:[...] }
     function finish(r, o) {
         if (r.status !== 'playing') return;
-        r.status = 'finished'; restoreEq(r); const rw = {}, xpm = {}, oc = {}, per = {};
+        r.status = 'finished'; restoreEq(r); const rw = {}, xpm = {}, oc = {}, per = {}, drp = {}, crd = {};
         Object.values(r.players).forEach(p => {
             const out = o.outcomes[p.id] || 'loss', amt = ModeInfo.reward(r.mode, r, out, Object.assign({ n: Object.keys(r.players).length }, o.ctx ? o.ctx(p) : {}));
             rw[p.id] = amt; oc[p.id] = out; if (o.per) per[p.id] = o.per(p);
             if (dbUsers[p.name]) {
-                const u = dbUsers[p.name]; u.bucks += amt; u.stats.earned += amt; u.stats.matches++;
-                xpm[p.id] = grantXp(p.name, out); const dr = rollDrop(p.name); saveUser(p.name);
+                const u = dbUsers[p.name]; u.bucks += amt; u.stats.earned += amt; u.stats.matches++; crd[p.id] = amt;
+                xpm[p.id] = grantXp(p.name, out); const dr = rollDrop(p.name); drp[p.id] = dr; saveUser(p.name);
                 io.to(p.id).emit('economyUpdate', ecoPayload(p.name)); if (dr) io.to(p.id).emit('dropReceived', dr);
             }
         });
         MS.delete(r.id);
         emit(r, 'gameOver', { winner: o.winner || 'TEAM', name: o.name || '', rewards: rw, xp: xpm, isTeamWin: false, mode: r.mode, outcomes: oc, msg: o.msg || '', lines: o.lines || [], per, team: o.teamWin || null });
+        let wvs = null, plc = {};
+        try { const f0 = Object.values(r.players)[0]; if (o.ctx && f0) { const c0 = o.ctx(f0); if (c0 && c0.waves != null) wvs = c0.waves | 0; } Object.keys(per).forEach(k => { if (per[k] && per[k].place) plc[k] = per[k].place; }); } catch (e) { }
+        emitMatchEnd(r, { outcomes: oc, rewards: crd, xp: xpm, drops: drp, place: plc, waves: wvs });
         pushRooms();
     }
     const allOutcome = (r, out) => { const m = {}; Object.keys(r.players).forEach(id => m[id] = out); return m; };
@@ -109,7 +112,7 @@ module.exports = function createModes(D) {
     function start(r, pK, now) {
         const map = mapOf(r), C = center(map), S = { mode: r.mode, zid: 0, t0: now, kills: {}, ev: {} };
         MS.set(r.id, S);
-        pK.forEach(id => { const p = r.players[id]; p.out = false; p.lives = 0; p.perk = null; p.caps = 0; p.score = 0; });
+        pK.forEach(id => { const p = r.players[id]; p.out = false; p.lives = 0; p.perk = null; p.caps = 0; p.score = 0; p.brPicks = 0; });
         switch (r.mode) {
             case 'base_defense': {
                 const mk0 = map.solids.find(o => o.type === 'spawn_core'), c = findOpen(r, mk0 ? mk0.x : C.x, mk0 ? mk0.y : C.y, 60); S.core = { x: c.x, y: c.y, hp: r.bdCoreHp, max: r.bdCoreHp, r: 46 };
@@ -593,7 +596,7 @@ module.exports = function createModes(D) {
         if (oldM && rarIdx(m.rarity) <= rarIdx(oldM.rarity)) return false;
         const mx0 = getMaxHp(p.equipped); p.equipped[slot] = m.id; const mx1 = getMaxHp(p.equipped);
         p.hp = mx1 > mx0 ? Math.min(mx1, p.hp + (mx1 - mx0)) : Math.min(p.hp, mx1);
-        pu.active = false; delete r.powerups[pid];
+        pu.active = false; delete r.powerups[pid]; p.brPicks = (p.brPicks | 0) + 1;
         emit(r, 'powerupCollected', { pid, playerId: sockId, type: 'mod' });
         io.to(sockId).emit('modPicked', { mod: m.id, slot, rar: m.rarity, replaced: old || null });
         return true;

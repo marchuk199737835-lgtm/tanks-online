@@ -9,6 +9,7 @@ const { MongoClient } = require('mongodb');
 const MapObj = require('./public/js/mapobjects.js');     // спільний модуль: об'єкти мап, зіткнення, двері
 const Nav = require('./navgrid.js');                     // пошук шляху для зомбі (обхід перешкод)
 const mountEditor = require('./editor-server.js');       // серверна частина редактора мап
+const Ev = require('./events.js');                       // шина подій (прогрес, профіль, соціальне, боти)
 
 process.on('uncaughtException', err => console.error('Crash prevented:', err));
 process.on('unhandledRejection', err => console.error('Promise rejection prevented:', err));
@@ -38,14 +39,14 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.ht
 
 const MAX_HP = 500, BUFF_DURATION = 15000, BASE_RELOAD = 2000;
 const mongoUri = process.env.MONGO_URI;
-let dbUsersCol = null, dbMapsCol = null, editorApi = null;
+let dbUsersCol = null, dbMapsCol = null, editorApi = null, dbRef = null;
 const dbUsers = Object.create(null); // без прототипу: логіни типу __proto__ чи constructor більше не ламають логіку
 
 if (mongoUri) {
     const client = new MongoClient(mongoUri);
     client.connect().then(() => {
         console.log("✅ Підключено до MongoDB!");
-        const db = client.db("tanks_db");
+        const db = client.db("tanks_db"); dbRef = db;
         dbUsersCol = db.collection("users");
         dbMapsCol = db.collection("maps");
         promoCol = db.collection("promo_uses");
@@ -209,6 +210,9 @@ function getValidEdgeSpawn(m, r, t = 'spawn_zombie') {
 }
 
 let rooms = {}, globalPlayers = {};
+const hooks = { clanTag: () => '', extraRooms: () => [], preJoin: () => false, botNames: null };   // модулі підміняють (clans.js → hooks.clanTag; bots.js → extraRooms/preJoin/botNames)
+const nickOf = n => (dbUsers[n] && dbUsers[n].nick) || n;
+const connHooks = [];   // обробники підключення від додаткових модулів (ctx.onConnection)
 
 function ecoPayload(name) {
     const u = dbUsers[name];
@@ -232,9 +236,16 @@ function playerLevel(name) { return dbUsers[name] ? GameData.levelFromXp(dbUsers
 
 // Список сесій отримують лише ті, хто його дивиться (кімната 'rb'), і не частіше разу на ~300 мс (раніше — усім підключеним на кожну зміну)
 let _roomsTimer = null;
+// Компактна статистика гравця для картки в лобі (ігри / перемоги / вбивства / смерті); для ботів її генерує bots.js
+function lobbyStats(n) {
+    const u = dbUsers[n]; if (!u) return { games: 0, wins: 0, kills: 0, deaths: 0 };
+    const ps = u.pstats || {}, st = u.stats || {}, num = v => (Number.isFinite(+v) ? Math.max(0, Math.floor(+v)) : 0);
+    return { games: num(ps.games || st.matches), wins: num(ps.wins), kills: num(ps.kills || st.kills), deaths: num(ps.deaths) };
+}
 function pushRooms() { if (_roomsTimer) return; _roomsTimer = setTimeout(() => { _roomsTimer = null; io.to('rb').emit('roomsList', getActiveRooms()); }, 300); }
 function getActiveRooms() {
-    return Object.values(rooms).map(r => ({ id: r.id, hostName: r.hostName, mode: r.mode, map: r.map, playersCount: Object.keys(r.players).length, maxPlayers: r.maxPlayers, status: r.status }));
+    let extra = []; try { extra = hooks.extraRooms() || []; } catch (e) { extra = []; }   // «віртуальні» сесії (bots.js)
+    return Object.values(rooms).map(r => ({ id: r.id, hostName: r.hostName, hostNick: nickOf(r.hostName), mode: r.mode, map: r.map, playersCount: Object.keys(r.players).length, maxPlayers: r.maxPlayers, status: r.status })).concat(extra);
 }
 
 function getMaxHp(equipped) {
@@ -273,8 +284,33 @@ function rollDrop(name) {
     return null;
 }
 
+// ===== Події прогресу: підрахунок вбивств/смертей за матч, 'kill', 'multikill', 'matchEnd' =====
+const WEAPON_TYPES = new Set(['normal', 'explosive', 'fast', 'piercing', 'homing', 'shotgun', 'minigun', 'incendiary', 'samurai', 'melee', 'acid', 'hunter_gun', 'boss_proj', 'mine', 'laser']);
+const cleanWeapon = t => (typeof t === 'string' && WEAPON_TYPES.has(t)) ? t : null;
+const matchTally = new Map();   // roomId -> { t0, kd: { [name]: { k, d } } }
+const tallyOf = r => { let t = matchTally.get(r.id); if (!t) { t = { t0: Date.now(), kd: Object.create(null) }; matchTally.set(r.id, t); } return t; };
+const kdOf = (t, name) => t.kd[name] || (t.kd[name] = { k: 0, d: 0 });
+const SHOTS = new Map(); let shotSeq = 1;   // постріли (id снаряда), щоб розпізнати «один снаряд — кілька вбивств»
+function trimShots(now) { for (const [k, s] of SHOTS) { if (now - s.t > 8000) SHOTS.delete(k); else break; } }
+// o: { outcomes:{socketId:'win'|'loss'|'draw'}, rewards:{}, xp:{}, drops:{}, place:{}, wave, waves }
+function emitMatchEnd(r, o) {
+    try {
+        const t = matchTally.get(r.id) || { t0: Date.now(), kd: Object.create(null) }; matchTally.delete(r.id);
+        const ps = Object.values(r.players), rank = { win: 0, draw: 1, loss: 2 };
+        const order = ps.slice().sort((a, b) => (rank[(o.outcomes || {})[a.id] || 'loss'] - rank[(o.outcomes || {})[b.id] || 'loss']) || ((b.score | 0) - (a.score | 0)));
+        const list = ps.map(p => {
+            const kd = t.kd[p.name] || { k: 0, d: 0 };
+            return { name: p.name, isBot: !!p.isBot, outcome: (o.outcomes || {})[p.id] || 'loss', kills: kd.k, deaths: kd.d, credits: (o.rewards && o.rewards[p.id]) | 0,
+                xp: (o.xp && o.xp[p.id]) || null, dropped: (o.drops && o.drops[p.id]) || null, place: (o.place && o.place[p.id]) || (order.indexOf(p) + 1),
+                team: p.team || null, caps: p.caps | 0, brPicks: p.brPicks | 0 };
+        });
+        Ev.emit('matchEnd', { roomId: r.id, mode: r.mode, durationMs: Math.max(0, Date.now() - t.t0), players: list, wave: o.wave == null ? null : o.wave, waves: o.waves == null ? null : o.waves });
+    } catch (e) { console.error('❌ matchEnd:', e && e.message); }
+}
+
 // УНІВЕРСАЛЬНА ФУНКЦІЯ ОБРОБКИ СМЕРТІ ТА РЕСПАВНУ
-function processPlayerDeath(r, victimId, killerId) {
+// meta (необов'язково): { weapon } — тип снаряда/джерело шкоди для події 'kill'
+function processPlayerDeath(r, victimId, killerId, meta) {
     let v = r.players[victimId];
     if (!v) return;
     v.buff = null;
@@ -287,6 +323,12 @@ function processPlayerDeath(r, victimId, killerId) {
         dbUsers[atk.name].stats.kills++;
         saveUser(atk.name);
     }
+    try {
+        const ta = tallyOf(r);
+        kdOf(ta, v.name).d++;
+        if (atk && atk.name !== v.name) kdOf(ta, atk.name).k++;
+        Ev.emit('kill', { roomId: r.id, mode: r.mode, killerName: atk ? atk.name : null, killerBot: !!(atk && atk.isBot), victimName: v.name, victimBot: !!v.isBot, weapon: cleanWeapon(meta && meta.weapon) });
+    } catch (e) { console.error('❌ kill event:', e && e.message); }
 
     if (Modes.has(r.mode)) { Modes.onDeath(r, v, killerId); return; }
     if (r.mode === 'team_deathmatch') {
@@ -344,7 +386,7 @@ function clampInt(v, min, max, def) {
 const ModeInfo = require('./public/js/modeinfo.js');   // спільне з клієнтом: режими, параметри, нагороди
 const VALID_MODES = ModeInfo.ORDER.slice();
 const Modes = require('./modes.js')({ io, rooms, dbUsers, MAP_DATA, MapObj, Nav, Z_TYPES, waveScale, getValidSpawn, getValidEdgeSpawn, checkCollisionServer, getMaxHp,
-    grantXp, rollDrop, saveUser, ecoPayload, pushRooms, zombieTick, processPlayerDeath, ZOMBIE_CAP, ZOMBIE_SPAWN_BASE, ZOMBIE_SPAWN_STEP });
+    grantXp, rollDrop, saveUser, ecoPayload, pushRooms, zombieTick, processPlayerDeath, emitMatchEnd, ZOMBIE_CAP, ZOMBIE_SPAWN_BASE, ZOMBIE_SPAWN_STEP });
 const teamsOf = r => r.mode === 'capture_points' ? Math.max(2, Math.min(4, r.cpTeams || 2)) : Math.max(2, Math.min(4, r.tdmTeams || 2));
 const isTeamPvp = m => m === 'team_deathmatch' || m === 'capture_points';
 const powerupsOn = m => m !== 'prophunt' && m !== 'team_deathmatch';
@@ -358,11 +400,11 @@ const TDM_TEAMS = ['red', 'blue', 'green', 'yellow']; // порядок як у 
 
 // Повернути кімнату в лобі (кінець гри, скасування гри) з повним очищенням ігрового стану
 function resetRoomToLobby(r) {
-    r.status = 'lobby'; r.state = 'waiting';
+    r.status = 'lobby'; r.state = 'waiting'; matchTally.delete(r.id);
     r.powerups = {}; r.tokens = {}; r.zombies = {}; r.mines = {}; r.wave = 1; Modes.cleanup(r.id);
     Object.values(r.players).forEach(p => {
         p.ready = false; p.score = 0; p.hp = getMaxHp(p.equipped); p.buff = null; p.out = false; p.lives = 0; p.perk = null; p.caps = 0;
-        p.stuckIn = []; p.onFire = null; p.isDisguised = false; p.level = playerLevel(p.name);
+        p.stuckIn = []; p.onFire = null; p.isDisguised = false; if (!p.isBot) p.level = playerLevel(p.name);
     });
     io.to(r.id).emit('updateLobby', r);
     pushRooms();
@@ -375,7 +417,7 @@ function removePlayer(rId, sockId) {
     const left = r.players[sockId];
     delete r.players[sockId];
     const ids = Object.keys(r.players);
-    if (ids.length === 0) { delete rooms[rId]; if (typeof SYNCS !== "undefined") SYNCS.delete(rId); BANS.delete(rId); Modes.cleanup(rId); return; }
+    if (ids.length === 0) { delete rooms[rId]; matchTally.delete(rId); if (typeof SYNCS !== "undefined") SYNCS.delete(rId); BANS.delete(rId); Modes.cleanup(rId); return; }
     if (r.hostSocket === sockId) { r.hostSocket = ids[0]; r.hostName = r.players[ids[0]].name; }
     if (r.status === 'playing') {
         let abort = false;
@@ -411,7 +453,109 @@ function adventState() {
     return { day: p.month === 9 ? p.day : 0, end: adventEndMs(p.year), now: now.getTime() };
 }
 
+// Запуск гри в кімнаті (кнопка лідера і боти-лідери з bots.js). notify(msg) — причина відмови. Повертає true, якщо гру запущено.
+function startRoomGame(roomId, notify) {
+    notify = notify || function () {};
+    let r = rooms[roomId];
+    if (r && r.status === 'lobby') {
+        const pK = Object.keys(r.players);
+        if (pK.length >= ModeInfo.minPlayers(r.mode) && pK.every(id => r.players[id].ready)) {
+            if (r.mode === 'prophunt') {
+                const nHunt = pK.filter(id => r.players[id].team === 'hunter').length, nHide = pK.filter(id => r.players[id].team === 'hider').length;
+                if (nHunt < 1 || nHide < 1) return notify('Для Хованок потрібен хоча б один мисливець і один, хто ховається!');
+                if (nHunt > r.hunterCount) return notify(`Забагато мисливців (максимум ${r.hunterCount})!`);
+            }
+            if (isTeamPvp(r.mode)) {
+                let c = {};
+                pK.forEach(id => { let t = r.players[id].team; if (t) c[t] = (c[t] || 0) + 1; });
+                let aT = Object.keys(c);
+                if (aT.length < 2) return notify('Для Командного бою потрібно мінімум 2 команди!');
+                if (r.tdmAutoBalance) {
+                    let v = Object.values(c);
+                    if (Math.max(...v) - Math.min(...v) > 1) return notify('Увімкнено Автобаланс: склади команд не рівні!');
+                }
+                const cM = MAP_DATA[r.map] ? r.map : 'epic_map';
+                let sPts = MAP_DATA[cM].solids.filter(s => s.type === 'spawn_player');
+                if (sPts.length < aT.length) return notify(`На мапі недостатньо точок спавну (${sPts.length}) для ${aT.length} команд!`);
+                r.teamScores = {};
+                aT.forEach(t => r.teamScores[t] = 0);
+                if (r.mode === 'team_deathmatch') r.timeEndTime = Date.now() + 4000 + (r.tdmTime * 1000);
+                let tS = {};
+                aT.forEach((t, i) => tS[t] = sPts[i % sPts.length]);
+                r.teamSpawns = {}; aT.forEach(t => r.teamSpawns[t] = { x: tS[t].x, y: tS[t].y });
+                pK.forEach(id => {
+                    let p = r.players[id];
+                    p.hp = getMaxHp(p.equipped);
+                    p.score = 0; p.buff = null; p.stuckIn = []; p.onFire = null; p.color = p.team;
+                    let sp = tS[p.team];
+                    let rx = sp.x + (Math.random() * 80 - 40), ry = sp.y + (Math.random() * 80 - 40);
+                    if (checkCollisionServer(cM, rx, ry, 24)) { rx = sp.x; ry = sp.y; }
+                    p.x = rx; p.y = ry;
+                });
+            } else {
+                pK.forEach(id => {
+                    let p = r.players[id];
+                    p.hp = getMaxHp(p.equipped);
+                    p.score = 0; p.buff = null; p.stuckIn = []; p.onFire = null;
+                    let sp = getValidSpawn(r.map, 24, 'spawn_player');
+                    p.x = sp.x; p.y = sp.y;
+                });
+            }
+            r.status = 'playing'; matchTally.set(roomId, { t0: Date.now(), kd: Object.create(null) });
+            r.powerups = {}; r.mines = {}; r.tokens = {}; r.zombies = {}; r.lastPowerupSpawn = Date.now();
+            if (Modes.has(r.mode)) { SYNCS.delete(roomId); Modes.start(r, pK, Date.now()); }
+            
+            if (r.mode === 'survival') {
+                r.wave = 0; r.state = 'waiting'; r.nextWaveTime = Date.now() + 4000; r.zombies = {};
+            } else if (r.mode === 'prophunt') {
+                r.state = 'hiding'; r.phaseEndTime = Date.now() + 4000 + (r.hideTime * 1000);
+                const prps = Array.from(MapObj.DISGUISE_IDS);
+                pK.forEach(id => {
+                    if (r.players[id].team === 'hider') {
+                        r.players[id].propType = prps[Math.floor(Math.random() * prps.length)];
+                        r.players[id].isDisguised = false;
+                    }
+                });
+            }
+            io.to(roomId).emit('gameStarting', r);
+            pushRooms();
+            return true;
+        }
+    }
+    return false;
+}
+
+// Підбір жетона (детматч): сокет-обробник і боти. Повертає true, якщо жетон зараховано.
+function collectTokenFor(roomId, sockId, tid) {
+    let r = rooms[roomId];
+    if (!r || r.status !== 'playing' || !r.tokens[tid] || !r.tokens[tid].active || !r.players[sockId] || r.players[sockId].hp <= 0) return;
+    r.tokens[tid].active = false; r.players[sockId].score += 1;
+    
+    if (r.players[sockId].score >= r.winScore && r.mode === 'deathmatch') {
+        r.status = 'finished';
+        let mt = 1 + Math.max(0, r.winScore - 5) * 0.10, bW = Math.round(10 * mt), bL = Math.round(2 * mt), rw = {}, xpm = {}, drp = {}, ocm = {};
+        Object.values(r.players).forEach(p => {
+            let a = Math.round(p.id === sockId ? bW : bL); rw[p.id] = a; ocm[p.id] = p.id === sockId ? 'win' : 'loss';
+            if (dbUsers[p.name]) {
+                dbUsers[p.name].bucks += a; dbUsers[p.name].stats.earned += a; dbUsers[p.name].stats.matches++;
+                xpm[p.id] = grantXp(p.name, p.id === sockId ? 'win' : 'loss');
+                let dr = rollDrop(p.name); drp[p.id] = dr; saveUser(p.name);
+                io.to(p.id).emit('economyUpdate', ecoPayload(p.name));
+                if (dr) io.to(p.id).emit('dropReceived', dr);
+            }
+        });
+        io.to(roomId).emit('tokenCollected', { tid: tid, playerId: sockId, score: r.players[sockId].score });
+        io.to(roomId).emit('gameOver', { winner: sockId, name: r.players[sockId] ? r.players[sockId].name : 'ГРАВЕЦЬ', rewards: rw, xp: xpm, isTeamWin: false });
+        emitMatchEnd(r, { outcomes: ocm, rewards: rw, xp: xpm, drops: drp });
+        pushRooms();
+    } else {
+        io.to(roomId).emit('tokenCollected', { tid: tid, playerId: sockId, score: r.players[sockId].score });
+    }
+    delete r.tokens[tid];
+}
+
 io.on('connection', (socket) => {
+    connHooks.forEach(f => { try { f(socket); } catch (e) { console.error('❌ connHook', e && e.message); } });
     socket.emit('initMusic', musicData);
     socket.emit('initZombies', Z_TYPES_CLIENT);
     
@@ -420,13 +564,14 @@ io.on('connection', (socket) => {
         if (!creds) return socket.emit('joinError', 'Некоректні дані!');
         const { name, password } = creds;
         if (!NAME_RE.test(name) || password.length < 4 || password.length > 128) return socket.emit('joinError', 'Логін 3-12 символів (літери, цифри, _ -), пароль від 4!');
-        if (dbUsers[name]) return socket.emit('joinError', 'Цей логін вже зайнятий!');
+        if (dbUsers[name] || (hooks.botNames && hooks.botNames.has(name.toLowerCase()))) return socket.emit('joinError', 'Цей логін вже зайнятий!');
         const token = crypto.randomUUID();
         dbUsers[name] = validateUser({ name: name, password: hashPwd(password), token: token, bucks: 0, lang: cleanLang(data && data.lang) });
         saveUser(name);
         globalPlayers[socket.id] = name;
         socket.emit('authSuccess', { name, token, lang: dbUsers[name].lang });
         sendEconomy(socket.id, name);
+        Ev.emit('login', { name, socketId: socket.id });
     });
 
     socket.on('login', (data) => {
@@ -442,6 +587,7 @@ io.on('connection', (socket) => {
         globalPlayers[socket.id] = name;
         socket.emit('authSuccess', { name, token, lang: cleanLang(u.lang) });
         sendEconomy(socket.id, name);
+        Ev.emit('login', { name, socketId: socket.id });
     });
 
     // зміна мови інтерфейсу — зберігається за акаунтом
@@ -463,6 +609,7 @@ io.on('connection', (socket) => {
             if (!hadLvl) saveUser(foundName);     // нагороди за рівні створюються один раз і зберігаються
             socket.emit('authSuccess', { name: foundName, token, lang: cleanLang(dbUsers[foundName].lang) });
             sendEconomy(socket.id, foundName);
+            Ev.emit('login', { name: foundName, socketId: socket.id });
         } else socket.emit('authError', 'Сесія закінчилась, увійдіть знову');
     });
 
@@ -522,6 +669,7 @@ io.on('connection', (socket) => {
                 u.inventory.push(modId);
                 saveUser(name);
                 socket.emit('caseResult', { modId: modId, bucks: u.bucks, inventory: u.inventory, equipped: u.equipped, stats: u.stats, caseId: caseId });
+                Ev.emit('caseOpened', { name, caseId, modId, price: cs.price, fromLevel: false });
             } else { u.bucks += cs.price; } // кейс не видав предмет - повертаємо креди
         } else socket.emit('joinError', 'Недостатньо кредів!');
     });
@@ -543,6 +691,7 @@ io.on('connection', (socket) => {
         if (win) u.inventory.push(d.target);
         saveUser(n);
         sendEconomy(socket.id, n);
+        Ev.emit('upgradeDone', { name: n, win, srcId: sId, tgtId: d.target });
         socket.emit('upgradeResult', { win: win, roll: roll, ch: ch, under: d.rollUnder, newBucks: u.bucks, inv: u.inventory, tId: d.target });
     });
 
@@ -563,6 +712,7 @@ io.on('connection', (socket) => {
         saveUser(name);
         socket.emit('caseResult', { modId: modId, bucks: u.bucks, inventory: u.inventory, equipped: u.equipped, stats: u.stats, caseId: caseId, fromLevel: lvl });
         sendEconomy(socket.id, name);
+        Ev.emit('caseOpened', { name, caseId, modId, price: 0, fromLevel: true });
     });
 
     socket.on('reorderInventory', (newInv) => {
@@ -607,6 +757,7 @@ io.on('connection', (socket) => {
             u.inventory.splice(idx, 1);
             saveUser(name);
             sendEconomy(socket.id, name);
+            Ev.emit('moduleEquipped', { name, modId: data.id });
             for (let rId in rooms) {
                 let r = rooms[rId];
                 if (r.players[socket.id] && r.status === 'lobby') {
@@ -629,6 +780,7 @@ io.on('connection', (socket) => {
             u.inventory.splice(idx, 1);
             saveUser(name);
             sendEconomy(socket.id, name);
+            Ev.emit('moduleSold', { name, modId: data.id, price: modPr });
         }
     });
 
@@ -671,6 +823,7 @@ io.on('connection', (socket) => {
     socket.on('joinRoom', (roomId) => {
         let n = globalPlayers[socket.id];
         if (!n || !dbUsers[n]) return socket.emit('joinError', 'Помилка авторизації');
+        try { if (hooks.preJoin(socket, roomId, n)) return; } catch (e) { console.error('❌ preJoin', e && e.message); }   // bots.js: віртуальні сесії, бот звільняє місце
         if (!rooms[roomId]) return socket.emit('joinError', 'Кімната не знайдена');
         let r = rooms[roomId];
         if (r.players[socket.id]) return socket.emit('joinedRoom', { roomId: roomId, roomData: r }); // вже тут
@@ -688,7 +841,8 @@ io.on('connection', (socket) => {
             id: socket.id, name: n, color: null, team: null, ready: false,
             hp: getMaxHp(uEq), score: 0, x: 0, y: 0, bodyAngle: 0, turretAngle: 0,
             buff: null, buffEndTime: 0, buffProgress: 0, stuckIn: [], laserTarget: null,
-            onFire: null, equipped: uEq, propType: 'prop_crate', isDisguised: false, level: playerLevel(n)
+            onFire: null, equipped: uEq, propType: 'prop_crate', isDisguised: false, level: playerLevel(n),
+            nick: nickOf(n), clan: hooks.clanTag(n) || '', stats: lobbyStats(n)
         };
         socket.emit('joinedRoom', { roomId: roomId, roomData: r });
         io.to(roomId).emit('updateLobby', r);
@@ -806,71 +960,8 @@ io.on('connection', (socket) => {
     });
 
     socket.on('startGame', (roomId) => {
-        let r = rooms[roomId];
-        if (r && r.hostSocket === socket.id && r.status === 'lobby') {
-            const pK = Object.keys(r.players);
-            if (pK.length >= ModeInfo.minPlayers(r.mode) && pK.every(id => r.players[id].ready)) {
-                if (r.mode === 'prophunt') {
-                    const nHunt = pK.filter(id => r.players[id].team === 'hunter').length, nHide = pK.filter(id => r.players[id].team === 'hider').length;
-                    if (nHunt < 1 || nHide < 1) return socket.emit('joinError', 'Для Хованок потрібен хоча б один мисливець і один, хто ховається!');
-                    if (nHunt > r.hunterCount) return socket.emit('joinError', `Забагато мисливців (максимум ${r.hunterCount})!`);
-                }
-                if (isTeamPvp(r.mode)) {
-                    let c = {};
-                    pK.forEach(id => { let t = r.players[id].team; if (t) c[t] = (c[t] || 0) + 1; });
-                    let aT = Object.keys(c);
-                    if (aT.length < 2) return socket.emit('joinError', 'Для Командного бою потрібно мінімум 2 команди!');
-                    if (r.tdmAutoBalance) {
-                        let v = Object.values(c);
-                        if (Math.max(...v) - Math.min(...v) > 1) return socket.emit('joinError', 'Увімкнено Автобаланс: склади команд не рівні!');
-                    }
-                    const cM = MAP_DATA[r.map] ? r.map : 'epic_map';
-                    let sPts = MAP_DATA[cM].solids.filter(s => s.type === 'spawn_player');
-                    if (sPts.length < aT.length) return socket.emit('joinError', `На мапі недостатньо точок спавну (${sPts.length}) для ${aT.length} команд!`);
-                    r.teamScores = {};
-                    aT.forEach(t => r.teamScores[t] = 0);
-                    if (r.mode === 'team_deathmatch') r.timeEndTime = Date.now() + 4000 + (r.tdmTime * 1000);
-                    let tS = {};
-                    aT.forEach((t, i) => tS[t] = sPts[i % sPts.length]);
-                    r.teamSpawns = {}; aT.forEach(t => r.teamSpawns[t] = { x: tS[t].x, y: tS[t].y });
-                    pK.forEach(id => {
-                        let p = r.players[id];
-                        p.hp = getMaxHp(p.equipped);
-                        p.score = 0; p.buff = null; p.stuckIn = []; p.onFire = null; p.color = p.team;
-                        let sp = tS[p.team];
-                        let rx = sp.x + (Math.random() * 80 - 40), ry = sp.y + (Math.random() * 80 - 40);
-                        if (checkCollisionServer(cM, rx, ry, 24)) { rx = sp.x; ry = sp.y; }
-                        p.x = rx; p.y = ry;
-                    });
-                } else {
-                    pK.forEach(id => {
-                        let p = r.players[id];
-                        p.hp = getMaxHp(p.equipped);
-                        p.score = 0; p.buff = null; p.stuckIn = []; p.onFire = null;
-                        let sp = getValidSpawn(r.map, 24, 'spawn_player');
-                        p.x = sp.x; p.y = sp.y;
-                    });
-                }
-                r.status = 'playing';
-                r.powerups = {}; r.mines = {}; r.tokens = {}; r.zombies = {}; r.lastPowerupSpawn = Date.now();
-                if (Modes.has(r.mode)) { SYNCS.delete(roomId); Modes.start(r, pK, Date.now()); }
-                
-                if (r.mode === 'survival') {
-                    r.wave = 0; r.state = 'waiting'; r.nextWaveTime = Date.now() + 4000; r.zombies = {};
-                } else if (r.mode === 'prophunt') {
-                    r.state = 'hiding'; r.phaseEndTime = Date.now() + 4000 + (r.hideTime * 1000);
-                    const prps = Array.from(MapObj.DISGUISE_IDS);
-                    pK.forEach(id => {
-                        if (r.players[id].team === 'hider') {
-                            r.players[id].propType = prps[Math.floor(Math.random() * prps.length)];
-                            r.players[id].isDisguised = false;
-                        }
-                    });
-                }
-                io.to(roomId).emit('gameStarting', r);
-                pushRooms();
-            }
-        }
+        const r = rooms[roomId];
+        if (r && r.hostSocket === socket.id) startRoomGame(roomId, msg => socket.emit('joinError', msg));
     });
 socket.on('selectProp', (data) => {
         if (!data || !data.roomId) return;
@@ -926,6 +1017,7 @@ socket.on('selectProp', (data) => {
                 return;
             }
             data.owner = socket.id; data.pierced = [];
+            { const nowS = Date.now(); trimShots(nowS); data.bid = shotSeq++; SHOTS.set(data.bid, { owner: socket.id, type: cleanWeapon(data.type), kills: 0, t: nowS }); }
             io.to(data.roomId).emit('spawnBullet', data);
         }
     });
@@ -953,7 +1045,14 @@ socket.on('selectProp', (data) => {
         v.hp = Math.max(0, v.hp - fD);
         io.to(socket.id).emit('hitConfirmed');
         
-        if (v.hp === 0) processPlayerDeath(r, data.targetId, socket.id);
+        if (v.hp === 0) {
+            processPlayerDeath(r, data.targetId, socket.id, { weapon: data.type });
+            const sh = (typeof data.bid === 'number') ? SHOTS.get(data.bid) : null;   // один снаряд (id видає сервер у 'shoot') — кілька вбивств
+            if (sh && sh.owner === socket.id) {
+                sh.kills++;
+                if (sh.kills >= 2 && atk) Ev.emit('multikill', { roomId: r.id, mode: r.mode, killerName: atk.name, killerBot: !!atk.isBot, weapon: sh.type || cleanWeapon(data.type), count: sh.kills });
+            }
+        }
     });
 
     socket.on('bulletMissed', (d) => {
@@ -972,32 +1071,7 @@ socket.on('selectProp', (data) => {
         if (v.hp === 0) processPlayerDeath(r, socket.id, 'zombie');
     });
 
-    socket.on('collectToken', (d) => {
-        let r = rooms[d.roomId];
-        if (!r || r.status !== 'playing' || !r.tokens[d.tid] || !r.tokens[d.tid].active || !r.players[socket.id] || r.players[socket.id].hp <= 0) return;
-        r.tokens[d.tid].active = false; r.players[socket.id].score += 1;
-        
-        if (r.players[socket.id].score >= r.winScore && r.mode === 'deathmatch') {
-            r.status = 'finished';
-            let mt = 1 + Math.max(0, r.winScore - 5) * 0.10, bW = Math.round(10 * mt), bL = Math.round(2 * mt), rw = {}, xpm = {};
-            Object.values(r.players).forEach(p => {
-                let a = Math.round(p.id === socket.id ? bW : bL); rw[p.id] = a;
-                if (dbUsers[p.name]) {
-                    dbUsers[p.name].bucks += a; dbUsers[p.name].stats.earned += a; dbUsers[p.name].stats.matches++;
-                    xpm[p.id] = grantXp(p.name, p.id === socket.id ? 'win' : 'loss');
-                    let dr = rollDrop(p.name); saveUser(p.name);
-                    io.to(p.id).emit('economyUpdate', ecoPayload(p.name));
-                    if (dr) io.to(p.id).emit('dropReceived', dr);
-                }
-            });
-            io.to(d.roomId).emit('tokenCollected', { tid: d.tid, playerId: socket.id, score: r.players[socket.id].score });
-            io.to(d.roomId).emit('gameOver', { winner: socket.id, name: r.players[socket.id] ? r.players[socket.id].name : 'ГРАВЕЦЬ', rewards: rw, xp: xpm, isTeamWin: false });
-            pushRooms();
-        } else {
-            io.to(d.roomId).emit('tokenCollected', { tid: d.tid, playerId: socket.id, score: r.players[socket.id].score });
-        }
-        delete r.tokens[d.tid];
-    });
+    socket.on('collectToken', (d) => { if (d) collectTokenFor(d.roomId, socket.id, d.tid); });
 
     socket.on('collectPowerup', (d) => {
         let r = rooms[d.roomId];
@@ -1037,41 +1111,45 @@ socket.on('selectProp', (data) => {
     });
 
     socket.on('disconnect', () => {
+        const lgName = globalPlayers[socket.id];
         delete globalPlayers[socket.id];
+        if (lgName) Ev.emit('logout', { name: lgName, socketId: socket.id });
         for (let rId in rooms) removePlayer(rId, socket.id);
         pushRooms();
     });
 });
 
 function endPropHuntGame(r, wT) {
-    r.status = 'finished'; let rew = {}, wId = null, xpm = {};
+    r.status = 'finished'; let rew = {}, wId = null, xpm = {}, drp = {}, ocm = {};
     Object.values(r.players).forEach(p => {
-        let isW = (p.team === wT), a = isW ? 15 : 3; rew[p.id] = a; if (isW && !wId) wId = p.id;
+        let isW = (p.team === wT), a = isW ? 15 : 3; rew[p.id] = a; ocm[p.id] = isW ? 'win' : 'loss'; if (isW && !wId) wId = p.id;
         if (dbUsers[p.name]) {
             dbUsers[p.name].bucks += a; dbUsers[p.name].stats.earned += a; dbUsers[p.name].stats.matches++;
             xpm[p.id] = grantXp(p.name, isW ? 'win' : 'loss');
-            let dr = rollDrop(p.name); saveUser(p.name);
+            let dr = rollDrop(p.name); drp[p.id] = dr; saveUser(p.name);
             io.to(p.id).emit('economyUpdate', ecoPayload(p.name));
             if (dr) io.to(p.id).emit('dropReceived', dr);
         }
     });
     io.to(r.id).emit('gameOver', { winner: wId || 'TEAM', name: wT === 'hunter' ? 'КОМАНДА МИСЛИВЦІВ' : 'ТІ, ХТО ХОВАВСЯ', rewards: rew, xp: xpm, isTeamWin: true });
+    emitMatchEnd(r, { outcomes: ocm, rewards: rew, xp: xpm, drops: drp });
     pushRooms();
 }
 
 function endTDMGame(r, wT) {
-    r.status = 'finished'; let rew = {}, wId = null, xpm = {}, isD = (wT === 'draw');
+    r.status = 'finished'; let rew = {}, wId = null, xpm = {}, drp = {}, ocm = {}, isD = (wT === 'draw');
     Object.values(r.players).forEach(p => {
-        let isW = !isD && (p.team === wT), a = isD ? 10 : (isW ? 20 : 5); rew[p.id] = a; if (isW && !wId) wId = p.id;
+        let isW = !isD && (p.team === wT), a = isD ? 10 : (isW ? 20 : 5); rew[p.id] = a; ocm[p.id] = isD ? 'draw' : (isW ? 'win' : 'loss'); if (isW && !wId) wId = p.id;
         if (dbUsers[p.name]) {
             dbUsers[p.name].bucks += a; dbUsers[p.name].stats.earned += a; dbUsers[p.name].stats.matches++;
             xpm[p.id] = grantXp(p.name, isD ? 'draw' : (isW ? 'win' : 'loss'));
-            let dr = rollDrop(p.name); saveUser(p.name);
+            let dr = rollDrop(p.name); drp[p.id] = dr; saveUser(p.name);
             io.to(p.id).emit('economyUpdate', ecoPayload(p.name));
             if (dr) io.to(p.id).emit('dropReceived', dr);
         }
     });
     io.to(r.id).emit('gameOver', { winner: isD ? 'DRAW' : (wT || 'TEAM'), name: isD ? 'НІЧИЯ' : `КОМАНДА ${typeof wT === 'string' ? wT.toUpperCase() : 'ПОБЕДИТЕЛЬ'}`, rewards: rew, xp: xpm, isTeamWin: !isD });
+    emitMatchEnd(r, { outcomes: ocm, rewards: rew, xp: xpm, drops: drp });
     pushRooms();
 }
 
@@ -1145,8 +1223,8 @@ function buildSync(r, now) {
         const a = [r1(p.x), r1(p.y), r2(p.bodyAngle), r2(p.turretAngle), r1(p.hp), p.score | 0, p.buff || 0, r2(p.buffProgress || 0), p.isDisguised ? 1 : 0];
         const k = a.join(',');
         if (full || S.p[id] !== k) { S.p[id] = k; P[id] = a; any = true; }
-        const st = JSON.stringify([p.name, p.color, p.team, p.equipped, p.propType, p.level, p.ready]);
-        if (full || S.st[id] !== st) { S.st[id] = st; ST[id] = { name: p.name, color: p.color, team: p.team, equipped: p.equipped, propType: p.propType, level: p.level, ready: p.ready }; any = true; }
+        const st = JSON.stringify([p.name, p.color, p.team, p.equipped, p.propType, p.level, p.ready, p.nick, p.clan]);
+        if (full || S.st[id] !== st) { S.st[id] = st; ST[id] = { name: p.name, nick: p.nick, clan: p.clan, color: p.color, team: p.team, equipped: p.equipped, propType: p.propType, level: p.level, ready: p.ready }; any = true; }
     }
     for (const id in S.p) if (!r.players[id]) { delete S.p[id]; delete S.st[id]; }
     const idk = ids.join('|');
@@ -1235,7 +1313,7 @@ setInterval(() => {
                     delete r.mines[mid];
                     p.hp = Math.max(0, p.hp - 125);
                     io.to(rId).emit('mineExploded', { x: m.x, y: m.y });
-                    if (p.hp === 0) processPlayerDeath(r, p.id, m.owner);
+                    if (p.hp === 0) processPlayerDeath(r, p.id, m.owner, { weapon: 'mine' });
                     break;
                 }
             }
@@ -1250,7 +1328,7 @@ setInterval(() => {
                     io.to(rId).emit('burnTick', { x: p.x, y: p.y });
                     if (p.hp === 0) {
                         let killerId = p.onFire ? p.onFire.owner : null;
-                        processPlayerDeath(r, p.id, killerId);
+                        processPlayerDeath(r, p.id, killerId, { weapon: 'incendiary' });
                     }
                 }
             }
@@ -1265,7 +1343,7 @@ setInterval(() => {
                         io.to(rId).emit('laserHit', { src: p.id, tgt: p.laserTarget });
                         if (r.players[p.laserTarget].buff !== 'shield') {
                             r.players[p.laserTarget].hp = Math.max(0, r.players[p.laserTarget].hp - 20);
-                            if (r.players[p.laserTarget].hp === 0) processPlayerDeath(r, p.laserTarget, p.id);
+                            if (r.players[p.laserTarget].hp === 0) processPlayerDeath(r, p.laserTarget, p.id, { weapon: 'laser' });
                         }
                     }
                 }
@@ -1289,11 +1367,12 @@ setInterval(() => {
         if (r.mode === 'survival') {
             const aP = Object.values(r.players).filter(pl => pl.hp > 0);
             if (aP.length === 0) {
-                r.status = 'finished'; let rw = {}, xpm = {};
+                r.status = 'finished'; let rw = {}, xpm = {}, drp = {}, ocm = {}, crd = {};
                 Object.values(r.players).forEach(pl => {
-                    let n = pl.name; if (dbUsers[n]) { let wv = r.wave; dbUsers[n].bucks += wv; dbUsers[n].stats.earned += wv; dbUsers[n].stats.matches++; xpm[pl.id] = grantXp(n, 'loss'); let dr = rollDrop(n); saveUser(n); io.to(pl.id).emit('economyUpdate', ecoPayload(n)); if (dr) io.to(pl.id).emit('dropReceived', dr); }
+                    let n = pl.name; ocm[pl.id] = 'loss'; if (dbUsers[n]) { let wv = r.wave; crd[pl.id] = wv; dbUsers[n].bucks += wv; dbUsers[n].stats.earned += wv; dbUsers[n].stats.matches++; xpm[pl.id] = grantXp(n, 'loss'); let dr = rollDrop(n); drp[pl.id] = dr; saveUser(n); io.to(pl.id).emit('economyUpdate', ecoPayload(n)); if (dr) io.to(pl.id).emit('dropReceived', dr); }
                 });
-                io.to(rId).emit('gameOver', { winner: 'ZOMBIES', wave: r.wave, rewards: rw, xp: xpm, isTeamWin: false }); pushRooms();
+                io.to(rId).emit('gameOver', { winner: 'ZOMBIES', wave: r.wave, rewards: rw, xp: xpm, isTeamWin: false });
+                emitMatchEnd(r, { outcomes: ocm, rewards: crd, xp: xpm, drops: drp, wave: r.wave, waves: Math.max(0, r.wave - 1) }); pushRooms();
                 continue;
             }
             if (Object.keys(r.zombies).length === 0) {
@@ -1320,6 +1399,24 @@ setInterval(() => {
         if (sy) io.to(rId).volatile.emit('sync2', sy);
     }
 }, 1000 / TICK_RATE);
+
+// ===== Додаткові модулі (прогрес, профіль, друзі, клани, боти) =====
+// Кожен файл — module.exports = function (ctx) { … }. Відсутні файли просто пропускаються.
+{
+    const Events = require('./events.js');
+    const onlineSocketsOf = name => Object.keys(globalPlayers).filter(id => globalPlayers[id] === name);
+    const ctx = {
+        io, rooms, dbUsers, globalPlayers, Events, GameData, MODULES, CASES, ModeInfo, Modes, MAP_DATA, MapObj, Nav, VALID_MODES, MAX_HP,
+        saveUser, sendEconomy, ecoPayload, grantXp, rollDrop, playerLevel, getMaxHp, pushRooms, hashPwd, validateUser, NAME_RE,
+        checkCollisionServer, getValidSpawn, processPlayerDeath, removePlayer, resetRoomToLobby, getRandomModuleFromCase,
+        hooks, displayName: nickOf, onConnection: f => connHooks.push(f), getDb: () => dbRef, onlineSocketsOf, isOnline: name => onlineSocketsOf(name).length > 0,
+        get BANS() { return BANS; }, get TICK_RATE() { return TICK_RATE; }, get SYNCS() { return SYNCS; }, startRoomGame, collectTokenFor, emitMatchEnd, teamsOf, isTeamPvp, powerupsOn, pickMap, clampInt, BUFF_DURATION, VALID_COLORS, TDM_TEAMS
+    };
+    ['progress', 'profile', 'social', 'clans', 'bots'].forEach(f => {
+        if (!fs.existsSync(path.join(__dirname, f + '.js'))) return;
+        try { require('./' + f + '.js')(ctx); console.log('✅ Модуль', f); } catch (e) { console.error('❌ Модуль', f, e && e.stack || e); }
+    });
+}
 
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => console.log(`Server running on port ${PORT}`));
