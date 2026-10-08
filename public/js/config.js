@@ -36,6 +36,10 @@ const MAP_DATA = {'epic_map':{size:3000,bg:'#565a6c',grid:'#494d55',solids:[{typ
 
 const PROP_TYPES = ['prop_crate','prop_barrel','prop_sandbag','prop_rock','prop_bush','prop_cone','prop_concrete','prop_hedgehog','prop_tent','prop_cont_red','prop_cont_blue','prop_wreck','prop_tires','prop_generator','tree','wall_square'];
 
+// Кольори танків (камуфляж у лобі) і команд: назва → hex. Список кольорів лобі — VALID_COLORS у server.js
+window.TANK_COLORS = { white: '#f8fafc', black: '#1e293b', red: '#ef4444', blue: '#3b82f6', brown: '#78350f', purple: '#9333ea', green: '#16a34a', yellow: '#eab308', orange: '#f97316', cyan: '#06b6d4' };
+window.tankHex = function (c, def) { return (c && window.TANK_COLORS[c]) || def; };
+
 // ОДНА ГЛОБАЛЬНА КОПІЯ НАЛАШТУВАНЬ БАФІВ ТА ІКОНОК
 window.BUFFS = {
     'none': { cd: 1500, dmg: 75, type: 'normal' },

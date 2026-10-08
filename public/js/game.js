@@ -1105,9 +1105,11 @@ function draw(now) {
     }
 
     for (let tid in tokens) {
-        const tkn = tokens[tid]; ctx.save(); ctx.translate(tkn.x, tkn.y + Math.sin(now / 200) * 10);
-        const cH = tkn.color === 'white' ? '#f8fafc' : tkn.color === 'black' ? '#1e293b' : tkn.color === 'red' ? '#ef4444' : tkn.color === 'blue' ? '#3b82f6' : tkn.color === 'brown' ? '#78350f' : '#9333ea';
-        ctx.shadowColor = cH; ctx.shadowBlur = 15;
+        const tkn = tokens[tid];
+        if (tkn.x < VX0 - 40 || tkn.x > VX1 + 40 || tkn.y < VY0 - 40 || tkn.y > VY1 + 40) continue;   // поза екраном не малюємо
+        ctx.save(); ctx.translate(tkn.x, tkn.y + Math.sin(now / 200) * 10);
+        const cH = tankHex(tkn.color, '#9333ea');
+        if (!_low) { ctx.shadowColor = cH; ctx.shadowBlur = 15; }   // світіння — дорогий ефект, на слабкій графіці без нього
         ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2); ctx.fillStyle = '#0f172a'; ctx.fill();
         ctx.lineWidth = 4; ctx.strokeStyle = cH; ctx.stroke();
         ctx.fillStyle = cH; ctx.font = '16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('★', 0, 1); ctx.restore();
@@ -1128,8 +1130,9 @@ function draw(now) {
     for (let pid in powerups) {
         let p = powerups[pid];
         if (p.mod) { if (window.ModesFX) ModesFX.lootDraw(ctx, p, now, _pv); continue; }
+        if (p.x < VX0 - 40 || p.x > VX1 + 40 || p.y < VY0 - 40 || p.y > VY1 + 40) continue;
         ctx.save(); ctx.translate(p.x, p.y);
-        ctx.fillStyle = '#1e293b'; ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2; ctx.shadowColor = '#f59e0b'; ctx.shadowBlur = 10;
+        ctx.fillStyle = '#1e293b'; ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2; if (!_low) { ctx.shadowColor = '#f59e0b'; ctx.shadowBlur = 10; }
         ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(-15, -15, 30, 30, 5); else ctx.rect(-15, -15, 30, 30);
         ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
         ctx.fillStyle = '#fff'; ctx.font = '16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -1147,7 +1150,7 @@ function draw(now) {
     for (let id in opponents) {
         const p = opponents[id], sn = currentRoomData.players[id]; if (!sn) { delete opponents[id]; continue; }
         if (p.x < VX0 - 140 || p.x > VX1 + 140 || p.y < VY0 - 140 || p.y > VY1 + 140) continue;   // поза екраном (із запасом на підпис/щит)
-        const cH = sn.color ? (sn.color === 'white' ? '#f8fafc' : sn.color === 'black' ? '#1e293b' : sn.color === 'red' ? '#ef4444' : sn.color === 'blue' ? '#3b82f6' : sn.color === 'brown' ? '#78350f' : '#9333ea') : '#ef4444';
+        const cH = tankHex(sn.color, sn.color ? '#9333ea' : '#ef4444');
         if (p.isDisguised) MapObj.drawDisguise(ctx, { type: p.propType, x: p.x - 25, y: p.y - 25, w: 50, h: 50, r: 25 }, tm);
         else drTnk(p.x, p.y, p.bodyAngle, p.turretAngle, cH, (window.dispName ? dispName(sn) : sn.name), false, p.hp, p.buff, sn.equipped, true);
         if ((myLocalTank.buff === 'homing' || myLocalTank.buff === 'autolaser') && id === homingTargetId && p.hp > 0) {
@@ -1157,7 +1160,7 @@ function draw(now) {
     
     drAL();
     if (myLocalTank.hp > 0) {
-        const mC = myColor ? (myColor === 'white' ? '#f8fafc' : myColor === 'black' ? '#1e293b' : myColor === 'red' ? '#ef4444' : myColor === 'blue' ? '#3b82f6' : myColor === 'brown' ? '#78350f' : '#9333ea') : '#3b82f6';
+        const mC = tankHex(myColor, myColor ? '#9333ea' : '#3b82f6');
         if (myLocalTank.isDisguised) MapObj.drawDisguise(ctx, { type: myLocalTank.propType, x: myLocalTank.x - 25, y: myLocalTank.y - 25, w: 50, h: 50, r: 25 }, tm);
         else { drTnk(myLocalTank.x, myLocalTank.y, myLocalTank.bodyAngle, myLocalTank.turretAngle, mC, (window.dispName ? dispName(myName) : myName), true, myLocalTank.hp, myLocalTank.buff, myEquipped, true); drPCA(); }
     }
