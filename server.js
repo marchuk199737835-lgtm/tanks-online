@@ -14,7 +14,8 @@ const Ev = require('./events.js');                       // шина подій 
 process.on('uncaughtException', err => console.error('Crash prevented:', err));
 process.on('unhandledRejection', err => console.error('Promise rejection prevented:', err));
 
-app.use(express.static(path.join(__dirname, 'public'), { setHeaders: (res, fp) => { if (/(^|[\\/])(sw\.js|manifest\.webmanifest)$/.test(fp)) res.setHeader('Cache-Control', 'no-cache'); } }));
+// статика: brotli/gzip, ETag/304, кеш, версіонування js/css в index.html, Range для звуків (див. static_gzip.js)
+require('./static_gzip.js')(app, express, { publicDir: path.join(__dirname, 'public'), log: console.log });
 
 const musicDir = path.join(__dirname, 'music');
 if (!fs.existsSync(musicDir)) fs.mkdirSync(musicDir);
@@ -34,7 +35,7 @@ function scanMusic() {
     });
 }
 scanMusic();
-app.use('/music', express.static(musicDir));
+app.use('/music', express.static(musicDir, { maxAge: '1d' }));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 const MAX_HP = 500, BUFF_DURATION = 15000, BASE_RELOAD = 2000;
@@ -235,14 +236,16 @@ function grantXp(name, outcome) {
 function playerLevel(name) { return dbUsers[name] ? GameData.levelFromXp(dbUsers[name].xp || 0) : 1; }
 
 // Список сесій отримують лише ті, хто його дивиться (кімната 'rb'), і не частіше разу на ~300 мс (раніше — усім підключеним на кожну зміну)
-let _roomsTimer = null;
+let _roomsTimer = null, _roomsLast = '';
 // Компактна статистика гравця для картки в лобі (ігри / перемоги / вбивства / смерті); для ботів її генерує bots.js
 function lobbyStats(n) {
     const u = dbUsers[n]; if (!u) return { games: 0, wins: 0, kills: 0, deaths: 0 };
     const ps = u.pstats || {}, st = u.stats || {}, num = v => (Number.isFinite(+v) ? Math.max(0, Math.floor(+v)) : 0);
     return { games: num(ps.games || st.matches), wins: num(ps.wins), kills: num(ps.kills || st.kills), deaths: num(ps.deaths) };
 }
-function pushRooms() { if (_roomsTimer) return; _roomsTimer = setTimeout(() => { _roomsTimer = null; io.to('rb').emit('roomsList', getActiveRooms()); }, 300); }
+// Троттлінг: не частіше разу на ~1.8 с (після паузи — майже одразу, ~150 мс), і лише якщо корисне навантаження справді змінилось (підпис JSON)
+const ROOMS_GAP = 1800; let _roomsAt = 0;
+function pushRooms() { if (_roomsTimer) return; _roomsTimer = setTimeout(() => { _roomsTimer = null; const lst = getActiveRooms(), js = JSON.stringify(lst); if (js === _roomsLast) return; _roomsLast = js; _roomsAt = Date.now(); io.to('rb').emit('roomsList', lst); }, Math.max(150, _roomsAt + ROOMS_GAP - Date.now())); }
 function getActiveRooms() {
     let extra = []; try { extra = hooks.extraRooms() || []; } catch (e) { extra = []; }   // «віртуальні» сесії (bots.js)
     return Object.values(rooms).map(r => ({ id: r.id, hostName: r.hostName, hostNick: nickOf(r.hostName), mode: r.mode, map: r.map, playersCount: Object.keys(r.players).length, maxPlayers: r.maxPlayers, status: r.status })).concat(extra);
@@ -1309,7 +1312,7 @@ setInterval(() => {
         for (let mid in r.mines) {
             let m = r.mines[mid];
             for (const p of Object.values(r.players)) {
-                if (p.hp > 0 && p.id !== m.owner && Math.hypot(p.x - m.x, p.y - m.y) < 35 && p.buff !== 'shield') {
+                if (p.hp > 0 && p.id !== m.owner && !ModeInfo.isPve(r.mode) && !(isTeamPvp(r.mode) && r.players[m.owner] && r.players[m.owner].team === p.team) && Math.hypot(p.x - m.x, p.y - m.y) < 35 && p.buff !== 'shield') {
                     delete r.mines[mid];
                     p.hp = Math.max(0, p.hp - 125);
                     io.to(rId).emit('mineExploded', { x: m.x, y: m.y });
@@ -1337,7 +1340,8 @@ setInterval(() => {
                 if (p.buff === 'healing' && p.hp > 0 && now >= p.nextHeal) {
                     p.hp = Math.min(getMaxHp(p.equipped), p.hp + 10); p.nextHeal = now + 1000;
                 }
-                if (p.buff === 'autolaser' && p.laserTarget && r.players[p.laserTarget] && r.players[p.laserTarget].hp > 0 && (!p.nextLaser || now >= p.nextLaser)) {
+                if (p.buff === 'autolaser' && p.laserTarget && r.players[p.laserTarget] && r.players[p.laserTarget].hp > 0 && (!p.nextLaser || now >= p.nextLaser)
+                    && !ModeInfo.isPve(r.mode) && !(isTeamPvp(r.mode) && p.team && p.team === r.players[p.laserTarget].team)) {   // союзників (кооп / своя команда) лазер не чіпає
                     if (Math.hypot(p.x - r.players[p.laserTarget].x, p.y - r.players[p.laserTarget].y) < 400) {
                         p.nextLaser = now + 100;
                         io.to(rId).emit('laserHit', { src: p.id, tgt: p.laserTarget });

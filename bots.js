@@ -285,16 +285,16 @@ module.exports = function (ctx) {
     }
     function tickVirtualRoom(v, now) {
         const m = metaOf(v);
-        if (v.status === 'playing') { if (now >= m.endAt) { removeVirtual(v); m.gone = true; vNextSpawn = Math.min(vNextSpawn, now + rnd(CFG.respawnRoomMs[0], CFG.respawnRoomMs[1])); ctx.pushRooms(); } return; }
-        if (now < m.nextEvt) return;
-        m.nextEvt = now + rnd(2200, 8500);
-        const ps = Object.values(v.players), n = ps.length, host = v.players[v.hostSocket];
+        if (v.status === 'playing') { if (now >= m.endAt) { removeVirtual(v); m.gone = true; vGapUntil = Math.max(vGapUntil, now + rnd(2000, 4000)); vNextSpawn = Math.min(vNextSpawn, now + rnd(CFG.respawnRoomMs[0], CFG.respawnRoomMs[1])); ctx.pushRooms(); } return; }
+        if (now < m.nextEvt || now < vGapUntil) return;   // зміни складу в списку — повільно: не частіше разу на ~3–6 с на ВЕСЬ список (4–8 с; інакше 8+ кімнат дають «мерехтіння» щосекунди)
+        m.nextEvt = now + rnd(5000, 11000);   // повільна динаміка: зміни складу не частіше разу на 5–11 с
+        const ps = Object.values(v.players), n = ps.length, host = v.players[v.hostSocket], statusBefore = v.status;
         const notReady = ps.filter(p => !p.ready), others = ps.filter(p => p !== host);
         if (m.cap === undefined) m.cap = Math.random() < 0.12 ? v.maxPlayers : Math.max(2, Math.min(v.maxPlayers - 1, Math.round(v.maxPlayers * rnd(0.45, 0.9))));
-        const w = { join: n < Math.min(v.maxPlayers, m.cap) ? 4.5 : 0, leave: n > 3 ? 1.1 : 0, ready: notReady.length ? 5 : 0, unready: ps.length > 2 ? 0.25 : 0, swap: 0.5 };
+        const w = { join: n < Math.min(v.maxPlayers, m.cap) ? 4.5 : 0, leave: n > 3 && now - (m.lastJoin || 0) > 20000 ? 0.5 : 0, ready: notReady.length ? 5 : 0, unready: ps.length > 2 ? 0.25 : 0, swap: 0.5 };
         const act = wpick(w);
         let changed = true;
-        if (act === 'join') changed = addVirtualBot(v, now);
+        if (act === 'join') { changed = addVirtualBot(v, now); if (changed) m.lastJoin = now; }
         else if (act === 'leave' && others.length) { const p = pick(others); delete v.players[p.id]; m.known.delete(p.id); forgetBot(p.id); }
         else if (act === 'ready' && notReady.length) pick(notReady).ready = true;
         else if (act === 'unready') { const p = pick(ps); p.ready = false; }
@@ -304,9 +304,10 @@ module.exports = function (ctx) {
         // у списку має лишатись достатньо «лобі»: гру не запускаємо, якщо це зменшить кількість відкритих сесій нижче половини
         const lobbies = Array.from(V.values()).filter(q => q.status === 'lobby').length, canStart = lobbies - 1 >= Math.max(2, Math.round(V.size * 0.5));
         if (canStart && (now >= m.startAt || (allReady && cnt >= Math.max(3, Math.ceil(v.maxPlayers * 0.8)) && now - m.born > 40000))) startFake(v, now);
+        if (v.status !== statusBefore || Object.keys(v.players).length !== n) vGapUntil = now + rnd(4000, 8000);   // видима зміна (склад/статус)
         if (changed) ctx.pushRooms();
     }
-    let vTarget = null, vTargetAt = 0, vNextSpawn = 0, vBooted = false;
+    let vGapUntil = 0, vTarget = null, vTargetAt = 0, vNextSpawn = 0, vBooted = false;
     function virtualTick(now) {
         if (CFG.virtualRooms === 0) return;
         if (vTarget === null || now - vTargetAt > rnd(90000, 240000)) {      // ціль повільно «дрейфує»
@@ -327,8 +328,8 @@ module.exports = function (ctx) {
         const real = Object.values(rooms).filter(r => !metaOf(r).virt || humansOf(r).length).length;
         const want = Math.max(CFG.virtualRooms !== null ? CFG.virtualRooms : 3, vTarget - (CFG.virtualRooms !== null ? 0 : Math.floor(real / 3)));
         const wantEff = CFG.virtualRooms !== null ? CFG.virtualRooms : want;
-        if (V.size < wantEff && now >= vNextSpawn && totalBotCount() < CFG.maxBotsTotal - 12) { makeVirtualRoom(); vNextSpawn = now + rnd(3000, 22000); ctx.pushRooms(); }
-        else if (V.size > wantEff + 1) { const lob = Array.from(V.values()).filter(v => v.status === 'lobby'); if (lob.length && Math.random() < 0.02) { removeVirtual(pick(lob)); ctx.pushRooms(); } }
+        if (V.size < wantEff && now >= vNextSpawn && now >= vGapUntil && totalBotCount() < CFG.maxBotsTotal - 12) { makeVirtualRoom(); vNextSpawn = now + rnd(3000, 22000); vGapUntil = now + rnd(4000, 8000); ctx.pushRooms(); }
+        else if (V.size > wantEff + 1) { const lob = Array.from(V.values()).filter(v => v.status === 'lobby'); if (lob.length && now >= vGapUntil && Math.random() < 0.02) { removeVirtual(pick(lob)); vGapUntil = now + rnd(4000, 8000); ctx.pushRooms(); } }
     }
     // перетворення віртуальної сесії на справжню кімнату (коли людина заходить)
     function materialize(v) {

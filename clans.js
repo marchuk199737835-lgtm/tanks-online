@@ -266,7 +266,14 @@ module.exports = function (ctx) {
         const u = dbUsers[login], c = clanById(clanOf(login));
         return { mine: c ? view(c, login) : null, cost: COST, bucks: u ? u.bucks : 0, max: MAX_MEMBERS, rewards: REWARDS, season: seasonNow() };
     }
-    function sendState(login) { sockets(login).forEach(id => io.to(id).emit('clanState', statePayload(login))); }
+    // пуш стану — лише якщо корисне навантаження справді змінилось для цього сокета (підпис JSON); без дублікатів
+    const lastSent = new Map();
+    function sendState(login) {
+        const ids = sockets(login); if (!ids.length) return;
+        const st = statePayload(login), sig = JSON.stringify(st);
+        if (lastSent.size > 3000) for (const k of lastSent.keys()) if (!io.sockets.sockets.has(k)) lastSent.delete(k);
+        ids.forEach(id => { if (lastSent.get(id) === sig) return; lastSent.set(id, sig); io.to(id).emit('clanState', st); });
+    }
     function pushClan(c) { Object.keys(c.members).forEach(k => { if (ctx.isOnline(k)) sendState(k); }); }
 
     // ---------- Членство ----------
@@ -361,7 +368,7 @@ module.exports = function (ctx) {
         const roleOf = (c, k) => (c && own(c.members, k)) ? c.members[k].role : null;
         const lg = v => (typeof v === 'string' && v.length > 0 && v.length <= 40) ? v : '';
 
-        on('clanGet', 400, (me, u) => { settle(); claimAward(me); socket.emit('clanState', statePayload(me)); });
+        on('clanGet', 400, (me, u) => { settle(); claimAward(me); const st = statePayload(me); lastSent.set(socket.id, JSON.stringify(st)); socket.emit('clanState', st); });
 
         on('clanList', 400, (me, u, d) => {
             const q = str(d.q, 30).trim().toLowerCase();

@@ -83,12 +83,14 @@ module.exports = function (ctx) {
     }
 
     // ---------- розсилка з тротлінгом (≤1 повного оновлення на 2 с на гравця) ----------
-    const lastPush = new Map(), dirty = new Set();
-    function pushNow(name) {
+    const lastPush = new Map(), dirty = new Set(), sentSig = new Map();
+    function pushNow(name, force) {
         dirty.delete(name); lastPush.set(name, Date.now());
         const ids = ctx.onlineSocketsOf(name); if (!ids.length) return;
         const st = stateFor(name); if (!st) return;
-        ids.forEach(id => io.to(id).emit('socialState', st));
+        const sig = JSON.stringify(st);
+        if (sentSig.size > 3000) for (const k of sentSig.keys()) if (!io.sockets.sockets.has(k)) sentSig.delete(k);
+        ids.forEach(id => { if (!force && sentSig.get(id) === sig) return; sentSig.set(id, sig); io.to(id).emit('socialState', st); });   // без дублікатів: лише якщо стан змінився для цього сокета
     }
     function markDirty(name) {
         if (!user(name) || !ctx.isOnline(name)) return;
@@ -211,7 +213,7 @@ module.exports = function (ctx) {
     function onAuth(socket) {
         const n = globalPlayers[socket.id]; if (!user(n)) return;
         ensurePid(n);
-        pushNow(n);
+        pushNow(n, true);
         const u = dbUsers[n], pend = arr(u, 'friendReqIn').length;
         if (pend > (notified.get(n) || 0)) socket.emit('socialNotify', { type: 'pending', n: pend });
         notified.set(n, pend);
