@@ -710,6 +710,8 @@ socket.on('playerRespawn', (data) => {
 });
 
 socket.on('tokenCollected', () => playSound('token'));
+// античит: сервер обрізав надто швидке переміщення — повертаємо танк у дозволену точку
+socket.on('posFix', (d) => { if (d && Number.isFinite(d.x) && Number.isFinite(d.y) && myLocalTank.hp > 0) { myLocalTank.x = d.x; myLocalTank.y = d.y; } });
 
 socket.on('bomberExplode', (data) => {
     if (typeof createExplosion === 'function') createExplosion(data.x, data.y, 40, '#dc2626');
@@ -1172,6 +1174,7 @@ function draw(now) {
         else { drTnk(myLocalTank.x, myLocalTank.y, myLocalTank.bodyAngle, myLocalTank.turretAngle, mC, (window.dispName ? dispName(myName) : myName), true, myLocalTank.hp, myLocalTank.buff, myEquipped, true); drPCA(); }
     }
     
+    if (window.EmoteFX) EmoteFX.draw(ctx, now);   // емоції над танками й мітка кілкаму
     lasers.forEach(l => { ctx.save(); ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 4; ctx.shadowColor = '#38bdf8'; ctx.shadowBlur = 15; ctx.globalAlpha = Math.max(0, l.life / 0.15); ctx.beginPath(); ctx.moveTo(l.x1, l.y1); ctx.lineTo(l.x2, l.y2); ctx.stroke(); ctx.restore(); });
     
     if (window.ModesFX) ModesFX.world(ctx, now, tm);

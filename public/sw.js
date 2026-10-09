@@ -49,6 +49,22 @@ function staleWhileRevalidate(req, name, limit) {
     });
 }
 
+// ===== Push-сповіщення (сервер: notify.js). Пакет: { t: заголовок, b: текст, u: адреса, tag } =====
+self.addEventListener('push', e => {
+    let d = {}; try { d = e.data ? e.data.json() : {}; } catch (er) { d = { t: 'PULS-PROJECT', b: e.data ? e.data.text() : '' }; }
+    e.waitUntil(self.registration.showNotification(d.t || 'PULS-PROJECT', {
+        body: d.b || '', icon: '/icon-192.png', badge: '/icon-192.png', tag: d.tag || 'puls', renotify: false, data: { u: d.u || '/' }, vibrate: [80, 40, 80]
+    }));
+});
+self.addEventListener('notificationclick', e => {
+    e.notification.close();
+    const url = (e.notification.data && e.notification.data.u) || '/';
+    e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+        for (const c of list) if (new URL(c.url).origin === location.origin && 'focus' in c) return c.focus();
+        return self.clients.openWindow(url);
+    }));
+});
+
 self.addEventListener('fetch', e => {
     const req = e.request, url = new URL(req.url);
     if (req.method !== 'GET' || url.origin !== location.origin) return;
