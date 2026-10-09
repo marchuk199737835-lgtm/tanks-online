@@ -68,7 +68,7 @@ let joysticks = {
 };
 
 let BASE_RELOAD = 2000;
-const isTeamM = m => m === 'team_deathmatch' || m === 'capture_points';   // командні PvP: свої не отримують шкоди
+const isTeamM = m => m === 'team_deathmatch' || m === 'capture_points' || m === 'rounds';   // командні PvP: свої не отримують шкоди
 const isPveM = m => !!(window.ModeInfo && ModeInfo.isPve(m));            // режими із зомбі/босами (виживання й нові кооп/соло)
 const canSpecM = m => m !== 'deathmatch';                                // де після смерті спостерігаємо за живими
 let mines = {};
@@ -160,7 +160,9 @@ function updatePhys(now, dt) {
             mx = Math.cos(joysticks.left.angle) * joysticks.left.force;
             my = Math.sin(joysticks.left.angle) * joysticks.left.force;
         }
-        
+        const _frz = !!(window.ModesFX && ModesFX.frozen && ModesFX.frozen());   // раунди: відлік перед раундом — стоїмо
+        if (_frz) { mx = 0; my = 0; }
+
         if (mx !== 0 || my !== 0) {
             if (currentRoomData.mode === 'prophunt' && myLocalTank.team === 'hider' && myLocalTank.isDisguised) {
                 myLocalTank.isDisguised = false;
@@ -228,7 +230,7 @@ function updatePhys(now, dt) {
         let rt = window.getReloadTime();
         if (fCfg.type !== 'none' && fCfg.cd) rt = (fCfg.cd < 500 ? fCfg.cd : rt);
         
-        if (sh && (now - lastShootTime >= rt) && !(currentRoomData.mode === 'prophunt' && currentRoomData.state !== 'seeking')) {
+        if (sh && !_frz && (now - lastShootTime >= rt) && !(currentRoomData.mode === 'prophunt' && currentRoomData.state !== 'seeking')) {
             fireBull(now, myHitRad, fCfg, tR);
         } else if (isMobile && !isMg && joysticks.right.released) {
             joysticks.right.released = false;
@@ -735,6 +737,11 @@ socket.on('newWave', (data) => {
 
 socket.on('gameOver', (data) => {
     if (currentRoomData) currentRoomData.status = 'finished';
+    if (currentRoomData && currentRoomData.rk) {   // рейтинговий бій: замість звичайного вікна — екран п'єдесталу (ranked.js, подія rkResult)
+        document.getElementById('winner-modal').classList.add('hidden'); document.getElementById('damage-vignette').style.opacity = 0;
+        if (window.ModesFX) ModesFX.reset();
+        if (window.RankedUI) RankedUI.onGameOver(data); return;
+    }
     document.getElementById('winner-modal').classList.remove('hidden'); document.getElementById('damage-vignette').style.opacity = 0;
     if (window.LV) LV.animateXp((data.xp && data.xp[myId]) || null);
     let dN = document.getElementById('drop-notification');

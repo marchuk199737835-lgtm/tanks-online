@@ -24,6 +24,12 @@
         return '';
     }
     let isBusy = false;
+    // реферальне посилання ?ref=<ID друга>: запам'ятовуємо до реєстрації й прибираємо з адресного рядка
+    try {
+        const rq = new URLSearchParams(location.search).get('ref');
+        if (rq && /^\d{7}$/.test(rq)) { localStorage.setItem('refCode', rq); history.replaceState(null, '', location.pathname + location.hash); }
+    } catch (e) {}
+    const refCode = () => { try { const v = localStorage.getItem('refCode'); return v && /^\d{7}$/.test(v) ? v : null; } catch (e) { return null; } };
 
     // ---------- іскри на тлі ----------
     const sp = $('au-sparks');
@@ -113,10 +119,19 @@
             if (e2) return showErr(e2);
         }
         busy(true); showErr('');
-        socket.emit(authMode, { name: n, password: p, lang: window.I18N ? I18N.lang : null });
+        const payload = { name: n, password: p, lang: window.I18N ? I18N.lang : null };
+        if (authMode === 'register' && refCode()) payload.ref = refCode();
+        socket.emit(authMode, payload);
+        if (authMode === 'register') socket.once('authSuccess', () => { try { localStorage.removeItem('refCode'); } catch (e) {} });
         setTimeout(() => busy(false), 8000);     // якщо сервер не відповів
     });
     setMode('login');
+    let _tok = null; try { _tok = localStorage.getItem('tankToken'); } catch (e) {}
+    if (refCode() && !_tok) {   // прийшов за запрошенням друга: одразу реєстрація + підказка про бонус
+        setMode('register');
+        const tip = document.createElement('div'); tip.className = 'au-ref'; tip.innerHTML = '🎁 <span>Вас запросив друг! Після реєстрації ви отримаєте</span> <b>+100</b> <span>кредитів</span>';
+        card.insertBefore(tip, card.firstChild);
+    }
 
     // ---------- заставка підключення ----------
     // Показується одразу (поки йде автовхід за токеном), знімається при першому showScreen.

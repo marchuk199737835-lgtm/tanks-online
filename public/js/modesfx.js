@@ -21,8 +21,36 @@
         boss_duel: () => box('<div class="mfx-col mfx-c"><span class="mfx-t">Бос</span><span class="mfx-big"><b data-r="i">0</b><em>/</em><b data-r="N">0</b></span></div><div class="mfx-col mfx-w"><span class="mfx-t"><b data-r="bn">—</b></span>' + bar('hp', 'red wide') + '<span class="mfx-n" data-r="hpn">0</span></div><div class="mfx-col mfx-c"><span class="mfx-t">Життя</span><span class="mfx-big mfx-hearts" data-r="lv">❤</span></div>'),
         battle_royale: () => box('<div class="mfx-col mfx-c"><span class="mfx-t">Живих</span><span class="mfx-big"><b data-r="al">0</b><em>/</em><b data-r="n">0</b></span></div><div class="mfx-col mfx-c mfx-zone"><span class="mfx-t" data-r="zt">Зона</span><span class="mfx-big" data-r="zv">—</span></div><div class="mfx-col mfx-c"><span class="mfx-t">Модулі</span><div class="mfx-slots" data-r="slots">' + ['cannon', 'turret', 'hull', 'tracks'].map(s => '<i class="mfx-slot empty" data-s="' + s + '"></i>').join('') + '</div></div>'),
         capture_points: () => box('<div class="mfx-scores" data-r="sc"></div><div class="mfx-col mfx-c"><span class="mfx-t">Мета</span><span class="mfx-big" data-r="goal">0</span></div><div class="mfx-col mfx-c"><span class="mfx-t">Час</span><span class="mfx-big" data-r="t">0:00</span></div>') + '<div class="mfx-pts" data-r="pts"></div>',
-        bounty: () => box('<div class="mfx-col mfx-w mfx-tg"><span class="mfx-t">Ціль полювання</span><span class="mfx-big mfx-gold" data-r="tg">—</span><span class="mfx-n" data-r="tgn"></span></div><div class="mfx-col mfx-c"><span class="mfx-t">Час</span><span class="mfx-big" data-r="t">0:00</span></div><div class="mfx-col mfx-c"><span class="mfx-t">До перемоги</span><span class="mfx-big" data-r="goal">0</span></div>') + '<div class="mfx-board" data-r="bd"></div>'
+        bounty: () => box('<div class="mfx-col mfx-w mfx-tg"><span class="mfx-t">Ціль полювання</span><span class="mfx-big mfx-gold" data-r="tg">—</span><span class="mfx-n" data-r="tgn"></span></div><div class="mfx-col mfx-c"><span class="mfx-t">Час</span><span class="mfx-big" data-r="t">0:00</span></div><div class="mfx-col mfx-c"><span class="mfx-t">До перемоги</span><span class="mfx-big" data-r="goal">0</span></div>') + '<div class="mfx-board" data-r="bd"></div>',
+        rounds: () => box('<div class="mfx-scores" data-r="sc"></div><div class="mfx-col mfx-c"><span class="mfx-t" data-r="rl">Раунд</span><span class="mfx-big" data-r="rd">1</span></div><div class="mfx-col mfx-c"><span class="mfx-t">Час</span><span class="mfx-big" data-r="t">0:00</span></div>') + '<div class="mfx-alive" data-r="al"></div>'
     };
+    // підпис раунду: звичайний / матч-пойнт / останній / додатковий
+    const RD_LB = { n: 'РАУНД', mp: 'МАТЧ-ПОЙНТ', last: 'ОСТАННІЙ РАУНД', ot: 'ДОДАТКОВИЙ РАУНД' };
+    function rdTitle(m) { return m.lb === 'ot' ? RD_LB.ot + ' ' + m.ot : m.lb === 'last' ? RD_LB.last : (RD_LB.n + ' ' + m.rd); }
+    // екран підготовки до раунду: зверху — який це раунд і рахунок, по центру — відлік 4…1, потім «БІЙ!»
+    let rdOv = null, rdShown = '', rdGoT = null;
+    function rdOverlay(m) {
+        const gs = $('game-screen'); if (!gs) return;
+        if (!rdOv) { rdOv = document.createElement('div'); rdOv.id = 'rd-ov'; rdOv.innerHTML = '<div class="rd-top"><small data-q="sub"></small><b data-q="t"></b><div class="rd-sc" data-q="sc"></div></div><div class="rd-num" data-q="n"></div>'; gs.appendChild(rdOv); }
+        const q = k => rdOv.querySelector('[data-q="' + k + '"]');
+        if (m.st === 'fz') {
+            const cdOn = $('countdown-overlay') && !$('countdown-overlay').classList.contains('hidden');   // перший раунд: великий відлік гри вже на екрані
+            const key = m.rd + ':' + m.fz;
+            if (rdShown !== key) {
+                rdShown = key; clearTimeout(rdGoT);
+                rdOv.className = 'on ' + (m.lb || 'n');
+                q('t').textContent = rdTitle(m); q('sub').textContent = m.lb === 'mp' ? 'Раунд ' + m.rd : m.lb === 'ot' ? 'Рахунок рівний' : '';
+                const ts = Object.keys(m.sc); q('sc').innerHTML = ts.map(t => '<i style="color:' + (TC[t] || '#fff') + '">' + esc(TN[t] || t) + ' <b>' + m.sc[t] + '</b></i>').join('<em>:</em>');
+                const n = q('n'); n.textContent = cdOn ? '' : String(Math.max(1, m.fz)); n.classList.remove('pop'); void n.offsetWidth; n.classList.add('pop');
+                if (!cdOn) { try { playSound('ui_click'); } catch (e) {} }
+            }
+        } else if (rdOv.classList.contains('on') && rdShown && rdShown !== 'go') {
+            rdShown = 'go'; const n = q('n'); n.textContent = 'БІЙ!'; n.classList.remove('pop'); void n.offsetWidth; n.classList.add('pop', 'go');
+            try { playSound('shoot'); } catch (e) {}
+            rdGoT = setTimeout(() => { if (rdOv) { rdOv.className = ''; q('n').classList.remove('go'); } }, 700);
+        }
+    }
+    function rdHide() { clearTimeout(rdGoT); rdShown = ''; if (rdOv) { rdOv.remove(); rdOv = null; } }
 
     function ensureHud(mode) {
         const gs = $('game-screen'); if (!gs) return;
@@ -85,6 +113,17 @@
                 if (bd && bd.dataset.s !== sig) { bd.dataset.s = sig; bd.innerHTML = list.map(p => '<span class="' + (p.id === myId ? 'me' : '') + (p.id === md.tg ? ' tg' : '') + '"><u>' + (p.id === md.tg ? '🎯' : '') + '</u>' + esc(dn(p)) + '<b>' + (p.score || 0) + '</b></span>').join(''); }
                 break;
             }
+            case 'rounds': {
+                const ts = Object.keys(md.sc), sc = ref.sc, sig = ts.map(t => t + md.sc[t]).join();
+                if (sc && sc.dataset.s !== sig) { sc.dataset.s = sig; sc.innerHTML = ts.map(t => '<b style="color:' + TC[t] + '">' + md.sc[t] + '</b>').join('<em>:</em>'); }
+                set('rl', md.lb === 'ot' ? 'Дод. раунд' : md.lb === 'last' ? 'Останній' : md.lb === 'mp' ? 'Матч-пойнт' : 'Раунд');
+                set('rd', md.lb === 'ot' ? md.ot : md.rd + '/' + md.R); set('t', md.st === 'live' ? fmt(md.t) : '—');
+                const al = ref.al, as = ts.map(t => (md.al[t] || 0) + '/' + (md.tot[t] || 0)).join();
+                if (al && al.dataset.s !== as) { al.dataset.s = as; al.innerHTML = ts.map(t => '<span style="--tc:' + TC[t] + '">' + Array.from({ length: md.tot[t] || 0 }, (_, i) => '<i class="' + (i < (md.al[t] || 0) ? 'on' : '') + '"></i>').join('') + '</span>').join('<em>VS</em>'); }
+                hud.classList.toggle('fz', md.st !== 'live');
+                rdOverlay(md);
+                break;
+            }
         }
     }
     // ряд слотів модулів гравця (БР): колір рідкості, назва в title, порожній — сірий пунктир
@@ -118,6 +157,12 @@
             case 'bountyPick': if (md && d.tg === nameOf(myId)) banner('<span>Вас обрано ціллю!</span> <em>+' + d.v + '</em>', 'bad'); else banner('<span>Ціль полювання:</span> <b>' + esc(dn(d.tg)) + '</b> <em>+' + d.v + '</em>', 'gold'); sfx('hitmarker'); break;
             case 'bountyClaimed': banner('<b>' + esc(dn(d.by)) + '</b> <span>знищив ціль</span> <b>' + esc(dn(d.tg)) + '</b> <em>+' + d.v + '</em>', 'good'); sfx('token'); break;
             case 'bountySurvived': banner('<b>' + esc(dn(d.tg)) + '</b> <span>пережив полювання</span> <em>+2</em>', 'gold'); sfx('powerup'); break;
+            case 'rdWin': {
+                const mine = r.players && r.players[myId] && r.players[myId].team;
+                if (!d.t) banner('<span>Раунд без переможця</span>', 'gold');
+                else banner('<span class="dot" style="background:' + (TC[d.t] || '#fff') + '"></span><span>Раунд виграли</span> <b>' + esc(TN[d.t] || d.t) + '</b>', d.t === mine ? 'good' : 'bad');
+                sfx(d.t && d.t === mine ? 'powerup' : 'hurt'); break;
+            }
         }
     }
 
@@ -148,7 +193,7 @@
         banner('<span>Отримано:</span> <b style="color:' + R.color + '">' + esc(m.name) + '</b> <span style="color:' + R.color + '">· ' + R.name + '</span>', 'good'); try { if (window.SFX && SFX.ready()) SFX.pickMod(m.rarity); else playSound('powerup'); } catch (e) {}
     });
     socket.on('bossWarning', () => { const r = cur(); if (r && NEWM.has(r.mode)) banner('<span>⚠ Бос поруч!</span>', 'bad'); });
-    socket.on('gameStarting', () => { if (window.SFX) SFX.resetHp(); window.PERK = { spd: 1, cd: 1 }; md = null; zr = null; finalPt = null; if (window.BRLoot) BRLoot.reset(); closePerk(); removeHud(); });
+    socket.on('gameStarting', () => { if (window.SFX) SFX.resetHp(); window.PERK = { spd: 1, cd: 1 }; md = null; zr = null; finalPt = null; if (window.BRLoot) BRLoot.reset(); closePerk(); removeHud(); rdHide(); });
 
     // ---------- малювання на мапі ----------
     const teamCol = t => TC[t] || '#94a3b8';
@@ -249,6 +294,8 @@
 
     window.ModesFX = {
         active: m => NEWM.has(m),
+        // раунди: під час підготовки й паузи між раундами рух і стрільба заблоковані (сервер теж не зараховує влучання)
+        frozen() { const r = cur(); return !!(md && r && md.m === 'rounds' && r.mode === 'rounds' && md.st !== 'live'); },
         outside(x, y) { return !!(md && md.m === 'battle_royale' && md.z && Math.hypot(x - md.z.x, y - md.z.y) > md.z.r); },
         sync(d) { md = d || md; },
         toggle(mode) { if (NEWM.has(mode)) ensureHud(mode); else if (hud) removeHud(); },
@@ -303,8 +350,8 @@
             const PL = { kills: 'Ваші вбивства', place: 'Ваше місце', bk: 'Знищено цілей', caps: 'Захоплень точок', score: 'Ваші очки' };
             ['place', 'kills', 'bk', 'caps', 'score'].forEach(k => { if (per[k] !== undefined && !(k === 'kills' && per.kills === 0 && data.mode === 'capture_points')) rows.unshift({ l: PL[k], v: per[k] }); });
             sum.innerHTML = rows.map(x => '<div><span>' + esc(x.l) + '</span><b>' + (x.l === 'Рахунок' ? String(x.v).split(' ').map(s => { const q = s.split(':'); return '<i style="color:' + (TC[q[0]] || '#fff') + '">' + q[1] + '</i>'; }).join('<em>:</em>') : esc(x.v)) + '</b></div>').join('');
-            closePerk(); removeHud();
+            closePerk(); removeHud(); rdHide();
         },
-        reset() { md = null; zr = null; finalPt = null; if (window.BRLoot) BRLoot.reset(); closePerk(); removeHud(); }
+        reset() { md = null; zr = null; finalPt = null; if (window.BRLoot) BRLoot.reset(); closePerk(); removeHud(); rdHide(); }
     };
 })();

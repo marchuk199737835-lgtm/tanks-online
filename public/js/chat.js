@@ -5,7 +5,7 @@
 (function () {
     'use strict';
     if (window.Chat || typeof socket === 'undefined') return;
-    var D = document, MAXROWS = 80, CHS = ['global', 'clan', 'room', 'team', 'dm'], TEAMM = { team_deathmatch: 1, capture_points: 1 };
+    var D = document, MAXROWS = 80, CHS = ['global', 'clan', 'room', 'team', 'dm'], TEAMM = { team_deathmatch: 1, capture_points: 1, rounds: 1 };
     var S = { me: null, hasClan: false, dmFo: false, tab: 'global', open: false, store: {}, unread: {}, loaded: {}, peer: null, convs: {}, fr: {}, online: [], rid: null, playing: false, team: false, kind: 'menu', hide: {}, prof: 1, snd: 1, logOn: 1, touch: false, ready: false };
     var root, fab, bdg, logEl, UI = null, pend = [], loading = 0, lastSnd = 0, infoT = 0;
 

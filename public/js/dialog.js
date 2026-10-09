@@ -77,7 +77,13 @@
     function inMatch() { return typeof currentRoomData !== 'undefined' && currentRoomData && currentRoomData.status === 'playing' && typeof currentRoomId !== 'undefined' && currentRoomId; }
     function leaveMatch() {
         if (!inMatch()) return;
-        uiDialog.confirm({
+        const ranked = !!currentRoomData.rk;
+        uiDialog.confirm(ranked ? {
+            kind: 'danger', icon: '🚪', title: 'Покинути рейтинговий бій?',
+            text: 'Вихід зараховується як поразка зі штрафом до рейтингу, а черга буде недоступна 3 хвилини. Ваше місце в команді займе інший танк.',
+            rows: [['Рейтинг', '— поразка', 'bad'], ['Креди', '— 0', 'bad'], ['Черга', '3 хв', 'bad']],
+            cancelText: 'Залишитись', okText: 'Покинути бій', danger: true
+        } : {
             kind: 'danger', icon: '🚪', title: 'Вийти з матчу?',
             text: 'Ви залишите бій передчасно й не отримаєте жодної нагороди: ні кредів, ні досвіду, ні кейсу. Для решти гравців бій триватиме.',
             rows: [['Креди', '— 0', 'bad'], ['Досвід', '— 0', 'bad'], ['Кейс', '— 0', 'bad']],
@@ -88,7 +94,9 @@
             currentRoomId = null; currentRoomData = null;
             ['settings-modal', 'winner-modal', 'prop-selection-menu', 'hunter-blind-overlay'].forEach(id => { const e = document.getElementById(id); if (e) { e.classList.add('hidden'); e.classList.remove('flex'); } });
             if (window.resetLobbyUI) resetLobbyUI();
+            if (window.ModesFX) ModesFX.reset();
             if (typeof switchMusicState === 'function') switchMusicState('loby');
+            if (ranked) { showScreen('main-menu-screen'); if (window.RankedUI) RankedUI.open(); if (window.uiToast) uiToast('Ви покинули рейтинговий бій: зараховано поразку', true); return; }
             showScreen('room-browser-screen');
             if (window.uiToast) uiToast('Ви вийшли з матчу без нагороди', true);
         });

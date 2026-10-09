@@ -639,10 +639,12 @@
         socket.on('seasonReward', function (d) { if (d && d.total > 0) { srQ.push(d); srNext(); } });
         socket.on('matchSummary', function (s) {
             if (!s) return;
+            if (typeof currentRoomData !== 'undefined' && currentRoomData && currentRoomData.rk) return;   // рейтинговий бій має власний екран підсумків
             s.recv = Date.now();
             if (pm.goAt && s.recv - pm.goAt < 8000 && !pm.shown) renderSummary(s); else { pm.sum = s; pm.sumAt = s.recv; }
         });
         socket.on('gameOver', function () {
+            if (typeof currentRoomData !== 'undefined' && currentRoomData && currentRoomData.rk) return;
             pm.goAt = Date.now(); pm.shown = false;
             var wm = $('winner-modal'); if (wm) { wm.classList.remove('ps-on', 'ps-win', 'ps-loss', 'ps-draw'); var b = $('ps-box'); if (b) { b.classList.add('hidden'); } }
             ensureBox();

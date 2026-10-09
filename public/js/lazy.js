@@ -19,7 +19,14 @@
           cards: [{ id: 'mm-progress', icon: '🏅', title: 'ЗАВДАННЯ', sub: 'БОНУС · ЗАВДАННЯ · НАГОРОДИ', color: 'amber', bg: '🎁' }] },
         { id: 'clans', src: 'js/clans.js', re: /^clan/,
           ev: ['clanState', 'clanList', 'clanPeek', 'clanChatMsg', 'clanNotify', 'clanResult'],
-          cards: [{ id: 'mm-clans', icon: '🛡️', title: 'КЛАНИ', sub: 'Команди та рейтинг', color: 'amber', bg: '🛡️' }] }
+          cards: [{ id: 'mm-clans', icon: '🛡️', title: 'КЛАНИ', sub: 'Команди та рейтинг', color: 'amber', bg: '🛡️' }] },
+        { id: 'tutorial', src: 'js/tutorial.js', re: /^tut/, ev: ['tutState'], cards: [], auto: true },   // навчання: вантажимо одразу, щойно сервер надіслав стан (навіть на повільному зв'язку)
+        { id: 'ranked', src: 'js/ranked.js', re: /^rk/,
+          ev: ['rkInfo', 'rkQueue', 'rkError', 'rkFound', 'rkResult', 'rkClaimed'],
+          cards: [{ id: 'mm-ranked', icon: '🏆', title: 'РЕЙТИНГОВИЙ РЕЖИМ', sub: 'Ранги · ліги · сезони', color: 'pink', bg: '⚔️' }] },
+        { id: 'referral', src: 'js/referral.js', re: /^ref/,
+          ev: ['refInfo', 'refError', 'refNotify'],
+          cards: [{ id: 'mm-referral', icon: '🤝', title: 'ЗАПРОСИ ДРУГА', sub: 'Креди та кейси за друзів', color: 'teal', bg: '🎁' }] }
     ];
     var MAXBUF = 40, authed = false, st = {};      // st[id] = { state: 0 нічого | 1 вантажиться | 2 готово, buf: [[ev, args]], waiters: [], failAt }
     MODS.forEach(function (m) { st[m.id] = { state: 0, buf: [], waiters: [], failAt: 0 }; });
@@ -31,6 +38,7 @@
     function record(ev, args) {
         var m = modFor(ev); if (!m) return; var s = st[m.id]; if (s.state === 2) return;
         s.buf.push([ev, args]); if (s.buf.length > MAXBUF) s.buf.shift();
+        if (m.auto && s.state === 0) load(m);
     }
     function hookSocket() {
         if (typeof socket === 'undefined' || !socket) return false;

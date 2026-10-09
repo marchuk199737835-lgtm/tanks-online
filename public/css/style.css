@@ -970,3 +970,31 @@ html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent
 .mfx-slots { display: flex; gap: 4px; } .mfx-slot { width: 24px; height: 24px; border-radius: 7px; border: 1.5px solid var(--rc, #475569); color: var(--rc, #475569); background: rgba(15,23,42,.85); box-shadow: 0 0 8px -2px var(--rc, transparent); display: grid; place-items: center; }
 .mfx-slot svg { width: 16px; height: 16px; display: block; } .mfx-slot.empty { border-style: dashed; border-color: #475569; box-shadow: none; opacity: .6; }
 @media (max-width: 760px), (max-height: 520px) { .mfx-slot { width: 20px; height: 20px; border-radius: 6px; } .mfx-slot svg { width: 13px; height: 13px; } .mfx-slots { gap: 3px; } }
+
+/* ===== Повернення після бою: гравець ще на екрані результатів ===== */
+.lb-pl.away { opacity: .72; }
+.lb-pl.away .lb-pl-st { background: rgba(245,158,11,.18); color: #fcd34d; border-color: rgba(245,158,11,.45); }
+/* ===== Запрошення друга на екрані входу ===== */
+.au-ref { margin: 0 0 10px; padding: 9px 12px; border-radius: 12px; background: linear-gradient(90deg, rgba(16,185,129,.22), rgba(59,130,246,.2)); border: 1px solid rgba(52,211,153,.5); color: #d1fae5; font-size: 12.5px; text-align: center; }
+.au-ref b { color: #fff; }
+/* ===== Режим «Раунди»: живі танки команд і екран підготовки ===== */
+.mfx-alive { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 4px; pointer-events: none; }
+.mfx-alive span { display: flex; gap: 3px; }
+.mfx-alive i { width: 10px; height: 10px; border-radius: 3px; background: rgba(15,23,42,.85); border: 1px solid var(--tc); opacity: .55; }
+.mfx-alive i.on { background: var(--tc); opacity: 1; box-shadow: 0 0 6px var(--tc); }
+.mfx-alive em { font: 400 10px/1 'Russo One', Arial; color: #94a3b8; font-style: normal; }
+#mfx.fz .mfx-box { opacity: .85; }
+#rd-ov { position: absolute; inset: 0; z-index: 45; pointer-events: none; display: none; }
+#rd-ov.on { display: block; }
+#rd-ov .rd-top { position: absolute; left: 50%; top: max(70px, 11vh); transform: translateX(-50%); text-align: center; white-space: nowrap; }
+#rd-ov .rd-top small { display: block; font: 700 12px/1 Jura, Arial; letter-spacing: .2em; color: #cbd5e1; margin-bottom: 6px; text-transform: uppercase; }
+#rd-ov .rd-top > b { display: block; font: 400 clamp(24px, 5vw, 48px)/1 'Russo One', Arial; letter-spacing: .14em; color: #fff; text-shadow: 0 0 24px rgba(244,114,182,.75), 0 3px 0 rgba(0,0,0,.5); }
+#rd-ov.last .rd-top > b, #rd-ov.mp .rd-top > b { color: #fde68a; text-shadow: 0 0 26px rgba(251,191,36,.85), 0 3px 0 rgba(0,0,0,.5); }
+#rd-ov.ot .rd-top > b { color: #fca5a5; text-shadow: 0 0 26px rgba(239,68,68,.85), 0 3px 0 rgba(0,0,0,.5); }
+#rd-ov .rd-sc { margin-top: 8px; font: 400 clamp(14px, 2.4vw, 20px)/1 'Russo One', Arial; display: flex; gap: 10px; justify-content: center; }
+#rd-ov .rd-sc i { font-style: normal; } #rd-ov .rd-sc em { color: #64748b; font-style: normal; }
+#rd-ov .rd-num { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font: 400 clamp(90px, 18vw, 190px)/1 'Russo One', Arial; color: #fff; text-shadow: 0 0 40px rgba(99,102,241,.85), 0 6px 0 rgba(0,0,0,.45); }
+#rd-ov .rd-num.go { color: #4ade80; text-shadow: 0 0 40px rgba(74,222,128,.85), 0 6px 0 rgba(0,0,0,.45); }
+#rd-ov .rd-num.pop { animation: rdPop .5s cubic-bezier(.2,1.4,.4,1); }
+@keyframes rdPop { from { transform: translate(-50%, -50%) scale(1.6); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+html.gfx-low #rd-ov .rd-num.pop { animation: none; }

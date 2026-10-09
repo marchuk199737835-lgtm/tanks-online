@@ -106,6 +106,7 @@
             case 'battle_royale': h += rule('⏱', 'До фіналу', tm('brTime')) + rule('☣️', 'Шкода зони', v('brDmg') + '%/с') + rule('🎁', 'Модулі', yn('brLoot')); break;
             case 'capture_points': h += rule('🚩', 'Команд', v('cpTeams')) + rule('📍', 'Точок', v('cpPoints')) + rule('🏁', 'Очки', v('cpScore')) + rule('⏱', 'Час', tm('cpTime')); break;
             case 'bounty': h += rule('🏁', 'Очки', v('bnScore')) + rule('⏱', 'Час', tm('bnTime')) + rule('🎯', 'Зміна цілі', v('bnInterval') + 'с'); break;
+            case 'rounds': h += rule('🔁', 'Раундів', v('rdRounds')) + rule('⏱', 'Раунд', v('rdTime') + 'с') + rule('🤝', 'Нічия', yn('rdDraw')); break;
         }
         const rr = MI.rewardRange(r.mode, r);
         h += rule(creditIcon(20), 'Нагорода', rr.loss + '–' + rr.win) + (rr.draw != null ? rule('🤝', 'Нічия', creditAmount(rr.draw, 14)) : '');
@@ -136,10 +137,10 @@
         const dot = MI.usesColor(r.mode) ? '<span class="lb-dot" style="background:rgb(' + pc + ')"></span>' : '';
         let acts = '';
         if (isHost && !me) acts = '<div class="lb-acts"><button type="button" class="lb-act" data-act="crown" data-id="' + esc(id) + '" title="Зробити лідером">👑</button><button type="button" class="lb-act danger" data-act="kick" data-id="' + esc(id) + '" title="Вигнати з сесії">✖</button><button type="button" class="lb-act danger" data-act="ban" data-id="' + esc(id) + '" title="Заблокувати в цій сесії">🚫</button></div>';
-        return '<div data-key="' + esc(id) + '" class="lb-pl' + (p.ready ? ' ready' : '') + (me ? ' me' : '') + '" style="--pc:' + pc + '">' + dot +
+        return '<div data-key="' + esc(id) + '" class="lb-pl' + (p.ready ? ' ready' : '') + (p.away ? ' away' : '') + (me ? ' me' : '') + '" style="--pc:' + pc + '">' + dot +
             '<span class="lb-pl-ico">' + (window.LV ? LV.icon(L, 32) : '') + '</span>' +
             '<div class="lb-pl-main"><span class="lb-pl-name">' + esc(window.dispName ? dispName(p) : p.name) + (host ? '<em>👑</em>' : '') + (me ? '<u>ВИ</u>' : '') + '</span><span class="lb-pl-lv">Рівень <b>' + L + '</b> · ' + esc(rank) + '</span>' + statLine(p) + '</div>' +
-            '<span class="lb-pl-st">' + (p.ready ? 'ГОТОВИЙ' : 'ЧЕКАЄ') + '</span>' + acts + '</div>';
+            '<span class="lb-pl-st" title="' + (p.away ? 'Ще дивиться результати бою' : '') + '">' + (p.away ? '🎮 У ГРІ' : p.ready ? 'ГОТОВИЙ' : 'ЧЕКАЄ') + '</span>' + acts + '</div>';
     }
     function teamBox(r, key, members, isHost, cap) {
         const T = TEAMS[key], mine = r.players[myId] && r.players[myId].team === key, full = cap != null && members.length >= cap && !mine;
@@ -156,7 +157,7 @@
             $('lobby-roster-title').textContent = 'Команди'; $('lobby-roster-sub').textContent = 'Мисливців: ' + hu.length + ' / ' + (r.hunterCount || 1);
             if (no.length) h += '<div class="lb-unass-h">Без команди</div>' + no.map(([id, p]) => card(r, id, p, isHost)).join('');
         } else if (MI.isTeamPvp(r.mode)) {
-            const keys = TDM_TEAMS.slice(0, (r.mode === 'capture_points' ? r.cpTeams : r.tdmTeams) || 2), no = entries.filter(([, p]) => !p.team || !keys.includes(p.team));
+            const keys = TDM_TEAMS.slice(0, (r.mode === 'rounds' || r.rk ? 2 : r.mode === 'capture_points' ? r.cpTeams : r.tdmTeams) || 2), no = entries.filter(([, p]) => !p.team || !keys.includes(p.team));
             h = '<div class="lb-teams">' + keys.map(k => teamBox(r, k, entries.filter(([, p]) => p.team === k), isHost, null)).join('') + '</div>';
             $('lobby-roster-title').textContent = 'Команди';
             const sizes = keys.map(k => entries.filter(([, p]) => p.team === k).length), unb = r.tdmAutoBalance && sizes.some(x => x > 0) && Math.max(...sizes) - Math.min(...sizes) > 1;
