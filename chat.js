@@ -122,7 +122,13 @@ module.exports = function (ctx) {
             if (bot) { m.to = th; m.bot = 1; return socket.emit('chatMsg', m); }   // боту: «доставлено», відповіді не буде
             const other = ctx.Handles.loginOf(th);
             if (!other || other === login || !user(other)) return socket.emit('chatErr', { msg: 'Гравця не знайдено' });
-            if (!ctx.isOnline(other)) return socket.emit('chatErr', { msg: 'Гравець не в мережі' });
+            if (!ctx.isOnline(other)) {
+                // друг не в мережі: повідомлення чекає в історії, а йому летить push «Вам написав …» (не частіше разу на добу)
+                if (!areFriends(login, other)) return socket.emit('chatErr', { msg: 'Гравець не в мережі' });
+                m.to = th; store('dm', dmKey(login, other), m); socket.emit('chatMsg', m);
+                try { if (ctx.Notify) ctx.Notify.send(other, 'dm', { n: nickOf(login), t: text.slice(0, 120) }); } catch (e) {}
+                return;
+            }
             if (!areFriends(login, other) && user(other).chatDmFriendsOnly) return socket.emit('chatErr', { msg: 'Гравець приймає приватні повідомлення лише від друзів' });
             m.to = th; store('dm', dmKey(login, other), m);
             sendList(new Set([login, other]), m);

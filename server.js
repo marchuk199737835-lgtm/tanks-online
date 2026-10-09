@@ -53,7 +53,7 @@ let dbUsersCol = null, dbMapsCol = null, editorApi = null, dbRef = null;
 const dbUsers = Object.create(null); // без прототипу: логіни типу __proto__ чи constructor більше не ламають логіку
 
 if (mongoUri) {
-    const client = new MongoClient(mongoUri);
+    const client = new MongoClient(mongoUri, { maxPoolSize: 5, minPoolSize: 0, maxIdleTimeMS: 60000, retryWrites: true });   // безкоштовний кластер: мало з'єднань
     client.connect().then(() => {
         console.log("✅ Підключено до MongoDB!");
         const db = client.db("tanks_db"); dbRef = db;
@@ -63,22 +63,88 @@ if (mongoUri) {
         promoCol.find({}).toArray().then(rows => { rows.forEach(r => { if (r && r._id) promoUses[r._id] = Math.max(promoUses[r._id] || 0, r.uses | 0); }); }).catch(e => console.error('❌ Лічильники промокодів:', e.message));
         if (editorApi) editorApi.loadSaved().catch(e => console.error('❌ Не вдалося завантажити мапи з БД:', e.message));
         dbUsersCol.find({}).toArray().then(users => {
-            users.forEach(u => dbUsers[u.name] = u);
+            users.forEach(u => { if (!u || typeof u.name !== 'string') return; if (!dbUsers[u.name]) dbUsers[u.name] = u; savedSnap.set(u.name, snapOf(u)); });
             console.log(`Завантажено акаунтів: ${users.length}`);
+            if (dirtyUsers.size) scheduleFlush(false);
         });
     }).catch(err => console.error("❌ Помилка MongoDB:", err));
 } else {
     console.warn("⚠️  MONGO_URI не задано! Акаунти зберігаються лише в пам'яті і зникнуть після перезапуску.");
 }
 
-function saveUser(name) {
-    if (dbUsersCol && dbUsers[name]) {
-        dbUsersCol.updateOne({ name: name }, { $set: dbUsers[name] }, { upsert: true })
-            .catch(err => console.error('❌ Не вдалося зберегти акаунт', name, err.message));
-    }
+// ===== Збереження акаунтів: економно для безкоштовної MongoDB (512 МБ, ~100 операцій/с) =====
+// Раніше КОЖЕН виклик saveUser (вбивство, підбір, вхід…) одразу писав увесь документ. Тепер:
+//  • виклики лише позначають акаунт «зміненим», запис іде пачкою раз на ~8 с (bulkWrite, один запит на пачку);
+//  • у БД летять ЛИШЕ поля, що змінились з останнього запису (порівняння з відбитком), незмінений акаунт — 0 операцій;
+//  • перед зупинкою сервера (редеплой, SIGTERM) усе незаписане зберігається; при помилці запису акаунт повертається в чергу.
+const dirtyUsers = new Set(), savedSnap = new Map(), DB_FLUSH_MS = 8000;
+const dbStat = { writes: 0, batches: 0, skipped: 0, errors: 0, since: Date.now() };
+let flushTimer = null, flushing = false;
+function snapOf(u) { const s = {}; for (const k of Object.keys(u)) { if (k === '_id') continue; try { s[k] = JSON.stringify(u[k]); } catch (e) { s[k] = String(Math.random()); } } return s; }
+function scheduleFlush(urgent) {
+    if (!dbUsersCol) return;
+    if (urgent && flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+    if (!flushTimer) flushTimer = setTimeout(() => { flushTimer = null; flushUsers(); }, urgent ? 400 : DB_FLUSH_MS);
 }
+// urgent — важливі зміни (новий акаунт, пароль): записати майже одразу
+function saveUser(name, urgent) {
+    if (!dbUsers[name]) return;
+    dirtyUsers.add(name);
+    scheduleFlush(!!urgent);
+}
+async function flushUsers() {
+    if (!dbUsersCol || flushing || !dirtyUsers.size) return;
+    flushing = true;
+    const names = [...dirtyUsers]; dirtyUsers.clear();
+    const ops = [], snaps = [];
+    for (const n of names) {
+        const u = dbUsers[n]; if (!u) continue;
+        const prev = savedSnap.get(n), snap = snapOf(u), set = {}; let any = false;
+        for (const k in snap) if (!prev || prev[k] !== snap[k]) { set[k] = u[k]; any = true; }
+        if (!any) { dbStat.skipped++; continue; }
+        set.name = n;
+        ops.push({ updateOne: { filter: { name: n }, update: { $set: set }, upsert: true } }); snaps.push([n, snap]);
+    }
+    try {
+        for (let i = 0; i < ops.length; i += 100) {
+            await dbUsersCol.bulkWrite(ops.slice(i, i + 100), { ordered: false });
+            snaps.slice(i, i + 100).forEach(([n, s]) => savedSnap.set(n, s));
+            dbStat.batches++; dbStat.writes += Math.min(100, ops.length - i);
+        }
+    } catch (err) {
+        dbStat.errors++; console.error('❌ Не вдалося зберегти акаунти:', err.message);
+        snaps.forEach(([n]) => dirtyUsers.add(n));            // спробуємо ще раз
+    } finally { flushing = false; if (dirtyUsers.size) scheduleFlush(false); }
+}
+let shuttingDown = false;
+async function gracefulExit(sig) {
+    if (shuttingDown) return; shuttingDown = true;
+    console.log('⏹  ' + sig + ': зберігаю дані перед зупинкою…');
+    try { clearTimeout(flushTimer); flushTimer = null; while (flushing) await new Promise(r => setTimeout(r, 50)); await flushUsers(); } catch (e) { console.error(e); }
+    try { if (hooks.beforeExit) await hooks.beforeExit(); } catch (e) {}
+    process.exit(0);
+}
+process.on('SIGTERM', () => gracefulExit('SIGTERM'));
+process.on('SIGINT', () => gracefulExit('SIGINT'));
 
 function hashPwd(pwd) { return crypto.createHash('sha256').update(pwd).digest('hex'); }
+// Вхід за токеном без перебору всіх акаунтів: індекс токен → логін (самовідновлюваний: промах → одноразова перебудова, не частіше 1/с)
+const tokenIdx = new Map(); let tokenIdxAt = 0;
+function loginByToken(token) {
+    let n = tokenIdx.get(token);
+    if (n && dbUsers[n] && dbUsers[n].token === token) return n;
+    if (Date.now() - tokenIdxAt < 1000) return null;
+    tokenIdxAt = Date.now(); tokenIdx.clear();
+    for (const k in dbUsers) { const t = dbUsers[k] && dbUsers[k].token; if (t) tokenIdx.set(t, k); }
+    n = tokenIdx.get(token); return n && dbUsers[n] && dbUsers[n].token === token ? n : null;
+}
+// Блокування акаунта (адмін-панель): u.ban = { until (0 = назавжди), reason }. Повертає текст для гравця або null
+function banInfo(u) {
+    const b = u && u.ban; if (!b || typeof b !== 'object') return null;
+    if (b.until && Date.now() > b.until) return null;
+    const left = b.until ? Math.ceil((b.until - Date.now()) / 60000) : 0;
+    return 'Акаунт заблоковано' + (b.until ? ' ще на ' + (left >= 1440 ? Math.ceil(left / 1440) + ' дн.' : left >= 60 ? Math.ceil(left / 60) + ' год' : left + ' хв') : ' назавжди') + (b.reason ? '. Причина: ' + String(b.reason).slice(0, 120) : '');
+}
 // Хеш IP-адреси підключення (саму адресу не зберігаємо): захист рейтингу й реферальної системи від твінків з одного пристрою/мережі
 const IP_SALT = process.env.IP_SALT || 'puls-ip-v1';
 function ipHashOf(socket) {
@@ -353,7 +419,7 @@ function processPlayerDeath(r, victimId, killerId, meta) {
     v.buff = null;
     v.onFire = null;
     
-    io.to(r.id).emit('playerDied', { id: victimId, killer: killerId });
+    io.to(r.id).emit('playerDied', { id: victimId, killer: killerId, w: cleanWeapon(meta && meta.weapon) || undefined });   // w — зброя (кілкам у звичайних сесіях)
     
     let atk = (killerId && r.players[killerId]) ? r.players[killerId] : null;
     if (atk && dbUsers[atk.name] && r.mode !== 'prophunt') {
@@ -578,6 +644,32 @@ function startRoomGame(roomId, notify) {
     return false;
 }
 
+// ===== Античит: швидкість руху =====
+// Клієнт шле позицію ~20 разів/с. Сервер тримає «бюджет» відстані: швидкість танка (модулі, бафи, покращення арени) × час × запас 1.3
+// + 40 px на нерівномірну мережу. Більше — позицію обрізаємо до дозволеної й повертаємо клієнту ('posFix').
+// Телепорт від сервера (спавн, відродження, новий раунд) помічаємо за тим, що p.x/p.y змінились не з цього обробника.
+const AC = new WeakMap();
+function maxSpeedOf(r, p) {
+    let s = 200 * GameData.statMult(p.equipped, 'speed');
+    if (p.buff === 'speed') s *= 1.5; else if (p.buff === 'samurai') s *= 1.6;
+    if (r.mode === 'solo_arena') s *= 1.35;
+    return s;
+}
+function speedCheck(r, p, x, y, socket) {
+    const now = Date.now(); let s = AC.get(p);
+    if (!s || s.x !== p.x || s.y !== p.y || s.room !== r.id) { s = { x: p.x, y: p.y, t: now, bud: 60, room: r.id, bad: 0, badAt: 0, fixAt: 0 }; AC.set(p, s); }
+    const dt = Math.min(1.5, Math.max(0, (now - s.t) / 1000)); s.t = now;
+    s.bud = Math.min(maxSpeedOf(r, p) * 1.3 * 1.5 + 60, s.bud + maxSpeedOf(r, p) * 1.3 * dt + 2);
+    const dx = x - s.x, dy = y - s.y, d = Math.hypot(dx, dy);
+    if (d <= s.bud + 40) { s.bud = Math.max(0, s.bud - d); s.x = x; s.y = y; return [x, y]; }
+    const k = Math.max(0, s.bud) / d, nx = s.x + dx * k, ny = s.y + dy * k;      // дозволена частина шляху
+    s.bud = 0; s.x = nx; s.y = ny;
+    if (now - s.badAt > 10000) s.bad = 0; s.bad++; s.badAt = now;
+    if (s.bad === 25) console.warn('⚠️ Античит: підозріла швидкість', p.name, r.id);
+    if (now - s.fixAt > 250) { s.fixAt = now; socket.emit('posFix', { x: Math.round(nx), y: Math.round(ny) }); }
+    return [nx, ny];
+}
+
 // Запис гравця-людини в кімнаті (лобі, швидка гра, рейтинговий матч)
 function newPlayerEntry(sockId, n) {
     const uEq = (dbUsers[n] && dbUsers[n].equipped) ? dbUsers[n].equipped : { cannon: null, turret: null, hull: null, tracks: null };
@@ -662,7 +754,8 @@ io.on('connection', (socket) => {
         globalPlayers[socket.id] = name;
         // новий акаунт: реферальний код (запрошення друга) і навчання новачка — обробляють referral.js / tutorial.js
         Ev.emit('register', { name, socketId: socket.id, ref: data && (typeof data.ref === 'string' || typeof data.ref === 'number') ? String(data.ref).slice(0, 16) : null, ip: ipHashOf(socket) });
-        saveUser(name);
+        saveUser(name, true);
+        tokenIdx.set(token, name);
         socket.emit('authSuccess', { name, token, lang: dbUsers[name].lang });
         sendEconomy(socket.id, name);
         Ev.emit('login', { name, socketId: socket.id });
@@ -675,8 +768,10 @@ io.on('connection', (socket) => {
         const name = findLogin(creds.name, hashPwd(password));
         let u = name ? dbUsers[name] : null;
         if (!u) return socket.emit('joinError', 'Невірний логін або пароль!');
+        const bn = banInfo(u); if (bn) return socket.emit('joinError', bn);
         const token = crypto.randomUUID();
-        u.token = token;
+        if (u.token) tokenIdx.delete(u.token);
+        u.token = token; tokenIdx.set(token, name);
         u = validateUser(u);
         saveUser(name);
         globalPlayers[socket.id] = name;
@@ -694,10 +789,10 @@ io.on('connection', (socket) => {
     });
 
     socket.on('authToken', (token) => {
-        if (typeof token !== 'string' || !token) return socket.emit('authError', 'Сесія закінчилась, увійдіть знову');
-        let foundName = null;
-        for (let n in dbUsers) { if (dbUsers[n].token === token) foundName = n; }
+        if (typeof token !== 'string' || !token || token.length > 80) return socket.emit('authError', 'Сесія закінчилась, увійдіть знову');
+        const foundName = loginByToken(token);
         if (foundName) {
+            const bn = banInfo(dbUsers[foundName]); if (bn) return socket.emit('authError', bn);
             globalPlayers[socket.id] = foundName;
             const hadLvl = !!dbUsers[foundName].levelRewards;
             dbUsers[foundName] = validateUser(dbUsers[foundName]);
@@ -1079,10 +1174,11 @@ socket.on('selectProp', (data) => {
         if (!data || !data.roomId) return;
         let r = rooms[data.roomId];
         if (r && r.status === 'playing' && r.mode === 'prophunt' && r.players[socket.id]) {
-            r.players[socket.id].isDisguised = data.state;
+            r.players[socket.id].isDisguised = !!data.state;
             if (data.state) {
-                r.players[socket.id].x = data.x;
-                r.players[socket.id].y = data.y;
+                // маскування «прилипає» до сітки 50 px: зсув не більше ~40 px від поточної позиції (без телепортів через цю подію)
+                const p = r.players[socket.id], x = +data.x, y = +data.y;
+                if (Number.isFinite(x) && Number.isFinite(y) && Math.hypot(x - p.x, y - p.y) <= 40) { const s = AC.get(p); p.x = x; p.y = y; if (s) { s.x = x; s.y = y; } }
                 r.players[socket.id].bodyAngle = 0;
                 r.players[socket.id].turretAngle = 0;
             }
@@ -1103,7 +1199,9 @@ socket.on('selectProp', (data) => {
             const x = +data.x, y = +data.y, ba = +data.bodyAngle, ta = +data.turretAngle;
             if (!Number.isFinite(x) || !Number.isFinite(y)) return;
             let p = r.players[socket.id];
-            p.x = x; p.y = y; if (Number.isFinite(ba)) p.bodyAngle = ba; if (Number.isFinite(ta)) p.turretAngle = ta;
+            if (p.hp <= 0 || p.out) return;                                  // загиблий не рухається
+            const ok = speedCheck(r, p, x, y, socket);
+            p.x = ok[0]; p.y = ok[1]; if (Number.isFinite(ba)) p.bodyAngle = ba; if (Number.isFinite(ta)) p.turretAngle = ta;
             if (p.stuckIn.length > 0) {
                 let cM = MAP_DATA[r.map] ? r.map : 'epic_map', arr = MAP_DATA[cM].solids, sI = [];
                 p.stuckIn.forEach(i => {
@@ -1536,9 +1634,10 @@ setInterval(() => {
         checkCollisionServer, getValidSpawn, processPlayerDeath, removePlayer, resetRoomToLobby, getRandomModuleFromCase,
         hooks, displayName: nickOf, onConnection: f => connHooks.push(f), getDb: () => dbRef, onlineSocketsOf, isOnline: name => _sockByName.has(name),
         get BANS() { return BANS; }, get TICK_RATE() { return TICK_RATE; }, get SYNCS() { return SYNCS; }, startRoomGame, collectTokenFor, emitMatchEnd, teamsOf, isTeamPvp, powerupsOn, pickMap, clampInt, BUFF_DURATION, VALID_COLORS, TDM_TEAMS,
-        newPlayerEntry, joinRoomFor, ipHashOf, getRandomModuleFromCase, matchTally: () => matchTally
+        newPlayerEntry, joinRoomFor, ipHashOf, getRandomModuleFromCase, matchTally: () => matchTally,
+        banInfo, dbStat, dirtyCount: () => dirtyUsers.size, flushUsers, PROMO_CODES
     };
-    ['handles', 'progress', 'profile', 'social', 'clans', 'chat', 'playercard', 'bots', 'ranked', 'referral', 'tutorial'].forEach(f => {
+    ['handles', 'progress', 'profile', 'social', 'clans', 'chat', 'playercard', 'bots', 'ranked', 'referral', 'tutorial', 'emotes', 'notify', 'admin'].forEach(f => {
         if (!fs.existsSync(path.join(__dirname, f + '.js'))) return;
         try { require('./' + f + '.js')(ctx); console.log('✅ Модуль', f); } catch (e) { console.error('❌ Модуль', f, e && e.stack || e); }
     });

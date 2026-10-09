@@ -107,7 +107,7 @@ module.exports = function (ctx) {
     function markDirty(c) {
         if (!c) return; dirty.add(c.id);
         if (!col || saveTimer) return;
-        saveTimer = setTimeout(flush, 2500);
+        saveTimer = setTimeout(flush, 10000);     // пачкою раз на 10 с (безкоштовна MongoDB: менше операцій)
     }
     function flush() {
         saveTimer = 0;
@@ -521,6 +521,7 @@ module.exports = function (ctx) {
 
     // ---------- Експорт ----------
     ctx.hooks.clanTag = name => tagOf(name);
+    { const prev = ctx.hooks.beforeExit; ctx.hooks.beforeExit = async () => { try { if (saveTimer) { clearTimeout(saveTimer); saveTimer = 0; } flush(); await new Promise(r => setTimeout(r, 700)); } catch (e) {} if (prev) await prev(); }; }   // дозапис перед зупинкою сервера
     ctx.Clans = {
         clanOf, tagOf, COST, membersOf: id => { const c = clanById(id); return c ? Object.keys(c.members) : []; },
         _t: { clans, settle, claimAward, addPts, seasonNow, rankTick, ranking, get loaded() { return loaded; } }
