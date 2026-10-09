@@ -118,7 +118,7 @@ module.exports = function (ctx) {
     // ---------- ЩОДЕННІ ЗАВДАННЯ ----------
     const caseIdsBy = (lo, hi) => Object.keys(CASES).map(Number).filter(id => CASES[id].price >= lo && CASES[id].price <= hi && CASES[id].price <= 340);
     const isPve = m => ModeInfo.isPve(m), isSolo = m => ModeInfo.isSolo(m);
-    const isTeam = m => m === 'team_deathmatch' || m === 'capture_points';
+    const isTeam = m => m === 'team_deathmatch' || m === 'capture_points' || m === 'rounds';
     const mePl = (e, p) => p; // читабельність
     const killIf = (cond, wpn) => ({ kill: (q, e) => (cond(e) && (!wpn || e.weapon === wpn)) ? 1 : 0 });
     function T(id, cat, ico, goal, reward, text, on, param) { return { id, cat, ico, goal, reward: typeof reward === 'function' ? reward : (() => reward), text, on: on || {}, param }; }

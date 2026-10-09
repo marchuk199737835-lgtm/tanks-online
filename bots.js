@@ -28,8 +28,8 @@ const CFG = {
     inRealRooms: !off(ENV.BOT_IN_ROOMS),
     maxSimBots: 60,                 // ботів у справжніх кімнатах (їх симулює ШІ)
     maxBotsTotal: 150,              // разом з віртуальними сесіями (там вони лише «в таблиці»)
-    modes: ['deathmatch', 'team_deathmatch', 'capture_points', 'battle_royale', 'bounty'],      // режими, де боти мають сенс
-    virtualModeW: { deathmatch: 3, team_deathmatch: 2.2, capture_points: 1.6, battle_royale: 2.2, bounty: 1 },
+    modes: ['deathmatch', 'team_deathmatch', 'capture_points', 'battle_royale', 'bounty', 'rounds'],      // режими, де боти мають сенс
+    virtualModeW: { deathmatch: 3, team_deathmatch: 2.2, capture_points: 1.6, battle_royale: 2.2, bounty: 1, rounds: 1.4 },
     fillHuman: [0.4, 1.0],          // частка місць, до якої боти добирають кімнату реального гравця
     joinEveryMs: [2000, 8000],      // як часто боти «підключаються» до кімнати людини
     virtualFill: [0.2, 0.9],        // початкове наповнення віртуальних сесій
@@ -239,6 +239,7 @@ module.exports = function (ctx) {
         if (mode === 'capture_points') { c.cpTeams = 2; c.cpPoints = pick([2, 3, 3, 4]); c.cpScore = pick([200, 300, 300, 400]); c.cpTime = pick([180, 300, 300]); }
         if (mode === 'battle_royale') { c.brTime = pick([180, 240, 300, 300]); c.brDmg = pick([4, 4, 5, 6]); c.brLoot = Math.random() < 0.8; }
         if (mode === 'bounty') { c.bnScore = pick([20, 30, 30]); c.bnTime = pick([180, 300]); c.bnInterval = pick([30, 40, 40, 60]); }
+        if (mode === 'rounds') { c.rdRounds = pick([4, 6, 6, 6, 8]); c.rdTime = pick([60, 90, 90, 120]); c.rdDraw = Math.random() < 0.25; c.tdmAutoBalance = true; }
         return c;
     }
     function buildRoom(id, host, mode, map, maxPlayers, cfg) {
@@ -257,8 +258,8 @@ module.exports = function (ctx) {
     }
     function makeVirtualRoom(opts) {
         opts = opts || {};
-        const mode = opts.mode || wpick(CFG.virtualModeW), teams = mode === 'team_deathmatch' ? 2 : mode === 'capture_points' ? 2 : 2;
-        let maxPlayers = ({ deathmatch: () => pick([4, 5, 6, 6, 6]), battle_royale: () => pick([5, 6, 6, 6]), bounty: () => pick([4, 5, 6, 6]), team_deathmatch: () => pick([4, 6, 6, 8, 10]), capture_points: () => pick([6, 6, 8, 10]) })[mode]();
+        const mode = opts.mode || wpick(CFG.virtualModeW), teams = 2;
+        let maxPlayers = ({ deathmatch: () => pick([4, 5, 6, 6, 6]), battle_royale: () => pick([5, 6, 6, 6]), bounty: () => pick([4, 5, 6, 6]), team_deathmatch: () => pick([4, 6, 6, 8, 10]), capture_points: () => pick([6, 6, 8, 10]), rounds: () => pick([4, 4, 6, 6, 8, 10]) })[mode]();
         const map = opts.map || pickVirtualMap(mode, teams), cfg = randomCfg(mode);
         const tier = clamp(Math.round(globalRef() + gauss() * 3), 1, 14);
         const nFill = clamp(Math.round(maxPlayers * rnd(CFG.virtualFill[0], CFG.virtualFill[1])), 2, maxPlayers - (Math.random() < 0.5 ? 1 : 0));
@@ -446,6 +447,8 @@ module.exports = function (ctx) {
             const r = rooms[rid]; if (!r) continue;
             const hs = humansOf(r), bs = botsOf(r);
             if (!hs.length) { if (bs.length) destroyRoom(r); continue; }
+            if (r.ranked) continue;                 // рейтинговий бій: склад і боти визначає ranked.js
+
             if (!bs.length && !CFG.inRealRooms) continue;
             const m = metaOf(r);
             if (!eligibleMode(r.mode) || (!m.virt && !CFG.inRealRooms)) { if (bs.length) { bs.forEach(p => botLeave(r, p.id)); } continue; }

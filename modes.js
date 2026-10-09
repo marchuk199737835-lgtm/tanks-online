@@ -103,7 +103,7 @@ module.exports = function createModes(D) {
         emit(r, 'gameOver', { winner: o.winner || 'TEAM', name: o.name || '', rewards: rw, xp: xpm, isTeamWin: false, mode: r.mode, outcomes: oc, msg: o.msg || '', lines: o.lines || [], per, team: o.teamWin || null });
         let wvs = null, plc = {};
         try { const f0 = Object.values(r.players)[0]; if (o.ctx && f0) { const c0 = o.ctx(f0); if (c0 && c0.waves != null) wvs = c0.waves | 0; } Object.keys(per).forEach(k => { if (per[k] && per[k].place) plc[k] = per[k].place; }); } catch (e) { }
-        emitMatchEnd(r, { outcomes: oc, rewards: crd, xp: xpm, drops: drp, place: plc, waves: wvs });
+        emitMatchEnd(r, { outcomes: oc, rewards: crd, xp: xpm, drops: drp, place: plc, waves: wvs, score: o.score || null });
         pushRooms();
     }
     const allOutcome = (r, out) => { const m = {}; Object.keys(r.players).forEach(id => m[id] = out); return m; };
@@ -198,9 +198,85 @@ module.exports = function createModes(D) {
                 pK.forEach(id => place(r.players[id], getValidSpawn(r.map, 24, 'spawn_player')));
                 break;
             }
+            case 'rounds': {
+                const teams = [...new Set(pK.map(id => r.players[id].team).filter(Boolean))];
+                S.teams = teams; S.sc = {}; teams.forEach(t => S.sc[t] = 0); S.R = r.rdRounds; S.played = 0; S.ot = 0; S.round = 0;
+                rdBegin(r, S, now, true);
+                break;
+            }
         }
         return S;
     }
+
+    // ---------- раунди ----------
+    // Стан: 'fz' — підготовка (4 с, рух і стрільба заблоковані), 'live' — бій, 'post' — раунд завершено (3 с паузи).
+    // Загиблі не відроджуються до наступного раунду. Підсумок раунду — коли в однієї з команд не лишилось живих або вийшов час.
+    const RD_FREEZE = 4000, RD_POST = 3000;
+    function rdLabel(r, S) {
+        if (S.ot > 0) return 'ot';
+        if (S.round >= S.R) return 'last';
+        const left = S.R - S.played - 1;                   // раундів після цього
+        return S.teams.some(t => S.teams.every(o => o === t || S.sc[t] + 1 > S.sc[o] + left)) ? 'mp' : 'n';   // комусь вистачить одного раунду — «матч-пойнт»
+    }
+    function rdBegin(r, S, now, first) {
+        S.round++; S.state = 'fz'; S.fzEnd = now + RD_FREEZE; S.end = S.fzEnd + r.rdTime * 1000; S.lb = rdLabel(r, S);
+        r.powerups = {}; r.mines = {};
+        Object.values(r.players).forEach(p => {
+            p.hp = getMaxHp(p.equipped); p.out = false; p.buff = null; p.buffEndTime = 0; p.onFire = null; p.stuckIn = [];
+            const ts = r.teamSpawns && r.teamSpawns[p.team];
+            place(p, ts ? ringSpot(r, ts, 0, 90, 24) : getValidSpawn(r.map, 24, 'spawn_player'));
+            if (!first) emit(r, 'playerRespawn', p);
+        });
+        note(r, 'rdRound', { n: S.round, lb: S.lb, ot: S.ot, sc: S.sc });
+    }
+    function rdRoundEnd(r, S, now, w) {
+        if (w) S.sc[w]++;
+        S.played++; S.state = 'post'; S.postEnd = now + RD_POST;
+        note(r, 'rdWin', { t: w || null, sc: S.sc });
+    }
+    // true — матч завершено
+    function rdCheckEnd(r, S, now) {
+        const [a, b] = S.teams, sa = S.sc[a] || 0, sb = S.sc[b] || 0;
+        if (S.ot > 0 || S.played >= S.R) {
+            if (sa !== sb) return endRounds(r, S, sa > sb ? a : b);
+            if (r.rdDraw && S.ot === 0) return endRounds(r, S, 'draw');
+            S.ot++; return false;                          // додатковий раунд (до першої перемоги)
+        }
+        const left = S.R - S.played;
+        if (sa > sb + left) return endRounds(r, S, a);
+        if (sb > sa + left) return endRounds(r, S, b);
+        return false;
+    }
+    function endRounds(r, S, wT) {
+        const draw = wT === 'draw', oc = {}; let wId = null;
+        Object.values(r.players).forEach(p => { oc[p.id] = draw ? 'draw' : (p.team === wT ? 'win' : 'loss'); if (!wId && oc[p.id] === 'win') wId = p.id; });
+        const sc = S.teams.map(t => t + ':' + (S.sc[t] || 0)).join(' ');
+        finish(r, { outcomes: oc, winner: draw ? 'DRAW' : (wT || 'TEAM'), name: draw ? '' : wT, msg: draw ? 'Рівний рахунок раундів' : 'Команда виграла більше раундів',
+            ctx: p => ({ kills: S.kills[p.id] || 0, rw: S.sc[p.team] || 0 }), lines: [['Рахунок', sc], ['Раундів зіграно', S.played]], teamWin: draw ? null : wT,
+            per: p => ({ kills: S.kills[p.id] || 0 }), score: Object.assign({}, S.sc) });
+        return true;
+    }
+    function rdTick(r, S, now, al) {
+        if (S.state === 'fz') { if (now >= S.fzEnd) S.state = 'live'; return false; }
+        if (S.state === 'live') {
+            const cnt = {}; S.teams.forEach(t => cnt[t] = 0); al.forEach(p => { if (cnt[p.team] !== undefined) cnt[p.team]++; });
+            const liveT = S.teams.filter(t => cnt[t] > 0);
+            if (liveT.length <= 1 || now >= S.end) {
+                let w = liveT.length === 1 ? liveT[0] : null;
+                if (liveT.length > 1) {      // час вийшов: більше живих, далі — більше сумарного здоров'я (у частках)
+                    const hp = {}; S.teams.forEach(t => hp[t] = 0); al.forEach(p => { if (hp[p.team] !== undefined) hp[p.team] += p.hp / getMaxHp(p.equipped); });
+                    const best = liveT.slice().sort((x, y) => (cnt[y] - cnt[x]) || (hp[y] - hp[x]));
+                    if (cnt[best[0]] !== cnt[best[1]] || Math.abs(hp[best[0]] - hp[best[1]]) > 0.01) w = best[0];
+                }
+                rdRoundEnd(r, S, now, w);
+            }
+            return false;
+        }
+        if (S.state === 'post' && now >= S.postEnd) { if (rdCheckEnd(r, S, now)) return true; rdBegin(r, S, now, false); }
+        return false;
+    }
+    // рух/стрільба заблоковані (підготовка до раунду й пауза після нього) — для ботів і перевірки влучань
+    function frozen(r, now) { const S = MS.get(r.id); return !!(S && S.mode === 'rounds' && (S.state === 'fz' || S.state === 'post')); }
 
     // ---------- покращення (арена) ----------
     function perkCalc(L) { return { dmg: 1 + 0.15 * (L.dmg || 0), cd: Math.pow(0.9, L.rate || 0), spd: 1 + 0.08 * (L.spd || 0), dr: Math.min(0.5, 0.1 * (L.armor || 0)), regen: 3 * (L.regen || 0), vamp: 4 * (L.vamp || 0), crit: 0.12 * (L.crit || 0) }; }
@@ -265,6 +341,11 @@ module.exports = function createModes(D) {
                 if (!checkBounty(r, S, now)) respawn(r, v, 3000, () => getValidSpawn(r.map, 24, 'spawn_player'));
                 break;
             }
+            case 'rounds': {   // без відродження до кінця раунду; підсумок раунду рахує tick
+                const atk = killerId && r.players[killerId];
+                if (atk && atk.id !== v.id && atk.team !== v.team) S.kills[atk.id] = (S.kills[atk.id] || 0) + 1;
+                break;
+            }
         }
     }
     function afterLeave(r, left) {
@@ -310,7 +391,8 @@ module.exports = function createModes(D) {
         const draw = wT === 'draw', oc = {}; let wId = null;
         Object.values(r.players).forEach(p => { oc[p.id] = draw ? 'draw' : (p.team === wT ? 'win' : 'loss'); if (!wId && oc[p.id] === 'win') wId = p.id; });
         const sc = S.teams.map(t => t + ':' + Math.floor(S.sc[t])).join(' ');
-        finish(r, { outcomes: oc, winner: draw ? 'DRAW' : (wT || 'TEAM'), name: draw ? '' : wT, msg: draw ? 'Рівний рахунок' : 'Команда захопила перевагу', ctx: p => ({ caps: p.caps || 0 }), lines: [['Рахунок', sc]], teamWin: wT, per: p => ({ caps: p.caps || 0, kills: S.kills[p.id] || 0 }) });
+        const scO = {}; S.teams.forEach(t => scO[t] = Math.floor(S.sc[t]));
+        finish(r, { outcomes: oc, winner: draw ? 'DRAW' : (wT || 'TEAM'), name: draw ? '' : wT, msg: draw ? 'Рівний рахунок' : 'Команда захопила перевагу', ctx: p => ({ caps: p.caps || 0 }), lines: [['Рахунок', sc]], teamWin: wT, per: p => ({ caps: p.caps || 0, kills: S.kills[p.id] || 0 }), score: scO });
         return true;
     }
     function checkBounty(r, S, now) {
@@ -394,6 +476,7 @@ module.exports = function createModes(D) {
             }
             case 'battle_royale': return brTick(r, S, now, dt, al);
             case 'capture_points': return cpTick(r, S, now, dt, al);
+            case 'rounds': return rdTick(r, S, now, al);
             case 'bounty': {
                 if (now < S.end - r.bnTime * 1000) return false;   // зворотний відлік перед боєм (4 с)
                 if (checkBounty(r, S, now)) return true;
@@ -656,13 +739,19 @@ module.exports = function createModes(D) {
             case 'battle_royale': { const Z = S.zone; const o = { m: r.mode, z: { x: rn(Z.x), y: rn(Z.y), r: Math.round(Z.r / 4) * 4, ph: Z.ph, np: S.nextPh | 0, go: now >= S.zStart }, al: alive(r).length, n: Object.keys(r.players).length, zt: Math.max(0, Math.ceil((S.zStart - now) / 1000)) }, dc = S.air && S.air.cur; if (dc) o.dr = { id: dc.id, x: dc.x, y: dc.y, st: dc.st, dur: dc.dur }; return o; }
             case 'capture_points': { const sc = {}; S.teams.forEach(t => sc[t] = Math.floor(S.sc[t])); return { m: r.mode, pts: S.pts.map(p => ({ i: p.i, x: p.x, y: p.y, r: p.r, o: p.o, w: p.w, p: Math.round(p.p) })), sc, goal: S.goal, t: left }; }
             case 'bounty': return { m: r.mode, tg: S.target, bv: S.bv, nt: S.target ? Math.max(0, Math.ceil((S.tEnd - now) / 1000)) : 0, t: left, goal: r.bnScore };
+            case 'rounds': {
+                const al = {}, tot = {}; S.teams.forEach(t => { al[t] = 0; tot[t] = 0; });
+                Object.values(r.players).forEach(p => { if (tot[p.team] === undefined) return; tot[p.team]++; if (p.hp > 0 && !p.out) al[p.team]++; });
+                return { m: r.mode, sc: S.sc, R: S.R, rd: S.round, st: S.state, lb: S.lb, ot: S.ot, al, tot,
+                    fz: S.state === 'fz' ? Math.max(0, Math.ceil((S.fzEnd - now) / 1000)) : 0, t: S.state === 'live' ? Math.max(0, Math.ceil((S.end - now) / 1000)) : (S.state === 'fz' ? r.rdTime : 0) };
+            }
         }
     }
     function cleanup(roomId) { MS.delete(roomId); const r = rooms[roomId]; if (r) restoreEq(r); }
     function powerupRule(r) {      // null — режим без бонусів; null-поле own — спавнить сам режим
-        if (r.mode === 'battle_royale') return { own: true };
+        if (r.mode === 'battle_royale' || r.mode === 'rounds') return { own: true };   // раунди — без бафів (чесний командний бій)
         return { every: 30000, max: 4, count: 2 };
     }
 
-    return { has, readSettings, applyUpdate, start, tick, onDeath, afterLeave, md, cleanup, pickPerk, dmgMult, dmgTaken, onZombieKill, powerupRule, pickMod, MS, BR: { brWeights, rollRarity, rollMod, lootCap, brF, SLOTS } };
+    return { has, readSettings, applyUpdate, start, tick, onDeath, afterLeave, md, cleanup, pickPerk, dmgMult, dmgTaken, onZombieKill, powerupRule, pickMod, frozen, MS, BR: { brWeights, rollRarity, rollMod, lootCap, brF, SLOTS } };
 };

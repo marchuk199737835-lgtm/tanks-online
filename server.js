@@ -79,6 +79,15 @@ function saveUser(name) {
 }
 
 function hashPwd(pwd) { return crypto.createHash('sha256').update(pwd).digest('hex'); }
+// Хеш IP-адреси підключення (саму адресу не зберігаємо): захист рейтингу й реферальної системи від твінків з одного пристрою/мережі
+const IP_SALT = process.env.IP_SALT || 'puls-ip-v1';
+function ipHashOf(socket) {
+    try {
+        const h = socket && socket.handshake || {}, xf = h.headers && h.headers['x-forwarded-for'];
+        const ip = String(xf ? String(xf).split(',')[0] : (h.address || '')).trim().replace(/^::ffff:/, '');
+        return ip ? crypto.createHash('sha256').update(IP_SALT + '|' + ip).digest('hex').slice(0, 16) : '';
+    } catch (e) { return ''; }
+}
 
 // ===== ПРОМОКОДИ =====
 // Коди й суми живуть лише на сервері (клієнту суму не довіряємо). credits — скільки Кредів (поле bucks) дає код;
@@ -87,7 +96,8 @@ function hashPwd(pwd) { return crypto.createHash('sha256').update(pwd).digest('h
 const PROMO_CODES = {
     'WELCOME':   { credits: 50,  maxUses: 0,    expires: null,         once: true },
     'BONUS25':   { credits: 25,  maxUses: 1000, expires: '2026-12-31', once: true },
-    'ALEX-TOP1': { credits: 200, maxUses: 0,    expires: null,         once: true }   // старий код (раніше був зашитий у usePromo)
+    'ALEX-TOP1': { credits: 200, maxUses: 0,    expires: null,         once: true },  // старий код (раніше був зашитий у usePromo)
+    'START':     { credits: 200, maxUses: 0,    expires: null,         once: true }   // промокод навчання новачка
 };
 let promoCol = null;
 const promoUses = Object.create(null);
@@ -235,7 +245,7 @@ const globalPlayers = new Proxy({}, {
         return true;
     }
 });
-const hooks = { clanTag: () => '', extraRooms: () => [], preJoin: () => false, botNames: null };   // модулі підміняють (clans.js → hooks.clanTag; bots.js → extraRooms/preJoin/botNames)
+const hooks = { clanTag: () => '', extraRooms: () => [], preJoin: () => false, botNames: null, inRankedQueue: null, leaveRankedQueue: null, rankedLeave: null };   // модулі підміняють (clans.js → hooks.clanTag; bots.js → extraRooms/preJoin/botNames)
 const nickOf = n => (dbUsers[n] && dbUsers[n].nick) || n;
 const connHooks = [];   // обробники підключення від додаткових модулів (ctx.onConnection)
 
@@ -272,7 +282,7 @@ const ROOMS_GAP = 1800; let _roomsAt = 0;
 function pushRooms() { if (_roomsTimer) return; _roomsTimer = setTimeout(() => { _roomsTimer = null; const lst = getActiveRooms(), js = JSON.stringify(lst); if (js === _roomsLast) return; _roomsLast = js; _roomsAt = Date.now(); io.to('rb').emit('roomsList', lst); }, Math.max(150, _roomsAt + ROOMS_GAP - Date.now())); }
 function getActiveRooms() {
     let extra = []; try { extra = hooks.extraRooms() || []; } catch (e) { extra = []; }   // «віртуальні» сесії (bots.js)
-    return Object.values(rooms).map(r => ({ id: r.id, hostName: r.hostName, hostNick: nickOf(r.hostName), mode: r.mode, map: r.map, playersCount: Object.keys(r.players).length, maxPlayers: r.maxPlayers, status: r.status })).concat(extra);
+    return Object.values(rooms).filter(r => !r.ranked).map(r => ({ id: r.id, hostName: r.hostName, hostNick: nickOf(r.hostName), mode: r.mode, map: r.map, playersCount: Object.keys(r.players).length, maxPlayers: r.maxPlayers, status: r.status })).concat(extra);
 }
 
 function getMaxHp(equipped) {
@@ -327,11 +337,11 @@ function emitMatchEnd(r, o) {
         const order = ps.slice().sort((a, b) => (rank[(o.outcomes || {})[a.id] || 'loss'] - rank[(o.outcomes || {})[b.id] || 'loss']) || ((b.score | 0) - (a.score | 0)));
         const list = ps.map(p => {
             const kd = t.kd[p.name] || { k: 0, d: 0 };
-            return { name: p.name, isBot: !!p.isBot, outcome: (o.outcomes || {})[p.id] || 'loss', kills: kd.k, deaths: kd.d, credits: (o.rewards && o.rewards[p.id]) | 0,
+            return { id: p.id, name: p.name, isBot: !!p.isBot, outcome: (o.outcomes || {})[p.id] || 'loss', kills: kd.k, deaths: kd.d, credits: (o.rewards && o.rewards[p.id]) | 0,
                 xp: (o.xp && o.xp[p.id]) || null, dropped: (o.drops && o.drops[p.id]) || null, place: (o.place && o.place[p.id]) || (order.indexOf(p) + 1),
                 team: p.team || null, caps: p.caps | 0, brPicks: p.brPicks | 0 };
         });
-        Ev.emit('matchEnd', { roomId: r.id, mode: r.mode, durationMs: Math.max(0, Date.now() - t.t0), players: list, wave: o.wave == null ? null : o.wave, waves: o.waves == null ? null : o.waves });
+        Ev.emit('matchEnd', { roomId: r.id, mode: r.mode, durationMs: Math.max(0, Date.now() - t.t0), players: list, wave: o.wave == null ? null : o.wave, waves: o.waves == null ? null : o.waves, score: o.score || null });
     } catch (e) { console.error('❌ matchEnd:', e && e.message); }
 }
 
@@ -426,9 +436,9 @@ const ModeInfo = require('./public/js/modeinfo.js');   // спільне з кл
 const VALID_MODES = ModeInfo.ORDER.slice();
 const Modes = require('./modes.js')({ io, rooms, dbUsers, MAP_DATA, MapObj, Nav, Z_TYPES, waveScale, getValidSpawn, getValidEdgeSpawn, checkCollisionServer, getMaxHp,
     grantXp, rollDrop, saveUser, ecoPayload, pushRooms, zombieTick, processPlayerDeath, emitMatchEnd, ZOMBIE_CAP, ZOMBIE_SPAWN_BASE, ZOMBIE_SPAWN_STEP });
-const teamsOf = r => r.mode === 'capture_points' ? Math.max(2, Math.min(4, r.cpTeams || 2)) : Math.max(2, Math.min(4, r.tdmTeams || 2));
-const isTeamPvp = m => m === 'team_deathmatch' || m === 'capture_points';
-const powerupsOn = m => m !== 'prophunt' && m !== 'team_deathmatch';
+const teamsOf = r => r.mode === 'rounds' || r.ranked ? 2 : r.mode === 'capture_points' ? Math.max(2, Math.min(4, r.cpTeams || 2)) : Math.max(2, Math.min(4, r.tdmTeams || 2));
+const isTeamPvp = m => m === 'team_deathmatch' || m === 'capture_points' || m === 'rounds';
+const powerupsOn = m => m !== 'prophunt' && m !== 'team_deathmatch' && m !== 'rounds';
 // мапа для режиму: бажана, якщо вона дозволена в цьому режимі (поле modes з редактора), інакше перша дозволена
 function pickMap(want, mode) {
     if (MAP_DATA[want] && MapObj.mapAllows(MAP_DATA[want], mode)) return want;
@@ -437,13 +447,16 @@ function pickMap(want, mode) {
 const VALID_COLORS = ['white', 'black', 'red', 'blue', 'brown', 'purple', 'green', 'yellow', 'orange', 'cyan'];   // 10 кольорів = макс. гравців у кімнаті
 const TDM_TEAMS = ['red', 'blue', 'green', 'yellow']; // порядок як у кнопках лобі
 
-// Повернути кімнату в лобі (кінець гри, скасування гри) з повним очищенням ігрового стану
-function resetRoomToLobby(r) {
+// Повернути кімнату в лобі (кінець гри, скасування гри) з повним очищенням ігрового стану.
+// backId — хто натиснув «Повернутись у сесію» після бою: у лобі одразу потрапляє лише він (і боти), решта людей лишаються
+// на екрані результатів зі статусом «У грі» (p.away), доки самі не натиснуть кнопку. Без backId (бій скасовано) — повертаються всі.
+function resetRoomToLobby(r, backId) {
     r.status = 'lobby'; r.state = 'waiting'; matchTally.delete(r.id);
     r.powerups = {}; r.tokens = {}; r.zombies = {}; r.mines = {}; r.wave = 1; Modes.cleanup(r.id);
     Object.values(r.players).forEach(p => {
         p.ready = false; p.score = 0; p.hp = getMaxHp(p.equipped); p.buff = null; p.out = false; p.lives = 0; p.perk = null; p.caps = 0;
         p.stuckIn = []; p.onFire = null; p.isDisguised = false; if (!p.isBot) p.level = playerLevel(p.name);
+        p.away = !!(backId && !p.isBot && p.id !== backId);
     });
     io.to(r.id).emit('updateLobby', r);
     pushRooms();
@@ -455,6 +468,7 @@ function removePlayer(rId, sockId) {
     if (!r || !r.players[sockId]) return;
     const left = r.players[sockId];
     delete r.players[sockId];
+    if (r.ranked && hooks.rankedLeave) { try { hooks.rankedLeave(r, left); } catch (e) { console.error('❌ rankedLeave', e && e.message); } }   // рейтинг: дезертирство = поразка, місце займає бот
     const ids = Object.keys(r.players);
     if (ids.length === 0) { delete rooms[rId]; matchTally.delete(rId); if (typeof SYNCS !== "undefined") SYNCS.delete(rId); BANS.delete(rId); Modes.cleanup(rId); return; }
     if (r.hostSocket === sockId) { r.hostSocket = ids[0]; r.hostName = r.players[ids[0]].name; }
@@ -564,6 +578,40 @@ function startRoomGame(roomId, notify) {
     return false;
 }
 
+// Запис гравця-людини в кімнаті (лобі, швидка гра, рейтинговий матч)
+function newPlayerEntry(sockId, n) {
+    const uEq = (dbUsers[n] && dbUsers[n].equipped) ? dbUsers[n].equipped : { cannon: null, turret: null, hull: null, tracks: null };
+    return {
+        id: sockId, name: n, color: null, team: null, ready: false,
+        hp: getMaxHp(uEq), score: 0, x: 0, y: 0, bodyAngle: 0, turretAngle: 0,
+        buff: null, buffEndTime: 0, buffProgress: 0, stuckIn: [], laserTarget: null,
+        onFire: null, equipped: uEq, propType: 'prop_crate', isDisguised: false, level: playerLevel(n),
+        nick: nickOf(n), clan: hooks.clanTag(n) || '', stats: lobbyStats(n)
+    };
+}
+// Вхід у кімнату (кнопка в списку сесій, запрошення друга, швидка гра). Повертає кімнату або null (помилку отримує клієнт).
+function joinRoomFor(socket, roomId, quiet) {
+    const n = globalPlayers[socket.id];
+    const fail = msg => { socket.emit(quiet ? 'quickPlayResult' : 'joinError', quiet ? { ok: false, msg } : msg); return null; };
+    if (!n || !dbUsers[n]) return fail('Помилка авторизації');
+    if (typeof roomId !== 'string') return fail('Кімната не знайдена');
+    try { if (hooks.preJoin(socket, roomId, n)) return null; } catch (e) { console.error('❌ preJoin', e && e.message); }   // bots.js: віртуальні сесії, бот звільняє місце
+    const r = rooms[roomId];
+    if (!r || r.ranked) return fail('Кімната не знайдена');
+    if (r.players[socket.id]) { socket.emit('joinedRoom', { roomId: roomId, roomData: r }); return r; } // вже тут
+    if (BANS.has(roomId) && BANS.get(roomId).has(n)) return fail('Лідер заблокував вас у цій сесії');
+    for (const rid in rooms) for (const pid in rooms[rid].players) if (rooms[rid].players[pid].name === n) return fail('Цей акаунт уже перебуває в сесії!');
+    if (hooks.inRankedQueue && hooks.inRankedQueue(n)) hooks.leaveRankedQueue(n);    // зайшов у звичайну сесію — виходимо з черги рейтингу
+    if (Object.keys(r.players).length >= r.maxPlayers) return fail('Кімната повна');
+    if (r.status !== 'lobby') return fail('Гра вже почалася');
+    socket.join(roomId);
+    r.players[socket.id] = newPlayerEntry(socket.id, n);
+    socket.emit('joinedRoom', { roomId: roomId, roomData: r });
+    io.to(roomId).emit('updateLobby', r);
+    pushRooms();
+    return r;
+}
+
 // Підбір жетона (детматч): сокет-обробник і боти. Повертає true, якщо жетон зараховано.
 function collectTokenFor(roomId, sockId, tid) {
     let r = rooms[roomId];
@@ -611,8 +659,10 @@ io.on('connection', (socket) => {
         if (Object.prototype.hasOwnProperty.call(dbUsers, name) || (hooks.botNames && hooks.botNames.has(name.toLowerCase())) || (hooks.nameTaken && hooks.nameTaken(name))) return socket.emit('joinError', 'Цей логін вже зайнятий!');
         const token = crypto.randomUUID();
         dbUsers[name] = validateUser({ name: name, password: hashPwd(password), token: token, bucks: 0, lang: cleanLang(data && data.lang) });
-        saveUser(name);
         globalPlayers[socket.id] = name;
+        // новий акаунт: реферальний код (запрошення друга) і навчання новачка — обробляють referral.js / tutorial.js
+        Ev.emit('register', { name, socketId: socket.id, ref: data && (typeof data.ref === 'string' || typeof data.ref === 'number') ? String(data.ref).slice(0, 16) : null, ip: ipHashOf(socket) });
+        saveUser(name);
         socket.emit('authSuccess', { name, token, lang: dbUsers[name].lang });
         sendEconomy(socket.id, name);
         Ev.emit('login', { name, socketId: socket.id });
@@ -696,6 +746,7 @@ io.on('connection', (socket) => {
         if (res.ok) { saveUser(name); sendEconomy(socket.id, name); }
         if (legacy) socket.emit(res.ok ? 'promoSuccess' : 'promoError', res.msg);
         else socket.emit('promoResult', res);
+        if (res.ok) Ev.emit('promoRedeemed', { name, code: String(code).trim().toUpperCase(), socketId: socket.id });   // навчання новачка слухає код START
     }
     socket.on('redeemPromo', (d) => handlePromo(d && typeof d === 'object' ? d.code : d, false));
     socket.on('usePromo', (code) => handlePromo(code, true));   // сумісність зі старими клієнтами
@@ -866,33 +917,40 @@ io.on('connection', (socket) => {
         pushRooms();
     });
 
-    socket.on('joinRoom', (roomId) => {
-        let n = globalPlayers[socket.id];
-        if (!n || !dbUsers[n]) return socket.emit('joinError', 'Помилка авторизації');
-        try { if (hooks.preJoin(socket, roomId, n)) return; } catch (e) { console.error('❌ preJoin', e && e.message); }   // bots.js: віртуальні сесії, бот звільняє місце
-        if (!rooms[roomId]) return socket.emit('joinError', 'Кімната не знайдена');
-        let r = rooms[roomId];
-        if (r.players[socket.id]) return socket.emit('joinedRoom', { roomId: roomId, roomData: r }); // вже тут
-        if (BANS.has(roomId) && BANS.get(roomId).has(n)) return socket.emit('joinError', 'Лідер заблокував вас у цій сесії');
-        for (const rid in rooms) {
-            for (const pid in rooms[rid].players) {
-                if (rooms[rid].players[pid].name === n) return socket.emit('joinError', 'Цей акаунт уже перебуває в сесії!');
-            }
+    socket.on('joinRoom', (roomId) => { joinRoomFor(socket, roomId); });
+
+    // ===== Швидка гра: кидає гравця в ІСНУЮЧЕ лобі (з людьми або ботами). Нових кімнат не створює. =====
+    let qpAt = 0;
+    socket.on('quickPlay', () => {
+        const n = globalPlayers[socket.id], fail = msg => socket.emit('quickPlayResult', { ok: false, msg });
+        if (!n || !dbUsers[n]) return fail('Спершу увійдіть в акаунт');
+        const now = Date.now(); if (now - qpAt < 1500) return; qpAt = now;
+        for (const rid in rooms) for (const pid in rooms[rid].players) if (rooms[rid].players[pid].name === n) {
+            if (rooms[rid].status === 'lobby' && !rooms[rid].ranked) { socket.emit('joinedRoom', { roomId: rid, roomData: rooms[rid] }); return; }
+            return fail('Ви вже перебуваєте в сесії');
         }
-        if (Object.keys(r.players).length >= r.maxPlayers) return socket.emit('joinError', 'Кімната повна');
-        if (r.status !== 'lobby') return socket.emit('joinError', 'Гра вже почалася');
-        socket.join(roomId);
-        let uEq = (dbUsers[n] && dbUsers[n].equipped) ? dbUsers[n].equipped : { cannon: null, turret: null, hull: null, tracks: null };
-        r.players[socket.id] = {
-            id: socket.id, name: n, color: null, team: null, ready: false,
-            hp: getMaxHp(uEq), score: 0, x: 0, y: 0, bodyAngle: 0, turretAngle: 0,
-            buff: null, buffEndTime: 0, buffProgress: 0, stuckIn: [], laserTarget: null,
-            onFire: null, equipped: uEq, propType: 'prop_crate', isDisguised: false, level: playerLevel(n),
-            nick: nickOf(n), clan: hooks.clanTag(n) || '', stats: lobbyStats(n)
-        };
-        socket.emit('joinedRoom', { roomId: roomId, roomData: r });
-        io.to(roomId).emit('updateLobby', r);
-        pushRooms();
+        const cand = [];
+        for (const rid in rooms) {
+            const r = rooms[rid]; if (r.ranked || r.status !== 'lobby' || ModeInfo.isSolo(r.mode)) continue;
+            if (BANS.has(rid) && BANS.get(rid).has(n)) continue;
+            const ps = Object.values(r.players), humans = ps.filter(p => !p.isBot).length, bots = ps.length - humans;
+            if (ps.length >= r.maxPlayers && !ps.some(p => p.isBot && p.id !== r.hostSocket)) continue;   // повна й немає бота, що звільнить місце
+            if (!humans && !bots) continue;
+            cand.push({ id: rid, sc: humans * 100 + ps.length * 8 + (ModeInfo.isPve(r.mode) ? 0 : 25) + Math.random() * 20 });
+        }
+        let extra = []; try { extra = hooks.extraRooms() || []; } catch (e) {}
+        extra.forEach(v => { if (v.status === 'lobby' && v.playersCount < v.maxPlayers && v.playersCount > 0) cand.push({ id: v.id, sc: v.playersCount * 8 + 25 + Math.random() * 20 }); });
+        if (!cand.length) return fail('Зараз немає відкритих лобі. Спробуйте за кілька секунд або створіть власну сесію');
+        cand.sort((a, b) => b.sc - a.sc);
+        const r = joinRoomFor(socket, cand[0].id, true); if (!r) return;
+        // одразу обираємо вільний камуфляж / найменшу команду й ставимо «готовий» — щоб бій почався якнайшвидше
+        const p = r.players[socket.id]; if (!p) return;
+        if (r.mode === 'prophunt') { const hunters = Object.values(r.players).filter(q => q.team === 'hunter').length; p.team = hunters < (r.hunterCount || 1) && Math.random() < 0.3 ? 'hunter' : 'hider'; }
+        else if (ModeInfo.usesColor(r.mode)) { const taken = new Set(Object.values(r.players).filter(q => q !== p && q.color).map(q => q.color)), free = VALID_COLORS.filter(c => !taken.has(c)); p.color = free.length ? free[Math.floor(Math.random() * free.length)] : null; }
+        else if (isTeamPvp(r.mode)) { const allowed = TDM_TEAMS.slice(0, teamsOf(r)), cnt = {}; allowed.forEach(t => cnt[t] = 0); Object.values(r.players).forEach(q => { if (q !== p && cnt[q.team] !== undefined) cnt[q.team]++; }); p.team = allowed.slice().sort((a, b) => cnt[a] - cnt[b])[0]; }
+        p.ready = !!(p.color || p.team);
+        socket.emit('quickPlayResult', { ok: true, roomId: r.id });
+        io.to(r.id).emit('updateLobby', r);
     });
 
     socket.on('leaveRoom', (roomId) => {
@@ -999,6 +1057,7 @@ io.on('connection', (socket) => {
     socket.on('toggleReady', (roomId) => {
         let r = rooms[roomId];
         if (r && r.status === 'lobby' && r.players[socket.id]) {
+            if (r.players[socket.id].away) return;                         // ще на екрані результатів
             if (!ModeInfo.usesColor(r.mode) && !r.players[socket.id].team) return;
             if (ModeInfo.usesColor(r.mode) && !r.players[socket.id].color) return;
             r.players[socket.id].ready = !r.players[socket.id].ready;
@@ -1084,7 +1143,8 @@ socket.on('selectProp', (data) => {
         if (ModeInfo.isPve(r.mode) || v.hp <= 0 || v.buff === 'shield') return;
         if (isTeamPvp(r.mode) && atk && atk.team === v.team) return;
         if (Modes.has(r.mode) && atk && (atk.hp <= 0 || atk.out)) return;
-        
+        if (Modes.frozen(r)) return;                              // раунди: підготовка / пауза між раундами
+
         if (!atk) return;                                         // влучати можуть лише гравці цієї кімнати
         let fD = Math.min(500, Math.max(0, +data.amt || 0));      // базова шкода снаряда (макс. — баф «бос» 500); NaN/рядки → 0
 
@@ -1097,6 +1157,7 @@ socket.on('selectProp', (data) => {
         
         if (data.type === 'incendiary') v.onFire = { end: Date.now() + 5000, nextTick: Date.now() + 1000, owner: socket.id };
         
+        if (r.ranked) r.ranked.dmg[socket.id] = (r.ranked.dmg[socket.id] || 0) + Math.min(v.hp, fD);   // рейтинг: облік участі (AFK не отримує рейтинг за перемогу)
         v.hp = Math.max(0, v.hp - fD);
         io.to(socket.id).emit('hitConfirmed');
         
@@ -1163,8 +1224,11 @@ socket.on('selectProp', (data) => {
 
     socket.on('backToRoomLobby', (roomId) => {
         let r = rooms[roomId];
-        if (r && r.status === 'finished') {
-            resetRoomToLobby(r);
+        if (!r || r.ranked || !r.players[socket.id]) return;
+        if (r.status === 'finished') resetRoomToLobby(r, socket.id);          // перший, хто повернувся: кімната знову в лобі, решта ще «у грі»
+        else if (r.status === 'lobby' && r.players[socket.id].away) {          // наступні: повертаються по одному
+            r.players[socket.id].away = false;
+            io.to(r.id).emit('updateLobby', r); pushRooms();
         }
     });
 
@@ -1207,7 +1271,7 @@ function endTDMGame(r, wT) {
         }
     });
     io.to(r.id).emit('gameOver', { winner: isD ? 'DRAW' : (wT || 'TEAM'), name: isD ? 'НІЧИЯ' : `КОМАНДА ${typeof wT === 'string' ? wT.toUpperCase() : 'ПОБЕДИТЕЛЬ'}`, rewards: rew, xp: xpm, isTeamWin: !isD });
-    emitMatchEnd(r, { outcomes: ocm, rewards: rew, xp: xpm, drops: drp });
+    emitMatchEnd(r, { outcomes: ocm, rewards: rew, xp: xpm, drops: drp, score: Object.assign({}, r.teamScores || {}) });
     pushRooms();
 }
 
@@ -1471,9 +1535,10 @@ setInterval(() => {
         saveUser, sendEconomy, ecoPayload, grantXp, rollDrop, playerLevel, getMaxHp, pushRooms, hashPwd, validateUser, NAME_RE, LOGIN_RE_NEW, PASS_RE_NEW,
         checkCollisionServer, getValidSpawn, processPlayerDeath, removePlayer, resetRoomToLobby, getRandomModuleFromCase,
         hooks, displayName: nickOf, onConnection: f => connHooks.push(f), getDb: () => dbRef, onlineSocketsOf, isOnline: name => _sockByName.has(name),
-        get BANS() { return BANS; }, get TICK_RATE() { return TICK_RATE; }, get SYNCS() { return SYNCS; }, startRoomGame, collectTokenFor, emitMatchEnd, teamsOf, isTeamPvp, powerupsOn, pickMap, clampInt, BUFF_DURATION, VALID_COLORS, TDM_TEAMS
+        get BANS() { return BANS; }, get TICK_RATE() { return TICK_RATE; }, get SYNCS() { return SYNCS; }, startRoomGame, collectTokenFor, emitMatchEnd, teamsOf, isTeamPvp, powerupsOn, pickMap, clampInt, BUFF_DURATION, VALID_COLORS, TDM_TEAMS,
+        newPlayerEntry, joinRoomFor, ipHashOf, getRandomModuleFromCase, matchTally: () => matchTally
     };
-    ['handles', 'progress', 'profile', 'social', 'clans', 'chat', 'playercard', 'bots'].forEach(f => {
+    ['handles', 'progress', 'profile', 'social', 'clans', 'chat', 'playercard', 'bots', 'ranked', 'referral', 'tutorial'].forEach(f => {
         if (!fs.existsSync(path.join(__dirname, f + '.js'))) return;
         try { require('./' + f + '.js')(ctx); console.log('✅ Модуль', f); } catch (e) { console.error('❌ Модуль', f, e && e.stack || e); }
     });

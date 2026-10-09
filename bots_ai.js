@@ -41,7 +41,8 @@ module.exports = function createAI(ctx, CFG) {
     const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
     const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
     const SM = (e, k) => GD.statMult(e, k);
-    const isTeamMode = r => r.mode === 'team_deathmatch' || r.mode === 'capture_points';
+    const isTeamMode = r => r.mode === 'team_deathmatch' || r.mode === 'capture_points' || r.mode === 'rounds';
+    const isFrozen = r => { try { return !!(Modes.frozen && Modes.frozen(r)); } catch (e) { return false; } };   // раунди: підготовка / пауза
     const mapOf = r => MAP_DATA[r.map] || MAP_DATA['epic_map'] || Object.values(MAP_DATA)[0];
     const LOSOPT = { skipWater: true, doorOpen: () => false };
     const BULLETOPT = { skipWater: true, doorOpen: () => false };
@@ -148,6 +149,7 @@ module.exports = function createAI(ctx, CFG) {
     function hitPlayer(room, b, v, dmgBase) {
         if (!v || v.hp <= 0 || v.out || v.buff === 'shield') return false;
         const atk = room.players[b.owner]; if (!atk) return false;
+        if (isFrozen(room)) return true;
         if (ctx.isTeamPvp(room.mode) && atk.team && atk.team === v.team) return false;
         if (Modes.has(room.mode) && (atk.hp <= 0 || atk.out)) return true;      // снаряд «з'їдається», але шкоди немає (так само відхиляє registerHit)
         const fD = dmgBase * SM(atk.equipped, 'dmg'), now = Date.now();
@@ -651,6 +653,7 @@ module.exports = function createAI(ctx, CFG) {
             B.stat.deaths++;
         }
         if (now < B.startAt) return;
+        if (isFrozen(room)) { aimTurret(room, B, p, dt, now, null); return; }   // відлік перед раундом: стоїмо, лише повертаємо башту
         const hpF = p.hp / ownMaxHp(p);
         let spdMul = SM(p.equipped, 'speed');
         if (p.buff === 'speed') spdMul *= 1.5; else if (p.buff === 'samurai') spdMul *= 1.6; else if (p.buff === 'boss') spdMul *= 0.6;
