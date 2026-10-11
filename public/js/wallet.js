@@ -68,8 +68,8 @@
                 h += '<div class="wl-g">' + esc(g.n) + '</div>';
                 ms.forEach(function (m) {
                     var md = MI.MODES[m], t, note = '';
-                    if (m === 'survival') { t = '+1'; note = 'за кожну пережиту хвилю'; }
-                    else { var rr = MI.rewardRange(m, {}); t = rng(rr.loss, rr.win); }
+                    var rr = MI.rewardRange(m, {}); t = rng(rr.loss, rr.win);
+                    if (m === 'survival') note = 'за 5–20 пережитих хвиль (пізні хвилі цінніші)';
                     h += row(md.e, md.sn, note, val(t));
                 });
             });

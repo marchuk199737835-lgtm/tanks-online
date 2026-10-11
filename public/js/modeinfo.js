@@ -29,7 +29,9 @@
     const NO_COLOR = ['prophunt', 'team_deathmatch', 'capture_points', 'rounds'];   // режими, де замість камуфляжу обирають команду
     const set = a => { const o = {}; a.forEach(x => o[x] = 1); return o; };
     const sPve = set(PVE), sSolo = set(SOLO), sTeams = set(TEAMS), sNoColor = set(NO_COLOR);
-    const CO = ['base_defense', 'boss_raid', 'convoy'], ALLPVE = ['base_defense', 'boss_raid', 'convoy', 'solo_arena', 'boss_duel'];
+    const CO = ['base_defense', 'boss_raid', 'convoy'], ALLPVE = ['survival', 'base_defense', 'boss_raid', 'convoy', 'solo_arena', 'boss_duel'];
+    // життя: '1'…'5' або 'inf' (безліч відроджень). Менше життів — важче, але нагорода більша
+    const LIVES = v => ({ v: v, l: v === 'inf' ? '∞' : v });
     const BOSSES = ['pikus', 'shurik', 'oneshot', 'padlo', 'titan'];
     const BOSS_NAMES = { pikus: 'Пікус', shurik: 'Шурік', oneshot: 'Ваншотус', padlo: 'Падло', titan: 'Титан' };
 
@@ -46,22 +48,25 @@
         { key: 'tdmAutoBalance', label: 'Автобаланс', type: 'toggle', def: true, modes: ['team_deathmatch', 'capture_points', 'rounds'], desc: 'Якщо увімкнено — гру не можна почати, поки склади команд відрізняються більш ніж на одного гравця.' },
 
         { key: 'pveDiff', label: 'Складність', min: 50, max: 200, def: 100, step: 25, unit: '%', modes: ALLPVE, desc: 'Міцність і шкода ворогів. Вище — важче, але й нагорода більша (50% дає −25% до нагороди, 200% — +50%).' },
+        { key: 'svLives', label: 'Життів на гравця', type: 'choice', def: '1', options: ['1', '2', '3'].map(LIVES), modes: ['survival'], desc: 'Скільки разів кожен гравець може загинути. Після загибелі відроджуєтесь через 6 с біля живого союзника. 1 — класичне виживання й найбільша нагорода.' },
+        { key: 'bdLives', label: 'Життів на гравця', type: 'choice', def: 'inf', options: ['1', '2', '3', '5', 'inf'].map(LIVES), modes: ['base_defense'], desc: 'Скільки разів кожен гравець може відродитися біля ядра. ∞ — без обмежень. Менше життів — важче, але нагорода більша.' },
+        { key: 'cvLives', label: 'Життів на гравця', type: 'choice', def: 'inf', options: ['1', '2', '3', '5', 'inf'].map(LIVES), modes: ['convoy'], desc: 'Скільки разів кожен гравець може відродитися біля конвою. ∞ — без обмежень. Якщо всі вибули — поразка. Менше життів — більша нагорода.' },
 
         { key: 'bdWaves', label: 'Хвиль до перемоги', min: 5, max: 30, def: 10, step: 1, modes: ['base_defense'], desc: 'Скільки хвиль потрібно відбити. Кожна десята хвиля — бос. Більше хвиль — довша гра й більша нагорода.' },
-        { key: 'bdCoreHp', label: 'Міцність ядра', min: 500, max: 5000, def: 2000, step: 250, modes: ['base_defense'], desc: 'Здоров’я ядра бази. Зомбі б’ють по ядру, якщо воно ближче за гравців. Впало ядро — поразка.' },
-        { key: 'bdRepair', label: 'Ремонт між хвилями', type: 'toggle', def: true, modes: ['base_defense'], desc: 'Якщо увімкнено — після кожної хвилі ядро відновлює 15% здоров’я.' },
+        { key: 'bdCoreHp', label: 'Міцність ядра', min: 500, max: 5000, def: 2000, step: 250, modes: ['base_defense'], desc: 'Здоров’я ядра бази. Зомбі б’ють по ядру, якщо воно ближче за гравців. Впало ядро — поразка. Слабше ядро — більша нагорода (500 — +25%, 5000 — −15%).' },
+        { key: 'bdRepair', label: 'Ремонт між хвилями', type: 'toggle', def: true, modes: ['base_defense'], desc: 'Якщо увімкнено — після кожної хвилі ядро відновлює 15% здоров’я. Без ремонту нагорода +15%.' },
 
         { key: 'rbBoss', label: 'Бос', type: 'choice', def: 'padlo', options: BOSSES.map(b => ({ v: b, l: BOSS_NAMES[b] })), modes: ['boss_raid'], desc: 'Кого будете бити. Від Пікуса (найлегший) до Титана (найважчий). Здоров’я боса росте разом із кількістю гравців.' },
         { key: 'rbMinions', label: 'Приспішники', type: 'toggle', def: true, modes: ['boss_raid'], desc: 'Якщо увімкнено — бос періодично викликає зомбі собі на допомогу.' },
         { key: 'rbLives', label: 'Життів на гравця', min: 1, max: 5, def: 3, step: 1, modes: ['boss_raid'], desc: 'Скільки разів кожен гравець може відродитися після загибелі. Коли життя закінчились — гравець спостерігає.' },
-        { key: 'rbTime', label: 'Час на бій', min: 120, max: 900, def: 420, step: 30, unit: 'с', modes: ['boss_raid'], desc: 'Скільки секунд є на вбивство боса. Не встигли — поразка.' },
+        { key: 'rbTime', label: 'Час на бій', min: 120, max: 900, def: 420, step: 30, unit: 'с', modes: ['boss_raid'], desc: 'Скільки секунд є на вбивство боса. Не встигли — поразка. Менше часу — більша нагорода.' },
 
-        { key: 'cvHp', label: 'Міцність конвою', min: 500, max: 5000, def: 1500, step: 250, modes: ['convoy'], desc: 'Здоров’я вантажівки. Її атакують зомбі, що ближчі до неї, ніж до гравців. Знищили — поразка.' },
-        { key: 'cvSpeed', label: 'Швидкість конвою', min: 40, max: 120, def: 70, step: 10, modes: ['convoy'], desc: 'Швидкість вантажівки (пікселів за секунду). Вона рухається лише коли поруч є гравець і немає ворогів.' },
-        { key: 'cvTime', label: 'Час на маршрут', min: 180, max: 900, def: 480, step: 30, unit: 'с', modes: ['convoy'], desc: 'За який час потрібно довезти вантаж. Не встигли — поразка.' },
+        { key: 'cvHp', label: 'Міцність конвою', min: 500, max: 5000, def: 1500, step: 250, modes: ['convoy'], desc: 'Здоров’я вантажівки. Її атакують зомбі, що ближчі до неї, ніж до гравців. Знищили — поразка. Слабша вантажівка — більша нагорода (500 — +25%, 5000 — −15%).' },
+        { key: 'cvSpeed', label: 'Швидкість конвою', min: 40, max: 120, def: 70, step: 10, modes: ['convoy'], desc: 'Швидкість вантажівки (пікселів за секунду). Вона рухається лише коли поруч є гравець і немає ворогів. Швидший конвой важче прикривати: 120 — +12% до нагороди, 40 — −7%.' },
+        { key: 'cvTime', label: 'Час на маршрут', min: 180, max: 900, def: 480, step: 30, unit: 'с', modes: ['convoy'], desc: 'За який час потрібно довезти вантаж. Не встигли — поразка. Менше часу — більша нагорода (3 хв — +20%, 15 хв — −10%).' },
 
         { key: 'saWaves', label: 'Хвиль до перемоги', min: 5, max: 40, def: 15, step: 1, modes: ['solo_arena'], desc: 'Скільки хвиль потрібно пройти на арені. Після кожної хвилі — вибір покращення.' },
-        { key: 'saHeal', label: 'Лікування між хвилями', type: 'toggle', def: true, modes: ['solo_arena'], desc: 'Якщо увімкнено — після кожної хвилі відновлюється 30% здоров’я.' },
+        { key: 'saHeal', label: 'Лікування між хвилями', type: 'toggle', def: true, modes: ['solo_arena'], desc: 'Якщо увімкнено — після кожної хвилі відновлюється 30% здоров’я. Без лікування нагорода +20%.' },
 
         { key: 'duBosses', label: 'Босів', min: 1, max: 5, def: 5, step: 1, modes: ['boss_duel'], desc: 'Скільки босів потрібно перемогти поспіль. Йдуть від найлегшого до найважчого.' },
         { key: 'duLives', label: 'Життів', min: 1, max: 3, def: 2, step: 1, modes: ['boss_duel'], desc: 'Скільки разів можна загинути. Після смерті відроджуєтесь на арені, а бос лишається з поточним здоров’ям.' },
@@ -96,16 +101,46 @@
     // outcome: 'win' | 'loss' | 'draw'. r — налаштування сесії. c — підсумки матчу:
     //  waves — відбито хвиль, frac — частка (0..1: збита частка здоров’я боса / пройдена частина маршруту / лишок здоров’я вантажівки),
     //  killed — переможено босів, n — гравців, place — місце (1 = переможець), kills — вбивства, caps — захоплення точок, bk — вбивства цілі
-    function dm(r) { const d = r && r.pveDiff != null ? +r.pveDiff : 100; return 0.5 + Math.max(50, Math.min(200, d)) / 200; }   // 0.75 … 1.5
+    // ----- МНОЖНИК СКЛАДНОСТІ PvE (усі налаштування, що ускладнюють гру, підвищують нагороду) -----
+    // n — гравців на старті матчу: маленькій команді важче (хвилі масштабуються, але не ідеально лінійно) — до +24% соло.
+    const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+    const livesN = v => v === 'inf' || v === Infinity || v == null ? Infinity : Math.max(1, parseInt(v) || 1);
+    function fLives(v) { const L = livesN(v); return L === Infinity ? 0.85 : ({ 1: 1.3, 2: 1.15, 3: 1.05, 4: 1.0, 5: 0.95 })[Math.min(5, L)]; }
+    const fDiff = r => 0.5 + clamp(r && r.pveDiff != null ? +r.pveDiff : 100, 50, 200) / 200;                 // 0.75 … 1.5
+    const fTeam = n => n >= 4 ? 1 : 1 + 0.08 * (4 - Math.max(1, n));                                      // 1 → ×1.24, 2 → ×1.16, 3 → ×1.08
+    const lerp2 = (x, lo, def, hi, fLo, fHi) => x <= def ? 1 + (fLo - 1) * (def - x) / Math.max(1, def - lo) : 1 + (fHi - 1) * (x - def) / Math.max(1, hi - def);
+    function mult(mode, r, n) {
+        r = r || {}; const v = k => (r[k] != null ? r[k] : BYKEY[k].def), parts = [];
+        const add = (l, f) => { if (Math.abs(f - 1) > 0.004) parts.push([l, Math.round(f * 100) / 100]); return f; };
+        let m = add('Складність', fDiff(r));
+        switch (mode) {
+            case 'survival': m *= add('Життів', fLives(v('svLives'))); break;
+            case 'base_defense': m *= add('Міцність ядра', lerp2(+v('bdCoreHp'), 500, 2000, 5000, 1.25, 0.85)); m *= add('Ремонт', v('bdRepair') ? 1 : 1.15); m *= add('Життів', fLives(v('bdLives'))); break;
+            case 'convoy': m *= add('Міцність конвою', lerp2(+v('cvHp'), 500, 1500, 5000, 1.25, 0.85)); m *= add('Швидкість', lerp2(+v('cvSpeed'), 40, 70, 120, 0.93, 1.12)); m *= add('Час', lerp2(+v('cvTime'), 180, 480, 900, 1.2, 0.9)); m *= add('Життів', fLives(v('cvLives'))); break;
+            case 'boss_raid': m *= add('Життів', fLives(String(v('rbLives')))); m *= add('Час', lerp2(+v('rbTime'), 120, 420, 900, 1.25, 0.9)); m *= add('Приспішники', v('rbMinions') ? 1 : 0.85); break;
+            case 'solo_arena': m *= add('Лікування', v('saHeal') ? 1 : 1.2); break;
+            case 'boss_duel': m *= add('Життів', ({ 1: 1.25, 2: 1, 3: 0.9 })[+v('duLives')] || 1); m *= add('Лікування', v('duHeal') ? 1 : 1.15); break;
+            default: return { m: 1, parts: [] };
+        }
+        if (!SOLO.includes(mode) && n) m *= add('Гравців у загоні', fTeam(n));
+        return { m: clamp(m, 0.5, 3), parts };
+    }
+    // очки за пережиті хвилі: кожна наступна хвиля цінніша (1.4 + 0.12·w), кожна десята (бос) — ще +4
+    function wavePts(W) { W = Math.max(0, W | 0); return 1.4 * W + 0.06 * W * (W + 1) + 4 * Math.floor(W / 10); }
     function reward(mode, r, outcome, c) {
         r = r || {}; c = c || {}; const v = k => (r[k] != null ? +r[k] : BYKEY[k].def), n = Math.max(1, c.n || 1), kills = c.kills || 0, frac = Math.max(0, Math.min(1, c.frac || 0));
+        const M = isPve(mode) ? mult(mode, r, n).m : 1;
         let a = 0;
         switch (mode) {
-            case 'base_defense': a = outcome === 'win' ? (14 + 1.6 * v('bdWaves')) * dm(r) : Math.max(1, (c.waves || 0) * 1.2 * dm(r)); break;
-            case 'boss_raid': { const t = Math.max(1, BOSSES.indexOf(r.rbBoss || BYKEY.rbBoss.def) + 1); a = outcome === 'win' ? (16 + 7 * t) * dm(r) : Math.max(1, 4 * t * frac * dm(r)); break; }
-            case 'convoy': a = outcome === 'win' ? (16 + 14 * frac) * dm(r) : Math.max(1, 10 * frac * dm(r)); break;
-            case 'solo_arena': a = outcome === 'win' ? (12 + 1.4 * v('saWaves')) * dm(r) : Math.max(1, (c.waves || 0) * 0.9 * dm(r)); break;
-            case 'boss_duel': { const B = v('duBosses'); a = outcome === 'win' ? (18 + 9 * B) * dm(r) * (v('duLives') === 1 ? 1.25 : 1) : Math.max(1, 5 * (c.killed || 0) * dm(r)); break; }
+            // виживання завжди закінчується «поразкою» — платимо за кожну пережиту хвилю (пізні хвилі цінніші)
+            case 'survival': a = wavePts(c.waves || 0) * M; break;
+            // перемога: усі хвилі + бонус 10, ціле ядро до +10%; поразка: пережиті хвилі
+            case 'base_defense': a = outcome === 'win' ? (wavePts(v('bdWaves')) + 10) * M * (0.9 + 0.2 * frac) : wavePts(c.waves || 0) * 0.9 * M; break;
+            case 'boss_raid': { const t = Math.max(1, BOSSES.indexOf(r.rbBoss || BYKEY.rbBoss.def) + 1); a = outcome === 'win' ? (16 + 7 * t) * M : 4 * t * frac * M; break; }
+            // перемога: 24 + до 12 за вцілілу вантажівку; поразка — лише за пройдену частину маршруту (frac = прогрес)
+            case 'convoy': a = (outcome === 'win' ? (24 + 12 * frac) * M : 20 * frac * frac * M) * (c.rf || 1); break;      // rf — довжина маршруту (коротка — менше)
+            case 'solo_arena': a = outcome === 'win' ? (wavePts(v('saWaves')) * 0.8 + 8) * M : wavePts(c.waves || 0) * 0.75 * M; break;
+            case 'boss_duel': { const B = v('duBosses'); a = outcome === 'win' ? (18 + 9 * B) * M : 5 * (c.killed || 0) * M; break; }
             case 'battle_royale': a = outcome === 'win' ? 16 + 3 * n + 2 * kills : outcome === 'draw' ? (16 + 3 * n) / 2 + 2 * kills : 2 + 9 * (n - (c.place || n)) / Math.max(1, n - 1) + 2 * kills; break;
             // класичні режими: нагороди нараховує server.js (collectToken / endPropHuntGame / endTDMGame) — формули дзеркальні, щоб прев'ю й вікно «Гаманець» показували правду
             case 'deathmatch': a = (outcome === 'win' ? 10 : 2) * (1 + Math.max(0, v('winScore') - 5) * 0.10); break;
@@ -121,8 +156,10 @@
         return Math.max(1, Math.round(a));
     }
     // Орієнтовний діапазон для підказки в лобі: [поразка, перемога]
+    // n: у лобі — реальна кількість гравців, у вікні створення — 2 (типовий загін)
     function rewardRange(mode, r) {
-        const n = Math.max(2, r && r.maxPlayers || 6);
+        const np = r && r.players ? Object.keys(r.players).length : 0, n = np || 2;
+        if (mode === 'survival') return { loss: reward(mode, r, 'loss', { waves: 5, n }), win: reward(mode, r, 'loss', { waves: 20, n }), draw: null };
         const lo = reward(mode, r, 'loss', { waves: 3, frac: 0.3, killed: 1, n, place: n, kills: 0, caps: 0 }), hi = reward(mode, r, 'win', { frac: 1, n, place: 1, kills: 0, caps: 0 });
         const hasDraw = mode === 'battle_royale' || mode === 'capture_points' || mode === 'bounty' || (mode === 'rounds' && r && r.rdDraw);
         return { loss: lo, win: hi, draw: hasDraw ? reward(mode, r, 'draw', { n, kills: 0 }) : null };
@@ -140,5 +177,5 @@
         heal:  { e: '❤️', n: 'Аптечка', d: 'Миттєво лікує 60% здоров’я', max: 99 }
     };
 
-    return { PERKS, MODES, ORDER, NEW, GROUPS, PVE, SOLO, PARAMS, BYKEY, BOSSES, BOSS_NAMES, MAP_ALIAS, isPve, isSolo, isTeamPvp, usesColor, minPlayers, paramOn, reward, rewardRange };
+    return { PERKS, MODES, ORDER, NEW, GROUPS, PVE, SOLO, PARAMS, BYKEY, BOSSES, BOSS_NAMES, MAP_ALIAS, isPve, isSolo, isTeamPvp, usesColor, minPlayers, paramOn, reward, rewardRange, mult, wavePts, livesN };
 });

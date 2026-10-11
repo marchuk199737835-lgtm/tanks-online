@@ -148,6 +148,7 @@
         switch (d.k) {
             case 'enrage': banner('<span>Бос скаженів!</span> <b>' + esc(d.n) + '</b>', 'bad'); sfx('boss_shoot'); break;
             case 'miniboss': banner('<span>На маршруті зʼявився бос!</span>', 'bad'); sfx('boss_shoot'); break;
+            case 'ambush': banner('<span>Засідка біля фінішу! Тримайте конвой!</span>', 'bad'); sfx('boss_shoot'); break;
             case 'capture': banner('<span class="dot" style="background:' + (TC[d.t] || '#fff') + '"></span><span>Точку захоплено:</span> <b>' + String.fromCharCode(64 + d.i) + '</b>', 'good'); sfx('powerup'); break;
             case 'zone': banner('<span>Зона звужується</span> <span>Фаза</span> <b>' + d.ph + '</b>', 'bad'); sfx('zone'); break;
             case 'dropWarn': banner('<span>📦 Аірдроп скидається!</span>', 'gold'); sfx('drop_warn'); break;

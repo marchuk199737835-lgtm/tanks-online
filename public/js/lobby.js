@@ -92,15 +92,16 @@
         const n = Object.keys(r.players).length;
         $('lobby-count').textContent = n + ' / ' + r.maxPlayers;
         let h = rule('👥', 'Гравців', n + ' / ' + r.maxPlayers);
+        const lv = k => { const x = val(r, MI.BYKEY[k]); return x === 'inf' ? '∞' : x; };
         const v = k => val(r, MI.BYKEY[k]), tm = k => { const t = +v(k); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); }, yn = k => v(k) ? '✓' : '✗';
         switch (r.mode) {
             case 'deathmatch': h += rule('🎯', 'Жетонів', r.winScore); break;
-            case 'survival': h += rule('🌊', 'Хвилі', '∞') + rule('🤝', 'Режим', 'Кооп'); break;
+            case 'survival': h += rule('🌊', 'Хвилі', '∞') + rule('❤️', 'Життів', lv('svLives')) + rule('💪', 'Складність', v('pveDiff') + '%'); break;
             case 'prophunt': h += rule('📦', 'Схованка', (r.hideTime || 30) + 'с') + rule('🔍', 'Пошук', (r.seekTime || 120) + 'с') + rule('🔴', 'Мисливців', r.hunterCount || 1); break;
             case 'team_deathmatch': h += rule('🚩', 'Команд', r.tdmTeams || 2) + rule('⏱', 'Час', (r.tdmTime || 180) + 'с') + rule('🏁', 'Очки', r.tdmScore || 20) + rule('⚖️', 'Автобаланс', r.tdmAutoBalance ? '✓' : '✗'); break;
-            case 'base_defense': h += rule('🌊', 'Хвиль', v('bdWaves')) + rule('🏰', 'Ядро', v('bdCoreHp')) + rule('💪', 'Складність', v('pveDiff') + '%') + rule('🔧', 'Ремонт', yn('bdRepair')); break;
+            case 'base_defense': h += rule('🌊', 'Хвиль', v('bdWaves')) + rule('🏰', 'Ядро', v('bdCoreHp')) + rule('💪', 'Складність', v('pveDiff') + '%') + rule('🔧', 'Ремонт', yn('bdRepair')) + rule('❤️', 'Життів', lv('bdLives')); break;
             case 'boss_raid': h += rule('👹', 'Бос', MI.BOSS_NAMES[v('rbBoss')]) + rule('❤️', 'Життів', v('rbLives')) + rule('⏱', 'Час', tm('rbTime')) + rule('💪', 'Складність', v('pveDiff') + '%') + rule('👥', 'Приспішники', yn('rbMinions')); break;
-            case 'convoy': h += rule('🚚', 'Конвой', v('cvHp')) + rule('⚡', 'Швидкість', v('cvSpeed')) + rule('⏱', 'Час', tm('cvTime')) + rule('💪', 'Складність', v('pveDiff') + '%'); break;
+            case 'convoy': h += rule('🚚', 'Конвой', v('cvHp')) + rule('⚡', 'Швидкість', v('cvSpeed')) + rule('⏱', 'Час', tm('cvTime')) + rule('💪', 'Складність', v('pveDiff') + '%') + rule('❤️', 'Життів', lv('cvLives')); break;
             case 'solo_arena': h += rule('🌊', 'Хвиль', v('saWaves')) + rule('💪', 'Складність', v('pveDiff') + '%') + rule('🩹', 'Лікування', yn('saHeal')); break;
             case 'boss_duel': h += rule('💀', 'Босів', v('duBosses')) + rule('❤️', 'Життів', v('duLives')) + rule('💪', 'Складність', v('pveDiff') + '%') + rule('🩹', 'Лікування', yn('duHeal')); break;
             case 'battle_royale': h += rule('⏱', 'До фіналу', tm('brTime')) + rule('☣️', 'Шкода зони', v('brDmg') + '%/с') + rule('🎁', 'Модулі', yn('brLoot')); break;
@@ -109,7 +110,12 @@
             case 'rounds': h += rule('🔁', 'Раундів', v('rdRounds')) + rule('⏱', 'Раунд', v('rdTime') + 'с') + rule('🤝', 'Нічия', yn('rdDraw')); break;
         }
         const rr = MI.rewardRange(r.mode, r);
-        h += rule(creditIcon(20), 'Нагорода', rr.loss + '–' + rr.win) + (rr.draw != null ? rule('🤝', 'Нічия', creditAmount(rr.draw, 14)) : '');
+        h += rule(creditIcon(20), r.mode === 'survival' ? 'Нагорода (5–20 хвиль)' : 'Нагорода', rr.loss + '–' + rr.win) + (rr.draw != null ? rule('🤝', 'Нічия', creditAmount(rr.draw, 14)) : '');
+        // множник складності PvE: усі налаштування, що ускладнюють гру, підвищують нагороду (деталі — у підказці)
+        if (MI.isPve(r.mode) && MI.mult) {
+            const mu = MI.mult(r.mode, r, n), tip = mu.parts.map(x => x[0] + ' ×' + x[1]).join(' · ');
+            h += '<div class="lb-rule lb-mult" title="' + esc(tip) + '"><i>📈</i><div><small>Множник нагороди</small><b class="' + (mu.m >= 1 ? 'up' : 'dn') + '">×' + mu.m.toFixed(2) + '</b></div></div>';
+        }
         const lr = $('lobby-rules'); if (lr.__h !== h) { lr.__h = h; lr.innerHTML = h; }
     }
     let lastMap = null;
@@ -139,7 +145,7 @@
         if (isHost && !me) acts = '<div class="lb-acts"><button type="button" class="lb-act" data-act="crown" data-id="' + esc(id) + '" title="Зробити лідером">👑</button><button type="button" class="lb-act danger" data-act="kick" data-id="' + esc(id) + '" title="Вигнати з сесії">✖</button><button type="button" class="lb-act danger" data-act="ban" data-id="' + esc(id) + '" title="Заблокувати в цій сесії">🚫</button></div>';
         return '<div data-key="' + esc(id) + '" class="lb-pl' + (p.ready ? ' ready' : '') + (p.away ? ' away' : '') + (me ? ' me' : '') + '" style="--pc:' + pc + '">' + dot +
             '<span class="lb-pl-ico">' + (window.LV ? LV.icon(L, 32) : '') + '</span>' +
-            '<div class="lb-pl-main"><span class="lb-pl-name">' + esc(window.dispName ? dispName(p) : p.name) + (host ? '<em>👑</em>' : '') + (me ? '<u>ВИ</u>' : '') + '</span><span class="lb-pl-lv">Рівень <b>' + L + '</b> · ' + esc(rank) + '</span>' + statLine(p) + '</div>' +
+            '<div class="lb-pl-main"><span class="lb-pl-name">' + esc(window.dispName ? dispName(p) : p.name) + (host ? '<em>👑</em>' : '') + (me ? '<u>ВИ</u>' : '') + (window.ClassFX && ClassFX.tag ? ClassFX.tag(r, p) : '') + '</span><span class="lb-pl-lv">Рівень <b>' + L + '</b> · ' + esc(rank) + '</span>' + statLine(p) + '</div>' +
             '<span class="lb-pl-st" title="' + (p.away ? 'Ще дивиться результати бою' : '') + '">' + (p.away ? '🎮 У ГРІ' : p.ready ? 'ГОТОВИЙ' : 'ЧЕКАЄ') + '</span>' + acts + '</div>';
     }
     function teamBox(r, key, members, isHost, cap) {
@@ -245,6 +251,7 @@
             updateParams(r);
         }
         renderRoster(r); renderFoot(r); drawMap(false);
+        if (window.ClassFX && ClassFX.lobby) ClassFX.lobby(r);      // кооп: вибір класу танка
     };
     window.resetLobbyUI = function () { prevHost = null; lastMap = null; dragging = null; kickArm = null; inited = false; };
 

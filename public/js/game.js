@@ -81,11 +81,12 @@ window.getTankSpeed = function() {
     if (myLocalTank.buff === 'samurai') spd *= 1.6;
     if (myLocalTank.buff === 'boss') spd *= 0.6;
     if (window.PERK) spd *= PERK.spd || 1;
+    if (window.ClassFX) spd *= ClassFX.spdMul();          // кооп: клас танка (+ «Адреналін» / «Тінь»)
     return spd;
 };
 
 window.getReloadTime = function() {
-    let cd = BASE_RELOAD;
+    let cd = window.ClassFX ? ClassFX.reload(BASE_RELOAD) : BASE_RELOAD;   // кооп: база перезарядки класу
     cd *= GameData.statMult(myEquipped, 'cd');
     if (window.PERK) cd *= PERK.cd || 1;
     return cd;
@@ -628,7 +629,7 @@ socket.on('sync2', (data) => {
             }
         } else {
             if (currentRoomData.mode === 'prophunt' && myLocalTank.hp > sp.hp) myLocalTank.isDisguised = false;
-            if (window.SFX && sp.hp !== myLocalTank.hp) { try { SFX.onHp(sp.hp, Math.round(MAX_HP * GameData.statMult(myEquipped, 'hp'))); } catch (e) {} }
+            if (window.SFX && sp.hp !== myLocalTank.hp) { try { SFX.onHp(sp.hp, Math.round(MAX_HP * GameData.statMult(myEquipped, 'hp') * (window.ClassFX ? ClassFX.hpMul() : 1))); } catch (e) {} }
             myLocalTank.hp = sp.hp; myLocalTank.buff = sp.buff; myLocalTank.buffProgress = sp.buffProgress; myLocalTank.score = sp.score;
             if (sp.equipped) myEquipped = sp.equipped;
             if (sp.color !== undefined) myColor = sp.color;
@@ -1156,12 +1157,13 @@ function draw(now) {
         ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(0, 0, 2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
     }
     
+    if (window.ClassFX) ClassFX.ground(ctx, now, _pv);   // кооп: аури класів, поле лікаря, зона артобстрілу, турелі (під танками)
     for (let id in opponents) {
         const p = opponents[id], sn = currentRoomData.players[id]; if (!sn) { delete opponents[id]; continue; }
         if (p.x < VX0 - 140 || p.x > VX1 + 140 || p.y < VY0 - 140 || p.y > VY1 + 140) continue;   // поза екраном (із запасом на підпис/щит)
         const cH = tankHex(sn.color, sn.color ? '#9333ea' : '#ef4444');
         if (p.isDisguised) MapObj.drawDisguise(ctx, { type: p.propType, x: p.x - 25, y: p.y - 25, w: 50, h: 50, r: 25 }, tm);
-        else drTnk(p.x, p.y, p.bodyAngle, p.turretAngle, cH, (window.dispName ? dispName(sn) : sn.name), false, p.hp, p.buff, sn.equipped, true);
+        else { const _ca = window.ClassFX ? ClassFX.alpha(id) : 1; if (_ca < 1) ctx.globalAlpha = _ca; drTnk(p.x, p.y, p.bodyAngle, p.turretAngle, cH, (window.dispName ? dispName(sn) : sn.name), false, p.hp, p.buff, sn.equipped, true); if (_ca < 1) ctx.globalAlpha = 1; }
         if ((myLocalTank.buff === 'homing' || myLocalTank.buff === 'autolaser') && id === homingTargetId && p.hp > 0) {
             ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(now / 300); ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3; ctx.setLineDash([15, 10]); ctx.strokeRect(-45, -45, 90, 90); ctx.restore();
         }
@@ -1171,7 +1173,7 @@ function draw(now) {
     if (myLocalTank.hp > 0) {
         const mC = tankHex(myColor, myColor ? '#9333ea' : '#3b82f6');
         if (myLocalTank.isDisguised) MapObj.drawDisguise(ctx, { type: myLocalTank.propType, x: myLocalTank.x - 25, y: myLocalTank.y - 25, w: 50, h: 50, r: 25 }, tm);
-        else { drTnk(myLocalTank.x, myLocalTank.y, myLocalTank.bodyAngle, myLocalTank.turretAngle, mC, (window.dispName ? dispName(myName) : myName), true, myLocalTank.hp, myLocalTank.buff, myEquipped, true); drPCA(); }
+        else { const _ca = window.ClassFX ? ClassFX.alpha(myId) : 1; if (_ca < 1) ctx.globalAlpha = _ca; drTnk(myLocalTank.x, myLocalTank.y, myLocalTank.bodyAngle, myLocalTank.turretAngle, mC, (window.dispName ? dispName(myName) : myName), true, myLocalTank.hp, myLocalTank.buff, myEquipped, true); if (_ca < 1) ctx.globalAlpha = 1; drPCA(); }
     }
     
     if (window.EmoteFX) EmoteFX.draw(ctx, now);   // емоції над танками й мітка кілкаму
@@ -1195,7 +1197,8 @@ function draw(now) {
         const e = bulletSprite(b.type);
         ctx.drawImage(e.cv, b.x + e.x, b.y + e.y, e.w, e.h);
     }
-    
+    if (window.ClassFX) ClassFX.top(ctx, now, _pv);   // кооп: щити, вогонь, промені турелей, вибухи артобстрілу, частинки
+
     if (_fx) {   // дахи будівель: прозорі лише для локального гравця всередині (інші танки під дахом не видно)
         const _rdt = Math.min(0.1, Math.max(0, (now - (draw._rt || now)) / 1000)); draw._rt = now;
         const _alive = myLocalTank.hp > 0;
@@ -1264,7 +1267,7 @@ function _cl(el, c) { if (el && el._cn !== c) { el._cn = c; el.className = c; } 
 window.updateHUD = function() {
     if (!currentRoomData || currentRoomData.status !== 'playing') return;
     let mHp = typeof MAX_HP !== 'undefined' ? MAX_HP : 500;
-    mHp *= GameData.statMult(myEquipped, 'hp');
+    mHp *= GameData.statMult(myEquipped, 'hp') * (window.ClassFX ? ClassFX.hpMul() : 1);
     mHp = Math.round(mHp);
     let pct = Math.max(0, Math.min(100, (myLocalTank.hp / mHp) * 100)), bC = myLocalTank.hp < mHp * 0.3 ? 'h-full bg-gradient-to-r from-red-600 to-red-400 w-full transition-all duration-300 shadow-[0_0_15px_rgba(239,68,68,0.8)]' : 'h-full bg-gradient-to-r from-green-500 to-emerald-400 w-full transition-all duration-300 shadow-[0_0_10px_rgba(34,197,94,0.5)]', hpB = document.getElementById('hp-bar'), hpT = document.getElementById('hp-text');
     if (hpB) { _sw(hpB, pct + '%'); if (hpB._c !== bC) { hpB.className = bC; hpB._c = bC; } }
