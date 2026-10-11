@@ -12,6 +12,7 @@ module.exports = function createModes(D) {
         grantXp, rollDrop, saveUser, ecoPayload, pushRooms, zombieTick, emitMatchEnd, ZOMBIE_CAP, ZOMBIE_SPAWN_BASE, ZOMBIE_SPAWN_STEP } = D;
     const MS = new Map();
     let contribMul = null;      // (r, p) → множник нагороди за внесок у кооп-бій (classes_srv.js)
+    let eliteMix = null;        // (r, ids, wave, d, n) — частину зомбі хвилі перетворити на еліт (server.js)
     const NEW = new Set(ModeInfo.NEW);
     const has = mode => NEW.has(mode);
     const BYKEY = ModeInfo.BYKEY, TEAM_ORDER = ['red', 'blue', 'green', 'yellow'];
@@ -79,7 +80,8 @@ module.exports = function createModes(D) {
         const base = Math.min(ZOMBIE_CAP, ZOMBIE_SPAWN_BASE + (wave - 1) * ZOMBIE_SPAWN_STEP);
         const cnt = Math.min(120, Math.max(5, Math.round(base * (o.cnt || 1) * (0.6 + 0.4 * d) * T.cnt)));
         const tL = ['normal', 'runner', 'spitter', 'tanker', 'bomber', 'ghost'], aT = tL.slice(0, Math.min(tL.length - 1, Math.floor(wave / 5)) + 1);
-        for (let i = 0; i < cnt; i++) mkZ(r, S, now, aT[Math.floor(Math.random() * aT.length)], getValidEdgeSpawn(r.map, 20, 'spawn_zombie'), hpM, dmgM);
+        const ids = []; for (let i = 0; i < cnt; i++) ids.push(mkZ(r, S, now, aT[Math.floor(Math.random() * aT.length)], getValidEdgeSpawn(r.map, 20, 'spawn_zombie'), hpM, dmgM).id);
+        if (eliteMix) eliteMix(r, ids, wave, d, n);      // еліт-зомбі з 5-ї хвилі
         return { isBoss: false };
     }
     function announceWave(r, wave, info) { emit(r, 'newWave', { wave, isBoss: info.isBoss, bossName: info.bossName }); }
@@ -546,10 +548,13 @@ module.exports = function createModes(D) {
             const cap = Math.round((22 + n * 8) * (0.6 + 0.4 * d)), have = zs.filter(z => !z.mb).length;
             if (have < cap) {
                 const k = Math.min(cap - have, Math.max(2, Math.round((2 + n * 1.2) * (0.6 + 0.4 * d)))), tL = ['normal', 'runner', 'spitter', 'tanker', 'bomber', 'ghost'], aT = tL.slice(0, Math.min(5, Math.floor(S.prog * 6)) + 1);
+                const ids = [];
                 for (let i = 0; i < k; i++) {
                     let pos = null; for (let t = 0; t < 8; t++) { const q = getValidEdgeSpawn(r.map, 20, 'spawn_zombie'), dd = Math.hypot(q.x - cv.x, q.y - cv.y); if (dd > 450 && dd < 1500) { pos = q; break; } if (!pos) pos = q; }
-                    mkZ(r, S, now, aT[Math.floor(Math.random() * aT.length)], pos, (1 + S.prog * 0.8) * d, (1 + S.prog * 0.4) * d);
+                    ids.push(mkZ(r, S, now, aT[Math.floor(Math.random() * aT.length)], pos, (1 + S.prog * 0.8) * d, (1 + S.prog * 0.4) * d).id);
                 }
+                // еліт на маршруті: після 30% шляху, «хвиля» умовно росте з прогресом (1 еліт на групу, далі більше)
+                if (eliteMix && S.prog >= 0.3 && Math.random() < 0.55) eliteMix(r, ids.slice(0, S.prog > 0.7 ? 2 : 1), 7, d, 1);
             }
         }
         // засідка біля фінішу: різкий наплив сильніших зомбі з усіх боків — фінал маршруту має бути напруженим
@@ -767,7 +772,7 @@ module.exports = function createModes(D) {
             case 'convoy': return { m: r.mode, cv: { x: rn(S.cv.x), y: rn(S.cv.y), hp: rn(S.cv.hp), max: S.cv.max, a: Math.round(S.cv.a * 100) / 100, r: S.cv.r }, A: S.A, B: S.B, prog: Math.round(S.prog * 100), t: left, hold: S.hold, go: now >= S.startAt };
             case 'solo_arena': return { m: r.mode, w: S.wave, W: S.W, st: S.st, pk: S.perks, z: Object.keys(r.zombies).length };
             case 'boss_duel': { const b = r.zombies[S.bossId], p = Object.values(r.players)[0]; return { m: r.mode, i: S.i + 1, N: S.list.length, st: S.st, b: b ? { n: Z_TYPES[S.list[S.i]].name, hp: rn(b.hp), max: b.maxHp } : null, lv: p ? p.lives : 0 }; }
-            case 'battle_royale': { const Z = S.zone; const o = { m: r.mode, z: { x: rn(Z.x), y: rn(Z.y), r: Math.round(Z.r / 4) * 4, ph: Z.ph, np: S.nextPh | 0, go: now >= S.zStart }, al: alive(r).length, n: Object.keys(r.players).length, zt: Math.max(0, Math.ceil((S.zStart - now) / 1000)) }, dc = S.air && S.air.cur; if (dc) o.dr = { id: dc.id, x: dc.x, y: dc.y, st: dc.st, dur: dc.dur }; return o; }
+            case 'battle_royale': { const Z = S.zone, nr = Z.ph >= Z.phases ? 0 : Z.R0 - (Z.R0 - Z.Rf) * (Z.ph + 1) / Z.phases; const o = { m: r.mode, z: { x: rn(Z.x), y: rn(Z.y), r: Math.round(Z.r / 4) * 4, nr: Math.round(nr / 4) * 4, ph: Z.ph, np: S.nextPh | 0, go: now >= S.zStart }, al: alive(r).length, n: Object.keys(r.players).length, zt: Math.max(0, Math.ceil((S.zStart - now) / 1000)) }, dc = S.air && S.air.cur; if (dc) o.dr = { id: dc.id, x: dc.x, y: dc.y, st: dc.st, dur: dc.dur }; return o; }
             case 'capture_points': { const sc = {}; S.teams.forEach(t => sc[t] = Math.floor(S.sc[t])); return { m: r.mode, pts: S.pts.map(p => ({ i: p.i, x: p.x, y: p.y, r: p.r, o: p.o, w: p.w, p: Math.round(p.p) })), sc, goal: S.goal, t: left }; }
             case 'bounty': return { m: r.mode, tg: S.target, bv: S.bv, nt: S.target ? Math.max(0, Math.ceil((S.tEnd - now) / 1000)) : 0, t: left, goal: r.bnScore };
             case 'rounds': {
@@ -784,5 +789,5 @@ module.exports = function createModes(D) {
         return { every: 30000, max: 4, count: 2 };
     }
 
-    return { has, readSettings, applyUpdate, start, tick, onDeath, afterLeave, md, cleanup, pickPerk, dmgMult, dmgTaken, onZombieKill, powerupRule, pickMod, frozen, MS, teamScale, setContrib: f => { contribMul = f; }, BR: { brWeights, rollRarity, rollMod, lootCap, brF, SLOTS } };
+    return { has, readSettings, applyUpdate, start, tick, onDeath, afterLeave, md, cleanup, pickPerk, dmgMult, dmgTaken, onZombieKill, powerupRule, pickMod, frozen, MS, teamScale, setContrib: f => { contribMul = f; }, setElite: f => { eliteMix = f; }, BR: { brWeights, rollRarity, rollMod, lootCap, brF, SLOTS } };
 };

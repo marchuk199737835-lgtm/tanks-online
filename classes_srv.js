@@ -61,6 +61,7 @@ module.exports = function (D) {
         if (s && s.k === 'shadow' && (now || Date.now()) < s.until) m *= c.ab.mul;
         return m;
     }
+    function baseMul(r, p) { return p && p.cls && live(r) ? TC.of(p.cls).dmg / TC.BASE.dmg : 1; }   // клас без здібностей (для визначення «крита»)
     function taken(r, p, amt) {
         const s = p && p._cs; if (!s || !live(r) || s.k !== 'bastion' || Date.now() >= s.until) return amt;
         const red = TC.C.tank.ab.red; addCp(r, p.id, amt * red * 0.5); return amt * (1 - red);
@@ -86,7 +87,7 @@ module.exports = function (D) {
         if (z.hp <= 0) {
             if (z.type === 'bomber') io.to(r.id).emit('bomberExplode', { x: z.x, y: z.y, dmg: Math.round(50 * (z.dmgMult || 1)) });
             if (Modes.has(r.mode)) Modes.onZombieKill(r, ownerId, z);
-            delete r.zombies[zid]; return true;
+            delete r.zombies[zid]; if (D.onZDeath) D.onZDeath(r, z, ownerId); return true;
         }
         return false;
     }
@@ -174,5 +175,5 @@ module.exports = function (D) {
     }
     function reset(p) { const s = p && p._cs; if (s) { s.until = 0; s.k = null; s.turret = null; s.shells = null; } }
 
-    return { onStart, setClass, use, tick, dmgMul, taken, speedMul, weight, onHit, contribMul, reset, on, live };
+    return { onStart, setClass, use, tick, dmgMul, baseMul, taken, speedMul, weight, onHit, contribMul, reset, on, live, hurt, area };
 };

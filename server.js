@@ -203,7 +203,7 @@ const MAP_DATA={"epic_map":{size:3000,bg:"#565a6c",grid:"#494d55",solids:[{type:
 try { const MM = require('./maps_modes.js'); Object.keys(MM).forEach(k => { const m = MapObj.sanitizeMap(JSON.parse(JSON.stringify(MM[k]))); if (m) MAP_DATA[k] = m; }); } catch (e) { console.warn('maps_modes.js:', e.message); }
 editorApi = mountEditor(app, { MAP_DATA: MAP_DATA, getMapsCol: () => dbMapsCol });
 if (!mongoUri) editorApi.loadSaved().catch(e => console.error('❌ Не вдалося завантажити мапи:', e.message));
-const Z_TYPES={normal:{hp:25,speed:120,dmg:10,radius:15,color:'#22c55e'},runner:{hp:15,speed:250,dmg:5,radius:12,color:'#84cc16'},tanker:{hp:100,speed:60,dmg:25,radius:25,color:'#15803d'},spitter:{hp:40,speed:90,dmg:15,radius:15,color:'#a3e635',ranged:true},bomber:{hp:30,speed:140,dmg:50,radius:18,color:'#dc2626',explode:true},ghost:{hp:20,speed:100,dmg:10,radius:15,color:'#cbd5e1',ghost:true},pikus:{isBoss:true,name:'ПІКУС',hp:1000,speed:294,dmg:100,radius:30,color:'#9333ea',bullets:3,cd:3000},shurik:{isBoss:true,name:'ШУРІК',hp:2000,speed:280,dmg:100,radius:22.5,color:'#f43f5e',bullets:10,cd:3000},oneshot:{isBoss:true,name:'ВАНШОТУС',hp:3000,speed:294,dmg:1000,radius:30,color:'#fbbf24',bullets:2,cd:2000},padlo:{isBoss:true,name:'ПАДЛО',hp:5000,speed:280,dmg:75,radius:15,color:'#10b981',bullets:25,cd:1500,ring:true},titan:{isBoss:true,name:'ТИТАН',hp:8000,speed:270,dmg:120,radius:36,color:'#38bdf8',bullets:18,cd:1400,ring:true}};
+const Z_TYPES={normal:{hp:25,speed:120,dmg:10,radius:15,color:'#22c55e'},runner:{hp:15,speed:250,dmg:5,radius:12,color:'#84cc16'},tanker:{hp:100,speed:60,dmg:25,radius:25,color:'#15803d'},spitter:{hp:40,speed:90,dmg:15,radius:15,color:'#a3e635',ranged:true},bomber:{hp:30,speed:140,dmg:50,radius:18,color:'#dc2626',explode:true},ghost:{hp:20,speed:100,dmg:10,radius:15,color:'#cbd5e1',ghost:true},puller:{hp:90,speed:95,dmg:15,radius:22,color:'#a855f7',elite:'puller',name:'ТЯГУН'},shielder:{hp:150,speed:70,dmg:20,radius:24,color:'#38bdf8',elite:'shielder',name:'ЩИТОНОСЕЦЬ'},splitter:{hp:110,speed:105,dmg:15,radius:22,color:'#f43f5e',elite:'splitter',name:'РОЗЩЕПЛЮВАЧ'},mini:{hp:12,speed:230,dmg:5,radius:11,color:'#fb7185'},pikus:{isBoss:true,name:'ПІКУС',hp:1000,speed:294,dmg:100,radius:30,color:'#9333ea',bullets:3,cd:3000},shurik:{isBoss:true,name:'ШУРІК',hp:2000,speed:280,dmg:100,radius:22.5,color:'#f43f5e',bullets:10,cd:3000},oneshot:{isBoss:true,name:'ВАНШОТУС',hp:3000,speed:294,dmg:1000,radius:30,color:'#fbbf24',bullets:2,cd:2000},padlo:{isBoss:true,name:'ПАДЛО',hp:5000,speed:280,dmg:75,radius:15,color:'#10b981',bullets:25,cd:1500,ring:true},titan:{isBoss:true,name:'ТИТАН',hp:8000,speed:270,dmg:120,radius:36,color:'#38bdf8',bullets:18,cd:1400,ring:true}};
 const GameData = require('./public/js/gamedata.js'); // єдине джерело модулів і кейсів (спільне з клієнтом)
 const MODULES = GameData.MODULES, CASES = GameData.CASES;
 
@@ -434,6 +434,15 @@ function processPlayerDeath(r, victimId, killerId, meta) {
     } catch (e) { console.error('❌ kill event:', e && e.message); }
 
     Classes.reset(v);      // здібність гасне разом із танком
+    if (TROPHY_MODES.has(r.mode) && !r.ranked) dropRepair(r, v.x, v.y, Date.now());      // трофей: ремкомплект зі знищеного танка
+    // ціль-лідер повалений: подвійні очки команді й +5 кредитів нападнику
+    if (r._leader && victimId === r._leader && atk && atk.id !== v.id && atk.team && atk.team !== v.team) {
+        hiddenSet(r, '_leader', null); hiddenSet(r, '_ldAt', 0);
+        if (r.mode === 'team_deathmatch' && r.teamScores && r.teamScores[atk.team] !== undefined) r.teamScores[atk.team]++;
+        else if (r.mode === 'capture_points') { const S = Modes.MS.get(r.id); if (S && S.sc && S.sc[atk.team] !== undefined) S.sc[atk.team] += 3; }
+        const u = !atk.isBot && dbUsers[atk.name]; if (u) { u.bucks += 5; u.stats.earned = (u.stats.earned | 0) + 5; saveUser(atk.name); io.to(atk.id).emit('economyUpdate', ecoPayload(atk.name)); }
+        io.to(r.id).emit('leaderDown', { by: nickOf(atk.name), tg: nickOf(v.name), byId: atk.id });
+    }
     if (Modes.has(r.mode)) { Modes.onDeath(r, v, killerId); return; }
     if (r.mode === 'survival') {   // життя: відродження через 6 с біля живого союзника; останнє — гравець вибуває
         v.lives = (v.lives || 1) - 1; io.to(v.id).emit('clsLives', { n: Math.max(0, v.lives) });
@@ -515,7 +524,8 @@ const ModeInfo = require('./public/js/modeinfo.js');   // спільне з кл
 const VALID_MODES = ModeInfo.ORDER.slice();
 const Modes = require('./modes.js')({ io, rooms, dbUsers, MAP_DATA, MapObj, Nav, Z_TYPES, waveScale, getValidSpawn, getValidEdgeSpawn, checkCollisionServer, getMaxHp,
     grantXp, rollDrop, saveUser, ecoPayload, pushRooms, zombieTick, processPlayerDeath, emitMatchEnd, applyEventBonus, ZOMBIE_CAP, ZOMBIE_SPAWN_BASE, ZOMBIE_SPAWN_STEP });
-const Classes = require('./classes_srv.js')({ io, rooms, getMaxHp, GameData, Modes, checkCollisionServer });   // класи танків у кооперативі
+const Classes = require('./classes_srv.js')({ io, rooms, getMaxHp, GameData, Modes, checkCollisionServer, onZDeath: (r, z, o) => onZDeath(r, z, o) });   // класи танків у кооперативі
+Modes.setElite((r, ids, wave, d, n) => eliteMix(r, ids, wave, d, n), (r, z, o) => onZDeath(r, z, o));   // еліт-зомбі в нових кооп-режимах
 const teamsOf = r => r.mode === 'rounds' || r.ranked ? 2 : r.mode === 'capture_points' ? Math.max(2, Math.min(4, r.cpTeams || 2)) : Math.max(2, Math.min(4, r.tdmTeams || 2));
 const isTeamPvp = m => m === 'team_deathmatch' || m === 'capture_points' || m === 'rounds';
 const powerupsOn = m => m !== 'prophunt' && m !== 'team_deathmatch' && m !== 'rounds';
@@ -653,6 +663,7 @@ function startRoomGame(roomId, notify) {
                 });
             }
             Classes.onStart(r, pK, Date.now());      // кооп: клас → характеристики танка (HP уже з урахуванням класу)
+            mapEvInit(r, Date.now()); hiddenSet(r, '_leader', null); hiddenSet(r, '_ldAt', 0);   // події на мапі, ціль-лідер
             io.to(roomId).emit('gameStarting', r);
             pushRooms();
             return true;
@@ -691,9 +702,10 @@ function maxSpeedOf(r, p) {
 }
 function speedCheck(r, p, x, y, socket) {
     const now = Date.now(); let s = AC.get(p);
-    if (!s || s.x !== p.x || s.y !== p.y || s.room !== r.id) { s = { x: p.x, y: p.y, t: now, bud: 60, room: r.id, bad: 0, badAt: 0, fixAt: 0 }; AC.set(p, s); }
+    if (!s || s.x !== p.x || s.y !== p.y || s.room !== r.id) { s = { x: p.x, y: p.y, t: now, bud: 60, room: r.id, bad: 0, badAt: 0, fixAt: 0, ext: 0, extUntil: 0 }; AC.set(p, s); }
     const dt = Math.min(0.6, Math.max(0, (now - s.t) / 1000)); s.t = now;
-    s.bud = Math.min(maxSpeedOf(r, p) * 1.3 * 0.6 + 40, s.bud + maxSpeedOf(r, p) * 1.3 * dt + 2);   // запас — не більше ~0.6 с руху (ривок після простою обмежено)
+    if (s.ext && now > s.extUntil) s.ext = 0;      // запас ривка діє ~0.7 с
+    s.bud = Math.min(maxSpeedOf(r, p) * 1.3 * 0.6 + 40 + s.ext, s.bud + maxSpeedOf(r, p) * 1.3 * dt + 2);   // запас — не більше ~0.6 с руху (ривок після простою обмежено)
     const dx = x - s.x, dy = y - s.y, d = Math.hypot(dx, dy);
     if (d <= s.bud + 40) { s.bud = Math.max(0, s.bud - d); s.x = x; s.y = y; return [x, y]; }
     const k = Math.max(0, s.bud) / d, nx = s.x + dx * k, ny = s.y + dy * k;      // дозволена частина шляху
@@ -702,6 +714,19 @@ function speedCheck(r, p, x, y, socket) {
     if (s.bad === 25) console.warn('⚠️ Античит: підозріла швидкість', p.name, r.id);
     if (now - s.fixAt > 250) { s.fixAt = now; socket.emit('posFix', { x: Math.round(nx), y: Math.round(ny) }); }
     return [nx, ny];
+}
+
+// ===== Ривок (Shift / кнопка на телефоні): ~150 px за 0.16 с, перезарядка 5 с. Рух рахує клієнт, сервер дає разовий запас відстані античиту =====
+const DASH_CD = 5000, DASH_DIST = 150;
+function dashFor(socket, d) {
+    if (!d || typeof d !== 'object') return;
+    const r = rooms[d.roomId], p = r && r.players[socket.id]; if (!p || r.status !== 'playing' || p.hp <= 0 || p.out) return;
+    if (p.isDisguised || (r.mode === 'prophunt' && (p.team === 'hider' || r.state !== 'seeking')) || Modes.frozen(r)) return;
+    const now = Date.now(); if (now < (p._dashAt || 0)) return;
+    Object.defineProperty(p, '_dashAt', { value: now + DASH_CD - 150, writable: true, configurable: true, enumerable: false });
+    let s = AC.get(p); if (!s || s.room !== r.id) { s = { x: p.x, y: p.y, t: now, bud: 60, room: r.id, bad: 0, badAt: 0, fixAt: 0, ext: 0, extUntil: 0 }; AC.set(p, s); }
+    s.ext = DASH_DIST + 60; s.extUntil = now + 700; s.bud += DASH_DIST + 30;
+    const a = +d.a; socket.to(r.id).emit('dashFx', { id: p.id, x: Math.round(p.x), y: Math.round(p.y), a: Number.isFinite(a) ? Math.round(a * 100) / 100 : 0 });
 }
 
 // Запис гравця-людини в кімнаті (лобі, швидка гра, рейтинговий матч)
@@ -1290,9 +1315,16 @@ socket.on('selectProp', (data) => {
         
         if (data.type === 'incendiary') v.onFire = { end: Date.now() + 5000, nextTick: Date.now() + 1000, owner: socket.id };
         
+        // добивання: у ворога < 15% HP і він поруч (≤ 170 px) — постріл знищує миттєво, нападник отримує +50 HP
+        let fin = false;
+        if (r.mode !== 'prophunt' && atk.hp > 0 && v.hp > 0 && v.hp / Math.max(1, getMaxHp(v.equipped)) < 0.15 && Math.hypot(atk.x - v.x, atk.y - v.y) <= 170) { fD = Math.max(fD, v.hp); fin = true; }
         if (r.ranked) r.ranked.dmg[socket.id] = (r.ranked.dmg[socket.id] || 0) + Math.min(v.hp, fD);   // рейтинг: облік участі (AFK не отримує рейтинг за перемогу)
-        v.hp = Math.max(0, v.hp - fD);
+        const hp0 = v.hp; v.hp = Math.max(0, v.hp - fD);
+        if (fin && v.hp === 0) { atk.hp = Math.min(getMaxHp(atk.equipped), atk.hp + 50); io.to(r.id).emit('finisher', { x: Math.round(v.x), y: Math.round(v.y), by: socket.id }); }
         io.to(socket.id).emit('hitConfirmed');
+        // цифри шкоди (нападнику) і легка віддача (жертві); k: 1 — сильне влучання, 2 — вбивство
+        io.to(socket.id).emit('dmgN', { x: Math.round(v.x), y: Math.round(v.y), v: Math.round(Math.min(hp0, fD)), k: v.hp === 0 ? 2 : (fD >= 2 * Math.min(500, Math.max(1, +data.amt || 1)) ? 1 : 0) });
+        if (!v.isBot && v.hp > 0) io.to(data.targetId).emit('knock', { x: Math.round(atk.x), y: Math.round(atk.y) });
         
         if (v.hp === 0) {
             processPlayerDeath(r, data.targetId, socket.id, { weapon: data.type });
@@ -1327,8 +1359,13 @@ socket.on('selectProp', (data) => {
         if (!d || typeof d !== 'object') return;
         let r = rooms[d.roomId];
         if (r && r.status === 'playing' && r.powerups[d.pid] && r.powerups[d.pid].mod) { Modes.pickMod(r, socket.id, d.pid); return; }   // модуль (королівський бій)
-        if (r && r.status === 'playing' && r.powerups[d.pid] && r.powerups[d.pid].active && r.players[socket.id] && r.players[socket.id].hp > 0 && powerupsOn(r.mode)) {
+        if (r && r.status === 'playing' && r.powerups[d.pid] && r.powerups[d.pid].active && r.players[socket.id] && r.players[socket.id].hp > 0 && (powerupsOn(r.mode) || r.powerups[d.pid].ev)) {
             let pT = r.powerups[d.pid].type, p = r.players[socket.id];
+            const pu0 = r.powerups[d.pid]; if (Math.hypot(pu0.x - p.x, pu0.y - p.y) > 120) return;      // підбір лише поруч
+            if (pT === 'repair') {      // трофей «ремкомплект»: +120 HP, без бафу
+                p.hp = Math.min(getMaxHp(p.equipped), p.hp + 120); delete r.powerups[d.pid];
+                io.to(d.roomId).emit('powerupCollected', { pid: d.pid, playerId: socket.id, type: 'repair' }); return;
+            }
             p.buff = pT; p.buffEndTime = Date.now() + BUFF_DURATION; r.powerups[d.pid].active = false;
             if (pT === 'healing') { p.hp = Math.min(getMaxHp(p.equipped), p.hp + 150); p.nextHeal = Date.now() + 1000; }
             io.to(d.roomId).emit('powerupCollected', { pid: d.pid, playerId: socket.id, type: pT });
@@ -1340,23 +1377,39 @@ socket.on('selectProp', (data) => {
         if (!d || typeof d !== 'object') return;
         let r = rooms[d.roomId];
         if (r && r.status === 'playing' && r.zombies[d.zid] && r.zombies[d.zid].hp > 0) {
-            let fD = Math.min(600, Math.max(0, +d.dmg || 0)), aP = r.players[socket.id];
-            if (aP) fD *= GameData.statMult(aP.equipped, 'dmg') * Classes.dmgMul(r, aP);
+            let fD = Math.min(600, Math.max(0, +d.dmg || 0)), aP = r.players[socket.id], norm = fD;
+            if (aP) { const eq = GameData.statMult(aP.equipped, 'dmg'); norm = fD * eq * Classes.baseMul(r, aP); fD *= eq * Classes.dmgMul(r, aP); }   // norm — звичайна шкода цього танка (без тіні/критів)
             if (Modes.has(r.mode)) fD *= Modes.dmgMult(r, socket.id);
             if (aP) Classes.onHit(r, aP, d.zid, fD, d.type);      // внесок у бій + осколки бомбардира
             if (!r.zombies[d.zid]) return;
             if (d.type === 'incendiary') r.zombies[d.zid].onFire = { end: Date.now() + 5000, nextTick: Date.now() + 1000, owner: socket.id };
-            r.zombies[d.zid].hp -= fD;
-            if (r.zombies[d.zid].hp <= 0) {
-                if (r.zombies[d.zid].type === 'bomber') io.to(d.roomId).emit('bomberExplode', { x: r.zombies[d.zid].x, y: r.zombies[d.zid].y, dmg: Math.round(50 * (r.zombies[d.zid].dmgMult || 1)) });
-                if (Modes.has(r.mode)) Modes.onZombieKill(r, socket.id, r.zombies[d.zid]);
-                delete r.zombies[d.zid];
+            const zz = r.zombies[d.zid], ZTz = Z_TYPES[zz.type] || {}, nowZ = Date.now();
+            if (zz.chainUntil > nowZ) { zz.chainUntil = 0; io.to(d.roomId).emit('chainBreak', { zid: d.zid }); }      // влучання по тягуну рве ланцюг
+            // добивання (кооп): лише міцні (еліт, танкери) з < 15% HP поруч; +50 HP не частіше ніж раз на 2 с
+            let fin = false;
+            if (aP && aP.hp > 0 && !ZTz.isBoss && (ZTz.elite || ZTz.hp >= 90) && zz.hp / Math.max(1, zz.maxHp) < 0.15 && Math.hypot(aP.x - zz.x, aP.y - zz.y) <= 170) { fD = Math.max(fD, zz.hp); fin = true; }
+            const shown = Math.round(Math.min(Math.max(0, zz.hp), fD));
+            zz.hp -= fD;
+            io.to(socket.id).emit('dmgN', { x: Math.round(zz.x), y: Math.round(zz.y), v: shown, k: zz.hp <= 0 ? 2 : (fD >= 1.5 * norm ? 1 : 0) });   // цифри шкоди; 1 — крит (тінь, критичний удар арени)
+            if (fin && zz.hp <= 0) {
+                if (nowZ >= (aP._finAt || 0)) { aP.hp = Math.min(getMaxHp(aP.equipped), aP.hp + 50); hiddenSet(aP, '_finAt', nowZ + 2000); }
+                io.to(d.roomId).emit('finisher', { x: Math.round(zz.x), y: Math.round(zz.y), by: socket.id });
+            }
+            if (zz.hp <= 0) {
+                if (zz.type === 'bomber') io.to(d.roomId).emit('bomberExplode', { x: zz.x, y: zz.y, dmg: Math.round(50 * (zz.dmgMult || 1)) });
+                if (Modes.has(r.mode)) Modes.onZombieKill(r, socket.id, zz);
+                delete r.zombies[d.zid]; onZDeath(r, zz, socket.id);
+                io.to(socket.id).emit('zKill', { x: Math.round(zz.x), y: Math.round(zz.y), b: Z_TYPES[zz.type] && Z_TYPES[zz.type].isBoss ? 1 : 0 });
+            } else if (aP && !(Z_TYPES[zz.type] && Z_TYPES[zz.type].isBoss)) {      // легка віддача: зомбі трохи відкидає від стрільця
+                const dx = zz.x - aP.x, dy = zz.y - aP.y, l = Math.hypot(dx, dy);
+                if (l > 1) { const nx = zz.x + dx / l * 7, ny = zz.y + dy / l * 7; if (!checkCollisionServer(r.map, nx, ny, (Z_TYPES[zz.type] || {}).radius || 15, [], r)) { zz.x = nx; zz.y = ny; } }
             }
         }
     });
 
     socket.on('pickPerk', (d) => { if (d && rooms[d.roomId]) Modes.pickPerk(rooms[d.roomId], socket.id, d.id); });
     socket.on('setClass', (d) => Classes.setClass(socket, d));          // кооп: вибір класу в лобі
+    socket.on('dash', (d) => dashFor(socket, d));                        // ривок
     socket.on('useAbility', (d) => Classes.use(socket, d));             // кооп: здібність класу (E / кнопка на телефоні)
 
     socket.on('backToRoomLobby', (roomId) => {
@@ -1425,7 +1478,7 @@ function zombieTick(r, rId, now, dt, aP, X) {
             if (now >= z.onFire.end) z.onFire = null;
             else if (now >= z.onFire.nextTick && z.hp > 0) {
                 z.onFire.nextTick = now + 1000; z.hp -= 20; io.to(rId).emit('burnTick', { x: z.x, y: z.y });
-                if (z.hp <= 0) { if (z.type === 'bomber') io.to(rId).emit('bomberExplode', { x: z.x, y: z.y, dmg: Math.round(50 * (z.dmgMult || 1)) }); delete r.zombies[zid]; continue; }
+                if (z.hp <= 0) { if (z.type === 'bomber') io.to(rId).emit('bomberExplode', { x: z.x, y: z.y, dmg: Math.round(50 * (z.dmgMult || 1)) }); delete r.zombies[zid]; onZDeath(r, z, z.onFire && z.onFire.owner); continue; }
             }
         }
         // вибір цілі: класові здібності (тінь / бастіон) змінюють лише пріоритет, а відстань для атаки лишається справжньою
@@ -1452,6 +1505,11 @@ function zombieTick(r, rId, now, dt, aP, X) {
                 z.stuckRef = { x: z.x, y: z.y, t: now };
             }
             const dmgV = Math.round(ZT.dmg * (z.dmgMult || 1));
+            // еліт «Тягун»: кидає ланцюг і підтягує танк до себе (клієнт рухає танк, сервер дає запас античиту); ланцюг рветься від влучання
+            if (ZT.elite === 'puller' && !st && t.id && r.players[t.id] && !t.isBot && now >= (z.nextPull || 0) && mD > 110 && mD < 380) {
+                z.nextPull = now + 7000; z.chainUntil = now + 900; grantMove(t, 360);
+                io.to(rId).emit('chain', { zid, pid: t.id, dur: 900 });
+            }
             if (ZT.isBoss && now > z.nextAttack) {
                 z.nextAttack = now + ZT.cd * cdM; let bC = ZT.bullets, spr = Math.PI / 4, sA = Math.atan2(dy, dx) - (spr / 2), stp = spr / Math.max(1, bC - 1); if (ZT.ring) { spr = Math.PI * 2; stp = spr / bC; sA = 0; }
                 for (let b = 0; b < bC; b++) { let a = sA + (b * stp); io.to(rId).emit('spawnBullet', { id: 'b_' + now + b + zid, x: z.x, y: z.y, vx: Math.cos(a) * 500, vy: Math.sin(a) * 500, type: 'boss_proj', owner: 'zombie', dmgOverride: dmgV }); }
@@ -1464,6 +1522,93 @@ function zombieTick(r, rId, now, dt, aP, X) {
                 if (st) st.hit(dmgV); else io.to(rId).emit('zombieMeleeHit', { targetId: t.id, dmg: dmgV });
             }
         }
+    }
+}
+
+// ===== ДИНАМІКА БОЮ: еліт-зомбі, трофеї (ремкомплект), добивання, ціль-лідер, події на мапі =====
+const TROPHY_MODES = new Set(['deathmatch', 'team_deathmatch', 'bounty', 'capture_points']);   // трофеї та події на мапі (без раундів і рейтингу)
+const ELITES = ['shielder', 'splitter', 'puller'];
+const EV_PTYPES = ['samurai', 'minigun', 'shotgun', 'homing', 'incendiary', 'explosive', 'piercing', 'healing', 'shield', 'autolaser'];
+function hiddenSet(o, k, v) { Object.defineProperty(o, k, { value: v, writable: true, configurable: true, enumerable: false }); return v; }
+// разовий запас відстані античиту (ланцюг тягуна)
+function grantMove(p, dist) { const s = AC.get(p); if (s) { s.ext = dist + 60; s.extUntil = Date.now() + 1200; s.bud += dist; } }
+// трофей «ремкомплект»: лежить 10 с; ev — не стирається в режимах без бонусів і підбирається там
+function dropRepair(r, x, y, now) { const id = 'rk_' + now + '_' + Math.floor(Math.random() * 1e6); r.powerups[id] = { id, x: Math.round(x), y: Math.round(y), type: 'repair', active: true, spawnTime: now, ttl: 10000, ev: true }; }
+// частину щойно створених зомбі перетворюємо на еліт (з 5-ї хвилі; тягун — з 7-ї); більше на вищій складності й у більшому загоні
+function eliteMix(r, ids, wave, d, n) {
+    if (wave < 5 || !ids.length) return;
+    const pool = ELITES.filter(t => t !== 'puller' || wave >= 7), now = Date.now();
+    const k = Math.min(10, Math.round((1 + (wave - 5) * 0.35) * (0.6 + 0.4 * d) * Math.sqrt(Math.max(1, n))));
+    for (let i = 0; i < k && ids.length; i++) {
+        const zid = ids.splice(Math.floor(Math.random() * ids.length), 1)[0], z = r.zombies[zid]; if (!z || !Z_TYPES[z.type] || Z_TYPES[z.type].isBoss) continue;
+        const t = pool[Math.floor(Math.random() * pool.length)], hm = z.maxHp / Z_TYPES[z.type].hp;
+        z.type = t; z.hp = z.maxHp = Math.round(Z_TYPES[t].hp * hm); z.nextPull = now + 3000 + Math.random() * 3000;
+    }
+}
+// загибель зомбі (усі шляхи: постріл, вогонь, здібності, міни): розщеплювач → 3 малих; еліт — 50% шанс ремкомплекту
+function onZDeath(r, z, ownerId) {
+    const now = Date.now(), ZT = Z_TYPES[z.type]; if (!ZT) return;
+    if (z.type === 'splitter') {
+        const hm = z.maxHp / ZT.hp;
+        for (let i = 0; i < 3; i++) {
+            const a = i * 2.09 + Math.random(), x = z.x + Math.cos(a) * 32, y = z.y + Math.sin(a) * 32, ok = !checkCollisionServer(r.map, x, y, 11, [], r);
+            const id = 'mini_' + now + '_' + i + '_' + Math.floor(Math.random() * 1e5), hp = Math.max(6, Math.round(Z_TYPES.mini.hp * hm));
+            r.zombies[id] = { id, x: ok ? x : z.x, y: ok ? y : z.y, type: 'mini', hp, maxHp: hp, dmgMult: z.dmgMult || 1, nextAttack: now + 500, onFire: null };
+        }
+        io.to(r.id).emit('zSplit', { x: Math.round(z.x), y: Math.round(z.y) });
+    }
+    if (ZT.elite && Math.random() < 0.5) dropRepair(r, z.x, z.y, now);
+}
+// ціль-лідер (командний бій, захоплення точок): найкращий за вбивствами гравець команди, що веде
+function leaderTick(r, now) {
+    if ((r.mode !== 'team_deathmatch' && r.mode !== 'capture_points') || r.ranked || now < (r._ldAt || 0)) return;
+    hiddenSet(r, '_ldAt', now + 1000);
+    let sc = null; if (r.mode === 'team_deathmatch') sc = r.teamScores; else { const S = Modes.MS.get(r.id); sc = S && S.sc; }
+    if (!sc) return; let best = null, bv = -1, tie = false;
+    for (const t in sc) { if (sc[t] > bv) { bv = sc[t]; best = t; tie = false; } else if (sc[t] === bv) tie = true; }
+    const ta = matchTally.get(r.id); let lid = null, lk = 0;
+    if (best && !tie && bv > 0 && ta) Object.values(r.players).forEach(p => { if (p.team !== best || p.hp <= 0) return; const k = (ta.kd[p.name] || {}).k || 0; if (k > lk) { lk = k; lid = p.id; } });
+    if ((r._leader || null) !== lid) { hiddenSet(r, '_leader', lid); io.to(r.id).emit('leader', { id: lid }); }
+}
+// події на мапі (детматч, командний, «Ціль», захоплення точок; перемикач у лобі): артудар, дрон із припасами, туман
+function mapEvInit(r, now) { hiddenSet(r, '_me', TROPHY_MODES.has(r.mode) && r.mapEvents !== false && !r.ranked ? { next: now + 4000 + 50000 + Math.random() * 40000, cur: null, last: null } : null); }
+function mapEvTick(r, now) {
+    const E = r._me; if (!E) return;
+    const C = E.cur, al = Object.values(r.players).filter(p => p.hp > 0 && !p.out);
+    if (C) {
+        let done = false;
+        if (C.k === 'art') {
+            if (now >= C.fire && C.left > 0 && now >= C.nextShell) {
+                C.left--; C.nextShell = now + 280;
+                const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * C.r, x = C.x + Math.cos(a) * d, y = C.y + Math.sin(a) * d;
+                io.to(r.id).emit('mapShell', { x: Math.round(x), y: Math.round(y) });
+                al.forEach(p => { if (p.hp > 0 && p.buff !== 'shield' && Math.hypot(p.x - x, p.y - y) < 95) { p.hp = Math.max(0, p.hp - 90); if (p.hp === 0) processPlayerDeath(r, p.id, null, { weapon: 'artillery' }); } });
+            }
+            done = C.left <= 0 && now >= C.nextShell + 400;
+        } else if (C.k === 'drone') {
+            C.drops.forEach(dp => { if (!dp.done && now >= dp.t) { dp.done = true; const id = 'dr_' + now + '_' + Math.floor(Math.random() * 1e6); r.powerups[id] = { id, x: dp.x, y: dp.y, type: EV_PTYPES[Math.floor(Math.random() * EV_PTYPES.length)], active: true, spawnTime: now, ttl: 25000, ev: true }; } });
+            done = now >= C.end;
+        } else done = now >= C.end;
+        if (done) { io.to(r.id).emit('mapEvEnd', { k: C.k }); E.cur = null; E.next = now + 60000 + Math.random() * 60000; }
+        return;
+    }
+    if (now < E.next) return;
+    const kinds = ['art', 'drone', 'fog'].filter(k => k !== E.last), k = kinds[Math.floor(Math.random() * kinds.length)]; E.last = k;
+    const M = MAP_DATA[r.map] || MAP_DATA['epic_map'], size = M.size;
+    if (k === 'art') {
+        if (!al.length) { E.next = now + 5000; return; }
+        const p = al[Math.floor(Math.random() * al.length)], a = Math.random() * Math.PI * 2, o = Math.random() * 220;
+        const x = Math.max(100, Math.min(size - 100, p.x + Math.cos(a) * o)), y = Math.max(100, Math.min(size - 100, p.y + Math.sin(a) * o));
+        E.cur = { k, x, y, r: 230, fire: now + 3000, left: 7, nextShell: now + 3000 };
+        io.to(r.id).emit('mapEv', { k, x: Math.round(x), y: Math.round(y), r: 230, warn: 3000 });
+    } else if (k === 'drone') {
+        const a = Math.random() * Math.PI * 2, cx = size / 2, cy = size / 2, L = size * 0.62, x0 = cx - Math.cos(a) * L, y0 = cy - Math.sin(a) * L, x1 = cx + Math.cos(a) * L, y1 = cy + Math.sin(a) * L, dur = 8000;
+        const drops = [0.32, 0.5, 0.68].map(f => { let x = x0 + (x1 - x0) * f, y = y0 + (y1 - y0) * f; if (checkCollisionServer(r.map, x, y, 26, [], r)) { const q = getValidSpawn(r.map, 26, 'spawn_powerup'); x = q.x; y = q.y; } return { x: Math.round(x), y: Math.round(y), t: now + Math.round(dur * f), done: false }; });
+        E.cur = { k, end: now + dur + 500, drops };
+        io.to(r.id).emit('mapEv', { k, x0: Math.round(x0), y0: Math.round(y0), x1: Math.round(x1), y1: Math.round(y1), dur, drops: drops.map(d => ({ x: d.x, y: d.y, f: (d.t - now) / dur })) });
+    } else {
+        E.cur = { k: 'fog', end: now + 20000 };
+        io.to(r.id).emit('mapEv', { k: 'fog', dur: 20000 });
     }
 }
 
@@ -1531,6 +1676,7 @@ setInterval(() => {
         if (r.status !== 'playing') { if (SYNCS.has(rId)) SYNCS.delete(rId); continue; }
 
         const PWR = Modes.has(r.mode) ? Modes.powerupRule(r) : null;
+        for (const k in r.powerups) { const pu = r.powerups[k]; if (pu.ttl && now - pu.spawnTime > pu.ttl) delete r.powerups[k]; }   // трофеї й скриньки дрона — з обмеженим часом
         if (powerupsOn(r.mode)) {
             let pKeys = Object.keys(r.powerups);
             pKeys.forEach(k => { if (!r.powerups[k].mod && now - r.powerups[k].spawnTime > 60000) delete r.powerups[k]; });   // модулі (mod) не зникають за часом
@@ -1547,7 +1693,7 @@ setInterval(() => {
                     });
                 }
             }
-        } else r.powerups = {};
+        } else { for (const k in r.powerups) if (!r.powerups[k].ev) delete r.powerups[k]; }   // режими без бонусів: лишаються лише трофеї / скриньки подій
 
         if (r.mode === 'prophunt') {
             if (r.state === 'hiding' && now >= r.phaseEndTime) {
@@ -1573,6 +1719,18 @@ setInterval(() => {
 
         for (let mid in r.mines) {
             let m = r.mines[mid];
+            if (ModeInfo.isPve(r.mode)) {      // кооп / соло: міна вибухає під зомбі (по площі), союзників не чіпає
+                for (const zid in r.zombies) {
+                    const z = r.zombies[zid], zr = (Z_TYPES[z.type] || {}).radius || 15;
+                    if (Math.hypot(z.x - m.x, z.y - m.y) < 22 + zr) {
+                        delete r.mines[mid]; io.to(rId).emit('mineExploded', { x: m.x, y: m.y });
+                        const ow = r.players[m.owner], dmg = 125 * (ow ? GameData.statMult(ow.equipped, 'dmg') : 1);
+                        Classes.area(r, m.x, m.y, 90, dmg, m.owner);
+                        break;
+                    }
+                }
+                continue;
+            }
             for (const p of Object.values(r.players)) {
                 if (p.hp > 0 && p.id !== m.owner && !ModeInfo.isPve(r.mode) && !(isTeamPvp(r.mode) && r.players[m.owner] && r.players[m.owner].team === p.team) && Math.hypot(p.x - m.x, p.y - m.y) < 35 && p.buff !== 'shield') {
                     delete r.mines[mid];
@@ -1602,6 +1760,11 @@ setInterval(() => {
                 if (p.buff === 'healing' && p.hp > 0 && now >= p.nextHeal) {
                     p.hp = Math.min(getMaxHp(p.equipped), p.hp + 10); p.nextHeal = now + 1000;
                 }
+                // кооп / соло: автолазер сам б'є найближчого зомбі чи боса в радіусі 400 (союзників не чіпає)
+                if (p.buff === 'autolaser' && ModeInfo.isPve(r.mode) && p.hp > 0 && !p.out && (!p.nextLaser || now >= p.nextLaser)) {
+                    let best = null, bd = 400; for (const zid in r.zombies) { const z = r.zombies[zid], dd = Math.hypot(z.x - p.x, z.y - p.y); if (dd < bd) { bd = dd; best = zid; } }
+                    if (best) { p.nextLaser = now + 100; io.to(rId).emit('laserHit', { src: p.id, tgt: best }); Classes.hurt(r, best, 20 * GameData.statMult(p.equipped, 'dmg'), p.id); }
+                }
                 if (p.buff === 'autolaser' && p.laserTarget && r.players[p.laserTarget] && r.players[p.laserTarget].hp > 0 && (!p.nextLaser || now >= p.nextLaser)
                     && !ModeInfo.isPve(r.mode) && !(isTeamPvp(r.mode) && p.team && p.team === r.players[p.laserTarget].team)) {   // союзників (кооп / своя команда) лазер не чіпає
                     if (Math.hypot(p.x - r.players[p.laserTarget].x, p.y - r.players[p.laserTarget].y) < 400) {
@@ -1628,6 +1791,7 @@ setInterval(() => {
             } else p.buffProgress = 0;
         });
 
+        mapEvTick(r, now); leaderTick(r, now);      // події на мапі, ціль-лідер
         Classes.tick(r, now, dt);      // кооп: здібності класів (лікування, турелі, артобстріл), ремонт інженером
         if (Modes.has(r.mode)) { if (Modes.tick(r, now, dt)) continue; }
 
@@ -1660,7 +1824,9 @@ setInterval(() => {
                         io.to(rId).emit('newWave', { wave: r.wave, isBoss: true, bossName: Z_TYPES[bType].name });
                     } else {
                         let sC = Math.min(120, Math.max(5, Math.round(Math.min(ZOMBIE_CAP, ZOMBIE_SPAWN_BASE + (r.wave - 1) * ZOMBIE_SPAWN_STEP) * (0.6 + 0.4 * dfc) * T.cnt))), sc = waveScale(r.wave), tL = ['normal', 'runner', 'spitter', 'tanker', 'bomber', 'ghost'], mI = Math.min(tL.length - 1, Math.floor((r.wave) / 5)), aT = tL.slice(0, mI + 1);
-                        for (let i = 0; i < sC; i++) { let t = aT[Math.floor(Math.random() * aT.length)], zS = getValidEdgeSpawn(r.map, 20, 'spawn_zombie'), zid = 'z_' + now + '_' + i; let zHp = Math.round(Z_TYPES[t].hp * sc.hp * dfc * T.hp); r.zombies[zid] = { id: zid, x: zS.x, y: zS.y, type: t, hp: zHp, maxHp: zHp, dmgMult: sc.dmg * dfc, nextAttack: 0, onFire: null }; }
+                        const nIds = [];
+                        for (let i = 0; i < sC; i++) { let t = aT[Math.floor(Math.random() * aT.length)], zS = getValidEdgeSpawn(r.map, 20, 'spawn_zombie'), zid = 'z_' + now + '_' + i; let zHp = Math.round(Z_TYPES[t].hp * sc.hp * dfc * T.hp); r.zombies[zid] = { id: zid, x: zS.x, y: zS.y, type: t, hp: zHp, maxHp: zHp, dmgMult: sc.dmg * dfc, nextAttack: 0, onFire: null }; nIds.push(zid); }
+                        eliteMix(r, nIds, r.wave, dfc, r._n0 || Object.keys(r.players).length);      // еліт-зомбі з 5-ї хвилі
                         io.to(rId).emit('newWave', { wave: r.wave, isBoss: false });
                     }
                     r.state = 'playing';
