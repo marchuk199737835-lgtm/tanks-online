@@ -762,11 +762,11 @@ socket.on('gameOver', (data) => {
         document.getElementById('winner-title').className = "text-6xl font-russo mb-4 text-red-500 tracking-widest drop-shadow-[0_0_15px_rgba(239,68,68,0.5)] relative z-10";
         document.getElementById('winner-emoji').innerText = "💀";
         document.getElementById('winner-message').innerText = `Ви протримались до ${data.wave} хвилі.`;
-        document.getElementById('winner-reward').innerText = data.wave;
+        document.getElementById('winner-reward').innerText = (data.rewards && data.rewards[myId]) || data.wave;
     } else if (data.isTeamWin) {
         let rw = data.rewards ? (data.rewards[myId] || 0) : 0;
         document.getElementById('winner-reward').innerText = rw;
-        if (rw === 20 || rw === 15) {
+        if (data.wins ? data.wins[myId] === 'win' : (rw === 20 || rw === 15)) {   // результат — явно від сервера (сума може бути збільшена подією)
             document.getElementById('winner-title').innerText = "ПЕРЕМОГА!";
             document.getElementById('winner-title').className = "text-5xl lg:text-6xl font-russo mb-4 text-white tracking-widest drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] relative z-10";
             document.getElementById('winner-emoji').innerText = "🏆";

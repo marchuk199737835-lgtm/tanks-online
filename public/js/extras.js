@@ -23,8 +23,19 @@
         '#emo-btn{position:fixed;right:calc(env(safe-area-inset-right,0px) + 22px);bottom:calc(env(safe-area-inset-bottom,0px) + 46%);z-index:35;width:46px;height:46px;border-radius:50%;border:1px solid rgba(165,180,252,.6);background:rgba(30,27,75,.75);color:#fff;font-size:20px;display:none;align-items:center;justify-content:center}' +
         'html.ctl-touch #game-screen:not(.hidden) ~ #emo-btn.show,#emo-btn.show{display:flex}' +
         '@media (max-width:640px){#emo-menu{flex-wrap:wrap;justify-content:center;width:min(330px,calc(100vw - 20px));bottom:calc(env(safe-area-inset-bottom,0px) + 44%)}#emo-menu button{min-width:94px}}' +
+        // ---- бульбашки емоцій ----
+        '#emo-layer{position:fixed;inset:0;pointer-events:none;z-index:31;overflow:hidden}' +
+        '.emo-b{position:absolute;left:0;top:0;will-change:transform}' +
+        '.emo-b span{display:block;transform:translate(-50%,-100%);padding:7px 14px 8px;border-radius:16px;white-space:nowrap;font:400 16px/1 "Russo One",Arial,sans-serif;letter-spacing:.03em;color:#fff;' +
+        'background:linear-gradient(160deg,rgba(76,29,149,.92),rgba(15,23,42,.94));border:2px solid rgba(196,181,253,.9);box-shadow:0 0 14px rgba(167,139,250,.6),0 6px 14px rgba(0,0,0,.45);text-shadow:0 0 8px rgba(196,181,253,.8);' +
+        'animation:emoPop 2.6s cubic-bezier(.2,1.5,.4,1) forwards;transform-origin:50% 100%}' +
+        '.emo-b span:after{content:"";position:absolute;left:50%;bottom:-8px;margin-left:-7px;border:7px solid transparent;border-bottom:0;border-top-color:rgba(196,181,253,.9)}' +
+        '.emo-b.me span{background:linear-gradient(160deg,rgba(8,145,178,.92),rgba(15,23,42,.94));border-color:rgba(103,232,249,.95);box-shadow:0 0 14px rgba(34,211,238,.6),0 6px 14px rgba(0,0,0,.45);text-shadow:0 0 8px rgba(103,232,249,.8)}.emo-b.me span:after{border-top-color:rgba(103,232,249,.95)}' +
+        '.emo-b.big span{padding:2px 6px;font-size:40px;background:none;border:0;box-shadow:none;text-shadow:0 0 18px rgba(255,255,255,.55),0 4px 10px rgba(0,0,0,.5)}.emo-b.big span:after{display:none}' +
+        '@keyframes emoPop{0%{opacity:0;transform:translate(-50%,-60%) scale(.3)}10%{opacity:1;transform:translate(-50%,-100%) scale(1.12)}18%{transform:translate(-50%,-100%) scale(1)}80%{opacity:1;transform:translate(-50%,-118%) scale(1)}100%{opacity:0;transform:translate(-50%,-135%) scale(.9)}}' +
+        'html.gfx-low .emo-b span{box-shadow:none;text-shadow:none}' +        '#ev-won{display:table;margin:-4px auto 12px;padding:5px 12px;border-radius:999px;background:linear-gradient(90deg,rgba(234,88,12,.9),rgba(219,39,119,.9));color:#fff;font:700 12px/1.2 Jura,Arial;box-shadow:0 0 16px rgba(234,88,12,.5);position:relative;z-index:10}' +
         // ---- кілкам ----
-        '#kc{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 70px);transform:translateX(-50%);z-index:44;min-width:260px;max-width:min(420px,calc(100vw - 20px));padding:12px 16px 12px;border-radius:16px;background:linear-gradient(160deg,rgba(69,10,10,.92),rgba(15,6,20,.92));border:1px solid rgba(248,113,113,.6);box-shadow:0 0 30px rgba(239,68,68,.35);color:#fee2e2;text-align:center;pointer-events:none;opacity:0;transition:opacity .2s}' +
+        '#kc{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 132px);transform:translateX(-50%);z-index:44;min-width:260px;max-width:min(420px,calc(100vw - 20px));padding:12px 16px 12px;border-radius:16px;background:linear-gradient(160deg,rgba(69,10,10,.92),rgba(15,6,20,.92));border:1px solid rgba(248,113,113,.6);box-shadow:0 0 30px rgba(239,68,68,.35);color:#fee2e2;text-align:center;pointer-events:none;opacity:0;transition:opacity .2s}' +
         '#kc.on{opacity:1;animation:kcIn .35s cubic-bezier(.2,1.3,.4,1)}@keyframes kcIn{from{transform:translateX(-50%) scale(1.25)}to{transform:translateX(-50%) scale(1)}}html.gfx-low #kc.on{animation:none}' +
         '#kc small{display:block;font:700 10px/1 Jura,Arial;letter-spacing:.25em;color:#fca5a5}#kc b{display:block;margin:5px 0 4px;font:400 20px/1.1 "Russo One",Arial;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
         '#kc .w{font-size:12.5px;color:#fecaca}#kc .hp{margin:7px auto 0;width:180px;height:7px;border-radius:5px;background:rgba(0,0,0,.5);overflow:hidden}#kc .hp i{display:block;height:100%;background:linear-gradient(90deg,#ef4444,#f59e0b)}#kc .rs{margin-top:6px;font-size:11px;color:#fca5a5}' +
@@ -68,29 +79,43 @@
     ebtn.addEventListener('pointerdown', function (e) { e.preventDefault(); e.stopPropagation(); menuOpen() ? closeMenu() : openMenu(); });
     setInterval(function () { var show = inGame() && document.documentElement.classList.contains('ctl-touch') && myLocalTank.hp > 0; ebtn.classList.toggle('show', show); if (!inGame()) closeMenu(); }, 500);
     socket.on('emo', function (d) { if (!Array.isArray(d)) return; var id = d[0], e = d[1] | 0; if (e < 0 || e >= EMO.length) return; if (id !== myId && emoOff()) return; bubbles[id] = { e: e, t: Date.now() }; });
-    socket.on('gameStarting', function () { bubbles = {}; kcHide(); });
+    socket.on('gameStarting', function () { if (window.EmoteFX) EmoteFX.clear(); kcHide(); });
 
-    // малювання над танками (викликає game.js у світових координатах): «бульбашка» з появою й згасанням
+    // «Бульбашки» над танками — HTML поверх полотна (гарні шрифти й емодзі, CSS-анімація). game.js щокадру викликає EmoteFX.draw
+    // у світових координатах: беремо поточну матрицю полотна й переводимо позицію танка в екранні пікселі.
+    var layer = null, nodes = {};
+    var isEmoji = function (s) { return !/[A-Za-zА-Яа-яІіЇїЄєҐґ]/.test(s); };
     function pos(id) { if (id === myId) return myLocalTank.hp > 0 ? myLocalTank : null; var o = typeof opponents !== 'undefined' ? opponents[id] : null; return o && o.hp > 0 && !o.isDisguised ? o : null; }
-    function bubble(ctx, x, y, txt, k) {
-        var a = k < 0.12 ? k / 0.12 : k > 0.8 ? (1 - k) / 0.2 : 1, sc = k < 0.12 ? 0.6 + 0.4 * (k / 0.12) + 0.12 * Math.sin(k / 0.12 * Math.PI) : 1;
-        ctx.save(); ctx.globalAlpha = Math.max(0, a); ctx.translate(x, y - 64 - (1 - sc) * 10); ctx.scale(sc, sc);
-        ctx.font = '700 17px "Russo One", Arial'; var w = Math.max(40, ctx.measureText(txt).width + 22), h = 30;
-        ctx.fillStyle = 'rgba(10,14,38,.9)'; ctx.strokeStyle = 'rgba(167,139,250,.9)'; ctx.lineWidth = 2;
-        ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(-w / 2, -h / 2, w, h, 12); else ctx.rect(-w / 2, -h / 2, w, h); ctx.fill(); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(-6, h / 2 - 1); ctx.lineTo(0, h / 2 + 7); ctx.lineTo(6, h / 2 - 1); ctx.closePath(); ctx.fill();
-        ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, 0, 1); ctx.restore();
+    function nodeFor(id, b) {
+        var n = nodes[id];
+        if (!n || n.e !== b.e || n.t !== b.t) {
+            if (n) n.el.remove();
+            if (!layer) { layer = document.createElement('div'); layer.id = 'emo-layer'; ($('game-screen') || document.body).appendChild(layer); }
+            var txt = tt(EMO[b.e]), el = document.createElement('div');
+            el.className = 'emo-b' + (isEmoji(txt) ? ' big' : '') + (id === myId ? ' me' : '');
+            el.innerHTML = '<span></span>'; el.firstChild.textContent = txt;
+            layer.appendChild(el); n = nodes[id] = { el: el, e: b.e, t: b.t };
+        }
+        return n;
     }
     window.EmoteFX = {
         draw: function (ctx, now) {
+            var cv = ctx.canvas, rect = null, m = null;
             for (var id in bubbles) {
-                var b = bubbles[id], k = (now - b.t) / 2600; if (k >= 1) { delete bubbles[id]; continue; }
-                var p = pos(id); if (!p) continue; bubble(ctx, p.x, p.y, tt(EMO[b.e]), k);
+                var b = bubbles[id], k = (now - b.t) / 2600;
+                if (k >= 1) { delete bubbles[id]; if (nodes[id]) { nodes[id].el.remove(); delete nodes[id]; } continue; }
+                var p = pos(id), n = nodeFor(id, b);
+                if (!p) { n.el.style.visibility = 'hidden'; continue; }
+                if (!m) { m = ctx.getTransform(); rect = cv.getBoundingClientRect(); }
+                var kx = rect.width / cv.width, ky = rect.height / cv.height;
+                var sx = rect.left + (m.a * p.x + m.c * p.y + m.e) * kx, sy = rect.top + (m.b * p.x + m.d * p.y + m.f) * ky - 66 * m.d * ky;
+                n.el.style.visibility = ''; n.el.style.transform = 'translate3d(' + Math.round(sx) + 'px,' + Math.round(sy) + 'px,0)';
             }
-            if (kc && kc.on && kc.killer) { var o = pos(kc.killer); if (o) { var t = now / 200; ctx.save(); ctx.strokeStyle = 'rgba(239,68,68,.9)'; ctx.lineWidth = 3; ctx.setLineDash([10, 7]); ctx.lineDashOffset = -now / 30; ctx.beginPath(); ctx.arc(o.x, o.y, 44 + 3 * Math.sin(t), 0, Math.PI * 2); ctx.stroke(); ctx.restore(); } }
-        }
+            for (var nid in nodes) if (!bubbles[nid]) { nodes[nid].el.remove(); delete nodes[nid]; }
+            if (kc && kc.on && kc.killer) { var o = pos(kc.killer); if (o) { ctx.save(); ctx.strokeStyle = 'rgba(239,68,68,.9)'; ctx.lineWidth = 3; ctx.setLineDash([10, 7]); ctx.lineDashOffset = -now / 30; ctx.beginPath(); ctx.arc(o.x, o.y, 44 + 3 * Math.sin(now / 200), 0, Math.PI * 2); ctx.stroke(); ctx.restore(); } }
+        },
+        clear: function () { bubbles = {}; for (var id in nodes) nodes[id].el.remove(); nodes = {}; }
     };
-
     // ================= КІЛКАМ (звичайні сесії) =================
     var WN = { normal: 'Гармата', explosive: 'Вибуховий снаряд', fast: 'Кулемет', minigun: 'Мінігун', piercing: 'Бронебійний снаряд', homing: 'Самонавідна ракета', shotgun: 'Дробовик', incendiary: 'Запальний снаряд', samurai: 'Клинок самурая', melee: 'Таран', mine: 'Міна', laser: 'Автолазер', hunter_gun: 'Рушниця мисливця', acid: 'Кислота', boss_proj: 'Снаряд боса' };
     var WI = { normal: '💥', explosive: '🧨', fast: '🔫', minigun: '🔫', piercing: '🗡️', homing: '🚀', shotgun: '💢', incendiary: '🔥', samurai: '⚔️', melee: '💥', mine: '💣', laser: '⚡', hunter_gun: '🎯' };
@@ -193,7 +218,14 @@
         if (!evIv) evIv = setInterval(paintEv, 30000);
     }
     socket.on('gameEvent', function (d) { evData = d; paintEv(); if (d && window.uiToast) uiToast('🔥 ' + d.title); });
-    socket.on('eventBonus', function (d) { if (d && window.uiToast) uiToast('🔥 ' + d.title + ': ' + (d.cr ? '+' + d.cr + ' ' + tt('кредитів') : '') + (d.xp ? ' +' + d.xp + ' XP' : '')); });
+    // вікно результату: позначка, що нагорода вже збільшена подією
+    socket.on('gameOver', function (d) {
+        var old = $('ev-won'); if (old) old.remove(); if (!d || !d.ev) return;
+        var anchor = $('winner-reward'); anchor = anchor && anchor.closest('div'); if (!anchor) return;
+        var e = document.createElement('div'); e.id = 'ev-won';
+        e.innerHTML = '🔥 <b></b>' + (d.ev.cr > 1 ? ' · ×' + d.ev.cr + ' <span>кредитів</span>' : '') + (d.ev.xp > 1 ? ' · ×' + d.ev.xp + ' XP' : '');
+        e.querySelector('b').textContent = d.ev.title; anchor.insertAdjacentElement('afterend', e);
+    });    socket.on('eventBonus', function (d) { if (d && window.uiToast) uiToast('🔥 ' + d.title + ': ' + (d.cr ? '+' + d.cr + ' ' + tt('кредитів') : '') + (d.xp ? ' +' + d.xp + ' XP' : '')); });
     var annEl = null, annT = null;
     socket.on('announce', function (d) {
         if (!d || !d.text) return; snd('powerup');
