@@ -745,7 +745,31 @@ I18N.add("tr", {
  "Червоні перемогли": "Kırmızılar kazandı",
  "Сині перемогли": "Maviler kazandı",
  "Зелені перемогли": "Yeşiller kazandı",
- "Жовті перемогли": "Sarılar kazandı"
+ "Жовті перемогли": "Sarılar kazandı",
+ "Ботів можна додати лише в режимах проти гравців": "Botlar yalnızca oyuncuya karşı oyuncu modlarında eklenebilir",
+ "Сесія заповнена: збільште кількість гравців у параметрах": "Oturum dolu: ayarlardan oyuncu sayısını artır",
+ "Зараз забагато ботів на сервері. Спробуйте трохи пізніше": "Şu anda sunucuda çok fazla bot var. Biraz sonra tekrar dene",
+ "Додати бота": "Bot ekle",
+ "Бот займе вільне місце; вигнати його можна кнопкою ✖": "Bot boş bir yeri alır; ✖ düğmesiyle onu atabilirsin",
+ "Зачекай — йде синтез…": "Bekle — sentez sürüyor…",
+ "Зачекай — кейс ще відкривається…": "Bekle — kasa hâlâ açılıyor…",
+ "Ой-ой!": "Eyvah!",
+ "Твій предмет зламався. Спробуй наступного разу — можливо, пощастить 🍀": "Eşyan kırıldı. Bir dahaki sefere tekrar dene — belki şansın yaver gider 🍀",
+ "Спробувати ще": "Tekrar dene",
+ "Забрати нагороду": "Ödülü al",
+ "ПОДІЙ ПОКИ НЕМАЄ": "ŞU AN ETKİNLİK YOK",
+ "Ми сповістимо, щойно почнеться нова подія. А поки — забирай нагороди за завдання!": "Yeni bir etkinlik başlar başlamaz haber vereceğiz. Bu arada görev ödüllerini topla!",
+ "Увімкни сповіщення — і не пропусти подвійні нагороди": "Bildirimleri aç, iki kat ödülleri kaçırma",
+ "ЗАВДАННЯ": "GÖREVLER",
+ "Увімкнути": "Aç",
+ "КРЕДИТИ": "KREDİ",
+ "ДО КІНЦЯ": "BİTİŞE",
+ "ЗАЛИШИЛОСЬ": "KALAN",
+ "ОСТАННІЙ ШАНС!": "SON ŞANS!",
+ "Подія завершується — встигни зіграти": "Etkinlik bitiyor — yetişip oyna",
+ "ГРАТИ": "OYNA",
+ "Лише в режимі": "Sadece şu modda",
+ "Бонус діє в усіх режимах": "Bonus tüm modlarda geçerli"
 }, [["Ви протримались до (\\d+) хвилі", "$1. dalgaya kadar dayandın"], ["(\\d+)Д", "$1g"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1 sn"], ["_ та -", "_ ve -"]]);
 // Креди (валюта), вікно «Гаманець» та промокоди
 I18N.add("tr", {

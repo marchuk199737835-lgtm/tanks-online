@@ -9,15 +9,33 @@ document.getElementById('nav-sessions-btn').onclick=()=>{socket.emit('requestRoo
 document.getElementById('nav-shop-btn').onclick=()=>{if(typeof renderShop==='function')renderShop();showScreen('shop-screen');};
 document.getElementById('nav-hangar-btn').onclick=()=>{if(typeof renderHangar==='function')renderHangar();showScreen('hangar-screen');};
 const navU=document.getElementById('nav-upgrader-btn');if(navU)navU.onclick=()=>{if(typeof renderUpgrader==='function')renderUpgrader();showScreen('upgrader-screen');};
-document.getElementById('shop-back-btn').onclick=()=>showScreen('main-menu-screen');
-document.getElementById('hangar-back-btn').onclick=()=>showScreen('main-menu-screen');
-const ubk=document.getElementById('upg-back-btn');if(ubk)ubk.onclick=()=>showScreen('main-menu-screen');
+// ===== Запобіжник вікон =====
+// 1) Поки йде синтез в апгрейдорі чи крутиться рулетка кейса, з екрана не вийти (інакше результат вискакував у меню).
+// 2) При переході на інший екран (особливо на старт матчу) закриваються всі вікна, відкриті поверх попереднього (профіль, картка гравця, клани, гаманець…).
+window.screenBusy=function(){const vis=id=>{const e=document.getElementById(id);return e&&!e.classList.contains('hidden');};if(vis('upgrader-screen')&&upgBusy)return 'Зачекай — йде синтез…';if(vis('roulette-modal'))return 'Зачекай — кейс ще відкривається…';return '';};
+window.closeOverlays=function(toGame){
+    ['Profile','Ranking','PlayerCard','Social','Referral','Credits','Progress','Wallet','RankedUI','Clans'].forEach(k=>{const o=window[k];if(o&&typeof o.close==='function'){try{o.close();}catch(e){}}});
+    try{if(window.LV&&LV.closeRewards)LV.closeRewards();}catch(e){}
+    ['case-info-modal','case-confirm-modal','upg-error-modal','advent-modal','context-menu','create-room-modal','reward-modal','roulette-modal'].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.add('hidden');});
+    // результати, що ще «в дорозі» (анімація рулетки/апгрейду), більше не вискочать на новому екрані
+    try{if(typeof rouletteTimers!=='undefined'){rouletteTimers.forEach(clearTimeout);rouletteTimers.length=0;}}catch(e){}
+    try{if(typeof upgResultTimers!=='undefined'){upgResultTimers.forEach(clearTimeout);upgResultTimers.length=0;if(upgBusy){upgFinish();upgSrcIdx=null;upgSrcId=null;upgTgtId=null;}}}catch(e){}
+    if(toGame){const s=document.getElementById('settings-modal');if(s)s.classList.add('hidden');try{if(window.uiDialog&&uiDialog.closeAll)uiDialog.closeAll();}catch(e){}}
+};
+(function(){const base=window.showScreen,SCR=['login-screen','main-menu-screen','room-browser-screen','shop-screen','lobby-screen','game-screen','hangar-screen','upgrader-screen'];
+    window.showScreen=function(id){const prev=SCR.find(i=>{const e=document.getElementById(i);return e&&!e.classList.contains('hidden');});if(prev&&prev!==id)closeOverlays(id==='game-screen');base(id);};})();
+const goMenu=()=>{const busy=screenBusy();if(busy){if(window.uiToast)uiToast(busy,true);return;}showScreen('main-menu-screen');};
+document.getElementById('shop-back-btn').onclick=goMenu;
+document.getElementById('hangar-back-btn').onclick=goMenu;
+const ubk=document.getElementById('upg-back-btn');if(ubk)ubk.onclick=goMenu;
 document.getElementById('back-to-menu-btn').onclick=()=>showScreen('main-menu-screen');
 
 window.openAdvent=function(){if(typeof playSound==='function')playSound('ui_click');document.getElementById('advent-modal').classList.remove('hidden');socket.emit('getAdventState');renderAdvent();};
 window.renderAdvent=function(){let grid=document.getElementById('advent-grid');if(!grid)return;grid.innerHTML='';let cD=window.adventDay||0,claims=myAdventClaims||[];const cnt=document.getElementById('advent-counter');if(cnt)cnt.innerText=claims.length;for(let d=3;d<=31;d++){let state='',content='',bg='bg-slate-800 border-slate-700',cursor='cursor-not-allowed opacity-50',onclick='';if(claims.includes(d)){state='ЗАБРАНО';bg='bg-emerald-900/50 border-emerald-500 text-emerald-400';content='✔️';}else if(d<cD){state='ПРОПУЩЕНО';bg='bg-red-900/30 border-red-800 text-red-500';content='❌';}else if(d===cD){state='ЗАБРАТИ';bg='bg-orange-600 border-orange-400 text-white animate-pulse shadow-[0_0_15px_#ea580c]';cursor='cursor-pointer hover:bg-orange-500';content=d===31?'🎁':`<span class="inline-flex items-center gap-1">${creditIcon(14)}${20+(d-3)*5}</span>`;onclick=`onclick="claimAdventDay()"`}else{state='ЗАКРИТО';bg='bg-slate-900 border-slate-700 text-slate-500';content='🔒';}if(d===31&&state!=='ЗАБРАНО'&&state!=='ЗАБРАТИ')content='🎃';grid.innerHTML+=`<div class="flex flex-col items-center justify-center p-2 rounded-xl border ${bg} ${cursor} transition h-20 relative overflow-hidden group" ${onclick}><span class="text-[10px] font-bold mb-1 opacity-70">${d}.10</span><span class="text-xl font-russo z-10 group-hover:scale-110 transition">${content}</span></div>`;}};
 window.claimAdventDay=function(){socket.emit('claimAdvent');};
-let _advLast=0;setInterval(()=>{let nowS=Date.now()+(window.adventOffset||0),timerEl=document.getElementById('hw-timer'),diff=(window.adventEnd||0)-nowS;if(Date.now()-_advLast>120000){_advLast=Date.now();socket.emit('getAdventState');}if(window.adventEnd&&diff>0&&timerEl){let d=Math.floor(diff/(1000*60*60*24)),h=Math.floor((diff/(1000*60*60))%24),m=Math.floor((diff/1000/60)%60),s=Math.floor((diff/1000)%60);timerEl.innerText=`${d}Д ${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;}else if(timerEl&&window.adventEnd){timerEl.innerText="ХЕЛОУІН НАСТАВ!";}},1000);
+// плашка адвенту в меню: смужка днів (забрано / пропущено / сьогодні) і кнопка-нагадування, перемальовується лише коли стан змінився
+let _advKey='';window.paintAdventMini=function(){const box=document.getElementById('mm-adv-days'),cl=document.getElementById('mm-adv-claim');if(!box)return;const cD=window.adventDay||0,claims=(typeof myAdventClaims!=='undefined'&&myAdventClaims)||[],key=cD+'|'+claims.join(',');if(key===_advKey)return;_advKey=key;let h='';for(let d=3;d<=31;d++)h+='<i class="'+(claims.includes(d)?'d':d<cD?'m':d===cD?'t':'')+'"></i>';box.innerHTML=h;if(cl)cl.classList.toggle('hidden',!(cD>=3&&cD<=31&&!claims.includes(cD)));};
+let _advLast=0;setInterval(()=>{paintAdventMini();let nowS=Date.now()+(window.adventOffset||0),timerEl=document.getElementById('hw-timer'),diff=(window.adventEnd||0)-nowS;if(Date.now()-_advLast>120000){_advLast=Date.now();socket.emit('getAdventState');}if(window.adventEnd&&diff>0&&timerEl){let d=Math.floor(diff/(1000*60*60*24)),h=Math.floor((diff/(1000*60*60))%24),m=Math.floor((diff/1000/60)%60),s=Math.floor((diff/1000)%60);timerEl.innerText=`${d}Д ${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;}else if(timerEl&&window.adventEnd){timerEl.innerText="ХЕЛОУІН НАСТАВ!";}},1000);
 
 window.rgbOf=function(r){return({common:'148,163,184',rare:'59,130,246',epic:'168,85,247',legendary:'234,179,8',mythic:'255,59,107'})[r]||'100,116,139';};
 window.hex2rgb=function(h){h=String(h||'#3b82f6').replace('#','');if(h.length===3)h=h.split('').map(x=>x+x).join('');const n=parseInt(h,16);return((n>>16)&255)+','+((n>>8)&255)+','+(n&255);};

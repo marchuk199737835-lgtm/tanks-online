@@ -745,7 +745,31 @@ I18N.add("fr", {
  "Червоні перемогли": "Les rouges ont gagné",
  "Сині перемогли": "Les bleus ont gagné",
  "Зелені перемогли": "Les verts ont gagné",
- "Жовті перемогли": "Les jaunes ont gagné"
+ "Жовті перемогли": "Les jaunes ont gagné",
+ "Ботів можна додати лише в режимах проти гравців": "Les bots ne peuvent être ajoutés qu'en mode joueur contre joueur",
+ "Сесія заповнена: збільште кількість гравців у параметрах": "La session est pleine : augmente le nombre de joueurs dans les paramètres",
+ "Зараз забагато ботів на сервері. Спробуйте трохи пізніше": "Trop de bots sur le serveur en ce moment. Réessaie un peu plus tard",
+ "Додати бота": "Ajouter un bot",
+ "Бот займе вільне місце; вигнати його можна кнопкою ✖": "Le bot occupe une place libre ; tu peux l'expulser avec le bouton ✖",
+ "Зачекай — йде синтез…": "Patiente — synthèse en cours…",
+ "Зачекай — кейс ще відкривається…": "Patiente — la caisse s'ouvre encore…",
+ "Ой-ой!": "Oups !",
+ "Твій предмет зламався. Спробуй наступного разу — можливо, пощастить 🍀": "Ton objet s'est cassé. Réessaie la prochaine fois — tu auras peut-être plus de chance 🍀",
+ "Спробувати ще": "Réessayer",
+ "Забрати нагороду": "Récupérer la récompense",
+ "ПОДІЙ ПОКИ НЕМАЄ": "AUCUN ÉVÉNEMENT POUR L'INSTANT",
+ "Ми сповістимо, щойно почнеться нова подія. А поки — забирай нагороди за завдання!": "On te préviendra dès qu'un nouvel événement commence. En attendant, récupère tes récompenses de quêtes !",
+ "Увімкни сповіщення — і не пропусти подвійні нагороди": "Active les notifications pour ne jamais rater les récompenses doublées",
+ "ЗАВДАННЯ": "QUÊTES",
+ "Увімкнути": "Activer",
+ "КРЕДИТИ": "CRÉDITS",
+ "ДО КІНЦЯ": "AVANT LA FIN",
+ "ЗАЛИШИЛОСЬ": "RESTANT",
+ "ОСТАННІЙ ШАНС!": "DERNIÈRE CHANCE !",
+ "Подія завершується — встигни зіграти": "L'événement se termine — joue vite",
+ "ГРАТИ": "JOUER",
+ "Лише в режимі": "Seulement en mode",
+ "Бонус діє в усіх режимах": "Bonus valable dans tous les modes"
 }, [["Ви протримались до (\\d+) хвилі", "Vous avez tenu jusqu'à la vague $1"], ["(\\d+)Д", "$1j"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1 s"], ["_ та -", "_ et -"]]);
 // Креди (валюта), вікно «Гаманець» та промокоди
 I18N.add("fr", {

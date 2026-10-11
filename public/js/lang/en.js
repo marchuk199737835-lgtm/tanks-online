@@ -856,7 +856,31 @@ I18N.add("en", {
  "Червоні перемогли": "Red team won",
  "Сині перемогли": "Blue team won",
  "Зелені перемогли": "Green team won",
- "Жовті перемогли": "Yellow team won"
+ "Жовті перемогли": "Yellow team won",
+ "Ботів можна додати лише в режимах проти гравців": "Bots can only be added in player-vs-player modes",
+ "Сесія заповнена: збільште кількість гравців у параметрах": "Session is full: increase the player count in the settings",
+ "Зараз забагато ботів на сервері. Спробуйте трохи пізніше": "Too many bots on the server right now. Try again a bit later",
+ "Додати бота": "Add bot",
+ "Бот займе вільне місце; вигнати його можна кнопкою ✖": "The bot takes a free slot; you can kick it with the ✖ button",
+ "Зачекай — йде синтез…": "Hold on — synthesis in progress…",
+ "Зачекай — кейс ще відкривається…": "Hold on — the case is still opening…",
+ "Ой-ой!": "Oops!",
+ "Твій предмет зламався. Спробуй наступного разу — можливо, пощастить 🍀": "Your item broke. Try again next time — maybe you'll get lucky 🍀",
+ "Спробувати ще": "Try again",
+ "Забрати нагороду": "Claim reward",
+ "ПОДІЙ ПОКИ НЕМАЄ": "NO EVENTS RIGHT NOW",
+ "Ми сповістимо, щойно почнеться нова подія. А поки — забирай нагороди за завдання!": "We'll notify you as soon as a new event starts. Meanwhile, grab your quest rewards!",
+ "Увімкни сповіщення — і не пропусти подвійні нагороди": "Turn on notifications so you never miss double rewards",
+ "ЗАВДАННЯ": "QUESTS",
+ "Увімкнути": "Turn on",
+ "КРЕДИТИ": "CREDITS",
+ "ДО КІНЦЯ": "LEFT",
+ "ЗАЛИШИЛОСЬ": "REMAINING",
+ "ОСТАННІЙ ШАНС!": "LAST CHANCE!",
+ "Подія завершується — встигни зіграти": "The event is ending — play while you can",
+ "ГРАТИ": "PLAY",
+ "Лише в режимі": "Only in mode",
+ "Бонус діє в усіх режимах": "Bonus applies to all modes"
 }, [["Ви протримались до (\\d+) хвилі", "You lasted until wave $1"], ["(\\d+)Д", "$1d"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1s"], ["_ та -", "_ and -"]]);
 // Креди (валюта), вікно «Гаманець» та промокоди
 I18N.add("en", {

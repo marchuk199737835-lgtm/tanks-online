@@ -310,42 +310,148 @@ canvas { display: block; cursor: crosshair; }
 .mm-round { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; background: rgba(15,23,42,.7); border: 1px solid rgba(148,163,184,.3); color: #cbd5e1; transition: all .2s; }
 .mm-round:hover { border-color: #60a5fa; box-shadow: 0 0 14px rgba(59,130,246,.4); transform: translateY(-1px); }
 .mm-out:hover { border-color: #f87171; box-shadow: 0 0 14px rgba(239,68,68,.4); }
-.mm-advent { margin: 8px auto 0; width: min(430px, calc(100% - 24px)); padding: 2px; border-radius: 14px; flex-shrink: 0; cursor: pointer; background: linear-gradient(100deg,#ea580c,#7c3aed,#ea580c); background-size: 200% 100%; animation: au-shimmer 4s linear infinite; box-shadow: 0 0 22px rgba(234,88,12,.35); transition: transform .2s; }
-.mm-advent:hover { transform: scale(1.02); }
-.mm-advent-in { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 5px 12px; border-radius: 12px; background: rgba(2,6,23,.92); }
-.mm-advent-l, .mm-advent-r { font-size: 26px; line-height: 1; } .mm-advent-l { animation: gift-wiggle 3s ease-in-out infinite; } .mm-advent-r { opacity: .6; }
-.mm-advent-c { text-align: center; line-height: 1.2; }
-.mm-advent-c b { display: block; font-family: 'Russo One', sans-serif; font-size: 12px; letter-spacing: .12em; color: #fb923c; text-shadow: 0 0 10px #f97316; }
-#hw-timer { display: inline-block; margin-top: 2px; padding: 1px 8px; border-radius: 8px; background: rgba(0,0,0,.55); border: 1px solid rgba(168,85,247,.5); font-family: ui-monospace, Menlo, monospace; font-size: 11px; letter-spacing: .1em; color: #fff; }
-.mm-hero { text-align: center; padding: 8px 12px 0; flex-shrink: 0; }
-.mm-title { font-size: 26px; line-height: 1; letter-spacing: .1em; background: linear-gradient(100deg,#fff 0%,#93c5fd 35%,#fff 50%,#a7f3d0 70%,#fff 100%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: au-shimmer 6s linear infinite; filter: drop-shadow(0 0 16px rgba(147,197,253,.45)); }
+/* ===== ГОЛОВНЕ МЕНЮ «АРСЕНАЛ»: ліворуч угорі адвент, ліворуч унизу чат (#ch-root, фіксований), у центрі танк і банер події, праворуч сітка карток ===== */
+.ars-body { flex: 1; min-height: 0; display: grid; gap: 10px; padding: 10px 12px 12px; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: "left" "center" "nav"; }
+.ars-left { grid-area: left; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.ars-center { grid-area: center; min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 10px; }
+/* адвент */
+.mm-advent { position: relative; overflow: hidden; cursor: pointer; border-radius: 16px; padding: 9px 14px 10px; text-align: left; background: linear-gradient(135deg, rgba(88,28,135,.9), rgba(124,45,18,.8)); border: 1px solid rgba(249,115,22,.6); box-shadow: 0 0 22px rgba(234,88,12,.22); transition: transform .25s, box-shadow .25s; flex-shrink: 0; }
+.mm-advent:hover, .mm-advent:focus-visible { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(249,115,22,.42); outline: none; }
+.mm-advent-ic { position: absolute; right: 10px; top: 6px; font-size: 34px; line-height: 1; animation: ars-sway 4s ease-in-out infinite; }
+@keyframes ars-sway { 50% { transform: rotate(-8deg) translateY(-3px); } }
+.mm-advent-t { display: block; font-family: 'Russo One', sans-serif; font-size: 12px; letter-spacing: .1em; color: #fdba74; padding-right: 44px; text-shadow: 0 0 10px rgba(249,115,22,.6); }
+#hw-timer { display: block; margin-top: 2px; font-family: 'Russo One', sans-serif; font-size: 18px; letter-spacing: .05em; color: #fff; font-variant-numeric: tabular-nums; }
+.mm-advent-days { display: flex; gap: 2px; margin-top: 8px; }
+.mm-advent-days i { flex: 1; height: 5px; border-radius: 2px; background: rgba(255,255,255,.14); }
+.mm-advent-days i.d { background: #fb923c; box-shadow: 0 0 5px #fb923c; } .mm-advent-days i.m { background: rgba(239,68,68,.45); } .mm-advent-days i.t { background: #fde047; animation: claim-pulse 1.2s infinite; }
+.mm-advent-claim { display: inline-block; margin-top: 8px; padding: 4px 10px; border-radius: 7px; background: #f97316; color: #1c0a00; font-family: 'Russo One', sans-serif; font-size: 11px; letter-spacing: .04em; animation: ars-glow 1.6s ease-in-out infinite; }
+.mm-advent-claim.hidden { display: none; }
+@keyframes ars-glow { 50% { box-shadow: 0 0 16px rgba(249,115,22,.9); } }
+/* центр: танк і назва */
+.mm-hero { text-align: center; pointer-events: none; flex-shrink: 0; }
+.ars-tank { width: 130px; height: 130px; margin: 0 auto 4px; border-radius: 50%; background: radial-gradient(circle, rgba(59,130,246,.3), transparent 68%); display: flex; align-items: center; justify-content: center; animation: ars-float 5s ease-in-out infinite; }
+.ars-tank svg { width: 72%; height: 72%; filter: drop-shadow(0 0 18px rgba(59,130,246,.55)); overflow: visible; }
+.ars-tur { animation: ars-aim 9s ease-in-out infinite; transform-origin: 0 0; }
+@keyframes ars-float { 50% { transform: translateY(-10px); } }
+@keyframes ars-aim { 0%, 100% { transform: rotate(0); } 30% { transform: rotate(-28deg); } 60% { transform: rotate(22deg); } }
+.mm-title { font-size: 28px; line-height: 1; letter-spacing: .1em; background: linear-gradient(100deg,#fff 0%,#93c5fd 35%,#fff 50%,#a7f3d0 70%,#fff 100%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: au-shimmer 6s linear infinite; filter: drop-shadow(0 0 16px rgba(147,197,253,.45)); }
 .mm-title span { color: #60a5fa; -webkit-text-fill-color: #60a5fa; }
-.mm-sub { margin-top: 4px; font-size: 9px; font-weight: 800; letter-spacing: .3em; text-transform: uppercase; color: #64748b; }
-.mm-grid-nav { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, 1fr); grid-auto-rows: 1fr; gap: 10px; padding: 12px; width: 100%; max-width: 1100px; margin: 0 auto; }
-@media (orientation: landscape) and (min-width: 560px) { .mm-grid-nav { grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; padding-top: 8px; } }
-.mm-card { --c: 59,130,246; position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px 6px; border-radius: 20px; text-align: center; min-height: 0; background: linear-gradient(160deg, rgba(var(--c),.22), rgba(15,23,42,.75) 60%); border: 1px solid rgba(var(--c),.45); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: transform .25s cubic-bezier(.2,1.2,.4,1), box-shadow .25s, border-color .25s; }
-.mm-card::before { content: ''; position: absolute; top: 0; bottom: 0; width: 45%; left: -70%; background: linear-gradient(100deg, transparent, rgba(255,255,255,.18), transparent); transform: skewX(-18deg); transition: left .6s; }
-.mm-card:hover, .mm-card:focus-visible { transform: translateY(-6px) scale(1.03); border-color: rgb(var(--c)); box-shadow: 0 14px 40px rgba(var(--c),.45), inset 0 0 30px rgba(var(--c),.18); }
-.mm-card:hover::before { left: 130%; }
-.mm-card:active { transform: scale(.97); }
+.mm-sub { margin-top: 5px; font-size: 9px; font-weight: 800; letter-spacing: .3em; text-transform: uppercase; color: #64748b; }
+/* сітка карток */
+#main-menu-screen .mm-grid-nav { grid-area: nav; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: minmax(74px, 1fr); gap: 10px; padding: 4px 4px 64px; margin: 0; width: auto; max-width: none; min-height: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; perspective: 700px; align-content: stretch; scrollbar-width: thin; scrollbar-color: #334155 transparent; }
+.mm-card { --c: 59,130,246; position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 2px; padding: 10px 12px; border-radius: 16px; text-align: left; min-height: 0; min-width: 0; background: linear-gradient(150deg, rgba(var(--c),.5), rgba(15,23,42,.94) 72%); border: 1px solid rgba(var(--c),.55); transform-style: preserve-3d; transition: transform .3s cubic-bezier(.2,.9,.3,1.2), box-shadow .3s, border-color .3s; }
+.mm-card::before { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.26) 45%, transparent 60%); transform: translateX(-100%); transition: transform .6s; pointer-events: none; z-index: 2; }
+.mm-card:hover, .mm-card:focus-visible { transform: rotateX(6deg) rotateY(-8deg) translateZ(8px); border-color: rgb(var(--c)); box-shadow: 0 14px 30px rgba(var(--c),.45); outline: none; z-index: 3; }
+.mm-card:hover::before, .mm-card:focus-visible::before { transform: translateX(100%); }
+.mm-card:active { transform: scale(.97); transition-duration: .1s; }
 .mm-card.c-blue { --c: 59,130,246; } .mm-card.c-purple { --c: 168,85,247; } .mm-card.c-green { --c: 16,185,129; } .mm-card.c-rose { --c: 244,63,94; }
-.mm-card-ico { position: relative; z-index: 1; font-size: 44px; line-height: 1; filter: drop-shadow(0 6px 14px rgba(var(--c),.6)); transition: transform .3s cubic-bezier(.2,1.5,.4,1); }
-.mm-card:hover .mm-card-ico { transform: scale(1.18) rotate(-6deg); }
-.mm-card h2 { position: relative; z-index: 1; font-size: 14px; letter-spacing: .1em; color: #fff; }
-.mm-card p { position: relative; z-index: 1; font-size: 8px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #94a3b8; }
-.mm-card-bg { position: absolute; right: -10px; bottom: -14px; font-size: 76px; opacity: .08; pointer-events: none; transform: rotate(-12deg); }
-.mm-dot { position: absolute; top: 10px; right: 12px; width: 14px; height: 14px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 12px #fbbf24; animation: claim-pulse 1.2s infinite; z-index: 2; }
+.mm-card-ico { position: absolute; right: 8px; top: 6px; font-size: 36px; line-height: 1; filter: drop-shadow(0 6px 14px rgba(var(--c),.6)); transition: transform .4s cubic-bezier(.2,.9,.3,1.4); pointer-events: none; }
+.mm-card:hover .mm-card-ico, .mm-card:focus-visible .mm-card-ico { transform: scale(1.22) rotate(-10deg) translateZ(20px); }
+.mm-card h2 { position: relative; z-index: 1; font-family: 'Russo One', sans-serif; font-size: 14px; line-height: 1.1; letter-spacing: .05em; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,.6); max-width: 100%; overflow-wrap: anywhere; }
+.mm-card p { position: relative; z-index: 1; font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #cbd5e1; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mm-card-bg { display: none; }
+#main-menu-screen .mm-card .mh-badge { left: 8px; right: auto; }
+.mm-dot { position: absolute; top: 9px; left: 10px; width: 14px; height: 14px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 12px #fbbf24; animation: claim-pulse 1.2s infinite; z-index: 2; }
 .mm-dot.hidden { display: none; }
-@media (max-height: 520px) and (orientation: landscape) { .mm-hero { display: none; } .mm-card-ico { font-size: 34px; } .mm-card h2 { font-size: 12px; } .mm-advent { margin-top: 4px; } .mm-advent-in { padding: 2px 10px; } .mm-advent-l, .mm-advent-r { font-size: 20px; } .mm-advent-c b { font-size: 10px; } }
-@media (max-width: 480px) and (orientation: portrait) { .mm-top { flex-wrap: wrap; } .mm-brand { order: 2; } .mm-brand-ico, .mm-brand-t > b, .mm-brand-t > span { display: none; } .mm-music { margin-top: 0; } .mm-top { padding-top: 10px; } .mm-top-r { width: 100%; flex-wrap: wrap; } .lv-mini { flex: 1 1 100%; width: auto; } .mm-pill { margin-right: auto; } .mm-card-ico { font-size: 52px; } .mm-card h2 { font-size: 15px; } .mm-card p { font-size: 9px; } .mm-title { font-size: 24px; } }
+/* «Швидка гра» — головна велика картка */
+#mm-quick { grid-column: span 2; grid-row: span 2; justify-content: flex-end; background: radial-gradient(120% 120% at 85% 0%, rgba(16,185,129,.75), rgba(59,130,246,.5) 45%, rgba(15,23,42,.95)); border-color: rgba(110,231,183,.8); }
+#mm-quick h2 { font-size: 24px; } #mm-quick p { font-size: 10px; color: #d1fae5; }
+#mm-quick .mm-card-ico { font-size: 72px; right: 14px; top: 10px; }
+#mm-quick::after { content: ''; position: absolute; inset: 0; border-radius: inherit; border: 2px solid #6ee7b7; animation: ars-ring 2s ease-out infinite; pointer-events: none; }
+@keyframes ars-ring { from { opacity: .9; } to { opacity: 0; transform: scale(1.05); } }
+/* порядок карток (модулі додають їх у різний час) */
+#mm-quick { order: 0; } #nav-sessions-btn { order: 1; } #mm-ranked { order: 2; } #nav-hangar-btn { order: 3; } #nav-shop-btn { order: 4; } #nav-upgrader-btn { order: 5; }
+#mm-progress { order: 6; } #mm-profile-card { order: 7; } #mm-rating-card { order: 8; } #mm-clans { order: 9; } #mm-referral { order: 10; }
+#main-menu-screen .mm-grid-nav > .mm-card:not([id^="nav-"]):not(#mm-quick):not(#mm-ranked):not(#mm-progress):not(#mm-profile-card):not(#mm-rating-card):not(#mm-clans):not(#mm-referral) { order: 20; }
+/* ===== БАНЕР ПОДІЇ ===== */
+.ars-ev { width: 100%; max-width: 680px; flex-shrink: 0; }
+.evb { position: relative; overflow: hidden; border-radius: 16px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; min-height: 62px; color: #fff; }
+.evb > * { position: relative; z-index: 1; }
+.evb-x { flex: none; font-family: 'Russo One', sans-serif; font-size: 32px; line-height: 1; }
+.evb-bd { flex: 1; min-width: 0; }
+.evb h5 { font-family: 'Russo One', sans-serif; font-size: 14px; letter-spacing: .05em; line-height: 1.15; overflow-wrap: anywhere; }
+.evb p { font-size: 11px; font-weight: 700; color: #e2e8f0; opacity: .88; margin-top: 2px; }
+.evb-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.evb-tags span { font-family: 'Russo One', sans-serif; font-size: 10px; padding: 2px 7px; border-radius: 6px; background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.22); white-space: nowrap; }
+.evb-tm { flex: none; text-align: center; font-family: 'Russo One', sans-serif; font-size: 16px; font-variant-numeric: tabular-nums; }
+.evb-tm small { display: block; font: 800 8px Jura, sans-serif; letter-spacing: .15em; opacity: .8; }
+.evb-go { flex: none; padding: 8px 12px; border-radius: 10px; background: #fff; color: #0f172a; font-family: 'Russo One', sans-serif; font-size: 12px; letter-spacing: .04em; cursor: pointer; transition: transform .2s, box-shadow .2s; }
+.evb-go:hover { transform: scale(1.07); box-shadow: 0 0 16px rgba(255,255,255,.5); }
+.evb .sp { position: absolute; z-index: 0; bottom: -5px; width: 4px; height: 4px; border-radius: 50%; background: #fde047; box-shadow: 0 0 6px #fde047; animation: ars-up 3s linear infinite; }
+@keyframes ars-up { to { transform: translateY(-90px); opacity: 0; } }
+.evb.on::before, .evb.mode::before { content: ''; position: absolute; inset: 0; z-index: 0; }
+/* активна */
+.evb.on { background: linear-gradient(110deg, #7c2d12, #be123c 45%, #6d28d9); border: 1px solid #fb923c; box-shadow: 0 0 30px rgba(249,115,22,.35); }
+.evb.on::before { background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.18) 50%, transparent 70%); animation: ars-shine 3s linear infinite; }
+@keyframes ars-shine { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.evb.on .evb-x { color: #fde047; text-shadow: 0 0 18px #f59e0b; animation: ars-beat 1.2s ease-in-out infinite; }
+@keyframes ars-beat { 50% { transform: scale(1.12); } }
+/* лише для режиму */
+.evb.mode { background: linear-gradient(110deg, #064e3b, #0e7490 55%, #1e3a8a); border: 1px solid #2dd4bf; box-shadow: 0 0 26px rgba(20,184,166,.35); }
+.evb.mode::before { background: repeating-linear-gradient(135deg, transparent 0 14px, rgba(255,255,255,.05) 14px 28px); }
+.evb.mode .evb-x { color: #a7f3d0; text-shadow: 0 0 16px #14b8a6; animation: ars-beat 1.6s ease-in-out infinite; }
+/* закінчується (< 1 год) */
+.evb.end { background: linear-gradient(110deg, #450a0a, #991b1b); border: 1px solid #f87171; animation: ars-warn 1s ease-in-out infinite; }
+@keyframes ars-warn { 50% { box-shadow: 0 0 24px rgba(239,68,68,.7); } }
+.evb.end .evb-x { color: #fecaca; } .evb.end .evb-tm { color: #fca5a5; }
+/* немає подій */
+.evb.none { background: linear-gradient(110deg, rgba(15,23,42,.9), rgba(30,41,82,.8)); border: 1px dashed rgba(59,130,246,.45); }
+.evb.none h5 { color: #93c5fd; } .evb.none p { color: #8fa3d6; }
+.evb-radar { position: relative; flex: none; width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(96,165,250,.5); background: radial-gradient(circle, rgba(59,130,246,.25), transparent 70%); overflow: hidden; }
+.evb-radar::before { content: ''; position: absolute; inset: 0; background: conic-gradient(from 0deg, rgba(96,165,250,.6), transparent 25%); animation: ars-rot 2.5s linear infinite; }
+.evb-radar::after { content: ''; position: absolute; inset: 30%; border-radius: 50%; border: 1px solid rgba(96,165,250,.4); }
+@keyframes ars-rot { to { transform: rotate(360deg); } }
+.evb.none .evb-go { background: rgba(59,130,246,.25); color: #dbeafe; border: 1px solid rgba(96,165,250,.6); }
+/* ===== альбомна орієнтація: три колонки ===== */
+@media (orientation: landscape) and (min-width: 760px) {
+  .ars-body { grid-template-columns: minmax(190px, 26%) minmax(0, 1fr) minmax(270px, 38%); grid-template-rows: minmax(0, 1fr); grid-template-areas: "left center nav"; gap: 14px; padding: 8px 14px 12px; }
+  .ars-center { justify-content: space-between; }
+  #main-menu-screen .mm-grid-nav { padding-bottom: 4px; }
+}
+/* телефон в альбомній: низька висота */
+@media (orientation: landscape) and (max-height: 520px) {
+  .ars-tank, .mm-sub { display: none; } .mm-title { font-size: 22px; }
+  .mm-advent { padding: 6px 10px; } .mm-advent-ic { font-size: 24px; } .mm-advent-t { font-size: 10px; } #hw-timer { font-size: 14px; } .mm-advent-days { margin-top: 5px; }
+  .evb { padding: 7px 10px; min-height: 0; gap: 8px; } .evb p, .evb-tags { display: none; } .evb-x { font-size: 24px; } .evb h5 { font-size: 12px; } .evb-radar { width: 32px; height: 32px; }
+  #main-menu-screen .mm-grid-nav { grid-auto-rows: minmax(54px, 1fr); gap: 7px; }
+  .mm-card { padding: 7px 9px; } .mm-card p { display: none; } .mm-card h2 { font-size: 12px; } .mm-card-ico { font-size: 26px; }
+  #mm-quick { grid-row: span 1; } #mm-quick h2 { font-size: 18px; } #mm-quick .mm-card-ico { font-size: 40px; top: 6px; }
+}
+/* портретний телефон: усе стовпчиком, адвент і банер компактні, танк прихований */
+@media (orientation: portrait) {
+  .ars-tank, .mm-hero { display: none; }
+  .ars-center { justify-content: flex-start; }
+  .mm-advent { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 10px; padding: 8px 12px; }
+  .mm-advent-t { padding-right: 0; grid-column: 1; } #hw-timer { grid-column: 1; font-size: 15px; } .mm-advent-days { grid-column: 1 / -1; margin-top: 6px; }
+  .mm-advent-ic { position: static; grid-column: 2; grid-row: 1 / span 2; font-size: 30px; } .mm-advent-claim { grid-column: 1 / -1; justify-self: start; margin-top: 6px; }
+  .evb { padding: 8px 12px; min-height: 0; } .evb-tags { display: none; } .evb-x { font-size: 26px; }
+}
+@media (orientation: portrait) and (max-width: 480px) { .mm-card h2 { font-size: 13px; } #mm-quick h2 { font-size: 22px; } #mm-quick .mm-card-ico { font-size: 60px; } }
+/* ПК (миша) */
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .ars-body { grid-template-columns: 340px minmax(0, 1fr) minmax(360px, 36%); padding: 14px 28px 20px; gap: 24px; }
+  .mm-advent { padding: 14px 18px; } .mm-advent-t { font-size: 15px; } #hw-timer { font-size: 26px; } .mm-advent-ic { font-size: 50px; right: 14px; top: 10px; } .mm-advent-days i { height: 7px; } .mm-advent-claim { font-size: 13px; padding: 5px 12px; }
+  .ars-tank { width: 210px; height: 210px; } .mm-title { font-size: clamp(28px, 3vw, 54px); white-space: nowrap; } .mm-sub { font-size: 12px; margin-top: 8px; }
+  #main-menu-screen .mm-grid-nav { gap: 14px; grid-auto-rows: minmax(84px, 1fr); }
+  .mm-card { padding: 12px 16px; border-radius: 18px; } .mm-card h2 { font-size: 17px; } .mm-card p { font-size: 11px; } .mm-card-ico { font-size: 46px; right: 12px; top: 10px; }
+  #mm-quick h2 { font-size: 34px; } #mm-quick p { font-size: 13px; } #mm-quick .mm-card-ico { font-size: 108px; right: 22px; top: 16px; }
+  .evb { padding: 14px 18px; min-height: 84px; gap: 16px; } .evb-x { font-size: 44px; } .evb h5 { font-size: 18px; } .evb p { font-size: 13px; } .evb-tags span { font-size: 11px; } .evb-tm { font-size: 20px; } .evb-tm small { font-size: 9px; } .evb-go { font-size: 14px; padding: 10px 16px; } .evb-radar { width: 56px; height: 56px; }
+}
+/* слабкі пристрої: без 3D, блисків, частинок і пульсацій — лише підсвітка */
+html.gfx-low .ars-tank, html.gfx-low .ars-tur, html.gfx-low .mm-advent-ic, html.gfx-low .mm-advent-claim, html.gfx-low .evb, html.gfx-low .evb-x, html.gfx-low .evb-radar::before, html.gfx-low .mm-title, html.gfx-low .mm-advent-days i.t { animation: none !important; }
+html.gfx-low .mm-card::before, html.gfx-low #mm-quick::after, html.gfx-low .evb::before, html.gfx-low .evb .sp { display: none !important; }
+html.gfx-low .mm-card:hover, html.gfx-low .mm-card:focus-visible { transform: translateY(-2px); }
+html.gfx-low .mm-card:hover .mm-card-ico { transform: none; }
+html.gfx-low #main-menu-screen .mm-grid-nav { perspective: none; }
+html.gfx-low .ars-tank svg, html.gfx-low .mm-title, html.gfx-medium .ars-tank svg { filter: none; }
+html.gfx-medium .evb .sp, html.gfx-medium #mm-quick::after { display: none; }
+@media (hover: none) { .mm-card:hover { transform: none; box-shadow: none; } .mm-card:hover::before { transform: translateX(-100%); } .mm-card:hover .mm-card-ico { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ars-tank, .ars-tur, .mm-advent-ic, .mm-advent-claim, .evb, .evb-x, .evb .sp, .evb::before, .evb-radar::before, #mm-quick::after { animation: none !important; } }
+@media (max-width: 480px) and (orientation: portrait) { .mm-top { flex-wrap: wrap; } .mm-brand { order: 2; } .mm-brand-ico, .mm-brand-t > b, .mm-brand-t > span { display: none; } .mm-music { margin-top: 0; } .mm-top { padding-top: 10px; } .mm-top-r { width: 100%; flex-wrap: wrap; } .lv-mini { flex: 1 1 100%; width: auto; } .mm-pill { margin-right: auto; } }
 @media (min-width:1024px) and (hover:hover) and (pointer:fine) {
   .mm-top { padding: 18px 28px 0; } .mm-brand-ico { width: 52px; height: 52px; } .mm-brand-t b { font-size: 20px; } .mm-brand-t > span { font-size: 10px; } .mm-music { font-size: 11px; padding: 4px 12px 4px 8px; margin-top: 7px; } .mm-music i { font-size: 14px; }
   .mm-top-r { gap: 12px; } .mm-pill { padding: 11px 18px; } .mm-pill span { font-size: 18px; } .mm-pill i { width: 22px; height: 22px; font-size: 15px; }
   .mm-round { width: 48px; height: 48px; font-size: 20px; }
-  .mm-advent { margin-top: 14px; width: 560px; } .mm-advent-in { padding: 10px 20px; } .mm-advent-c b { font-size: 22px; } #hw-timer { font-size: 18px; padding: 3px 14px; } .mm-advent-l, .mm-advent-r { font-size: 44px; }
-  .mm-hero { padding-top: 14px; } .mm-title { font-size: 56px; } .mm-sub { font-size: 12px; margin-top: 8px; }
-  .mm-grid-nav { gap: 24px; padding: 24px 40px 36px; align-content: stretch; grid-auto-rows: 1fr; } .mm-card { border-radius: 28px; gap: 12px; }
-  .mm-card-ico { font-size: 84px; } .mm-card h2 { font-size: 24px; } .mm-card p { font-size: 12px; } .mm-card-bg { font-size: 150px; }
 }
 
 /* ---------- ЛОБІ ---------- */
@@ -448,6 +554,10 @@ canvas { display: block; cursor: crosshair; }
 .lb-team-h span { font-size: 10px; color: #cbd5e1; }
 .lb-join { padding: 7px; border-radius: 10px; font-family: 'Russo One', sans-serif; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: #fff; background: rgba(var(--pc),.35); border: 1px solid rgb(var(--pc)); transition: all .2s; cursor: pointer; }
 .lb-join:hover:not(:disabled) { background: rgb(var(--pc)); box-shadow: 0 0 16px rgba(var(--pc),.7); } .lb-join:disabled { opacity: .45; cursor: not-allowed; filter: grayscale(.6); }
+.lb-add-bot { flex: none; margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 12px; border-radius: 12px; font-family: 'Russo One', sans-serif; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #d1fae5; background: linear-gradient(90deg, rgba(16,185,129,.22), rgba(59,130,246,.18)); border: 1px dashed rgba(52,211,153,.7); cursor: pointer; transition: background .2s, transform .15s, box-shadow .2s; }
+.lb-add-bot i { font-style: normal; font-size: 16px; transition: transform .3s; } .lb-add-bot small { font: 700 11px Jura, sans-serif; color: #94a3b8; letter-spacing: 0; }
+.lb-add-bot:hover:not(:disabled) { background: linear-gradient(90deg, rgba(16,185,129,.45), rgba(59,130,246,.35)); box-shadow: 0 0 16px rgba(16,185,129,.45); border-style: solid; } .lb-add-bot:hover:not(:disabled) i { transform: rotate(-12deg) scale(1.2); }
+.lb-add-bot:active:not(:disabled) { transform: scale(.97); } .lb-add-bot:disabled { opacity: .45; cursor: not-allowed; filter: grayscale(.6); }
 .lb-team .lb-pl { padding: 4px 6px; } .lb-team .lb-pl-ico { width: 26px; height: 26px; } .lb-team .lb-pl-st { display: none; } .lb-team .lb-pl.ready::after { content: '✓'; color: #34d399; font-weight: 900; font-size: 13px; }
 .lb-empty { text-align: center; padding: 10px 4px; font-size: 9px; font-weight: 800; letter-spacing: .08em; color: #475569; text-transform: uppercase; border: 1px dashed rgba(71,85,105,.5); border-radius: 10px; }
 .lb-unass-h { margin: 10px 2px 4px; font-size: 9px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #64748b; }

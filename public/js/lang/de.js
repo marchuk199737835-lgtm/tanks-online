@@ -745,7 +745,31 @@ I18N.add("de", {
  "Червоні перемогли": "Rot hat gewonnen",
  "Сині перемогли": "Blau hat gewonnen",
  "Зелені перемогли": "Grün hat gewonnen",
- "Жовті перемогли": "Gelb hat gewonnen"
+ "Жовті перемогли": "Gelb hat gewonnen",
+ "Ботів можна додати лише в режимах проти гравців": "Bots können nur in Spieler-gegen-Spieler-Modi hinzugefügt werden",
+ "Сесія заповнена: збільште кількість гравців у параметрах": "Sitzung ist voll: Erhöhe die Spielerzahl in den Einstellungen",
+ "Зараз забагато ботів на сервері. Спробуйте трохи пізніше": "Gerade zu viele Bots auf dem Server. Versuch es etwas später",
+ "Додати бота": "Bot hinzufügen",
+ "Бот займе вільне місце; вигнати його можна кнопкою ✖": "Der Bot belegt einen freien Platz; mit ✖ kannst du ihn entfernen",
+ "Зачекай — йде синтез…": "Moment — Synthese läuft…",
+ "Зачекай — кейс ще відкривається…": "Moment — die Kiste öffnet sich noch…",
+ "Ой-ой!": "Oh oh!",
+ "Твій предмет зламався. Спробуй наступного разу — можливо, пощастить 🍀": "Dein Gegenstand ist kaputtgegangen. Versuch es nächstes Mal — vielleicht hast du Glück 🍀",
+ "Спробувати ще": "Nochmal versuchen",
+ "Забрати нагороду": "Belohnung abholen",
+ "ПОДІЙ ПОКИ НЕМАЄ": "GERADE KEINE EVENTS",
+ "Ми сповістимо, щойно почнеться нова подія. А поки — забирай нагороди за завдання!": "Wir benachrichtigen dich, sobald ein neues Event startet. Hol dir bis dahin deine Quest-Belohnungen!",
+ "Увімкни сповіщення — і не пропусти подвійні нагороди": "Aktiviere Benachrichtigungen und verpasse keine doppelten Belohnungen",
+ "ЗАВДАННЯ": "AUFGABEN",
+ "Увімкнути": "Aktivieren",
+ "КРЕДИТИ": "CREDITS",
+ "ДО КІНЦЯ": "BIS ZUM ENDE",
+ "ЗАЛИШИЛОСЬ": "VERBLEIBEND",
+ "ОСТАННІЙ ШАНС!": "LETZTE CHANCE!",
+ "Подія завершується — встигни зіграти": "Das Event endet bald — schnell noch spielen",
+ "ГРАТИ": "SPIELEN",
+ "Лише в режимі": "Nur im Modus",
+ "Бонус діє в усіх режимах": "Bonus gilt in allen Modi"
 }, [["Ви протримались до (\\d+) хвилі", "Du hast bis Welle $1 durchgehalten"], ["(\\d+)Д", "$1T"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1 s"], ["_ та -", "_ und -"]]);
 // Креди (валюта), вікно «Гаманець» та промокоди
 I18N.add("de", {

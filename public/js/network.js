@@ -90,18 +90,22 @@ socket.on('caseResult',(result)=>{
     },4400));
 });
 
+const upgResultTimers=[];   // таймери анімації апгрейду: closeOverlays (ui.js) скасовує їх, якщо гравця примусово перекинуло на інший екран
 socket.on('upgradeResult',(res)=>{
     myBucks=res.newBucks;myInventory=res.inv;
     if(typeof updateGlobalBucks==='function')updateGlobalBucks();
     const pointer=document.getElementById('upg-pointer'),actionBtn=document.getElementById('upg-action-btn');
     if(pointer){
+        upgResultTimers.forEach(clearTimeout);upgResultTimers.length=0;
         pointer.classList.remove('hidden');pointer.style.transition='none';pointer.style.left='0%';
-        setTimeout(()=>{if(!(window.UISFX&&UISFX.ready()&&UISFX.upgRun(pointer)))playSound('shoot');pointer.style.transition='left 3s cubic-bezier(0.1, 1, 0.3, 1)';pointer.style.left=res.roll+'%';},50);
-        setTimeout(()=>{
+        upgResultTimers.push(setTimeout(()=>{if(!(window.UISFX&&UISFX.ready()&&UISFX.upgRun(pointer)))playSound('shoot');pointer.style.transition='left 3s cubic-bezier(0.1, 1, 0.3, 1)';pointer.style.left=res.roll+'%';},50));
+        upgResultTimers.push(setTimeout(()=>{
+            upgResultTimers.length=0;
             pointer.classList.add('hidden');
             if(typeof upgFinish==='function')upgFinish();
             upgSrcIdx=null;upgSrcId=null;upgTgtId=null;document.getElementById('upg-slot-src').innerHTML='';document.getElementById('upg-slot-tgt').innerHTML='';
             if(typeof renderUpgrader==='function')renderUpgrader();if(typeof renderHangar==='function')renderHangar();
+            if(document.getElementById('upgrader-screen').classList.contains('hidden'))return;   // гравець уже не в апгрейдорі — вікно результату не показуємо
             if(res.win){
                 if(!(window.UISFX&&UISFX.ready()&&UISFX.upgWin(MODULES[res.tId]&&MODULES[res.tId].rarity)))playSound('powerup');const rw=document.getElementById('reward-modal');
                 if(rw){
@@ -117,11 +121,10 @@ socket.on('upgradeResult',(res)=>{
                 }
             }else{
                 if(!(window.UISFX&&UISFX.ready()&&UISFX.upgFail()))playSound('hurt');
-                let em=document.getElementById('upg-error-modal'),et=document.getElementById('upg-error-txt');
-                if(em&&et){et.innerText='Апгрейд не вдався! Модуль та креди згоріли...';em.classList.remove('hidden');}
-                else alert('Апгрейд не вдався!');
+                // не «помилка», а дружнє повідомлення: предмет зламався, це частина гри
+                uiDialog.show({kind:'warn',icon:'💔',title:'Ой-ой!',text:'Твій предмет зламався. Спробуй наступного разу — можливо, пощастить 🍀',buttons:[{t:'Спробувати ще',cls:'primary'}]});
             }
-        },3200);
+        },3200));
     }
 });
 

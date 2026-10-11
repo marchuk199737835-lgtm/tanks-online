@@ -168,6 +168,32 @@
             h = entries.map(([id, p]) => card(r, id, p, isHost)).join('');
         }
         const pl = $('players-list'); if (pl.__h !== h) { pl.__h = h; if (window.DomPatch && pl.firstChild) DomPatch.html(pl, h); else pl.innerHTML = h; }   // лише змінені вузли: без блимання при готовності/вході ботів
+        renderAddBot(r, isHost, entries.length);
+    }
+
+    // ---------- кнопка лідера «Додати бота» (режими з ботами приходять із сервера: botCfg) ----------
+    let botModes = null, addBotBtn = null;
+    socket.on('botCfg', d => { botModes = d && Array.isArray(d.modes) ? d.modes : null; if (cur()) renderRoster(cur()); });
+    socket.on('connect', () => socket.emit('getBotCfg')); if (socket.connected) socket.emit('getBotCfg');
+    socket.on('botAddError', msg => toast(String(msg || ''), true));
+    function renderAddBot(r, isHost, n) {
+        if (!addBotBtn) {
+            const card = $('players-list').parentElement; if (!card) return;
+            addBotBtn = document.createElement('button'); addBotBtn.type = 'button'; addBotBtn.id = 'lb-add-bot'; addBotBtn.className = 'lb-add-bot';
+            addBotBtn.innerHTML = '<i>🤖</i><b>Додати бота</b><small></small>';
+            addBotBtn.addEventListener('click', () => {
+                const rr = cur(); if (!rr || addBotBtn.disabled) return; click();
+                addBotBtn.disabled = true; setTimeout(() => { if (cur()) renderRoster(cur()); }, 600);
+                socket.emit('addBot', { roomId: currentRoomId });
+            });
+            card.appendChild(addBotBtn);
+        }
+        const cap = Math.min(r.maxPlayers || 0, MI.usesColor(r.mode) ? Object.keys(COLORS).length : 10);
+        const show = isHost && !r.rk && r.status === 'lobby' && !!botModes && botModes.includes(r.mode) && !MI.isSolo(r.mode);
+        addBotBtn.style.display = show ? '' : 'none'; if (!show) return;
+        const full = n >= cap; addBotBtn.disabled = full;
+        addBotBtn.querySelector('small').textContent = n + ' / ' + cap;
+        addBotBtn.title = full ? 'Сесія заповнена: збільште кількість гравців у параметрах' : 'Бот займе вільне місце; вигнати його можна кнопкою ✖';
     }
     $('players-list').addEventListener('click', e => {
         const b = e.target.closest('button'); if (!b) return; const r = cur(); if (!r) return;

@@ -71,7 +71,8 @@
         if (k === 'money') return money({ price: null });
         show({ kind: k, text: m });
     };
-    window.uiDialog = { show, confirm, money, close: () => close(), isOpen: () => !!cur };
+    // closeAll — закрити поточне вікно й викинути чергу (старт матчу: жодне меню-вікно не має висіти поверх бою)
+    window.uiDialog = { show, confirm, money, close: () => close(), closeAll: () => { queue = []; close(cur && cur.cancelValue); }, isOpen: () => !!cur };
 
     // ---- вихід із матчу ----
     function inMatch() { return typeof currentRoomData !== 'undefined' && currentRoomData && currentRoomData.status === 'playing' && typeof currentRoomId !== 'undefined' && currentRoomId; }

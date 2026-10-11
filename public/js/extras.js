@@ -207,17 +207,43 @@
         if (!d || !window.uiDialog) return; snd('ui_buy');
         uiDialog.show({ kind: 'success', icon: '🤗', title: 'Ми скучили!', text: 'Вас не було ' + d.days + ' дн. Тримайте подарунок до повернення: +' + d.cr + ' кредитів!' });
     });
-    var evBar = null, evData = null, evIv = null;
-    function fmtLeft(ms) { ms = Math.max(0, ms); var h = Math.floor(ms / 36e5), m = Math.floor(ms % 36e5 / 6e4); return h ? h + ':' + String(m).padStart(2, '0') : m + ' хв'; }
+    // ---- банер події на головному екрані (#mm-ev): 4 стани — активна / лише для режиму / закінчується (< 1 год) / подій немає ----
+    var evBox = null, evData = null, evT = null;
+    var two = function (n) { return String(n).padStart(2, '0'); };
+    function fmtClock(ms) { var s = Math.max(0, Math.floor(ms / 1000)); return two(Math.floor(s / 3600)) + ':' + two(Math.floor(s % 3600 / 60)) + ':' + two(s % 60); }
+    function modeName(m) { var M = m && window.ModeInfo && ModeInfo.MODES[m]; return M ? { e: M.e, n: M.sn || M.n } : null; }
+    function pushOn() { return pushOk && Notification.permission === 'granted' && lsGet('pushOn') === '1'; }
+    function evHtml(st, E) {
+        if (st === 'none') return '<div class="evb none"><div class="evb-radar"></div><div class="evb-bd"><h5>ПОДІЙ ПОКИ НЕМАЄ</h5><p>' + (pushOn() ? 'Ми сповістимо, щойно почнеться нова подія. А поки — забирай нагороди за завдання!' : 'Увімкни сповіщення — і не пропусти подвійні нагороди') + '</p></div>' +
+            (pushOn() ? '<button type="button" class="evb-go" data-ev="quests">🏅 <span>ЗАВДАННЯ</span></button>' : (pushOk && Notification.permission !== 'denied' ? '<button type="button" class="evb-go" data-ev="push">🔔 <span>Увімкнути</span></button>' : '')) + '</div>';
+        var mult = Math.max(E.cr || 1, E.xp || 1), mn = modeName(E.mode), sp = '';
+        if (st !== 'end') for (var i = 0; i < 8; i++) sp += '<i class="sp" style="left:' + (6 + i * 12) + '%;animation-delay:' + (i * 0.37).toFixed(2) + 's"></i>';
+        var tags = (E.cr > 1 ? '<span>💰 ×' + E.cr + ' <b>КРЕДИТИ</b></span>' : '') + (E.xp > 1 ? '<span>⭐ ×' + E.xp + ' XP</span>' : '') + (mn ? '<span>' + mn.e + ' <b>' + esc(mn.n) + '</b></span>' : '');
+        var tm = '<div class="evb-tm"><span data-ev-t>' + fmtClock(E.until - Date.now()) + '</span><small>' + (st === 'end' ? 'ДО КІНЦЯ' : 'ЗАЛИШИЛОСЬ') + '</small></div>';
+        if (st === 'end') return '<div class="evb end"><div class="evb-x">⏳</div><div class="evb-bd"><h5>ОСТАННІЙ ШАНС!</h5><p><b class="i18n-skip">' + esc(E.title) + '</b> · <span>Подія завершується — встигни зіграти</span></p><div class="evb-tags">' + tags + '</div></div>' + tm + '<button type="button" class="evb-go" data-ev="play">▶ <span>ГРАТИ</span></button></div>';
+        return '<div class="evb ' + st + '">' + sp + '<div class="evb-x">' + (st === 'mode' && mn ? mn.e : '×' + mult) + '</div><div class="evb-bd"><h5>🔥 <span class="i18n-skip">' + esc(E.title) + '</span></h5><p>' +
+            (mn ? '<span>Лише в режимі</span> <b>' + esc(mn.n) + '</b>' : '<span>Бонус діє в усіх режимах</span>') + '</p><div class="evb-tags">' + tags + '</div></div>' + tm + (st === 'mode' ? '<button type="button" class="evb-go" data-ev="play">▶ <span>ГРАТИ</span></button>' : '') + '</div>';
+    }
     function paintEv() {
-        if (!evBar) { var ad = document.querySelector('#main-menu-screen .mm-advent'); if (!ad) return; evBar = document.createElement('div'); evBar.id = 'ev-bar'; ad.insertAdjacentElement('afterend', evBar); }
-        if (!evData || evData.until < Date.now()) { evBar.classList.remove('on'); clearInterval(evIv); evIv = null; return; }
-        var mn = evData.mode && window.ModeInfo && ModeInfo.MODES[evData.mode] ? ModeInfo.MODES[evData.mode].e + ' ' + ModeInfo.MODES[evData.mode].sn : '';
-        evBar.innerHTML = '🔥 <b>' + esc(evData.title) + '</b>' + (evData.cr > 1 ? ' · ×' + evData.cr + ' <span>кредитів</span>' : '') + (evData.xp > 1 ? ' · ×' + evData.xp + ' XP' : '') + (mn ? ' · <span>' + esc(mn) + '</span>' : '') + ' · ⏳ ' + fmtLeft(evData.until - Date.now());
-        evBar.classList.add('on');
-        if (!evIv) evIv = setInterval(paintEv, 30000);
+        clearTimeout(evT); evT = null;
+        if (!evBox) { evBox = $('mm-ev'); if (!evBox) return; evBox.addEventListener('click', onEvClick); }
+        var now = Date.now(), E = evData && evData.until > now ? evData : null;
+        var st = !E ? 'none' : (E.until - now < 36e5 ? 'end' : (E.mode ? 'mode' : 'on'));
+        var key = st + '|' + (E ? [E.title, E.cr, E.xp, E.mode, E.until].join(',') : (pushOn() ? 'p' : 'n'));
+        if (evBox.__k !== key) { evBox.__k = key; evBox.innerHTML = evHtml(st, E); }
+        else if (E) { var t = evBox.querySelector('[data-ev-t]'); if (t) t.textContent = fmtClock(E.until - now); }
+        if (E) { var menu = $('main-menu-screen'), vis = menu && !menu.classList.contains('hidden'); evT = setTimeout(paintEv, vis ? 1000 : 15000); }   // секундний таймер лише коли меню на екрані
+    }
+    function onEvClick(e) {
+        var b = e.target.closest && e.target.closest('[data-ev]'); if (!b) return; snd('ui_click');
+        if (b.dataset.ev === 'play') { var s = $('nav-sessions-btn'); if (s) s.click(); }
+        else if (b.dataset.ev === 'quests') { var q = $('mm-progress'); if (q) q.click(); }
+        else if (b.dataset.ev === 'push') subscribe().then(function (r) { if (r !== 'ok' && window.uiToast) uiToast(r === 'denied' ? 'Сповіщення заблоковано в налаштуваннях браузера' : 'Не вдалося увімкнути сповіщення', true); paintEv(); paintPushRow(); });
     }
     socket.on('gameEvent', function (d) { evData = d; paintEv(); if (d && window.uiToast) uiToast('🔥 ' + d.title); });
+    // одразу показуємо стан «подій немає»; повернення в меню — миттєво оновлюємо таймер
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(paintEv, 60); }); else setTimeout(paintEv, 60);
+    (function () { var m = $('main-menu-screen'); if (m && window.MutationObserver) new MutationObserver(function () { if (!m.classList.contains('hidden') && evData) paintEv(); }).observe(m, { attributes: true, attributeFilter: ['class'] }); })();
     // вікно результату: позначка, що нагорода вже збільшена подією
     socket.on('gameOver', function (d) {
         var old = $('ev-won'); if (old) old.remove(); if (!d || !d.ev) return;

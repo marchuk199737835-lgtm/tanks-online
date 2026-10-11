@@ -745,7 +745,31 @@ I18N.add("pl", {
  "Червоні перемогли": "Czerwoni wygrali",
  "Сині перемогли": "Niebiescy wygrali",
  "Зелені перемогли": "Zieloni wygrali",
- "Жовті перемогли": "Żółci wygrali"
+ "Жовті перемогли": "Żółci wygrali",
+ "Ботів можна додати лише в режимах проти гравців": "Boty można dodać tylko w trybach gracz kontra gracz",
+ "Сесія заповнена: збільште кількість гравців у параметрах": "Sesja jest pełna: zwiększ liczbę graczy w ustawieniach",
+ "Зараз забагато ботів на сервері. Спробуйте трохи пізніше": "Teraz jest za dużo botów na serwerze. Spróbuj trochę później",
+ "Додати бота": "Dodaj bota",
+ "Бот займе вільне місце; вигнати його можна кнопкою ✖": "Bot zajmie wolne miejsce; możesz go wyrzucić przyciskiem ✖",
+ "Зачекай — йде синтез…": "Poczekaj — trwa synteza…",
+ "Зачекай — кейс ще відкривається…": "Poczekaj — skrzynka jeszcze się otwiera…",
+ "Ой-ой!": "Ojej!",
+ "Твій предмет зламався. Спробуй наступного разу — можливо, пощастить 🍀": "Twój przedmiot się zepsuł. Spróbuj następnym razem — może dopisze ci szczęście 🍀",
+ "Спробувати ще": "Spróbuj ponownie",
+ "Забрати нагороду": "Odbierz nagrodę",
+ "ПОДІЙ ПОКИ НЕМАЄ": "NA RAZIE BRAK WYDARZEŃ",
+ "Ми сповістимо, щойно почнеться нова подія. А поки — забирай нагороди за завдання!": "Powiadomimy cię, gdy zacznie się nowe wydarzenie. A na razie odbierz nagrody za zadania!",
+ "Увімкни сповіщення — і не пропусти подвійні нагороди": "Włącz powiadomienia i nie przegap podwójnych nagród",
+ "ЗАВДАННЯ": "ZADANIA",
+ "Увімкнути": "Włącz",
+ "КРЕДИТИ": "KREDYTY",
+ "ДО КІНЦЯ": "DO KOŃCA",
+ "ЗАЛИШИЛОСЬ": "POZOSTAŁO",
+ "ОСТАННІЙ ШАНС!": "OSTATNIA SZANSA!",
+ "Подія завершується — встигни зіграти": "Wydarzenie się kończy — zdąż zagrać",
+ "ГРАТИ": "GRAJ",
+ "Лише в режимі": "Tylko w trybie",
+ "Бонус діє в усіх режимах": "Bonus działa we wszystkich trybach"
 }, [["Ви протримались до (\\d+) хвилі", "Wytrzymałeś do fali $1"], ["(\\d+)Д", "$1d"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1 s"], ["_ та -", "_ i -"]]);
 // Креди (валюта), вікно «Гаманець» та промокоди
 I18N.add("pl", {
