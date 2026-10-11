@@ -352,7 +352,7 @@ function getActiveRooms() {
 }
 
 function getMaxHp(equipped) {
-    return Math.round(MAX_HP * GameData.statMult(equipped, 'hp'));
+    return Math.round(MAX_HP * GameData.statMult(equipped, 'hp') * ((equipped && equipped.hpMul) || 1));   // hpMul — клас танка (кооп), неперелічувана властивість копії екіпіровки
 }
 
 // мови інтерфейсу (мова зберігається в акаунті; тексти перекладає клієнт — public/js/i18n.js та public/js/lang/*.js)
@@ -433,7 +433,20 @@ function processPlayerDeath(r, victimId, killerId, meta) {
         Ev.emit('kill', { roomId: r.id, mode: r.mode, killerName: atk ? atk.name : null, killerBot: !!(atk && atk.isBot), victimName: v.name, victimBot: !!v.isBot, weapon: cleanWeapon(meta && meta.weapon) });
     } catch (e) { console.error('❌ kill event:', e && e.message); }
 
+    Classes.reset(v);      // здібність гасне разом із танком
     if (Modes.has(r.mode)) { Modes.onDeath(r, v, killerId); return; }
+    if (r.mode === 'survival') {   // життя: відродження через 6 с біля живого союзника; останнє — гравець вибуває
+        v.lives = (v.lives || 1) - 1; io.to(v.id).emit('clsLives', { n: Math.max(0, v.lives) });
+        if (v.lives <= 0) { v.out = true; return; }
+        setTimeout(() => {
+            const R = rooms[r.id]; if (!R || R !== r || r.status !== 'playing' || !r.players[victimId] || v.hp > 0 || v.out) return;
+            const mate = Object.values(r.players).find(q => q.hp > 0 && !q.out); let sp = getValidSpawn(r.map, 24, 'spawn_player');
+            if (mate) for (let i = 0; i < 12; i++) { const a = Math.random() * Math.PI * 2, x = mate.x + Math.cos(a) * 90, y = mate.y + Math.sin(a) * 90; if (!checkCollisionServer(r.map, x, y, 26)) { sp = { x, y }; break; } }
+            v.hp = getMaxHp(v.equipped); v.buff = null; v.onFire = null; v.stuckIn = []; v.x = sp.x; v.y = sp.y;
+            io.to(r.id).emit('playerRespawn', v);
+        }, 6000);
+        return;
+    }
     if (r.mode === 'team_deathmatch') {
         if (atk && atk.team && atk.team !== v.team) {
             r.teamScores[atk.team]++;
@@ -502,6 +515,7 @@ const ModeInfo = require('./public/js/modeinfo.js');   // спільне з кл
 const VALID_MODES = ModeInfo.ORDER.slice();
 const Modes = require('./modes.js')({ io, rooms, dbUsers, MAP_DATA, MapObj, Nav, Z_TYPES, waveScale, getValidSpawn, getValidEdgeSpawn, checkCollisionServer, getMaxHp,
     grantXp, rollDrop, saveUser, ecoPayload, pushRooms, zombieTick, processPlayerDeath, emitMatchEnd, applyEventBonus, ZOMBIE_CAP, ZOMBIE_SPAWN_BASE, ZOMBIE_SPAWN_STEP });
+const Classes = require('./classes_srv.js')({ io, rooms, getMaxHp, GameData, Modes, checkCollisionServer });   // класи танків у кооперативі
 const teamsOf = r => r.mode === 'rounds' || r.ranked ? 2 : r.mode === 'capture_points' ? Math.max(2, Math.min(4, r.cpTeams || 2)) : Math.max(2, Math.min(4, r.tdmTeams || 2));
 const isTeamPvp = m => m === 'team_deathmatch' || m === 'capture_points' || m === 'rounds';
 const powerupsOn = m => m !== 'prophunt' && m !== 'team_deathmatch' && m !== 'rounds';
@@ -626,6 +640,8 @@ function startRoomGame(roomId, notify) {
             
             if (r.mode === 'survival') {
                 r.wave = 0; r.state = 'waiting'; r.nextWaveTime = Date.now() + 4000; r.zombies = {};
+                Object.defineProperty(r, '_n0', { value: pK.length, writable: true, configurable: true, enumerable: false });   // розмір загону на старті
+                const L = ModeInfo.livesN(r.svLives); pK.forEach(id => { r.players[id].lives = L; r.players[id].out = false; });
             } else if (r.mode === 'prophunt') {
                 r.state = 'hiding'; r.phaseEndTime = Date.now() + 4000 + (r.hideTime * 1000);
                 const prps = Array.from(MapObj.DISGUISE_IDS);
@@ -636,6 +652,7 @@ function startRoomGame(roomId, notify) {
                     }
                 });
             }
+            Classes.onStart(r, pK, Date.now());      // кооп: клас → характеристики танка (HP уже з урахуванням класу)
             io.to(roomId).emit('gameStarting', r);
             pushRooms();
             return true;
@@ -670,7 +687,7 @@ function maxSpeedOf(r, p) {
     let s = 200 * GameData.statMult(p.equipped, 'speed');
     if (p.buff === 'speed') s *= 1.5; else if (p.buff === 'samurai') s *= 1.6;
     if (r.mode === 'solo_arena') s *= 1.35;
-    return s;
+    return s * Classes.speedMul(r, p);
 }
 function speedCheck(r, p, x, y, socket) {
     const now = Date.now(); let s = AC.get(p);
@@ -1300,7 +1317,7 @@ socket.on('selectProp', (data) => {
         if (!r || r.status !== 'playing' || !r.players[socket.id] || (d.attacker !== 'zombie' && d.attacker !== 'bomber')) return;
         let v = r.players[socket.id];
         if (v.buff === 'shield' || v.hp <= 0 || !ModeInfo.isPve(r.mode)) return;
-        v.hp = Math.max(0, v.hp - Modes.dmgTaken(r, socket.id, Math.min(400, Math.max(0, +d.amt || 0))));
+        v.hp = Math.max(0, v.hp - Classes.taken(r, v, Modes.dmgTaken(r, socket.id, Math.min(400, Math.max(0, +d.amt || 0)))));
         if (v.hp === 0) processPlayerDeath(r, socket.id, 'zombie');
     });
 
@@ -1323,9 +1340,11 @@ socket.on('selectProp', (data) => {
         if (!d || typeof d !== 'object') return;
         let r = rooms[d.roomId];
         if (r && r.status === 'playing' && r.zombies[d.zid] && r.zombies[d.zid].hp > 0) {
-            let fD = d.dmg, aP = r.players[socket.id];
-            if (aP) fD *= GameData.statMult(aP.equipped, 'dmg');
+            let fD = Math.min(600, Math.max(0, +d.dmg || 0)), aP = r.players[socket.id];
+            if (aP) fD *= GameData.statMult(aP.equipped, 'dmg') * Classes.dmgMul(r, aP);
             if (Modes.has(r.mode)) fD *= Modes.dmgMult(r, socket.id);
+            if (aP) Classes.onHit(r, aP, d.zid, fD, d.type);      // внесок у бій + осколки бомбардира
+            if (!r.zombies[d.zid]) return;
             if (d.type === 'incendiary') r.zombies[d.zid].onFire = { end: Date.now() + 5000, nextTick: Date.now() + 1000, owner: socket.id };
             r.zombies[d.zid].hp -= fD;
             if (r.zombies[d.zid].hp <= 0) {
@@ -1337,6 +1356,8 @@ socket.on('selectProp', (data) => {
     });
 
     socket.on('pickPerk', (d) => { if (d && rooms[d.roomId]) Modes.pickPerk(rooms[d.roomId], socket.id, d.id); });
+    socket.on('setClass', (d) => Classes.setClass(socket, d));          // кооп: вибір класу в лобі
+    socket.on('useAbility', (d) => Classes.use(socket, d));             // кооп: здібність класу (E / кнопка на телефоні)
 
     socket.on('backToRoomLobby', (roomId) => {
         let r = rooms[roomId];
@@ -1407,8 +1428,10 @@ function zombieTick(r, rId, now, dt, aP, X) {
                 if (z.hp <= 0) { if (z.type === 'bomber') io.to(rId).emit('bomberExplode', { x: z.x, y: z.y, dmg: Math.round(50 * (z.dmgMult || 1)) }); delete r.zombies[zid]; continue; }
             }
         }
-        aP.forEach(pl => { let d = Math.hypot(pl.x - z.x, pl.y - z.y); if (pl.buff === 'invisible') d *= 3; if (d < mD) { mD = d; t = pl; } });
-        if (X && X.targets) for (const T of X.targets) { const d = Math.hypot(T.x - z.x, T.y - z.y) - T.r; if (d < mD) { mD = d; t = T; st = T; } }
+        // вибір цілі: класові здібності (тінь / бастіон) змінюють лише пріоритет, а відстань для атаки лишається справжньою
+        let bw = Infinity;
+        aP.forEach(pl => { let d = Math.hypot(pl.x - z.x, pl.y - z.y); if (pl.buff === 'invisible') d *= 3; const w = pl._cs ? Classes.weight(pl, d, now) : d; if (w < bw) { bw = w; mD = d; t = pl; } });
+        if (X && X.targets) for (const T of X.targets) { const d = Math.hypot(T.x - z.x, T.y - z.y) - T.r; if (d < bw) { bw = d; mD = d; t = T; st = T; } }
         if (t) {
             let dx = t.x - z.x, dy = t.y - z.y, l = Math.max(Math.hypot(dx, dy), 0.001), sp = ZT.speed, cdM = 1;
             if (X && X.enrage && ZT.isBoss && z.hp < z.maxHp * 0.5) { sp *= 1.3; cdM = 0.7; }
@@ -1605,32 +1628,39 @@ setInterval(() => {
             } else p.buffProgress = 0;
         });
 
+        Classes.tick(r, now, dt);      // кооп: здібності класів (лікування, турелі, артобстріл), ремонт інженером
         if (Modes.has(r.mode)) { if (Modes.tick(r, now, dt)) continue; }
 
         if (r.mode === 'survival') {
-            const aP = Object.values(r.players).filter(pl => pl.hp > 0);
-            if (aP.length === 0) {
+            const aP = Object.values(r.players).filter(pl => pl.hp > 0 && !pl.out);
+            // кінець: усі вибули (життя скінчились). Хто чекає відродження — ще в грі
+            if (Object.values(r.players).every(pl => pl.out || (pl.hp <= 0 && !(pl.lives > 0)))) {
                 r.status = 'finished'; let rw = {}, xpm = {}, drp = {}, ocm = {}, crd = {};
+                const cleared = Math.max(0, r.state === 'waiting' ? r.wave : r.wave - 1), n0 = r._n0 || Object.keys(r.players).length;
+                const base = ModeInfo.reward('survival', r, 'loss', { waves: cleared, n: n0 });
                 Object.values(r.players).forEach(pl => {
-                    let n = pl.name; ocm[pl.id] = 'loss'; if (dbUsers[n]) { let wv = r.wave; crd[pl.id] = wv; dbUsers[n].bucks += wv; dbUsers[n].stats.earned += wv; dbUsers[n].stats.matches++; xpm[pl.id] = grantXp(n, 'loss'); let dr = rollDrop(n); drp[pl.id] = dr; saveUser(n); io.to(pl.id).emit('economyUpdate', ecoPayload(n)); if (dr) io.to(pl.id).emit('dropReceived', dr); }
+                    let n = pl.name; ocm[pl.id] = 'loss'; if (dbUsers[n]) { let wv = Math.max(1, Math.round(base * Classes.contribMul(r, pl))); crd[pl.id] = wv; dbUsers[n].bucks += wv; dbUsers[n].stats.earned += wv; dbUsers[n].stats.matches++; xpm[pl.id] = grantXp(n, 'loss'); let dr = rollDrop(n); drp[pl.id] = dr; saveUser(n); io.to(pl.id).emit('economyUpdate', ecoPayload(n)); if (dr) io.to(pl.id).emit('dropReceived', dr); }
                 });
                 const evb = applyEventBonus(r, crd, xpm); Object.assign(rw, crd);
                 io.to(rId).emit('gameOver', { winner: 'ZOMBIES', wave: r.wave, rewards: rw, xp: xpm, isTeamWin: false, ev: evb });
-                emitMatchEnd(r, { outcomes: ocm, rewards: crd, xp: xpm, drops: drp, wave: r.wave, waves: Math.max(0, r.wave - 1) }); pushRooms();
+                emitMatchEnd(r, { outcomes: ocm, rewards: crd, xp: xpm, drops: drp, wave: r.wave, waves: cleared }); pushRooms();
                 continue;
             }
             if (Object.keys(r.zombies).length === 0) {
                 if (r.state === 'playing') { r.state = 'waiting'; r.nextWaveTime = now + 4000; let nW = r.wave + 1; if (nW === 10 || nW === 20 || nW === 30 || nW === 40) io.to(rId).emit('bossWarning'); }
                 else if (r.state === 'waiting' && now > r.nextWaveTime) {
                     r.wave++; let isBW = (r.wave % 10 === 0 && r.wave <= 40);
+                    // складність (налаштування лобі) і розмір загону: як у нових кооп-режимах (modes.js teamScale)
+                    const dfc = (r.pveDiff || 100) / 100, T = Modes.teamScale(r._n0 || Object.keys(r.players).length);
                     if (isBW) {
                         let bTypes = ['pikus', 'shurik', 'oneshot', 'padlo'], bType = bTypes[(r.wave / 10) - 1], zid = 'boss_' + now, zS = getValidSpawn(r.map, 50, 'spawn_zombie');
-                        let bsc = waveScale(r.wave), bHp = Math.round(Z_TYPES[bType].hp * bsc.hp);
-                        r.zombies[zid] = { id: zid, x: zS.x, y: zS.y, type: bType, hp: bHp, maxHp: bHp, dmgMult: bsc.dmg, nextAttack: 0, onFire: null };
+                        let bsc = waveScale(r.wave), bHp = Math.round(Z_TYPES[bType].hp * bsc.hp * dfc * T.boss);
+                        r.zombies[zid] = { id: zid, x: zS.x, y: zS.y, type: bType, hp: bHp, maxHp: bHp, dmgMult: bsc.dmg * dfc, nextAttack: 0, onFire: null };
+                        for (let i = 0, k = Math.round((r.wave / 10) * 3 * T.cnt); i < k; i++) { const t = r.wave >= 20 ? 'runner' : 'normal', zS2 = getValidEdgeSpawn(r.map, 20, 'spawn_zombie'), id2 = 'z_' + now + '_e' + i, h2 = Math.round(Z_TYPES[t].hp * bsc.hp * dfc * T.hp); r.zombies[id2] = { id: id2, x: zS2.x, y: zS2.y, type: t, hp: h2, maxHp: h2, dmgMult: bsc.dmg * dfc, nextAttack: 0, onFire: null }; }
                         io.to(rId).emit('newWave', { wave: r.wave, isBoss: true, bossName: Z_TYPES[bType].name });
                     } else {
-                        let sC = Math.min(ZOMBIE_CAP, ZOMBIE_SPAWN_BASE + (r.wave - 1) * ZOMBIE_SPAWN_STEP), sc = waveScale(r.wave), tL = ['normal', 'runner', 'spitter', 'tanker', 'bomber', 'ghost'], mI = Math.min(tL.length - 1, Math.floor((r.wave) / 5)), aT = tL.slice(0, mI + 1);
-                        for (let i = 0; i < sC; i++) { let t = aT[Math.floor(Math.random() * aT.length)], zS = getValidEdgeSpawn(r.map, 20, 'spawn_zombie'), zid = 'z_' + now + '_' + i; let zHp = Math.round(Z_TYPES[t].hp * sc.hp); r.zombies[zid] = { id: zid, x: zS.x, y: zS.y, type: t, hp: zHp, maxHp: zHp, dmgMult: sc.dmg, nextAttack: 0, onFire: null }; }
+                        let sC = Math.min(120, Math.max(5, Math.round(Math.min(ZOMBIE_CAP, ZOMBIE_SPAWN_BASE + (r.wave - 1) * ZOMBIE_SPAWN_STEP) * (0.6 + 0.4 * dfc) * T.cnt))), sc = waveScale(r.wave), tL = ['normal', 'runner', 'spitter', 'tanker', 'bomber', 'ghost'], mI = Math.min(tL.length - 1, Math.floor((r.wave) / 5)), aT = tL.slice(0, mI + 1);
+                        for (let i = 0; i < sC; i++) { let t = aT[Math.floor(Math.random() * aT.length)], zS = getValidEdgeSpawn(r.map, 20, 'spawn_zombie'), zid = 'z_' + now + '_' + i; let zHp = Math.round(Z_TYPES[t].hp * sc.hp * dfc * T.hp); r.zombies[zid] = { id: zid, x: zS.x, y: zS.y, type: t, hp: zHp, maxHp: zHp, dmgMult: sc.dmg * dfc, nextAttack: 0, onFire: null }; }
                         io.to(rId).emit('newWave', { wave: r.wave, isBoss: false });
                     }
                     r.state = 'playing';

@@ -11,6 +11,7 @@ module.exports = function createModes(D) {
     const { io, rooms, dbUsers, MAP_DATA, MapObj, Nav, Z_TYPES, waveScale, getValidSpawn, getValidEdgeSpawn, checkCollisionServer, getMaxHp,
         grantXp, rollDrop, saveUser, ecoPayload, pushRooms, zombieTick, emitMatchEnd, ZOMBIE_CAP, ZOMBIE_SPAWN_BASE, ZOMBIE_SPAWN_STEP } = D;
     const MS = new Map();
+    let contribMul = null;      // (r, p) → множник нагороди за внесок у кооп-бій (classes_srv.js)
     const NEW = new Set(ModeInfo.NEW);
     const has = mode => NEW.has(mode);
     const BYKEY = ModeInfo.BYKEY, TEAM_ORDER = ['red', 'blue', 'green', 'yellow'];
@@ -62,16 +63,21 @@ module.exports = function createModes(D) {
         const z = { id, x: pos.x, y: pos.y, type, hp, maxHp: hp, dmgMult: dmgM, nextAttack: 0, onFire: null };
         r.zombies[id] = z; return z;
     }
+    // Масштаб хвиль під розмір загону: спершу більше зомбі (до ×2.2 на 4 гравців), далі — міцніші зомбі (кількість обмежена заради мережі й ФПС).
+    // Соло — 1.0. Так і вдвох, і повною кімнатою бій щільний, а не «порожній» чи «непрохідний».
+    function teamScale(n) { n = Math.max(1, n | 0); return { cnt: Math.min(2.2, 0.6 + 0.4 * n), hp: 1 + 0.12 * Math.max(0, n - 4), boss: 1 + 0.45 * (n - 1) }; }
     // хвиля зомбі як у «Виживанні», але з урахуванням складності та кількості гравців
     function spawnWave(r, S, now, wave, o) {
-        o = o || {}; const sc = waveScale(wave), d = df(r), n = Object.keys(r.players).length, hpM = sc.hp * d, dmgM = sc.dmg * d;
+        o = o || {}; const sc = waveScale(wave), d = df(r), n = S.n0 || Object.keys(r.players).length, T = teamScale(n), hpM = sc.hp * d * T.hp, dmgM = sc.dmg * d;
         if (wave % 10 === 0 && wave <= 40) {
             const bt = WAVE_BOSS[wave / 10 - 1], pos = getValidSpawn(r.map, 50, 'spawn_zombie');
-            const z = mkZ(r, S, now, bt, pos, hpM * (1 + 0.35 * (n - 1)), dmgM, 'boss'); z.nextAttack = now + 3000;
+            const z = mkZ(r, S, now, bt, pos, sc.hp * d * T.boss, dmgM, 'boss'); z.nextAttack = now + 3000;
+            // супровід боса: з кожним наступним босом — більше
+            for (let i = 0, k = Math.round((wave / 10) * 3 * T.cnt); i < k; i++) mkZ(r, S, now, wave >= 20 ? 'runner' : 'normal', getValidEdgeSpawn(r.map, 20, 'spawn_zombie'), hpM, dmgM);
             return { isBoss: true, bossName: Z_TYPES[bt].name };
         }
         const base = Math.min(ZOMBIE_CAP, ZOMBIE_SPAWN_BASE + (wave - 1) * ZOMBIE_SPAWN_STEP);
-        const cnt = Math.min(120, Math.max(5, Math.round(base * (o.cnt || 1) * (0.6 + 0.4 * d) * (0.75 + 0.25 * n))));
+        const cnt = Math.min(120, Math.max(5, Math.round(base * (o.cnt || 1) * (0.6 + 0.4 * d) * T.cnt)));
         const tL = ['normal', 'runner', 'spitter', 'tanker', 'bomber', 'ghost'], aT = tL.slice(0, Math.min(tL.length - 1, Math.floor(wave / 5)) + 1);
         for (let i = 0; i < cnt; i++) mkZ(r, S, now, aT[Math.floor(Math.random() * aT.length)], getValidEdgeSpawn(r.map, 20, 'spawn_zombie'), hpM, dmgM);
         return { isBoss: false };
@@ -89,9 +95,11 @@ module.exports = function createModes(D) {
     // o: { outcomes:{id:'win'|'loss'|'draw'}, ctx:(p)=>{...}, winner, name, msg, lines:[...] }
     function finish(r, o) {
         if (r.status !== 'playing') return;
+        const S0 = MS.get(r.id), n0 = (S0 && S0.n0) || Object.keys(r.players).length;
         r.status = 'finished'; restoreEq(r); const rw = {}, xpm = {}, oc = {}, per = {}, drp = {}, crd = {};
         Object.values(r.players).forEach(p => {
-            const out = o.outcomes[p.id] || 'loss', amt = ModeInfo.reward(r.mode, r, out, Object.assign({ n: Object.keys(r.players).length }, o.ctx ? o.ctx(p) : {}));
+            const out = o.outcomes[p.id] || 'loss', base = ModeInfo.reward(r.mode, r, out, Object.assign({ n: n0 }, o.ctx ? o.ctx(p) : {}));
+            const amt = contribMul ? Math.max(1, Math.round(base * contribMul(r, p))) : base;      // кооп: хто майже нічого не зробив (AFK) — отримує менше
             rw[p.id] = amt; oc[p.id] = out; if (o.per) per[p.id] = o.per(p);
             if (dbUsers[p.name]) {
                 const u = dbUsers[p.name]; u.bucks += amt; u.stats.earned += amt; u.stats.matches++; crd[p.id] = amt;
@@ -114,8 +122,10 @@ module.exports = function createModes(D) {
         const map = mapOf(r), C = center(map), S = { mode: r.mode, zid: 0, t0: now, kills: {}, ev: {} };
         MS.set(r.id, S);
         pK.forEach(id => { const p = r.players[id]; p.out = false; p.lives = 0; p.perk = null; p.caps = 0; p.score = 0; p.brPicks = 0; });
+        S.n0 = pK.length;      // розмір загону на старті: масштаб хвиль і множник нагороди
         switch (r.mode) {
             case 'base_defense': {
+                const L = ModeInfo.livesN(r.bdLives); pK.forEach(id => { r.players[id].lives = L; });
                 const mk0 = map.solids.find(o => o.type === 'spawn_core'), c = findOpen(r, mk0 ? mk0.x : C.x, mk0 ? mk0.y : C.y, 60); S.core = { x: c.x, y: c.y, hp: r.bdCoreHp, max: r.bdCoreHp, r: 46 };
                 S.wave = 0; S.W = r.bdWaves; S.st = 'wait'; S.next = now + 5000;
                 pK.forEach(id => place(r.players[id], ringSpot(r, c, 110, 200, 26)));
@@ -134,6 +144,7 @@ module.exports = function createModes(D) {
                 break;
             }
             case 'convoy': {
+                const L = ModeInfo.livesN(r.cvLives); pK.forEach(id => { r.players[id].lives = L; });
                 const sp = map.solids.filter(s => s.type === 'spawn_player');
                 const cands = []; sp.forEach(a => sp.forEach(b => { if (a !== b) cands.push([a, b]); }));
                 let A = null, B = null; const ma = map.solids.find(o => o.type === 'spawn_convoy_a'), mb = map.solids.find(o => o.type === 'spawn_convoy_b');
@@ -145,8 +156,14 @@ module.exports = function createModes(D) {
                     for (let i = 0; i < 40; i++) { const q = randFree(r, 34), d = dist(q, A); if (d > best && d > Math.min(C.w, C.h) * 0.35 && ok(A, q)) { best = d; B = q; } }
                     if (!B) B = findOpen(r, C.x + C.w * 0.3, C.y - C.h * 0.3, 34);
                 }
+                // маршрут без маркерів редактора має бути довгим (≥ ~1800 px шляху): інакше конвой «доїжджав» за секунди й давав легку нагороду
+                if (!(ma && mb)) {
+                    const fA = Nav.buildField(grid, A.x, A.y), NA = grid.N, pl = q => { const v = fA.dist[Math.floor(q.y / Nav.CS) * NA + Math.floor(q.x / Nav.CS)]; return v >= 0 ? v : -1; };
+                    if (pl(B) * Nav.CS < 1800) { let best = pl(B), bb = B; for (let i = 0; i < 90; i++) { const q = randFree(r, 34), d = pl(q); if (d > best) { best = d; bb = q; } } B = bb; }
+                }
                 const f = Nav.buildField(grid, B.x, B.y), N = grid.N, d0 = Math.max(1, f.dist[Math.floor(A.y / Nav.CS) * N + Math.floor(A.x / Nav.CS)]);
                 S.A = { x: A.x, y: A.y }; S.B = { x: B.x, y: B.y }; S.d0 = d0; S.cv = { x: A.x, y: A.y, hp: r.cvHp, max: r.cvHp, a: 0, r: 34 };
+                S.rf = Math.max(0.3, Math.min(1.25, d0 * Nav.CS / 2400));      // нагорода пропорційна довжині маршруту (стандарт ~2400 px)
                 S.end = now + 4000 + r.cvTime * 1000; S.startAt = now + 4000; S.prog = 0; S.hold = 1; S.spawnAt = S.startAt + 3000; S.mb = false; S.nav = {};
                 pK.forEach(id => place(r.players[id], ringSpot(r, A, 70, 160, 26)));
                 break;
@@ -311,8 +328,13 @@ module.exports = function createModes(D) {
     function onDeath(r, v, killerId) {
         const S = MS.get(r.id); if (!S) return; const now = Date.now();
         switch (r.mode) {
-            case 'base_defense': respawn(r, v, 5000, () => ringSpot(r, S.core, 110, 200, 26)); break;
-            case 'convoy': respawn(r, v, 5000, () => ringSpot(r, S.cv, 90, 180, 26)); break;
+            // життя (налаштування лобі): ∞ — як раніше; інакше після останнього — гравець вибуває й спостерігає
+            case 'base_defense': case 'convoy': {
+                if (v.lives !== Infinity) { v.lives--; io.to(v.id).emit('clsLives', { n: Math.max(0, v.lives) }); }
+                if (v.lives === Infinity || v.lives > 0) respawn(r, v, 5000, () => r.mode === 'convoy' ? ringSpot(r, S.cv, 90, 180, 26) : ringSpot(r, S.core, 110, 200, 26));
+                else v.out = true;
+                break;
+            }
             case 'boss_raid':
                 v.lives--; if (v.lives > 0) respawn(r, v, 4000, () => getValidSpawn(r.map, 26, 'spawn_player')); else v.out = true;
                 break;
@@ -416,11 +438,12 @@ module.exports = function createModes(D) {
         switch (r.mode) {
             case 'base_defense': {
                 const c = S.core;
+                if (ps.length && ps.every(p => p.out)) { finish(r, { outcomes: allOutcome(r, 'loss'), winner: 'ZOMBIES', msg: 'Загін вибув', ctx: () => ({ waves: Math.max(0, S.wave - 1) }), lines: [['Хвиль відбито', Math.max(0, S.wave - 1) + ' / ' + S.W]] }); return true; }
                 if (c.hp <= 0) { finish(r, { outcomes: allOutcome(r, 'loss'), winner: 'ZOMBIES', msg: 'Ядро бази знищено', ctx: () => ({ waves: Math.max(0, S.wave - 1) }), lines: [['Хвиль відбито', Math.max(0, S.wave - 1) + ' / ' + S.W]] }); return true; }
                 if (Object.keys(r.zombies).length === 0) {
                     if (S.st === 'play') {
                         S.st = 'wait'; S.next = now + 6000;
-                        if (S.wave >= S.W) { finish(r, { outcomes: allOutcome(r, 'win'), winner: 'TEAM', msg: 'База вистояла!', ctx: () => ({ waves: S.W }), lines: [['Хвиль відбито', S.W + ' / ' + S.W], ['Міцність ядра', Math.round(c.hp / c.max * 100) + '%']] }); return true; }
+                        if (S.wave >= S.W) { finish(r, { outcomes: allOutcome(r, 'win'), winner: 'TEAM', msg: 'База вистояла!', ctx: () => ({ waves: S.W, frac: c.hp / c.max }), lines: [['Хвиль відбито', S.W + ' / ' + S.W], ['Міцність ядра', Math.round(c.hp / c.max * 100) + '%']] }); return true; }
                         if (r.bdRepair) c.hp = Math.min(c.max, c.hp + c.max * 0.15);
                         if ((S.wave + 1) % 10 === 0) emit(r, 'bossWarning');
                     } else if (S.st === 'wait' && now >= S.next) { S.wave++; announceWave(r, S.wave, spawnWave(r, S, now, S.wave, {})); S.st = 'play'; }
@@ -501,10 +524,11 @@ module.exports = function createModes(D) {
 
     // --- конвой ---
     function convoyTick(r, S, now, dt, al) {
-        const cv = S.cv, n = Object.keys(r.players).length;
-        if (cv.hp <= 0) { finish(r, { outcomes: allOutcome(r, 'loss'), winner: 'ZOMBIES', msg: 'Конвой знищено', ctx: () => ({ frac: S.prog }), lines: [['Маршрут пройдено', Math.round(S.prog * 100) + '%']] }); return true; }
-        if (now >= S.end) { finish(r, { outcomes: allOutcome(r, 'loss'), winner: 'ZOMBIES', msg: 'Час вийшов', ctx: () => ({ frac: S.prog }), lines: [['Маршрут пройдено', Math.round(S.prog * 100) + '%']] }); return true; }
-        if (Math.hypot(cv.x - S.B.x, cv.y - S.B.y) < 90) { finish(r, { outcomes: allOutcome(r, 'win'), winner: 'TEAM', msg: 'Вантаж доставлено!', ctx: () => ({ frac: cv.hp / cv.max }), lines: [['Міцність конвою', Math.round(cv.hp / cv.max * 100) + '%'], ['Залишилось часу', mmss(S.end - now)]] }); return true; }
+        const cv = S.cv, n = S.n0 || Object.keys(r.players).length;
+        if (Object.values(r.players).every(p => p.out)) { finish(r, { outcomes: allOutcome(r, 'loss'), winner: 'ZOMBIES', msg: 'Загін вибув', ctx: () => ({ frac: S.prog, rf: S.rf }), lines: [['Маршрут пройдено', Math.round(S.prog * 100) + '%']] }); return true; }
+        if (cv.hp <= 0) { finish(r, { outcomes: allOutcome(r, 'loss'), winner: 'ZOMBIES', msg: 'Конвой знищено', ctx: () => ({ frac: S.prog, rf: S.rf }), lines: [['Маршрут пройдено', Math.round(S.prog * 100) + '%']] }); return true; }
+        if (now >= S.end) { finish(r, { outcomes: allOutcome(r, 'loss'), winner: 'ZOMBIES', msg: 'Час вийшов', ctx: () => ({ frac: S.prog, rf: S.rf }), lines: [['Маршрут пройдено', Math.round(S.prog * 100) + '%']] }); return true; }
+        if (Math.hypot(cv.x - S.B.x, cv.y - S.B.y) < 90) { finish(r, { outcomes: allOutcome(r, 'win'), winner: 'TEAM', msg: 'Вантаж доставлено!', ctx: () => ({ frac: cv.hp / cv.max, rf: S.rf }), lines: [['Міцність конвою', Math.round(cv.hp / cv.max * 100) + '%'], ['Залишилось часу', mmss(S.end - now)]] }); return true; }
         if (now < S.startAt) return false;
         const zs = Object.values(r.zombies), threat = zs.some(z => Math.hypot(z.x - cv.x, z.y - cv.y) < 230), escort = al.some(p => Math.hypot(p.x - cv.x, p.y - cv.y) < 380);
         S.hold = threat ? 2 : (escort ? 0 : 1);
@@ -527,6 +551,12 @@ module.exports = function createModes(D) {
                     mkZ(r, S, now, aT[Math.floor(Math.random() * aT.length)], pos, (1 + S.prog * 0.8) * d, (1 + S.prog * 0.4) * d);
                 }
             }
+        }
+        // засідка біля фінішу: різкий наплив сильніших зомбі з усіх боків — фінал маршруту має бути напруженим
+        if (!S.amb && S.prog >= 0.85) {
+            S.amb = true; const d = df(r), T = teamScale(n), k = Math.min(40, Math.round(10 * T.cnt * (0.6 + 0.4 * d))), tl = ['runner', 'tanker', 'spitter', 'bomber'];
+            for (let i = 0; i < k; i++) mkZ(r, S, now, tl[i % tl.length], ringSpot(r, cv, 420, 650, 20), 1.8 * d * T.hp, 1.4 * d);
+            note(r, 'ambush', {}); emit(r, 'bossWarning');
         }
         if (!S.mb && S.prog >= 0.5) { S.mb = true; const z = mkZ(r, S, now, 'pikus', getValidEdgeSpawn(r.map, 30, 'spawn_zombie'), (1 + 0.35 * (n - 1)) * df(r), df(r), 'boss'); z.mb = true; z.nextAttack = now + 2500; emit(r, 'bossWarning'); note(r, 'miniboss', {}); }
         zombieTick(r, r.id, now, dt, al, { targets: [{ id: 'cv', x: cv.x, y: cv.y, r: cv.r, hit: d => { cv.hp = Math.max(0, cv.hp - d); } }] });
@@ -754,5 +784,5 @@ module.exports = function createModes(D) {
         return { every: 30000, max: 4, count: 2 };
     }
 
-    return { has, readSettings, applyUpdate, start, tick, onDeath, afterLeave, md, cleanup, pickPerk, dmgMult, dmgTaken, onZombieKill, powerupRule, pickMod, frozen, MS, BR: { brWeights, rollRarity, rollMod, lootCap, brF, SLOTS } };
+    return { has, readSettings, applyUpdate, start, tick, onDeath, afterLeave, md, cleanup, pickPerk, dmgMult, dmgTaken, onZombieKill, powerupRule, pickMod, frozen, MS, teamScale, setContrib: f => { contribMul = f; }, BR: { brWeights, rollRarity, rollMod, lootCap, brF, SLOTS } };
 };
