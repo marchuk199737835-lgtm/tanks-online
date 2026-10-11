@@ -397,17 +397,21 @@ module.exports = function (ctx) {
         const H = hs.length, eff = Math.min(r.maxPlayers, colorCap(r));
         if (!m.warmed) { m.warmed = true; AI.warm(r); }
         if (m.frac === null) { m.frac = rnd(CFG.fillHuman[0], CFG.fillHuman[1]); m.nextJoin = now + rnd(2500, 6500); }
+        // боти, яких лідер додав кнопкою «Додати бота»: автодобір їх не рахує й не виводить
+        const man = m.manual || (m.manual = new Set());
         // вигнані лідером боти: запам'ятовуємо, щоб не повертати
-        for (const id of Array.from(m.known)) if (!r.players[id]) { m.known.delete(id); if (!m.removed.has(id)) { m.noMore = bs.length; } else m.removed.delete(id); forgetBot(id); }
+        for (const id of Array.from(m.known)) if (!r.players[id]) { m.known.delete(id); if (man.has(id)) man.delete(id); else if (!m.removed.has(id)) { m.noMore = bs.filter(p => !man.has(p.id)).length; } else m.removed.delete(id); forgetBot(id); }
+        const auto = bs.filter(p => !man.has(p.id));
         let wantTotal = Math.max(2, Math.round(eff * m.frac));
         const cap = H >= 4 ? 0 : H === 3 ? 1 : H === 2 ? 2 : 99;
-        let wantBots = clamp(wantTotal - H, 0, cap);
+        let wantBots = clamp(wantTotal - H - man.size, 0, cap);
         if (m.noMore !== undefined) wantBots = Math.min(wantBots, m.noMore);
-        if (m.virt) wantBots = Math.min(Math.max(wantBots, bs.length > 0 ? 1 : 0), cap);
+        if (m.virt) wantBots = Math.min(Math.max(wantBots, auto.length > 0 ? 1 : 0), cap);
+        if (!m.virt && !CFG.inRealRooms) wantBots = 0;
         const total = Object.keys(r.players).length;
-        if ((bs.length > wantBots || total > r.maxPlayers) && now >= m.nextLeave) {
-            const cand = bs.filter(p => p.id !== r.hostSocket); if (cand.length) { botLeave(r, pick(cand).id); m.nextLeave = now + rnd(1500, 5000); return; }
-        } else if (bs.length < wantBots && total < r.maxPlayers && now >= m.nextJoin) {
+        if ((auto.length > wantBots || total > r.maxPlayers) && now >= m.nextLeave) {
+            const cand = auto.filter(p => p.id !== r.hostSocket); if (cand.length) { botLeave(r, pick(cand).id); m.nextLeave = now + rnd(1500, 5000); return; }
+        } else if (auto.length < wantBots && total < r.maxPlayers && now >= m.nextJoin) {
             if (addRealRoomBot(r, m, now)) m.nextJoin = now + rnd(CFG.joinEveryMs[0], CFG.joinEveryMs[1]);
         }
         // поведінка кожного бота: колір/команда й готовність
@@ -451,7 +455,7 @@ module.exports = function (ctx) {
 
             if (!bs.length && !CFG.inRealRooms) continue;
             const m = metaOf(r);
-            if (!eligibleMode(r.mode) || (!m.virt && !CFG.inRealRooms)) { if (bs.length) { bs.forEach(p => botLeave(r, p.id)); } continue; }
+            if (!eligibleMode(r.mode)) { if (bs.length) { bs.forEach(p => botLeave(r, p.id)); } continue; }
             // лідером у кімнаті людей має бути людина
             const host = r.players[r.hostSocket];
             if ((!host || host.isBot) && !m.virt) { const h = hs[0]; r.hostSocket = h.id; r.hostName = h.name; emitLobby(r); ctx.pushRooms(); }
@@ -464,6 +468,26 @@ module.exports = function (ctx) {
     // =====================================================================
     ctx.onConnection(socket => {
         socket.on('shoot', d => AI.onShoot(socket.id, d));
+        socket.emit('botCfg', { modes: CFG.modes });      // клієнт показує лідеру кнопку «Додати бота» лише в цих режимах
+        socket.on('getBotCfg', () => socket.emit('botCfg', { modes: CFG.modes }));
+        // лідер додає бота вручну (понад автодобір; лише в лобі, не в рейтингових і не в соло/кооп-режимах)
+        socket.on('addBot', d => {
+            try {
+                const r = d && typeof d === 'object' ? rooms[d.roomId] : null;
+                if (!r || r.hostSocket !== socket.id || r.status !== 'lobby' || r.ranked) return;
+                const err = msg => socket.emit('botAddError', msg), now = Date.now(), m = metaOf(r);
+                if (now - (m.lastManual || 0) < 500) return;
+                m.lastManual = now;
+                if (!eligibleMode(r.mode)) return err('Ботів можна додати лише в режимах проти гравців');
+                if (Object.keys(r.players).length >= Math.min(r.maxPlayers, colorCap(r))) return err('Сесія заповнена: збільште кількість гравців у параметрах');
+                if (simBotCount() >= CFG.maxSimBots || totalBotCount() >= CFG.maxBotsTotal) return err('Зараз забагато ботів на сервері. Спробуйте трохи пізніше');
+                const hs = humansOf(r), ref = hs.length ? hs.reduce((a, p) => a + (p.level || 1), 0) / hs.length : globalRef();
+                const p = makeBot(ref, {});
+                addToRoom(r, p, false); m.known.add(p.id); (m.manual || (m.manual = new Set())).add(p.id);
+                const b = BOTS.get(p.id).b; b.pend = true; b.readyAt = now + rnd(700, 2200);
+                emitLobby(r); ctx.pushRooms();
+            } catch (e) { console.error('❌ addBot:', e && e.message); }
+        });
         // зміна режиму лідером на такий, де ботам не місце, — боти виходять (інакше соло-режим відмовить через «інших гравців»)
         socket.on('updateRoomSettings', d => {
             try {
