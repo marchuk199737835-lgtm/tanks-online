@@ -100,7 +100,8 @@ module.exports = function createModes(D) {
             }
         });
         MS.delete(r.id);
-        emit(r, 'gameOver', { winner: o.winner || 'TEAM', name: o.name || '', rewards: rw, xp: xpm, isTeamWin: false, mode: r.mode, outcomes: oc, msg: o.msg || '', lines: o.lines || [], per, team: o.teamWin || null });
+        const evb = D.applyEventBonus ? D.applyEventBonus(r, crd, xpm, rw) : null;      // подія адміністрації: ×креди / ×досвід — уже у вікні результату
+        emit(r, 'gameOver', { winner: o.winner || 'TEAM', name: o.name || '', rewards: rw, xp: xpm, isTeamWin: false, mode: r.mode, outcomes: oc, msg: o.msg || '', lines: o.lines || [], per, team: o.teamWin || null, ev: evb });
         let wvs = null, plc = {};
         try { const f0 = Object.values(r.players)[0]; if (o.ctx && f0) { const c0 = o.ctx(f0); if (c0 && c0.waves != null) wvs = c0.waves | 0; } Object.keys(per).forEach(k => { if (per[k] && per[k].place) plc[k] = per[k].place; }); } catch (e) { }
         emitMatchEnd(r, { outcomes: oc, rewards: crd, xp: xpm, drops: drp, place: plc, waves: wvs, score: o.score || null });

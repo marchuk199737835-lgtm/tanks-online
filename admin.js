@@ -59,21 +59,8 @@ module.exports = function (ctx) {
     function evLoad() { if (evLoaded) return; const db = ctx.getDb && ctx.getDb(); if (!db) return; evLoaded = true; db.collection('meta').findOne({ _id: 'event' }).then(d => { if (d && d.ev && d.ev.until > Date.now()) EVENT = d.ev; }).catch(() => { evLoaded = false; }); }
     const lt = setInterval(() => { evLoad(); if (evLoaded) clearInterval(lt); }, 4000); if (lt.unref) lt.unref();
     Events.on('login', e => { const p = evPublic(); if (p) setTimeout(() => io.to(e.socketId).emit('gameEvent', p), 1200); });
-    // бонус події: додаємо кредити й досвід поверх звичайної нагороди
-    Events.on('matchEnd', ev => {
-        try {
-            const E = evActive(); if (!E || !ev || (E.mode && E.mode !== ev.mode)) return;
-            (ev.players || []).forEach(p => {
-                const u = !p.isBot && dbUsers[p.name]; if (!u) return;
-                const cr = Math.round((p.credits | 0) * (E.cr - 1)), xp = p.xp && p.xp.gain ? Math.round(p.xp.gain * (E.xp - 1)) : 0;
-                if (cr <= 0 && xp <= 0) return;
-                if (cr > 0) { u.bucks += cr; if (u.stats) u.stats.earned = (u.stats.earned | 0) + cr; }
-                if (xp > 0) u.xp = (u.xp || 0) + xp;
-                saveUser(p.name);
-                ctx.onlineSocketsOf(p.name).forEach(sid => { io.to(sid).emit('eventBonus', { cr, xp, title: E.title }); ctx.sendEconomy(sid, p.name); });
-            });
-        } catch (e) { console.error('❌ event bonus', e && e.message); }
-    });
+    // бонус події: server.js (applyEventBonus) питає активну подію для режиму й нараховує ×креди / ×досвід ДО показу вікна результату
+    ctx.hooks.eventBonus = mode => { const E = evActive(); return E && (!E.mode || E.mode === mode) ? E : null; };
 
     // ---------- статистика ----------
     let opsWin = [];
@@ -154,7 +141,8 @@ module.exports = function (ctx) {
             const mode = typeof d.mode === 'string' && ModeInfo.MODES[d.mode] ? d.mode : null, title = String(d.title || '').replace(/[<>]/g, '').trim().slice(0, 60) || 'Подія';
             if (cr === 1 && xp === 1) return socket.emit('admErr', { msg: 'Множник має бути більшим за ×1' });
             EVENT = { title, cr: Math.round(cr * 100) / 100, xp: Math.round(xp * 100) / 100, mode, until: Date.now() + hours * 3600e3 }; evSave();
-            io.emit('gameEvent', evPublic()); log(by, 'event', mode || 'all', EVENT); ok('Подію запущено', { stats: stats() });
+            io.emit('gameEvent', evPublic()); log(by, 'event', mode || 'all', EVENT);
+            try { if (ctx.Notify && ctx.Notify.sendAll) ctx.Notify.sendAll('event', { n: title, t: (cr > 1 ? '×' + EVENT.cr + ' 💰 ' : '') + (xp > 1 ? '×' + EVENT.xp + ' XP' : '') }); } catch (e) {}   // push усім підписаним, хто не в мережі ok('Подію запущено', { stats: stats() });
         });
         A('admEventStop', (by) => { EVENT = null; evSave(); io.emit('gameEvent', null); log(by, 'event-stop'); ok('Подію зупинено', { stats: stats() }); });
         A('admAnnounce', (by, d) => {

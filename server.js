@@ -311,7 +311,7 @@ const globalPlayers = new Proxy({}, {
         return true;
     }
 });
-const hooks = { clanTag: () => '', extraRooms: () => [], preJoin: () => false, botNames: null, inRankedQueue: null, leaveRankedQueue: null, rankedLeave: null };   // модулі підміняють (clans.js → hooks.clanTag; bots.js → extraRooms/preJoin/botNames)
+const hooks = { clanTag: () => '', extraRooms: () => [], preJoin: () => false, botNames: null, inRankedQueue: null, leaveRankedQueue: null, rankedLeave: null, eventBonus: null };   // модулі підміняють (clans.js → hooks.clanTag; bots.js → extraRooms/preJoin/botNames)
 const nickOf = n => (dbUsers[n] && dbUsers[n].nick) || n;
 const connHooks = [];   // обробники підключення від додаткових модулів (ctx.onConnection)
 
@@ -501,7 +501,7 @@ function clampInt(v, min, max, def) {
 const ModeInfo = require('./public/js/modeinfo.js');   // спільне з клієнтом: режими, параметри, нагороди
 const VALID_MODES = ModeInfo.ORDER.slice();
 const Modes = require('./modes.js')({ io, rooms, dbUsers, MAP_DATA, MapObj, Nav, Z_TYPES, waveScale, getValidSpawn, getValidEdgeSpawn, checkCollisionServer, getMaxHp,
-    grantXp, rollDrop, saveUser, ecoPayload, pushRooms, zombieTick, processPlayerDeath, emitMatchEnd, ZOMBIE_CAP, ZOMBIE_SPAWN_BASE, ZOMBIE_SPAWN_STEP });
+    grantXp, rollDrop, saveUser, ecoPayload, pushRooms, zombieTick, processPlayerDeath, emitMatchEnd, applyEventBonus, ZOMBIE_CAP, ZOMBIE_SPAWN_BASE, ZOMBIE_SPAWN_STEP });
 const teamsOf = r => r.mode === 'rounds' || r.ranked ? 2 : r.mode === 'capture_points' ? Math.max(2, Math.min(4, r.cpTeams || 2)) : Math.max(2, Math.min(4, r.tdmTeams || 2));
 const isTeamPvp = m => m === 'team_deathmatch' || m === 'capture_points' || m === 'rounds';
 const powerupsOn = m => m !== 'prophunt' && m !== 'team_deathmatch' && m !== 'rounds';
@@ -644,6 +644,23 @@ function startRoomGame(roomId, notify) {
     return false;
 }
 
+// ===== Бонус події (адмін-панель): множник кредитів / досвіду — нараховується ДО показу вікна результату =====
+// credits — фактично нараховані креди (змінюється на місці), xpm — досвід (змінюється на місці), shown — інша мапа для показу (якщо відрізняється)
+function applyEventBonus(r, credits, xpm, shown) {
+    let E = null; try { E = hooks.eventBonus ? hooks.eventBonus(r.mode) : null; } catch (e) {}
+    if (!E || (E.cr <= 1 && E.xp <= 1)) return null;
+    Object.values(r.players).forEach(p => {
+        const u = !p.isBot && dbUsers[p.name]; if (!u) return;
+        let touched = false;
+        const c = credits[p.id] | 0, add = E.cr > 1 ? Math.round(c * (E.cr - 1)) : 0;
+        if (add > 0) { u.bucks += add; u.stats.earned = (u.stats.earned | 0) + add; credits[p.id] = c + add; if (shown && shown !== credits) shown[p.id] = (shown[p.id] | 0) + add; touched = true; }
+        const x = xpm && xpm[p.id];
+        if (x && x.gain > 0 && E.xp > 1) { const ax = Math.round(x.gain * (E.xp - 1)); u.xp = (u.xp || 0) + ax; x.gain += ax; x.after = u.xp; x.lvlAfter = GameData.levelFromXp(u.xp); touched = true; }
+        if (touched) { saveUser(p.name); io.to(p.id).emit('economyUpdate', ecoPayload(p.name)); }
+    });
+    return { title: E.title, cr: E.cr, xp: E.xp };
+}
+
 // ===== Античит: швидкість руху =====
 // Клієнт шле позицію ~20 разів/с. Сервер тримає «бюджет» відстані: швидкість танка (модулі, бафи, покращення арени) × час × запас 1.3
 // + 40 px на нерівномірну мережу. Більше — позицію обрізаємо до дозволеної й повертаємо клієнту ('posFix').
@@ -658,8 +675,8 @@ function maxSpeedOf(r, p) {
 function speedCheck(r, p, x, y, socket) {
     const now = Date.now(); let s = AC.get(p);
     if (!s || s.x !== p.x || s.y !== p.y || s.room !== r.id) { s = { x: p.x, y: p.y, t: now, bud: 60, room: r.id, bad: 0, badAt: 0, fixAt: 0 }; AC.set(p, s); }
-    const dt = Math.min(1.5, Math.max(0, (now - s.t) / 1000)); s.t = now;
-    s.bud = Math.min(maxSpeedOf(r, p) * 1.3 * 1.5 + 60, s.bud + maxSpeedOf(r, p) * 1.3 * dt + 2);
+    const dt = Math.min(0.6, Math.max(0, (now - s.t) / 1000)); s.t = now;
+    s.bud = Math.min(maxSpeedOf(r, p) * 1.3 * 0.6 + 40, s.bud + maxSpeedOf(r, p) * 1.3 * dt + 2);   // запас — не більше ~0.6 с руху (ривок після простою обмежено)
     const dx = x - s.x, dy = y - s.y, d = Math.hypot(dx, dy);
     if (d <= s.bud + 40) { s.bud = Math.max(0, s.bud - d); s.x = x; s.y = y; return [x, y]; }
     const k = Math.max(0, s.bud) / d, nx = s.x + dx * k, ny = s.y + dy * k;      // дозволена частина шляху
@@ -724,7 +741,8 @@ function collectTokenFor(roomId, sockId, tid) {
             }
         });
         io.to(roomId).emit('tokenCollected', { tid: tid, playerId: sockId, score: r.players[sockId].score });
-        io.to(roomId).emit('gameOver', { winner: sockId, name: r.players[sockId] ? r.players[sockId].name : 'ГРАВЕЦЬ', rewards: rw, xp: xpm, isTeamWin: false });
+        const evb = applyEventBonus(r, rw, xpm);
+        io.to(roomId).emit('gameOver', { winner: sockId, name: r.players[sockId] ? r.players[sockId].name : 'ГРАВЕЦЬ', rewards: rw, xp: xpm, isTeamWin: false, ev: evb });
         emitMatchEnd(r, { outcomes: ocm, rewards: rw, xp: xpm, drops: drp });
         pushRooms();
     } else {
@@ -1351,7 +1369,8 @@ function endPropHuntGame(r, wT) {
             if (dr) io.to(p.id).emit('dropReceived', dr);
         }
     });
-    io.to(r.id).emit('gameOver', { winner: wId || 'TEAM', name: wT === 'hunter' ? 'КОМАНДА МИСЛИВЦІВ' : 'ТІ, ХТО ХОВАВСЯ', rewards: rew, xp: xpm, isTeamWin: true });
+    const evb = applyEventBonus(r, rew, xpm);
+    io.to(r.id).emit('gameOver', { winner: wId || 'TEAM', name: wT === 'hunter' ? 'КОМАНДА МИСЛИВЦІВ' : 'ТІ, ХТО ХОВАВСЯ', rewards: rew, xp: xpm, isTeamWin: true, wins: ocm, ev: evb });
     emitMatchEnd(r, { outcomes: ocm, rewards: rew, xp: xpm, drops: drp });
     pushRooms();
 }
@@ -1368,7 +1387,8 @@ function endTDMGame(r, wT) {
             if (dr) io.to(p.id).emit('dropReceived', dr);
         }
     });
-    io.to(r.id).emit('gameOver', { winner: isD ? 'DRAW' : (wT || 'TEAM'), name: isD ? 'НІЧИЯ' : `КОМАНДА ${typeof wT === 'string' ? wT.toUpperCase() : 'ПОБЕДИТЕЛЬ'}`, rewards: rew, xp: xpm, isTeamWin: !isD });
+    const evb = applyEventBonus(r, rew, xpm);
+    io.to(r.id).emit('gameOver', { winner: isD ? 'DRAW' : (wT || 'TEAM'), name: isD ? 'НІЧИЯ' : `КОМАНДА ${typeof wT === 'string' ? wT.toUpperCase() : 'ПОБЕДИТЕЛЬ'}`, rewards: rew, xp: xpm, isTeamWin: !isD, wins: ocm, ev: evb });
     emitMatchEnd(r, { outcomes: ocm, rewards: rew, xp: xpm, drops: drp, score: Object.assign({}, r.teamScores || {}) });
     pushRooms();
 }
@@ -1594,7 +1614,8 @@ setInterval(() => {
                 Object.values(r.players).forEach(pl => {
                     let n = pl.name; ocm[pl.id] = 'loss'; if (dbUsers[n]) { let wv = r.wave; crd[pl.id] = wv; dbUsers[n].bucks += wv; dbUsers[n].stats.earned += wv; dbUsers[n].stats.matches++; xpm[pl.id] = grantXp(n, 'loss'); let dr = rollDrop(n); drp[pl.id] = dr; saveUser(n); io.to(pl.id).emit('economyUpdate', ecoPayload(n)); if (dr) io.to(pl.id).emit('dropReceived', dr); }
                 });
-                io.to(rId).emit('gameOver', { winner: 'ZOMBIES', wave: r.wave, rewards: rw, xp: xpm, isTeamWin: false });
+                const evb = applyEventBonus(r, crd, xpm); Object.assign(rw, crd);
+                io.to(rId).emit('gameOver', { winner: 'ZOMBIES', wave: r.wave, rewards: rw, xp: xpm, isTeamWin: false, ev: evb });
                 emitMatchEnd(r, { outcomes: ocm, rewards: crd, xp: xpm, drops: drp, wave: r.wave, waves: Math.max(0, r.wave - 1) }); pushRooms();
                 continue;
             }

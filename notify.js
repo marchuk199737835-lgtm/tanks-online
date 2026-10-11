@@ -31,6 +31,9 @@ module.exports = function (ctx) {
         pl: { daily: ['🎁 Dzienny bonus czeka', 'Odbierz dzisiejszą nagrodę — nie przerywaj serii!'], friend: ['🤝 Znajomy czeka', '{n} jest teraz w grze. Dołącz do bitwy!'], season: ['🏆 Do końca sezonu 2 dni', 'Awansuj w rankingu na czas — nagroda zależy od ligi!'], dm: ['💬 {n} napisał do ciebie', '{t}'] },
         tr: { daily: ['🎁 Günlük bonus seni bekliyor', 'Bugünün ödülünü al — serini bozma!'], friend: ['🤝 Bir arkadaşın bekliyor', '{n} şu an oyunda. Savaşa katıl!'], season: ['🏆 Sezonun bitmesine 2 gün', 'Zamanında yüksel — ödül ligine bağlı!'], dm: ['💬 {n} sana yazdı', '{t}'] }
     };
+    // подія від адміністрації: «🔥 Подія: <назва>» + множники
+    const EV = { uk: ['🔥 Подія: {n}', '{t} — заходьте в бій, поки діє бонус!'], en: ['🔥 Event: {n}', '{t} — jump into battle while the bonus lasts!'], es: ['🔥 Evento: {n}', '{t}: ¡entra en batalla mientras dure el bono!'], de: ['🔥 Event: {n}', '{t} — ab in den Kampf, solange der Bonus gilt!'], fr: ['🔥 Événement : {n}', '{t} — au combat tant que le bonus dure !'], pt: ['🔥 Evento: {n}', '{t} — entre na batalha enquanto o bônus durar!'], pl: ['🔥 Wydarzenie: {n}', '{t} — do bitwy, póki trwa bonus!'], tr: ['🔥 Etkinlik: {n}', '{t} — bonus sürerken savaşa katıl!'] };
+    Object.keys(TXT).forEach(l => { TXT[l].event = EV[l]; });
     const fill = (s, d) => s.replace('{n}', d.n || '').replace('{t}', d.t || '');
 
     // ---------- ключі VAPID ----------
@@ -130,5 +133,7 @@ module.exports = function (ctx) {
             if (Array.isArray(u.push)) { u.push = u.push.filter(x => x.e !== d.e); if (!u.push.length) pushUsers.delete(n); saveUser(n); }
         });
     });
-    ctx.Notify = { send, pushUsers };
+    // усім підписаним (подія від адміністрації); send сам пропускає тих, хто в мережі, і тримає ліміт «раз на добу»
+    function sendAll(type, d) { let n = 0; pushUsers.forEach(l => { if (send(l, type, d)) n++; }); return n; }
+    ctx.Notify = { send, sendAll, pushUsers };
 };
