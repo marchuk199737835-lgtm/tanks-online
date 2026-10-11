@@ -72,7 +72,7 @@ window.BUFF_ICONS = {
     'healing': '➕', 'speed': '⚡', 'shield': '🛡️', 'invisible': '👻',
     'double_dmg': '⚔️', 'boss': '👹', 'samurai': '🗡️', 'minigun': '🔫',
     'shotgun': '💥', 'homing': '🎯', 'incendiary': '🔥', 'explosive': '💣',
-    'piercing': '🪡', 'autolaser': '⚡', 'reaper': '☠️', 'hunter_gun': '🔫'
+    'piercing': '🪡', 'autolaser': '⚡', 'reaper': '☠️', 'hunter_gun': '🔫', 'repair': '🔧'
 };
 
 window.BUFF_NAMES = {

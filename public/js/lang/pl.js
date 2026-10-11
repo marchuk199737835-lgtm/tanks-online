@@ -820,7 +820,31 @@ I18N.add("pl", {
  "АКТИВНО": "AKTYWNA",
  "ГОТОВО": "GOTOWE",
  "Здібність": "Umiejętność",
- "за 5–20 пережитих хвиль (пізні хвилі цінніші)": "za 5–20 przetrwanych fal (późniejsze fale są cenniejsze)"
+ "за 5–20 пережитих хвиль (пізні хвилі цінніші)": "za 5–20 przetrwanych fal (późniejsze fale są cenniejsze)",
+ "Ривок": "Zryw",
+ "Табло": "Tablica wyników",
+ "Інтерфейс бою": "Interfejs walki",
+ "Міні-мапа: увімкнено": "Minimapa: włączona",
+ "Міні-мапа: вимкнено": "Minimapa: wyłączona",
+ "Масштаб HUD у бою": "Skala HUD w walce",
+ "ПОДВІЙНЕ!": "PODWÓJNE!",
+ "ПОТРІЙНЕ!": "POTRÓJNE!",
+ "НЕСТРИМНИЙ!": "NIEPOWSTRZYMANY!",
+ "КОМБО": "KOMBO",
+ "Артилерійський удар!": "Ostrzał artyleryjski!",
+ "Тікай із червоної зони": "Uciekaj z czerwonej strefy",
+ "Дрон із припасами!": "Dron z zaopatrzeniem!",
+ "Скриньки з бонусами — встигни першим": "Skrzynki z bonusami — bądź pierwszy",
+ "Туман!": "Mgła!",
+ "20 секунд видно лише поруч": "Przez 20 sekund widzisz tylko najbliższe otoczenie",
+ "Ти — ціль!": "Jesteś celem!",
+ "За твоє знищення ворог отримає подвійну нагороду": "Wróg dostanie podwójną nagrodę za zniszczenie ciebie",
+ "Лідера повалено!": "Lider pokonany!",
+ "Події на мапі": "Wydarzenia na mapie",
+ "Раз на 1–2 хвилини на мапі стається подія: артилерійський удар (тікай із червоної зони), дрон скидає скриньки з бонусами або на 20 секунд опускається туман.": "Co 1–2 minuty na mapie dzieje się coś: ostrzał artyleryjski (uciekaj z czerwonej strefy), dron zrzuca skrzynki z bonusami albo na 20 sekund opada mgła.",
+ "Події": "Wydarzenia",
+ "Шквальний вогонь без пауз — стеж за перегрівом ствола.": "Ogień bez przerwy — uważaj na przegrzanie lufy.",
+ "Ремкомплект": "Zestaw naprawczy"
 }, [["Ви протримались до (\\d+) хвилі", "Wytrzymałeś do fali $1"], ["(\\d+)Д", "$1d"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1 s"], ["_ та -", "_ i -"]]);
 // Креди (валюта), вікно «Гаманець» та промокоди
 I18N.add("pl", {

@@ -45,6 +45,7 @@
         { key: 'tdmTeams', label: 'Команд', min: 2, max: 4, def: 2, step: 1, modes: ['team_deathmatch'], desc: 'Скільки команд беруть участь у бою (червоні, сині, зелені, жовті).' },
         { key: 'tdmTime', label: 'Тривалість бою', min: 60, max: 300, def: 180, step: 10, unit: 'с', modes: ['team_deathmatch'], desc: 'Максимальний час бою. Коли час вийде, перемагає команда з більшою кількістю очків.' },
         { key: 'tdmScore', label: 'Очки для перемоги', min: 5, max: 50, def: 20, step: 1, modes: ['team_deathmatch'], desc: 'Команда, яка першою набере стільки очок (за вбивства), перемагає достроково.' },
+        { key: 'mapEvents', label: 'Події на мапі', type: 'toggle', def: true, modes: ['deathmatch', 'team_deathmatch', 'bounty', 'capture_points'], desc: 'Раз на 1–2 хвилини на мапі стається подія: артилерійський удар (тікай із червоної зони), дрон скидає скриньки з бонусами або на 20 секунд опускається туман.' },
         { key: 'tdmAutoBalance', label: 'Автобаланс', type: 'toggle', def: true, modes: ['team_deathmatch', 'capture_points', 'rounds'], desc: 'Якщо увімкнено — гру не можна почати, поки склади команд відрізняються більш ніж на одного гравця.' },
 
         { key: 'pveDiff', label: 'Складність', min: 50, max: 200, def: 100, step: 25, unit: '%', modes: ALLPVE, desc: 'Міцність і шкода ворогів. Вище — важче, але й нагорода більша (50% дає −25% до нагороди, 200% — +50%).' },

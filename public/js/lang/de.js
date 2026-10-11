@@ -820,7 +820,31 @@ I18N.add("de", {
  "АКТИВНО": "AKTIV",
  "ГОТОВО": "BEREIT",
  "Здібність": "Fähigkeit",
- "за 5–20 пережитих хвиль (пізні хвилі цінніші)": "für 5–20 überlebte Wellen (spätere Wellen zählen mehr)"
+ "за 5–20 пережитих хвиль (пізні хвилі цінніші)": "für 5–20 überlebte Wellen (spätere Wellen zählen mehr)",
+ "Ривок": "Sprint",
+ "Табло": "Punktetafel",
+ "Інтерфейс бою": "Kampfoberfläche",
+ "Міні-мапа: увімкнено": "Minikarte: an",
+ "Міні-мапа: вимкнено": "Minikarte: aus",
+ "Масштаб HUD у бою": "Kampf-HUD-Größe",
+ "ПОДВІЙНЕ!": "DOPPELKILL!",
+ "ПОТРІЙНЕ!": "DREIFACHKILL!",
+ "НЕСТРИМНИЙ!": "UNAUFHALTSAM!",
+ "КОМБО": "KOMBO",
+ "Артилерійський удар!": "Artillerieschlag!",
+ "Тікай із червоної зони": "Raus aus der roten Zone",
+ "Дрон із припасами!": "Versorgungsdrohne!",
+ "Скриньки з бонусами — встигни першим": "Bonuskisten — sei der Erste",
+ "Туман!": "Nebel!",
+ "20 секунд видно лише поруч": "20 Sekunden lang siehst du nur in der Nähe",
+ "Ти — ціль!": "Du bist das Ziel!",
+ "За твоє знищення ворог отримає подвійну нагороду": "Der Gegner bekommt für deine Zerstörung die doppelte Belohnung",
+ "Лідера повалено!": "Anführer gefallen!",
+ "Події на мапі": "Kartenereignisse",
+ "Раз на 1–2 хвилини на мапі стається подія: артилерійський удар (тікай із червоної зони), дрон скидає скриньки з бонусами або на 20 секунд опускається туман.": "Alle 1–2 Minuten passiert etwas auf der Karte: ein Artillerieschlag (raus aus der roten Zone), eine Drohne wirft Bonuskisten ab oder 20 Sekunden lang zieht Nebel auf.",
+ "Події": "Ereignisse",
+ "Шквальний вогонь без пауз — стеж за перегрівом ствола.": "Dauerfeuer ohne Pause — achte auf die Überhitzung des Rohrs.",
+ "Ремкомплект": "Reparaturkit"
 }, [["Ви протримались до (\\d+) хвилі", "Du hast bis Welle $1 durchgehalten"], ["(\\d+)Д", "$1T"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1 s"], ["_ та -", "_ und -"]]);
 // Креди (валюта), вікно «Гаманець» та промокоди
 I18N.add("de", {

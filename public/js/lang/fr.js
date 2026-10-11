@@ -820,7 +820,31 @@ I18N.add("fr", {
  "АКТИВНО": "ACTIVE",
  "ГОТОВО": "PRÊTE",
  "Здібність": "Capacité",
- "за 5–20 пережитих хвиль (пізні хвилі цінніші)": "pour 5–20 vagues survécues (les dernières valent plus)"
+ "за 5–20 пережитих хвиль (пізні хвилі цінніші)": "pour 5–20 vagues survécues (les dernières valent plus)",
+ "Ривок": "Ruée",
+ "Табло": "Tableau des scores",
+ "Інтерфейс бою": "Interface de combat",
+ "Міні-мапа: увімкнено": "Mini-carte : activée",
+ "Міні-мапа: вимкнено": "Mini-carte : désactivée",
+ "Масштаб HUD у бою": "Échelle du HUD en combat",
+ "ПОДВІЙНЕ!": "DOUBLÉ !",
+ "ПОТРІЙНЕ!": "TRIPLÉ !",
+ "НЕСТРИМНИЙ!": "INARRÊTABLE !",
+ "КОМБО": "COMBO",
+ "Артилерійський удар!": "Frappe d’artillerie !",
+ "Тікай із червоної зони": "Sors de la zone rouge",
+ "Дрон із припасами!": "Drone de ravitaillement !",
+ "Скриньки з бонусами — встигни першим": "Caisses de bonus — sois le premier",
+ "Туман!": "Brouillard !",
+ "20 секунд видно лише поруч": "Pendant 20 secondes tu ne vois qu’autour de toi",
+ "Ти — ціль!": "Tu es la cible !",
+ "За твоє знищення ворог отримає подвійну нагороду": "L’ennemi reçoit une double récompense s’il te détruit",
+ "Лідера повалено!": "Le leader est tombé !",
+ "Події на мапі": "Événements de carte",
+ "Раз на 1–2 хвилини на мапі стається подія: артилерійський удар (тікай із червоної зони), дрон скидає скриньки з бонусами або на 20 секунд опускається туман.": "Toutes les 1 à 2 minutes, un événement survient : frappe d’artillerie (fuis la zone rouge), un drone largue des caisses de bonus ou le brouillard tombe pendant 20 secondes.",
+ "Події": "Événements",
+ "Шквальний вогонь без пауз — стеж за перегрівом ствола.": "Tir de barrage sans pause — surveille la surchauffe du canon.",
+ "Ремкомплект": "Kit de réparation"
 }, [["Ви протримались до (\\d+) хвилі", "Vous avez tenu jusqu'à la vague $1"], ["(\\d+)Д", "$1j"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1 s"], ["_ та -", "_ et -"]]);
 // Креди (валюта), вікно «Гаманець» та промокоди
 I18N.add("fr", {

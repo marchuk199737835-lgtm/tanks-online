@@ -931,7 +931,31 @@ I18N.add("en", {
  "АКТИВНО": "ACTIVE",
  "ГОТОВО": "READY",
  "Здібність": "Ability",
- "за 5–20 пережитих хвиль (пізні хвилі цінніші)": "for 5–20 survived waves (later waves are worth more)"
+ "за 5–20 пережитих хвиль (пізні хвилі цінніші)": "for 5–20 survived waves (later waves are worth more)",
+ "Ривок": "Dash",
+ "Табло": "Scoreboard",
+ "Інтерфейс бою": "Battle interface",
+ "Міні-мапа: увімкнено": "Minimap: on",
+ "Міні-мапа: вимкнено": "Minimap: off",
+ "Масштаб HUD у бою": "Battle HUD scale",
+ "ПОДВІЙНЕ!": "DOUBLE KILL!",
+ "ПОТРІЙНЕ!": "TRIPLE KILL!",
+ "НЕСТРИМНИЙ!": "UNSTOPPABLE!",
+ "КОМБО": "COMBO",
+ "Артилерійський удар!": "Artillery strike!",
+ "Тікай із червоної зони": "Get out of the red zone",
+ "Дрон із припасами!": "Supply drone!",
+ "Скриньки з бонусами — встигни першим": "Bonus crates — be the first",
+ "Туман!": "Fog!",
+ "20 секунд видно лише поруч": "For 20 seconds you can only see nearby",
+ "Ти — ціль!": "You are the target!",
+ "За твоє знищення ворог отримає подвійну нагороду": "The enemy gets a double reward for destroying you",
+ "Лідера повалено!": "Leader down!",
+ "Події на мапі": "Map events",
+ "Раз на 1–2 хвилини на мапі стається подія: артилерійський удар (тікай із червоної зони), дрон скидає скриньки з бонусами або на 20 секунд опускається туман.": "Every 1–2 minutes something happens on the map: an artillery strike (run from the red zone), a drone drops bonus crates, or fog rolls in for 20 seconds.",
+ "Події": "Events",
+ "Шквальний вогонь без пауз — стеж за перегрівом ствола.": "Non-stop barrage fire — watch the barrel overheat.",
+ "Ремкомплект": "Repair kit"
 }, [["Ви протримались до (\\d+) хвилі", "You lasted until wave $1"], ["(\\d+)Д", "$1d"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1s"], ["_ та -", "_ and -"]]);
 // Креди (валюта), вікно «Гаманець» та промокоди
 I18N.add("en", {

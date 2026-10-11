@@ -820,7 +820,31 @@ I18N.add("es", {
  "АКТИВНО": "ACTIVA",
  "ГОТОВО": "LISTA",
  "Здібність": "Habilidad",
- "за 5–20 пережитих хвиль (пізні хвилі цінніші)": "por 5–20 oleadas superadas (las últimas valen más)"
+ "за 5–20 пережитих хвиль (пізні хвилі цінніші)": "por 5–20 oleadas superadas (las últimas valen más)",
+ "Ривок": "Embestida",
+ "Табло": "Marcador",
+ "Інтерфейс бою": "Interfaz de combate",
+ "Міні-мапа: увімкнено": "Minimapa: activado",
+ "Міні-мапа: вимкнено": "Minimapa: desactivado",
+ "Масштаб HUD у бою": "Escala del HUD en combate",
+ "ПОДВІЙНЕ!": "¡DOBLE!",
+ "ПОТРІЙНЕ!": "¡TRIPLE!",
+ "НЕСТРИМНИЙ!": "¡IMPARABLE!",
+ "КОМБО": "COMBO",
+ "Артилерійський удар!": "¡Ataque de artillería!",
+ "Тікай із червоної зони": "Sal de la zona roja",
+ "Дрон із припасами!": "¡Dron de suministros!",
+ "Скриньки з бонусами — встигни першим": "Cajas de bonus — llega el primero",
+ "Туман!": "¡Niebla!",
+ "20 секунд видно лише поруч": "Durante 20 segundos solo ves lo cercano",
+ "Ти — ціль!": "¡Eres el objetivo!",
+ "За твоє знищення ворог отримає подвійну нагороду": "El enemigo recibe doble recompensa por destruirte",
+ "Лідера повалено!": "¡Líder abatido!",
+ "Події на мапі": "Eventos del mapa",
+ "Раз на 1–2 хвилини на мапі стається подія: артилерійський удар (тікай із червоної зони), дрон скидає скриньки з бонусами або на 20 секунд опускається туман.": "Cada 1–2 minutos ocurre algo en el mapa: un ataque de artillería (sal de la zona roja), un dron suelta cajas de bonus o cae la niebla durante 20 segundos.",
+ "Події": "Eventos",
+ "Шквальний вогонь без пауз — стеж за перегрівом ствола.": "Fuego de ráfaga sin pausa — vigila el sobrecalentamiento del cañón.",
+ "Ремкомплект": "Kit de reparación"
 }, [["Ви протримались до (\\d+) хвилі", "Aguantaste hasta la oleada $1"], ["(\\d+)Д", "$1d"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1 s"], ["_ та -", "_ y -"]]);
 // Креди (валюта), вікно «Гаманець» та промокоди
 I18N.add("es", {

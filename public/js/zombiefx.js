@@ -202,9 +202,11 @@
     function hash(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); }
 
     // ---------- малювання ----------
+    // еліт-зомбі малюються спрайтами схожих типів (власні ефекти — у hud.js), з іншим масштабом
+    const ALIAS = { puller: 'spitter', shielder: 'tanker', splitter: 'bomber', mini: 'runner' }, EMUL = { puller: 1.35, shielder: 1.05, splitter: 1.3, mini: 0.72 };
     function drawOne(ctx, z, id, t, K, g, view) {
-        const type = ART[z.type] ? z.type : null, hb = (window.zType ? window.zType(z.type) : null) || { radius: 15, color: '#22c55e' };
-        const R = type ? VR[type] : hb.radius + 2, boss = !!BOSS[type];
+        const type = ART[z.type] ? z.type : (ALIAS[z.type] && ART[ALIAS[z.type]] ? ALIAS[z.type] : null), hb = (window.zType ? window.zType(z.type) : null) || { radius: 15, color: '#22c55e' };
+        const em = EMUL[z.type] || 1, R = (type ? VR[type] : hb.radius + 2) * em, boss = !!BOSS[type];
         if (z.x < view.x0 - R * 1.6 || z.x > view.x1 + R * 1.6 || z.y < view.y0 - R * 1.6 || z.y > view.y1 + R * 1.6) return;
         // напрям і темп ходьби — за фактичним переміщенням
         if (z._lx === undefined) { z._lx = z.x; z._ly = z.y; z.ang = 0; z._ph = hash(id) % 7; z._born = t; z._hp = z.hp; }
@@ -214,7 +216,7 @@
         const ts = t / 1000;
         if (!type) { ctx.fillStyle = hb.color; ctx.beginPath(); ctx.arc(z.x, z.y, hb.radius, 0, TAU); ctx.fill(); return; }
         const f = Math.floor(z._ph) % K.N;
-        const born = Math.min(1, (t - z._born) / 280), sc = 0.55 + 0.45 * (1 - Math.pow(1 - born, 3));
+        const born = Math.min(1, (t - z._born) / 280), sc = (0.55 + 0.45 * (1 - Math.pow(1 - born, 3))) * em;
         const B = view.m, tf = (th, k) => { const co = Math.cos(th) * k, si = Math.sin(th) * k; ctx.setTransform(B.a * co + B.c * si, B.b * co + B.d * si, -B.a * si + B.c * co, -B.b * si + B.d * co, B.a * z.x + B.c * z.y + B.e, B.b * z.x + B.d * z.y + B.f); };
         if (boss && g.fx >= 0.5) { const a = auraSprite(type); tf(0, 1); ctx.globalAlpha = 0.55 + 0.25 * Math.sin(ts * 3 + z._ph); ctx.drawImage(a.cv, -a.w / 2, -a.h / 2, a.w, a.h); ctx.globalAlpha = 1; }
         if (boss && RING[type]) { const rs = ringSprite(type, K); tf(g.tier === 'low' ? 0 : ts * (RING_SPD[type] || 0), 1); ctx.drawImage(rs.cv, -rs.w / 2, -rs.h / 2, rs.w, rs.h); }

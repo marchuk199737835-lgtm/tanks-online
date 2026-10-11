@@ -95,18 +95,18 @@
         const lv = k => { const x = val(r, MI.BYKEY[k]); return x === 'inf' ? '∞' : x; };
         const v = k => val(r, MI.BYKEY[k]), tm = k => { const t = +v(k); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); }, yn = k => v(k) ? '✓' : '✗';
         switch (r.mode) {
-            case 'deathmatch': h += rule('🎯', 'Жетонів', r.winScore); break;
+            case 'deathmatch': h += rule('🎯', 'Жетонів', r.winScore) + rule('🎲', 'Події', yn('mapEvents')); break;
             case 'survival': h += rule('🌊', 'Хвилі', '∞') + rule('❤️', 'Життів', lv('svLives')) + rule('💪', 'Складність', v('pveDiff') + '%'); break;
             case 'prophunt': h += rule('📦', 'Схованка', (r.hideTime || 30) + 'с') + rule('🔍', 'Пошук', (r.seekTime || 120) + 'с') + rule('🔴', 'Мисливців', r.hunterCount || 1); break;
-            case 'team_deathmatch': h += rule('🚩', 'Команд', r.tdmTeams || 2) + rule('⏱', 'Час', (r.tdmTime || 180) + 'с') + rule('🏁', 'Очки', r.tdmScore || 20) + rule('⚖️', 'Автобаланс', r.tdmAutoBalance ? '✓' : '✗'); break;
+            case 'team_deathmatch': h += rule('🚩', 'Команд', r.tdmTeams || 2) + rule('⏱', 'Час', (r.tdmTime || 180) + 'с') + rule('🏁', 'Очки', r.tdmScore || 20) + rule('⚖️', 'Автобаланс', r.tdmAutoBalance ? '✓' : '✗') + rule('🎲', 'Події', yn('mapEvents')); break;
             case 'base_defense': h += rule('🌊', 'Хвиль', v('bdWaves')) + rule('🏰', 'Ядро', v('bdCoreHp')) + rule('💪', 'Складність', v('pveDiff') + '%') + rule('🔧', 'Ремонт', yn('bdRepair')) + rule('❤️', 'Життів', lv('bdLives')); break;
             case 'boss_raid': h += rule('👹', 'Бос', MI.BOSS_NAMES[v('rbBoss')]) + rule('❤️', 'Життів', v('rbLives')) + rule('⏱', 'Час', tm('rbTime')) + rule('💪', 'Складність', v('pveDiff') + '%') + rule('👥', 'Приспішники', yn('rbMinions')); break;
             case 'convoy': h += rule('🚚', 'Конвой', v('cvHp')) + rule('⚡', 'Швидкість', v('cvSpeed')) + rule('⏱', 'Час', tm('cvTime')) + rule('💪', 'Складність', v('pveDiff') + '%') + rule('❤️', 'Життів', lv('cvLives')); break;
             case 'solo_arena': h += rule('🌊', 'Хвиль', v('saWaves')) + rule('💪', 'Складність', v('pveDiff') + '%') + rule('🩹', 'Лікування', yn('saHeal')); break;
             case 'boss_duel': h += rule('💀', 'Босів', v('duBosses')) + rule('❤️', 'Життів', v('duLives')) + rule('💪', 'Складність', v('pveDiff') + '%') + rule('🩹', 'Лікування', yn('duHeal')); break;
             case 'battle_royale': h += rule('⏱', 'До фіналу', tm('brTime')) + rule('☣️', 'Шкода зони', v('brDmg') + '%/с') + rule('🎁', 'Модулі', yn('brLoot')); break;
-            case 'capture_points': h += rule('🚩', 'Команд', v('cpTeams')) + rule('📍', 'Точок', v('cpPoints')) + rule('🏁', 'Очки', v('cpScore')) + rule('⏱', 'Час', tm('cpTime')); break;
-            case 'bounty': h += rule('🏁', 'Очки', v('bnScore')) + rule('⏱', 'Час', tm('bnTime')) + rule('🎯', 'Зміна цілі', v('bnInterval') + 'с'); break;
+            case 'capture_points': h += rule('🚩', 'Команд', v('cpTeams')) + rule('📍', 'Точок', v('cpPoints')) + rule('🏁', 'Очки', v('cpScore')) + rule('⏱', 'Час', tm('cpTime')) + rule('🎲', 'Події', yn('mapEvents')); break;
+            case 'bounty': h += rule('🏁', 'Очки', v('bnScore')) + rule('⏱', 'Час', tm('bnTime')) + rule('🎯', 'Зміна цілі', v('bnInterval') + 'с') + rule('🎲', 'Події', yn('mapEvents')); break;
             case 'rounds': h += rule('🔁', 'Раундів', v('rdRounds')) + rule('⏱', 'Раунд', v('rdTime') + 'с') + rule('🤝', 'Нічия', yn('rdDraw')); break;
         }
         const rr = MI.rewardRange(r.mode, r);

@@ -299,6 +299,7 @@
         frozen() { const r = cur(); return !!(md && r && md.m === 'rounds' && r.mode === 'rounds' && md.st !== 'live'); },
         outside(x, y) { return !!(md && md.m === 'battle_royale' && md.z && Math.hypot(x - md.z.x, y - md.z.y) > md.z.r); },
         sync(d) { md = d || md; },
+        get md() { return md; },      // для міні-мапи (hud.js)
         toggle(mode) { if (NEWM.has(mode)) ensureHud(mode); else if (hud) removeHud(); },
         hud() { paint(); },
         world(ctx, now) {

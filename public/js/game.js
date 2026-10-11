@@ -178,6 +178,7 @@ function updatePhys(now, dt) {
             if (!checkCollision(myLocalTank.x, nY, myRad, true, isB) && !checkPCollision(myLocalTank.x, nY, myRad) || isB) myLocalTank.y = nY;
         }
         
+        if (window.BHUD && !_frz) BHUD.dashStep(dt, myRad, myLocalTank.buff === 'boss');   // ривок (Shift / кнопка на телефоні)
         {
             let tgtA = null;
             if (joysticks.right.active) tgtA = joysticks.right.angle;
@@ -231,8 +232,9 @@ function updatePhys(now, dt) {
         let rt = window.getReloadTime();
         if (fCfg.type !== 'none' && fCfg.cd) rt = (fCfg.cd < 500 ? fCfg.cd : rt);
         
-        if (sh && !_frz && (now - lastShootTime >= rt) && !(currentRoomData.mode === 'prophunt' && currentRoomData.state !== 'seeking')) {
+        if (sh && !_frz && (now - lastShootTime >= rt) && !(window.BHUD && BHUD.heatLocked(now)) && !(currentRoomData.mode === 'prophunt' && currentRoomData.state !== 'seeking')) {
             fireBull(now, myHitRad, fCfg, tR);
+            if (window.BHUD) BHUD.heatShot(now);      // перегрів (Штурмовик, мінігун, швидкий вогонь)
         } else if (isMobile && !isMg && joysticks.right.released) {
             joysticks.right.released = false;
         }
@@ -268,10 +270,21 @@ function updatePhys(now, dt) {
                 b.vx = Math.cos(ang) * cSpd; b.vy = Math.sin(ang) * cSpd;
             }
         }
+        const _bpx = b.x, _bpy = b.y;
         b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
-        
+
         let hW = false, bC = window.BUFFS[b.type] || window.BUFFS['none'], isP = (b.type === 'samurai' || b.type === 'homing' || b.type.includes('piercing') || b.type === 'ghost_melee' || b.type === 'boss_proj');
         hW = checkCollision(b.x, b.y, 4, !isP, true);
+        // рикошет: звичайний снаряд гравця один раз відбивається від стіни (дзеркально по осі зіткнення); однаково на всіх клієнтах
+        if (hW && b.type === 'none' && !b.rb && b.owner !== 'zombie' && b.life > 0) {
+            const hx = checkCollision(b.x, _bpy, 4, true, true), hy = checkCollision(_bpx, b.y, 4, true, true);
+            if (hx || !hy) b.vx = -b.vx; if (hy || !hx) b.vy = -b.vy;
+            b.x = _bpx; b.y = _bpy; b.rb = 1;
+            if (window.BHUD) BHUD.ricochet(b.x, b.y);
+            continue;
+        }
+        // щит еліт-зомбі «Щитоносець» зупиняє снаряди гравців спереду (і прикриває зомбі позаду)
+        if (!hW && b.owner !== 'zombie' && window.BHUD && isPveM(currentRoomData.mode) && BHUD.shieldBlock(b)) hW = true;
         
         let isS = isPveM(currentRoomData.mode), hP = false, hZ = false;
         
@@ -690,7 +703,7 @@ socket.on('mineExploded', (d) => {
 socket.on('burnTick', (d) => { createExplosion(d.x, d.y, 3, '#f97316'); });
 
 socket.on('laserHit', (d) => {
-    let srcP = d.src === myId ? myLocalTank : opponents[d.src], tgtP = d.tgt === myId ? myLocalTank : opponents[d.tgt];
+    let srcP = d.src === myId ? myLocalTank : opponents[d.src], tgtP = d.tgt === myId ? myLocalTank : (opponents[d.tgt] || zombies[d.tgt]);   // у кооперативі ціль — зомбі
     if (srcP && tgtP) lasers.push({ x1: srcP.x, y1: srcP.y, x2: tgtP.x, y2: tgtP.y, life: 0.15 });
 });
 
@@ -1142,7 +1155,9 @@ function draw(now) {
         if (p.mod) { if (window.ModesFX) ModesFX.lootDraw(ctx, p, now, _pv); continue; }
         if (p.x < VX0 - 40 || p.x > VX1 + 40 || p.y < VY0 - 40 || p.y > VY1 + 40) continue;
         ctx.save(); ctx.translate(p.x, p.y);
-        ctx.fillStyle = '#1e293b'; ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2; if (!_low) { ctx.shadowColor = '#f59e0b'; ctx.shadowBlur = 10; }
+        const _pc = p.type === 'repair' ? '#22c55e' : p.ev ? '#38bdf8' : '#f59e0b';      // трофей — зелений, скриньки дрона — блакитні
+        if (p.type === 'repair' || p.ev) ctx.scale(1 + 0.08 * Math.sin(now / 160), 1 + 0.08 * Math.sin(now / 160));
+        ctx.fillStyle = '#1e293b'; ctx.strokeStyle = _pc; ctx.lineWidth = 2; if (!_low) { ctx.shadowColor = _pc; ctx.shadowBlur = 10; }
         ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(-15, -15, 30, 30, 5); else ctx.rect(-15, -15, 30, 30);
         ctx.fill(); ctx.stroke(); ctx.shadowBlur = 0;
         ctx.fillStyle = '#fff'; ctx.font = '16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -1151,19 +1166,20 @@ function draw(now) {
     
     for (let mid in mines) {
         let m = mines[mid]; ctx.save(); ctx.translate(m.x, m.y);
-        ctx.globalAlpha = (m.owner === myId) ? 0.5 : 0.01;
+        ctx.globalAlpha = (m.owner === myId) ? 0.5 : (isPveM(currentRoomData.mode) ? 0.35 : 0.01);   // у кооперативі міни союзників видно (вони для зомбі)
         ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2; ctx.stroke();
         ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(0, 0, 2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
     }
     
+    if (window.BHUD) BHUD.ground(ctx, _pv);               // сліди гусениць (дрифт)
     if (window.ClassFX) ClassFX.ground(ctx, now, _pv);   // кооп: аури класів, поле лікаря, зона артобстрілу, турелі (під танками)
     for (let id in opponents) {
         const p = opponents[id], sn = currentRoomData.players[id]; if (!sn) { delete opponents[id]; continue; }
         if (p.x < VX0 - 140 || p.x > VX1 + 140 || p.y < VY0 - 140 || p.y > VY1 + 140) continue;   // поза екраном (із запасом на підпис/щит)
         const cH = tankHex(sn.color, sn.color ? '#9333ea' : '#ef4444');
         if (p.isDisguised) MapObj.drawDisguise(ctx, { type: p.propType, x: p.x - 25, y: p.y - 25, w: 50, h: 50, r: 25 }, tm);
-        else { const _ca = window.ClassFX ? ClassFX.alpha(id) : 1; if (_ca < 1) ctx.globalAlpha = _ca; drTnk(p.x, p.y, p.bodyAngle, p.turretAngle, cH, (window.dispName ? dispName(sn) : sn.name), false, p.hp, p.buff, sn.equipped, true); if (_ca < 1) ctx.globalAlpha = 1; }
+        else { const _ca = window.ClassFX ? ClassFX.alpha(id) : 1; if (_ca < 1) ctx.globalAlpha = _ca; drTnk(p.x, p.y, p.bodyAngle + (window.BHUD ? BHUD.slip(id) : 0), p.turretAngle, cH, (window.dispName ? dispName(sn) : sn.name), false, p.hp, p.buff, sn.equipped, true); if (_ca < 1) ctx.globalAlpha = 1; }
         if ((myLocalTank.buff === 'homing' || myLocalTank.buff === 'autolaser') && id === homingTargetId && p.hp > 0) {
             ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(now / 300); ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3; ctx.setLineDash([15, 10]); ctx.strokeRect(-45, -45, 90, 90); ctx.restore();
         }
@@ -1173,7 +1189,7 @@ function draw(now) {
     if (myLocalTank.hp > 0) {
         const mC = tankHex(myColor, myColor ? '#9333ea' : '#3b82f6');
         if (myLocalTank.isDisguised) MapObj.drawDisguise(ctx, { type: myLocalTank.propType, x: myLocalTank.x - 25, y: myLocalTank.y - 25, w: 50, h: 50, r: 25 }, tm);
-        else { const _ca = window.ClassFX ? ClassFX.alpha(myId) : 1; if (_ca < 1) ctx.globalAlpha = _ca; drTnk(myLocalTank.x, myLocalTank.y, myLocalTank.bodyAngle, myLocalTank.turretAngle, mC, (window.dispName ? dispName(myName) : myName), true, myLocalTank.hp, myLocalTank.buff, myEquipped, true); if (_ca < 1) ctx.globalAlpha = 1; drPCA(); }
+        else { const _ca = window.ClassFX ? ClassFX.alpha(myId) : 1; if (_ca < 1) ctx.globalAlpha = _ca; drTnk(myLocalTank.x, myLocalTank.y, myLocalTank.bodyAngle + (window.BHUD ? BHUD.slip(myId) : 0), myLocalTank.turretAngle, mC, (window.dispName ? dispName(myName) : myName), true, myLocalTank.hp, myLocalTank.buff, myEquipped, true); if (_ca < 1) ctx.globalAlpha = 1; drPCA(); }
     }
     
     if (window.EmoteFX) EmoteFX.draw(ctx, now);   // емоції над танками й мітка кілкаму
@@ -1195,9 +1211,12 @@ function draw(now) {
             ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(Math.atan2(b.vy, b.vx)); ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 10; ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 15; ctx.beginPath(); ctx.arc(0, 0, 25, -Math.PI / 1.5, Math.PI / 1.5); ctx.stroke(); ctx.restore(); continue;
         }
         const e = bulletSprite(b.type);
+        if (b.rb) ctx.globalAlpha = 0.7;      // після рикошету снаряд тьмяніший
         ctx.drawImage(e.cv, b.x + e.x, b.y + e.y, e.w, e.h);
+        if (b.rb) ctx.globalAlpha = 1;
     }
     if (window.ClassFX) ClassFX.top(ctx, now, _pv);   // кооп: щити, вогонь, промені турелей, вибухи артобстрілу, частинки
+    if (window.BHUD) BHUD.top(ctx, _pv);              // шлейф ривка, пил дрифту, цифри шкоди
 
     if (_fx) {   // дахи будівель: прозорі лише для локального гравця всередині (інші танки під дахом не видно)
         const _rdt = Math.min(0.1, Math.max(0, (now - (draw._rt || now)) / 1000)); draw._rt = now;

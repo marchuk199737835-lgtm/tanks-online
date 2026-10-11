@@ -820,7 +820,31 @@ I18N.add("tr", {
  "АКТИВНО": "AKTİF",
  "ГОТОВО": "HAZIR",
  "Здібність": "Yetenek",
- "за 5–20 пережитих хвиль (пізні хвилі цінніші)": "5–20 atlatılan dalga için (geç dalgalar daha değerli)"
+ "за 5–20 пережитих хвиль (пізні хвилі цінніші)": "5–20 atlatılan dalga için (geç dalgalar daha değerli)",
+ "Ривок": "Atılma",
+ "Табло": "Skor tablosu",
+ "Інтерфейс бою": "Savaş arayüzü",
+ "Міні-мапа: увімкнено": "Mini harita: açık",
+ "Міні-мапа: вимкнено": "Mini harita: kapalı",
+ "Масштаб HUD у бою": "Savaş HUD ölçeği",
+ "ПОДВІЙНЕ!": "ÇİFTE!",
+ "ПОТРІЙНЕ!": "ÜÇLÜ!",
+ "НЕСТРИМНИЙ!": "DURDURULAMAZ!",
+ "КОМБО": "KOMBO",
+ "Артилерійський удар!": "Topçu ateşi!",
+ "Тікай із червоної зони": "Kırmızı bölgeden çık",
+ "Дрон із припасами!": "İkmal dronu!",
+ "Скриньки з бонусами — встигни першим": "Bonus sandıkları — ilk sen kap",
+ "Туман!": "Sis!",
+ "20 секунд видно лише поруч": "20 saniye boyunca yalnızca yakını görürsün",
+ "Ти — ціль!": "Hedef sensin!",
+ "За твоє знищення ворог отримає подвійну нагороду": "Seni yok eden düşman iki kat ödül alır",
+ "Лідера повалено!": "Lider düştü!",
+ "Події на мапі": "Harita olayları",
+ "Раз на 1–2 хвилини на мапі стається подія: артилерійський удар (тікай із червоної зони), дрон скидає скриньки з бонусами або на 20 секунд опускається туман.": "Her 1–2 dakikada haritada bir olay olur: topçu ateşi (kırmızı bölgeden kaç), dron bonus sandıkları bırakır ya da 20 saniyelik sis çöker.",
+ "Події": "Olaylar",
+ "Шквальний вогонь без пауз — стеж за перегрівом ствола.": "Aralıksız baraj ateşi — namlunun aşırı ısınmasına dikkat et.",
+ "Ремкомплект": "Tamir kiti"
 }, [["Ви протримались до (\\d+) хвилі", "$1. dalgaya kadar dayandın"], ["(\\d+)Д", "$1g"], ["(\\d+)с(?![А-ЯІЇЄҐа-яіїєґ])", "$1 sn"], ["_ та -", "_ ve -"]]);
 // Креди (валюта), вікно «Гаманець» та промокоди
 I18N.add("tr", {
