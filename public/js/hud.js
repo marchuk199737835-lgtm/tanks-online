@@ -53,7 +53,10 @@
         '.bh-ic{--p:1;position:relative;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;background:rgba(15,23,42,.9)}' +
         '.bh-ic:before{content:"";position:absolute;inset:-2px;border-radius:50%;background:conic-gradient(#38bdf8 calc(var(--p)*360deg),rgba(255,255,255,.1) 0);-webkit-mask:radial-gradient(circle,transparent 60%,#000 62%);mask:radial-gradient(circle,transparent 60%,#000 62%)}' +
         '.bh-ic.cd{filter:grayscale(.8) brightness(.7)}.bh-ic small{position:absolute;bottom:-12px;left:50%;transform:translateX(-50%);font:700 8px/1 "Russo One",Arial;color:#94a3b8;white-space:nowrap}' +
-        '#bh-buff.bh-ic:before{background:conic-gradient(#facc15 calc(var(--p)*360deg),rgba(255,255,255,.1) 0)}#bh-buff.off{display:none}' +
+        '#bh-buff.bh-ic:before,#bh-buffm.bh-ic:before{background:conic-gradient(#facc15 calc(var(--p)*360deg),rgba(255,255,255,.1) 0)}#bh-buff.off{display:none}' +
+        // бонус на телефоні — кільце праворуч від круглої міні-мапи
+        '#bh-buffm{display:none!important;position:absolute;left:calc(100% + 10px);top:50%;margin-top:calc(-17px * var(--bhz));width:calc(34px * var(--bhz));height:calc(34px * var(--bhz));font-size:calc(17px * var(--bhz));pointer-events:none;box-shadow:0 0 12px rgba(250,204,21,.45),0 4px 10px rgba(0,0,0,.5)}' +
+        'html.ctl-touch #bh-buffm:not(.off){display:flex!important}html.gfx-low #bh-buffm{box-shadow:none}' +
         '@keyframes bhPulse{50%{opacity:.65}}' +
         // чат у бою (ПК) — над міні-мапою
         'html.bh-on #ch-root[data-k=game][data-t="0"]{left:14px;bottom:198px}' +
@@ -125,7 +128,7 @@
         // HP — ліва дуга (заповнюється знизу вгору), перезарядка — права (згори вниз)
         var hp0 = Math.PI * 0.62, hp1 = Math.PI * 1.38, c0 = -Math.PI * 0.28, c1 = Math.PI * 0.28;
         mm.innerHTML = '<canvas></canvas><svg id="bh-arc" viewBox="-9 -9 118 118"><path class="bg" d="' + arcPath(50, 50, 54, hp0, hp1) + '"/><path class="hp" pathLength="100" stroke-dasharray="100 100" d="' + arcPath(50, 50, 54, hp0, hp1) + '"/>' +
-            '<path class="bg" d="' + arcPath(50, 50, 54, c0, c1) + '"/><path class="cd" pathLength="100" stroke-dasharray="100 100" d="' + arcPath(50, 50, 54, c0, c1) + '"/></svg><b id="bh-hpm"></b><span class="bh-key">M</span>';
+            '<path class="bg" d="' + arcPath(50, 50, 54, c0, c1) + '"/><path class="cd" pathLength="100" stroke-dasharray="100 100" d="' + arcPath(50, 50, 54, c0, c1) + '"/></svg><b id="bh-hpm"></b><span class="bh-ic off" id="bh-buffm"></span><span class="bh-key">M</span>';
         gs.appendChild(mm); cv = mm.querySelector('canvas'); g = cv.getContext('2d'); arc = mm.querySelector('#bh-arc');
         mm.addEventListener('click', function () { setBig(!big, touch() ? 2000 : 0); snd('ui_click'); });
         mm.addEventListener('touchstart', function (e) { e.stopPropagation(); }, { passive: true });
@@ -176,8 +179,9 @@
         // табло «Цілі» (мітки гравців під панеллю режиму)
         var bd = document.querySelector('#mfx .mfx-board');
         if (bd) {
-            var w = $('bh-bwrap');
-            if (!w || w.parentElement !== bd.parentElement) {
+            var w = bd.parentElement;
+            if (!w || w.id !== 'bh-bwrap') {      // обгортаємо лише один раз (панель перебудовується — обгортка зникає разом із нею)
+                var old = $('bh-bwrap'); if (old) old.remove();
                 w = document.createElement('div'); w.id = 'bh-bwrap'; bd.parentElement.insertBefore(w, bd); w.appendChild(bd);
                 var bt = document.createElement('button'); bt.type = 'button'; bt.className = 'bh-tgl'; w.insertBefore(bt, bd);
                 var ch = document.createElement('span'); ch.className = 'bh-chip'; w.appendChild(ch);
@@ -293,11 +297,15 @@
         var seen = {};
         for (var i = 0; i < list.length; i++) {
             var id2 = list[i][0], p = list[i][1], s = trk[id2]; seen[id2] = 1;
-            if (!s) { trk[id2] = { x: p.x, y: p.y, a: p.bodyAngle, slip: 0, m: 0 }; continue; }
-            var v = Math.hypot(p.x - s.x, p.y - s.y) / Math.max(dt, 0.001), w = angDiff(p.bodyAngle, s.a) / Math.max(dt, 0.001);
-            var target = (v > 130 && v < 900 && Math.abs(w) > 2.2) ? clamp(-w * 0.06, -0.3, 0.3) : 0;
-            s.slip += (target - s.slip) * Math.min(1, dt * (target ? 10 : 5));
-            if (maxM && Math.abs(s.slip) > 0.06 && now - s.m > 34) {
+            if (!s) { trk[id2] = { x: p.x, y: p.y, va: p.bodyAngle, vw: 0, slip: 0, m: 0 }; continue; }
+            var v = Math.hypot(p.x - s.x, p.y - s.y) / Math.max(dt, 0.001);
+            // корпус повертається миттєво (кут = напрям руху) — тож малюємо «видимий» кут, що доганяє його пружиною з легким перекидом:
+            // при різкому повороті на швидкості танк ковзає боком (занос), лишаючи сліди гусениць
+            var dA = angDiff(p.bodyAngle, s.va);
+            if (Math.abs(dA) > 2.6 || v < 25 || v > 1400) { s.va = p.bodyAngle; s.vw = 0; }      // розворот назад / стоїть / телепорт — без заносу
+            else for (var ss = 0, n = Math.ceil(dt / 0.008); ss < n; ss++) { var h = dt / n; s.vw += (110 * angDiff(p.bodyAngle, s.va) - 13 * s.vw) * h; s.va += s.vw * h; }
+            s.slip = clamp(angDiff(s.va, p.bodyAngle), -1.1, 1.1);
+            if (maxM && v > 110 && Math.abs(s.slip) > 0.14 && now - s.m > 30) {
                 s.m = now; var ca = Math.cos(p.bodyAngle + s.slip), sa = Math.sin(p.bodyAngle + s.slip), rx = p.x - ca * 22, ry = p.y - sa * 22;
                 marks.push({ x: rx - sa * 14, y: ry + ca * 14, a: p.bodyAngle + s.slip, t: now }); marks.push({ x: rx + sa * 14, y: ry - ca * 14, a: p.bodyAngle + s.slip, t: now });
                 while (marks.length > maxM) marks.shift();
@@ -318,7 +326,7 @@
             c.save(); c.fillStyle = '#000';
             for (var i = 0; i < marks.length; i++) {
                 var m = marks[i], age = (now - m.t) / 3000; if (age >= 1) continue; if (m.x < view.x0 - 20 || m.x > view.x1 + 20 || m.y < view.y0 - 20 || m.y > view.y1 + 20) continue;
-                c.globalAlpha = 0.28 * (1 - age); c.save(); c.translate(m.x, m.y); c.rotate(m.a); c.fillRect(-5, -2.5, 10, 5); c.restore();
+                c.globalAlpha = 0.36 * (1 - age); c.save(); c.translate(m.x, m.y); c.rotate(m.a); c.fillRect(-5, -2.5, 10, 5); c.restore();
             }
             c.restore();
             while (marks.length && now - marks[0].t > 3000) marks.shift();
@@ -484,8 +492,11 @@
         var dp = pn >= dash.cdEnd ? 1 : 1 - (dash.cdEnd - pn) / DASH_CD, di = $('bh-dashi');
         if (di) { di.style.setProperty('--p', dp.toFixed(3)); di.classList.toggle('cd', dp < 1); }
         dashBtn.style.setProperty('--p', dp.toFixed(3)); dashBtn.classList.toggle('cd', dp < 1);
-        var bf = $('bh-buff');
-        if (bf) { if (myLocalTank.buff && myLocalTank.buffProgress > 0) { bf.classList.remove('off'); var ic = (window.BUFF_ICONS && BUFF_ICONS[myLocalTank.buff]) || '✨'; if (bf._i !== ic) { bf._i = ic; bf.textContent = ic; } bf.style.setProperty('--p', myLocalTank.buffProgress.toFixed(3)); } else bf.classList.add('off'); }
+        var bOn = !!(myLocalTank.buff && myLocalTank.buffProgress > 0), ic = bOn ? ((window.BUFF_ICONS && BUFF_ICONS[myLocalTank.buff]) || '✨') : '';
+        [$('bh-buff'), $('bh-buffm')].forEach(function (bf) {      // ПК — у капсулі, телефон — біля міні-мапи
+            if (!bf) return; bf.classList.toggle('off', !bOn); if (!bOn) return;
+            if (bf._i !== ic) { bf._i = ic; bf.textContent = ic; } bf.style.setProperty('--p', myLocalTank.buffProgress.toFixed(3));
+        });
         paintBoards();
         // міні-мапа: частота за рівнем графіки
         var every = tier() === 'low' ? 250 : tier() === 'medium' ? 125 : 66;
