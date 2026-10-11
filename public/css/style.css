@@ -357,8 +357,27 @@ canvas { display: block; cursor: crosshair; }
 #mm-quick { grid-column: span 2; grid-row: span 2; justify-content: flex-end; background: radial-gradient(120% 120% at 85% 0%, rgba(16,185,129,.75), rgba(59,130,246,.5) 45%, rgba(15,23,42,.95)); border-color: rgba(110,231,183,.8); }
 #mm-quick h2 { font-size: 24px; } #mm-quick p { font-size: 10px; color: #d1fae5; }
 #mm-quick .mm-card-ico { font-size: 72px; right: 14px; top: 10px; }
-#mm-quick::after { content: ''; position: absolute; inset: 0; border-radius: inherit; border: 2px solid #6ee7b7; animation: ars-ring 2s ease-out infinite; pointer-events: none; }
-@keyframes ars-ring { from { opacity: .9; } to { opacity: 0; transform: scale(1.05); } }
+#mm-quick { animation: ars-qglow 2.6s ease-in-out infinite; }
+@keyframes ars-qglow { 50% { box-shadow: 0 0 0 2px rgba(110,231,183,.55), 0 0 34px rgba(16,185,129,.45); } }
+/* нахил за курсором (menuhub.js ставить --rx/--ry/--mx/--my) + світлова пляма під курсором */
+.mm-card::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,.24), transparent 46%); opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 2; }
+.mm-card.tl { transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateZ(10px); transition: transform .08s linear, box-shadow .3s, border-color .3s; }
+.mm-card.tl::after { opacity: 1; }
+/* каскадна поява при відкритті меню */
+.mm-in .mm-grid-nav > .mm-card { animation: ars-cardin .55s cubic-bezier(.2,.9,.3,1.15) both; animation-delay: calc(var(--i, 0) * 45ms); }
+.mm-in #mm-quick { animation: ars-cardin .55s cubic-bezier(.2,.9,.3,1.15) both, ars-qglow 2.6s ease-in-out .6s infinite; }
+.mm-in .mm-advent { animation: ars-left .5s cubic-bezier(.2,.9,.3,1.1) both; }
+.mm-in .mm-hero { animation: ars-zoom .7s cubic-bezier(.2,.9,.3,1.1) both .1s; }
+.mm-in .ars-ev { animation: ars-upin .55s cubic-bezier(.2,.9,.3,1.1) both .25s; }
+@keyframes ars-cardin { from { opacity: 0; transform: translateX(26px) rotateY(-18deg) scale(.94); } }
+@keyframes ars-left { from { opacity: 0; transform: translateX(-26px); } }
+@keyframes ars-zoom { from { opacity: 0; transform: scale(.85); } }
+@keyframes ars-upin { from { opacity: 0; transform: translateY(20px); } }
+/* орбіти навколо танка */
+.ars-tank { position: relative; }
+.ars-tank::before, .ars-tank::after { content: ''; position: absolute; border-radius: 50%; pointer-events: none; }
+.ars-tank::before { inset: -4%; border: 2px dashed rgba(96,165,250,.35); animation: ars-rot 22s linear infinite; }
+.ars-tank::after { inset: 9%; border: 1.5px solid rgba(167,139,250,.18); border-top-color: #a78bfa; border-right-color: rgba(167,139,250,.6); animation: ars-rot 5s linear infinite reverse; }
 /* порядок карток (модулі додають їх у різний час) */
 #mm-quick { order: 0; } #nav-sessions-btn { order: 1; } #mm-ranked { order: 2; } #nav-hangar-btn { order: 3; } #nav-shop-btn { order: 4; } #nav-upgrader-btn { order: 5; }
 #mm-progress { order: 6; } #mm-profile-card { order: 7; } #mm-rating-card { order: 8; } #mm-clans { order: 9; } #mm-referral { order: 10; }
@@ -439,14 +458,15 @@ canvas { display: block; cursor: crosshair; }
 }
 /* слабкі пристрої: без 3D, блисків, частинок і пульсацій — лише підсвітка */
 html.gfx-low .ars-tank, html.gfx-low .ars-tur, html.gfx-low .mm-advent-ic, html.gfx-low .mm-advent-claim, html.gfx-low .evb, html.gfx-low .evb-x, html.gfx-low .evb-radar::before, html.gfx-low .mm-title, html.gfx-low .mm-advent-days i.t { animation: none !important; }
-html.gfx-low .mm-card::before, html.gfx-low #mm-quick::after, html.gfx-low .evb::before, html.gfx-low .evb .sp { display: none !important; }
+html.gfx-low .mm-card::before, html.gfx-low .mm-card::after, html.gfx-low .ars-tank::before, html.gfx-low .ars-tank::after, html.gfx-low .evb::before, html.gfx-low .evb .sp { display: none !important; }
+html.gfx-low #mm-quick, html.gfx-low .mm-in * { animation: none !important; }
 html.gfx-low .mm-card:hover, html.gfx-low .mm-card:focus-visible { transform: translateY(-2px); }
 html.gfx-low .mm-card:hover .mm-card-ico { transform: none; }
 html.gfx-low #main-menu-screen .mm-grid-nav { perspective: none; }
 html.gfx-low .ars-tank svg, html.gfx-low .mm-title, html.gfx-medium .ars-tank svg { filter: none; }
-html.gfx-medium .evb .sp, html.gfx-medium #mm-quick::after { display: none; }
+html.gfx-medium .evb .sp { display: none; }
 @media (hover: none) { .mm-card:hover { transform: none; box-shadow: none; } .mm-card:hover::before { transform: translateX(-100%); } .mm-card:hover .mm-card-ico { transform: none; } }
-@media (prefers-reduced-motion: reduce) { .ars-tank, .ars-tur, .mm-advent-ic, .mm-advent-claim, .evb, .evb-x, .evb .sp, .evb::before, .evb-radar::before, #mm-quick::after { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .ars-tank, .ars-tur, .mm-advent-ic, .mm-advent-claim, .evb, .evb-x, .evb .sp, .evb::before, .evb-radar::before, #mm-quick, .ars-tank::before, .ars-tank::after, .mm-in * { animation: none !important; } }
 @media (max-width: 480px) and (orientation: portrait) { .mm-top { flex-wrap: wrap; } .mm-brand { order: 2; } .mm-brand-ico, .mm-brand-t > b, .mm-brand-t > span { display: none; } .mm-music { margin-top: 0; } .mm-top { padding-top: 10px; } .mm-top-r { width: 100%; flex-wrap: wrap; } .lv-mini { flex: 1 1 100%; width: auto; } .mm-pill { margin-right: auto; } }
 @media (min-width:1024px) and (hover:hover) and (pointer:fine) {
   .mm-top { padding: 18px 28px 0; } .mm-brand-ico { width: 52px; height: 52px; } .mm-brand-t b { font-size: 20px; } .mm-brand-t > span { font-size: 10px; } .mm-music { font-size: 11px; padding: 4px 12px 4px 8px; margin-top: 7px; } .mm-music i { font-size: 14px; }

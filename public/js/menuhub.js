@@ -39,4 +39,58 @@
         if (n === true) { bd.classList.add('dot'); bd.textContent = ''; } else { bd.classList.remove('dot'); bd.textContent = n > 99 ? '99+' : n; }
     }
     window.MenuHub = { addCard: addCard, addTop: addTop, badge: badge, ready: ready };
+
+    // ---------- «Арсенал»: збираємо розкладку, навіть якщо index.html ще старий (часткове оновлення файлів) ----------
+    var TANK = '<div class="ars-tank" aria-hidden="true"><svg viewBox="-70 -70 140 140"><defs><linearGradient id="ars-h" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#60a5fa"/><stop offset="1" stop-color="#1e3a8a"/></linearGradient><linearGradient id="ars-t" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#93c5fd"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs><rect x="-44" y="-40" width="18" height="80" rx="6" fill="#0f172a" stroke="#475569" stroke-width="2"/><rect x="26" y="-40" width="18" height="80" rx="6" fill="#0f172a" stroke="#475569" stroke-width="2"/><path d="M-44 -30h18M-44 -18h18M-44 -6h18M-44 6h18M-44 18h18M-44 30h18M26 -30h18M26 -18h18M26 -6h18M26 6h18M26 18h18M26 30h18" stroke="#334155" stroke-width="2"/><rect x="-30" y="-36" width="60" height="72" rx="12" fill="url(#ars-h)" stroke="#bfdbfe" stroke-width="2"/><g class="ars-tur"><rect x="-5" y="-64" width="10" height="46" rx="3" fill="#cbd5e1" stroke="#475569" stroke-width="2"/><circle r="22" fill="url(#ars-t)" stroke="#dbeafe" stroke-width="2.5"/><circle r="9" fill="rgba(2,6,23,.5)" stroke="#93c5fd" stroke-width="1.5"/></g></svg></div>';
+    function ensureArsenal() {
+        var m = document.getElementById('main-menu-screen'), n = nav(); if (!m || !n || m.querySelector('.ars-body')) return;
+        var body = document.createElement('div'); body.className = 'ars-body';
+        var left = document.createElement('aside'); left.className = 'ars-left';
+        var center = document.createElement('section'); center.className = 'ars-center';
+        var adv = m.querySelector('.mm-advent');
+        if (adv) {
+            var tm = document.getElementById('hw-timer'); if (!tm) { tm = document.createElement('div'); tm.id = 'hw-timer'; }
+            adv.innerHTML = '<span class="mm-advent-ic" aria-hidden="true">🎃</span><b class="mm-advent-t">АДВЕНТ КАЛЕНДАР</b><div class="mm-advent-days" id="mm-adv-days"></div><span class="mm-advent-claim hidden" id="mm-adv-claim">🎁 Забрати нагороду</span>';
+            adv.insertBefore(tm, adv.querySelector('.mm-advent-days')); adv.setAttribute('role', 'button'); adv.tabIndex = 0; left.appendChild(adv);
+        }
+        var hero = m.querySelector('.mm-hero'); if (hero) { if (!hero.querySelector('.ars-tank')) hero.insertAdjacentHTML('afterbegin', TANK); center.appendChild(hero); }
+        if (!document.getElementById('mm-ev')) { var ev = document.createElement('div'); ev.id = 'mm-ev'; ev.className = 'ars-ev'; center.appendChild(ev); }
+        var old = document.getElementById('ev-bar'); if (old) old.remove();
+        n.parentNode.insertBefore(body, n); body.appendChild(left); body.appendChild(center); body.appendChild(n);
+    }
+    ready(ensureArsenal);
+
+    // ---------- ефекти: картка нахиляється за курсором з відблиском (лише миша), каскадна поява при відкритті меню ----------
+    var lowGfx = function () { return document.documentElement.classList.contains('gfx-low') || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); };
+    function tilt() {
+        var n = nav(); if (!n || n.__tilt || !(window.matchMedia && matchMedia('(hover:hover) and (pointer:fine)').matches)) return; n.__tilt = 1;
+        var cur = null, ev = null, raf = 0;
+        function reset(c) { c.classList.remove('tl'); ['--rx', '--ry', '--mx', '--my'].forEach(function (k) { c.style.removeProperty(k); }); }
+        function apply() {
+            raf = 0; if (!cur || !ev || lowGfx()) return;
+            var r = cur.getBoundingClientRect(), x = (ev.clientX - r.left) / r.width, y = (ev.clientY - r.top) / r.height;
+            cur.style.setProperty('--rx', ((0.5 - y) * 12).toFixed(2) + 'deg'); cur.style.setProperty('--ry', ((x - 0.5) * 14).toFixed(2) + 'deg');
+            cur.style.setProperty('--mx', (x * 100).toFixed(1) + '%'); cur.style.setProperty('--my', (y * 100).toFixed(1) + '%'); cur.classList.add('tl');
+        }
+        n.addEventListener('pointermove', function (e) {
+            var c = e.target.closest && e.target.closest('.mm-card');
+            if (c !== cur) { if (cur) reset(cur); cur = c; }
+            if (!c) return; ev = e; if (!raf) raf = requestAnimationFrame(apply);
+        });
+        n.addEventListener('pointerleave', function () { if (cur) reset(cur); cur = null; });
+    }
+    function intro() {
+        var m = document.getElementById('main-menu-screen'); if (!m || lowGfx()) return;
+        var cards = Array.prototype.slice.call(m.querySelectorAll('.mm-grid-nav > .mm-card'));
+        cards.sort(function (a, b) { return (parseInt(getComputedStyle(a).order, 10) || 0) - (parseInt(getComputedStyle(b).order, 10) || 0); });
+        cards.forEach(function (c, i) { c.style.setProperty('--i', i); });
+        m.classList.remove('mm-in'); void m.offsetWidth; m.classList.add('mm-in');
+        clearTimeout(intro.t); intro.t = setTimeout(function () { m.classList.remove('mm-in'); }, 1300);
+    }
+    ready(function () {
+        tilt();
+        var m = document.getElementById('main-menu-screen'); if (!m || !window.MutationObserver) return;
+        var was = !m.classList.contains('hidden');
+        new MutationObserver(function () { var vis = !m.classList.contains('hidden'); if (vis && !was) intro(); was = vis; }).observe(m, { attributes: true, attributeFilter: ['class'] });
+    });
 })();
