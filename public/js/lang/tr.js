@@ -501,6 +501,8 @@ I18N.add("tr", {
  "Легші тіні й ефекти, трохи нижча чіткість. Зручно для старих ноутбуків": "Daha hafif gölge ve efektler, biraz düşük netlik. Eski dizüstüler için uygun",
  "Без тіней, мало ефектів, 30 кадрів/с. Для дуже слабких пристроїв.": "Gölgesiz, az efekt, 30 fps. Çok zayıf cihazlar için.",
  "Без тіней, мало ефектів, 30 кадрів/с. Для дуже слабких пристроїв": "Gölgesiz, az efekt, 30 fps. Çok zayıf cihazlar için",
+ "Легші тіні й ефекти (на телефоні — трохи нижча чіткість). Зручно для старих ноутбуків.": "Daha hafif gölge ve efektler (telefonda biraz düşük netlik). Eski dizüstüler için uygun.",
+ "Без тіней, мало ефектів, менша чіткість. Якщо пристрій не тягне 60 кадрів — рівні 30. Для дуже слабких пристроїв.": "Gölgesiz, az efekt, düşük netlik. Cihaz 60 fps'i kaldıramazsa — sabit 30. Çok zayıf cihazlar için.",
  "Інвентар повний": "Envanter dolu",
  "Вас заблоковано": "Engellendin",
  "Ваш баланс": "Bakiyeniz",

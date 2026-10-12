@@ -1102,7 +1102,10 @@ function draw(now) {
     ctx.setTransform(RS, 0, 0, RS, 0, 0); ctx.clearRect(0, 0, GW, GH);
     ctx.save();
     let shX = 0, shY = 0;
-    if (shakeTime > 0) { shX = (Math.random() - 0.5) * 20; shY = (Math.random() - 0.5) * 20; shakeTime -= 0.03; }
+    {   // тряска камери: згасає за реальним часом (раніше — на 0.03 за КАДР, тож на слабкому пристрої трусило вдвічі довше) і плавно слабне під кінець
+        const _sdt = Math.min(0.1, Math.max(0, (now - (draw._sh || now)) / 1000)); draw._sh = now;
+        if (shakeTime > 0) { const _a = 20 * Math.min(1, shakeTime / 0.12) * (window.GFX && GFX.tier === 'low' ? 0.6 : 1); shX = (Math.random() - 0.5) * _a; shY = (Math.random() - 0.5) * _a; shakeTime -= 1.8 * _sdt; }
+    }
     const _s = RS * VS; _curS = _s; const _ox = Math.round(GW * RS / 2 - _s * (camera.x - shX)), _oy = Math.round(GH * RS / 2 - _s * (camera.y - shY)); _curOx = _ox; _curOy = _oy;   // цілий піксельний зсув: чанки й живі об'єкти лягають без розмиття
     ctx.setTransform(_s, 0, 0, _s, _ox, _oy);
 
@@ -1397,7 +1400,9 @@ function gameLoop(now) {
     // обмеження частоти кадрів для слабких пристроїв (час між кадрами накопичується в dt, тож швидкість гри не змінюється)
     // оцінка періоду оновлення екрана (мінімум із останніх інтервалів rAF) — щоб обмежувач кадрів не «з'їдав» кадри на 120/144 Гц
     { const _d = now - (gameLoop._t || now); gameLoop._t = now; if (_d > 3 && _d < gameLoop._rp) gameLoop._rp = _d; else gameLoop._rp = Math.min(34, gameLoop._rp * 1.002); }
-    if (window.GFX && GFX.cap && now - lastTime < 1000 / GFX.cap - gameLoop._rp * 0.5) { gameLoopId = requestAnimationFrame(gameLoop); return; }
+    // обмежувач вмикається лише коли екран оновлюється помітно частіше за стелю (120/144 Гц, або 60 Гц при стелі 30);
+    // на звичайному 60-герцовому екрані зі стелею 60 кадри не пропускаємо зовсім — раніше «пізній» кадр, за яким ішов «ранній», губився і картинка смикалась
+    if (window.GFX && GFX.cap && gameLoop._rp < 1000 / GFX.cap * 0.8 && now - lastTime < 1000 / GFX.cap - gameLoop._rp * 0.5) { gameLoopId = requestAnimationFrame(gameLoop); return; }
     const dt = Math.min((now - lastTime) / 1000, 0.1);
     const _raw = (now - lastTime) / 1000;
     lastTime = now;
@@ -1405,7 +1410,7 @@ function gameLoop(now) {
         if (window.GFX) GFX.frame(now, _raw);
         // Помилка в одному кадрі більше не вбиває цикл: інакше картинка зависає, а звуки з сокетів продовжують грати
         const _w0 = performance.now();
-        try { updatePhys(now, dt); draw(now); if (window.GFX) GFX.work(performance.now() - _w0); }
+        try { updatePhys(now, dt); draw(now); if (window.GFX) GFX.work(performance.now() - _w0); if (window.BHUD) BHUD.frame(); }   // HUD — після кадру, по одній справі за кадр
         catch (err) {
             if (now - (window.__loopErrAt || 0) > 2000) { window.__loopErrAt = now; console.error('Помилка ігрового циклу (цикл продовжує працювати):', err); }
             try { ctx.setTransform(RS, 0, 0, RS, 0, 0); ctx.globalAlpha = 1; ctx.shadowColor = 'transparent'; } catch (e) {}

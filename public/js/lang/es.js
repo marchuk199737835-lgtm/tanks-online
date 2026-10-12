@@ -501,6 +501,8 @@ I18N.add("es", {
  "Легші тіні й ефекти, трохи нижча чіткість. Зручно для старих ноутбуків": "Sombras y efectos más ligeros, algo menos de nitidez. Ideal para portátiles viejos",
  "Без тіней, мало ефектів, 30 кадрів/с. Для дуже слабких пристроїв.": "Sin sombras, pocos efectos, 30 fps. Para dispositivos muy lentos.",
  "Без тіней, мало ефектів, 30 кадрів/с. Для дуже слабких пристроїв": "Sin sombras, pocos efectos, 30 fps. Para dispositivos muy lentos",
+ "Легші тіні й ефекти (на телефоні — трохи нижча чіткість). Зручно для старих ноутбуків.": "Sombras y efectos más ligeros (algo menos de nitidez en el móvil). Ideal para portátiles viejos.",
+ "Без тіней, мало ефектів, менша чіткість. Якщо пристрій не тягне 60 кадрів — рівні 30. Для дуже слабких пристроїв.": "Sin sombras, pocos efectos, menos nitidez. Si el dispositivo no aguanta 60 fps — 30 fps estables. Para dispositivos muy lentos.",
  "Інвентар повний": "Inventario lleno",
  "Вас заблоковано": "Has sido bloqueado",
  "Ваш баланс": "Tu saldo",

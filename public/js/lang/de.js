@@ -501,6 +501,8 @@ I18N.add("de", {
  "Легші тіні й ефекти, трохи нижча чіткість. Зручно для старих ноутбуків": "Leichtere Schatten und Effekte, etwas geringere Schärfe. Gut für alte Laptops",
  "Без тіней, мало ефектів, 30 кадрів/с. Для дуже слабких пристроїв.": "Keine Schatten, wenige Effekte, 30 FPS. Für sehr schwache Geräte.",
  "Без тіней, мало ефектів, 30 кадрів/с. Для дуже слабких пристроїв": "Keine Schatten, wenige Effekte, 30 FPS. Für sehr schwache Geräte",
+ "Легші тіні й ефекти (на телефоні — трохи нижча чіткість). Зручно для старих ноутбуків.": "Leichtere Schatten und Effekte (auf dem Handy etwas geringere Schärfe). Gut für alte Laptops.",
+ "Без тіней, мало ефектів, менша чіткість. Якщо пристрій не тягне 60 кадрів — рівні 30. Для дуже слабких пристроїв.": "Keine Schatten, wenige Effekte, geringere Schärfe. Schafft das Gerät keine 60 FPS — gleichmäßige 30. Für sehr schwache Geräte.",
  "Інвентар повний": "Inventar voll",
  "Вас заблоковано": "Du wurdest gesperrt",
  "Ваш баланс": "Dein Guthaben",

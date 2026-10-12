@@ -235,8 +235,15 @@
         else if ((e.code === 'KeyM' || e.key === 'm' || e.key === 'M' || e.key === 'ь' || e.key === 'Ь') && inGame() && mmOn) { setBig(!big, 0); }
     });
     // виклик з game.js (updatePhys): переміщення під час ривка з перевіркою стін
+    var knk = { vx: 0, vy: 0, until: 0 };
     function dashStep(dt, rad, isB) {
-        var now = performance.now(); if (now >= dash.until || myLocalTank.hp <= 0) return;
+        var now = performance.now();
+        if (now < knk.until && myLocalTank.hp > 0) {      // віддача від влучання
+            var kx = myLocalTank.x + knk.vx * dt, ky = myLocalTank.y + knk.vy * dt;
+            if (typeof checkCollision !== 'function' || !checkCollision(kx, myLocalTank.y, rad, true, false)) myLocalTank.x = kx;
+            if (typeof checkCollision !== 'function' || !checkCollision(myLocalTank.x, ky, rad, true, false)) myLocalTank.y = ky;
+        }
+        if (now >= dash.until || myLocalTank.hp <= 0) return;
         var sp = DASH_DIST / (DASH_MS / 1000), nx = myLocalTank.x + dash.ax * sp * dt, ny = myLocalTank.y + dash.ay * sp * dt;
         if (typeof checkCollision !== 'function' || isB || !checkCollision(nx, myLocalTank.y, rad, true, false)) myLocalTank.x = nx;
         if (typeof checkCollision !== 'function' || isB || !checkCollision(myLocalTank.x, ny, rad, true, false)) myLocalTank.y = ny;
@@ -251,19 +258,19 @@
     // ================= «СОКОВИТІСТЬ»: цифри шкоди, віддача, вбивства, серії =================
     var nums = [];       // { x, y, v, k, t }
     socket.on('dmgN', function (d) {
-        if (!d || !inGame()) return; var cap = tier() === 'low' ? 8 : 26; if (nums.length >= cap) nums.shift();
+        if (!d || !inGame()) return; var cap = tier() === 'low' ? 8 : tier() === 'medium' ? 14 : 24; if (nums.length >= cap) nums.shift();
         nums.push({ x: d.x + (Math.random() - 0.5) * 18, y: d.y - 20, v: d.v, k: d.k | 0, t: Date.now() });
     });
     socket.on('knock', function (d) {
         if (!d || typeof myLocalTank === 'undefined' || myLocalTank.hp <= 0 || !inGame()) return;
         var dx = myLocalTank.x - d.x, dy = myLocalTank.y - d.y, l = Math.hypot(dx, dy); if (l < 1) return;
-        var nx = myLocalTank.x + dx / l * 8, ny = myLocalTank.y + dy / l * 8;
-        if (typeof checkCollision === 'function' && !checkCollision(nx, ny, 22, true, false)) { myLocalTank.x = nx; myLocalTank.y = ny; }
-        if (typeof shakeTime !== 'undefined') shakeTime = Math.max(shakeTime, 0.08);
+        // віддача — плавний поштовх за ~0,1 с (раніше миттєвий стрибок на 8 px, що виглядав як ривок картинки)
+        knk.vx = dx / l * 80; knk.vy = dy / l * 80; knk.until = performance.now() + 100;
+        if (typeof shakeTime !== 'undefined') shakeTime = Math.max(shakeTime, 0.06);
     });
     function killFx(big) {
         if (typeof shakeTime !== 'undefined') shakeTime = Math.max(shakeTime, big ? 0.22 : 0.12);
-        if (flash && tier() !== 'low') { flash.style.transition = 'none'; flash.style.opacity = big ? '1' : '.6'; void flash.offsetWidth; flash.style.transition = 'opacity .35s'; flash.style.opacity = '0'; }
+        if (flash && tier() === 'high') { flash.style.transition = 'none'; flash.style.opacity = big ? '1' : '.6'; void flash.offsetWidth; flash.style.transition = 'opacity .35s'; flash.style.opacity = '0'; }
     }
     // серії: PvP — вбивства гравців з паузою < 4 с; PvE — комбо зомбі з паузою < 2 с
     var st = { n: 0, at: 0 }, zc = { n: 0, at: 0 };
@@ -291,7 +298,7 @@
     var trk = {}, marks = [], dust = [];
     function angDiff(a, b) { var d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; }
     function driftUpdate(now, dt) {
-        var t = tier(), maxM = t === 'low' ? 0 : t === 'medium' ? 120 : 260;
+        var t = tier(), maxM = t === 'low' ? 0 : t === 'medium' ? 90 : 200;
         var list = []; if (myLocalTank.hp > 0) list.push([myId, myLocalTank]);
         for (var id in opponents) { var o = opponents[id]; if (o.hp > 0 && !o.isDisguised) list.push([id, o]); }
         var seen = {};
@@ -323,10 +330,17 @@
         driftUpdate(now, dt);
         // сліди гусениць (зникають за 3 с)
         if (marks.length) {
+            // одним шляхом на кожен із 4 рівнів прозорості (замість save/rotate/restore на кожен слід — у десятки разів менше викликів)
             c.save(); c.fillStyle = '#000';
-            for (var i = 0; i < marks.length; i++) {
-                var m = marks[i], age = (now - m.t) / 3000; if (age >= 1) continue; if (m.x < view.x0 - 20 || m.x > view.x1 + 20 || m.y < view.y0 - 20 || m.y > view.y1 + 20) continue;
-                c.globalAlpha = 0.36 * (1 - age); c.save(); c.translate(m.x, m.y); c.rotate(m.a); c.fillRect(-5, -2.5, 10, 5); c.restore();
+            for (var bk = 0; bk < 4; bk++) {
+                c.beginPath(); var any = false;
+                for (var i = 0; i < marks.length; i++) {
+                    var m = marks[i], age = (now - m.t) / 3000; if (age >= 1 || Math.min(3, (age * 4) | 0) !== bk) continue; if (m.x < view.x0 - 20 || m.x > view.x1 + 20 || m.y < view.y0 - 20 || m.y > view.y1 + 20) continue;
+                    var ca = m.c, sa = m.s; if (ca === undefined) { ca = m.c = Math.cos(m.a); sa = m.s = Math.sin(m.a); }
+                    var ux = ca * 5, uy = sa * 5, vx = -sa * 2.5, vy = ca * 2.5;
+                    c.moveTo(m.x - ux - vx, m.y - uy - vy); c.lineTo(m.x + ux - vx, m.y + uy - vy); c.lineTo(m.x + ux + vx, m.y + uy + vy); c.lineTo(m.x - ux + vx, m.y - uy + vy); c.closePath(); any = true;
+                }
+                if (any) { c.globalAlpha = 0.36 * (1 - (bk + 0.5) / 4); c.fill(); }
             }
             c.restore();
             while (marks.length && now - marks[0].t > 3000) marks.shift();
@@ -343,7 +357,7 @@
         for (var i = ghosts.length - 1; i >= 0; i--) {
             var gh = ghosts[i], age = (now - gh.t) / 320; if (age >= 1) { ghosts.splice(i, 1); continue; } if (age < 0) continue;
             c.save(); c.translate(gh.x, gh.y); c.rotate(gh.a); c.globalAlpha = 0.38 * (1 - age);
-            if (!lo && window.GFX && GFX.shadow) { c.shadowColor = gh.c; c.shadowBlur = 12; }
+            if (tier() === 'high') { c.shadowColor = gh.c; c.shadowBlur = 12; }
             c.fillStyle = gh.c; if (c.roundRect) { c.beginPath(); c.roundRect(-26, -22, 52, 44, 10); c.fill(); } else c.fillRect(-26, -22, 52, 44);
             c.restore();
         }
@@ -361,7 +375,7 @@
             c.restore();
         }
     }
-    var api = { ground: ground, top: top, dashStep: function (dt, rad, isB) { dashStep(dt, rad, isB); pullStep(dt, rad); }, slip: function (id) { var s = trk[id]; return s ? s.slip : 0; },
+    var api = { frame: function () { frame(); }, ground: ground, top: top, dashStep: function (dt, rad, isB) { dashStep(dt, rad, isB); pullStep(dt, rad); }, slip: function (id) { var s = trk[id]; return s ? s.slip : 0; },
         ricochet: ricochet, heatLocked: heatLocked, heatShot: heatShot, shieldBlock: shieldBlock };
     window.BHUD = api;
 
@@ -389,6 +403,12 @@
         if (shp) { x.restore(); x.strokeStyle = 'rgba(96,165,250,.45)'; x.lineWidth = 2; x.beginPath(); m.shape.forEach(function (p, i) { if (i) x.lineTo(p.x * k, p.y * k); else x.moveTo(p.x * k, p.y * k); }); x.closePath(); x.stroke(); }
         staticCv = c; staticCv._k = k; staticCv._size = size; staticKey = key; return c;
     }
+    // емодзі на міні-мапі — заздалегідь намальовані картинки (fillText емодзі щоразу — дуже повільний)
+    var EMO = {};
+    function emo(g, ch, x, y) {
+        var e = EMO[ch]; if (!e) { e = EMO[ch] = document.createElement('canvas'); e.width = e.height = 24; var x2 = e.getContext('2d'); x2.font = '18px Arial'; x2.textAlign = 'center'; x2.textBaseline = 'middle'; x2.fillText(ch, 12, 13); }
+        g.drawImage(e, x - 6, y - 6, 12, 12);
+    }
     function drawMini() {
         var r = room(); if (!r || !g) return; var st0 = buildStatic(r); if (!st0) return;
         var round = touch(), W = cv.clientWidth, H = cv.clientHeight; if (!W || !H) return;
@@ -412,7 +432,7 @@
                 g.fillStyle = 'rgba(239,68,68,.16)'; g.beginPath(); g.rect(0, 0, W, H); g.arc(zx, zy, Math.max(0, md.z.r * sc), 0, Math.PI * 2, true); g.fill();
                 g.strokeStyle = 'rgba(147,197,253,.95)'; g.lineWidth = 1.6; g.beginPath(); g.arc(zx, zy, Math.max(0, md.z.r * sc), 0, Math.PI * 2); g.stroke();
                 if (md.z.nr && md.z.nr < md.z.r) { g.setLineDash([4, 4]); g.strokeStyle = 'rgba(255,255,255,.75)'; g.beginPath(); g.arc(zx, zy, md.z.nr * sc, 0, Math.PI * 2); g.stroke(); g.setLineDash([]); }
-                if (md.dr && md.dr.st !== 'done') { var pp = 0.6 + 0.4 * Math.sin(now / 160); var p1 = dot(md.dr.x, md.dr.y, 4 + pp * 2, md.dr.st === 'open' ? '#ff3b6b' : '#f59e0b', '#fff', 7); g.font = '9px Arial'; g.textAlign = 'center'; g.fillText('📦', p1[0], p1[1] - 9); }
+                if (md.dr && md.dr.st !== 'done') { var pp = 0.6 + 0.4 * Math.sin(now / 160); var p1 = dot(md.dr.x, md.dr.y, 4 + pp * 2, md.dr.st === 'open' ? '#ff3b6b' : '#f59e0b', '#fff', 7); emo(g, '📦', p1[0], p1[1] - 9); }
             } else if (mode === 'convoy' && md.cv) {
                 if (md.A && md.B) { g.setLineDash([3, 4]); g.strokeStyle = 'rgba(56,189,248,.5)'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(X(md.cv.x), Y(md.cv.y)); g.lineTo(X(md.B.x), Y(md.B.y)); g.stroke(); g.setLineDash([]); dot(md.B.x, md.B.y, 4, '#facc15', '#fff', 6); }
                 g.save(); var cp = edge(md.cv.x, md.cv.y, 7); g.translate(cp[0], cp[1]); g.rotate(md.cv.a || 0); g.fillStyle = '#38bdf8'; g.strokeStyle = '#fff'; g.lineWidth = 1; g.fillRect(-6, -3.5, 12, 7); g.strokeRect(-6, -3.5, 12, 7); g.restore();
@@ -429,7 +449,7 @@
             var o = opponents[id], sn = r.players[id]; if (!sn || !(o.hp > 0) || o.isDisguised) continue;
             var ally = pve || (TEAM_MODES[mode] && sn.team && sn.team === myTeam);
             if (ally) { dot(o.x, o.y, 3.2, '#4ade80', 'rgba(2,6,23,.8)'); continue; }
-            if (id === tgt) { var tp = dot(o.x, o.y, 4, '#facc15', '#fff', 7); g.font = '9px Arial'; g.textAlign = 'center'; g.fillText('👑', tp[0], tp[1] - 8); continue; }
+            if (id === tgt) { var tp = dot(o.x, o.y, 4, '#facc15', '#fff', 7); emo(g, '👑', tp[0], tp[1] - 8); continue; }
             if (ENEMY_MODES[mode]) { var age = now - (shots[id] || 0); if (age < 2000) { g.globalAlpha = 1 - age / 2000; dot(o.x, o.y, 3.6, '#ef4444', '#fecaca'); g.globalAlpha = 1; } }
         }
         // сам гравець: стрілка в напрямку руху
@@ -452,57 +472,74 @@
         else { var fC = window.BUFFS && (BUFFS[myLocalTank.buff] || BUFFS['none']); cd = fC && fC.cd < 500 ? fC.cd : (window.getReloadTime ? getReloadTime() : 2000); }
         var el = typeof lastShootTime !== 'undefined' ? now - lastShootTime : cd; return Math.max(0, Math.min(1, el / cd));
     }
-    function tick() {
+    // Записи в DOM — лише коли значення змінилось (кожен запис змушує браузер перераховувати стилі й перемальовувати шар)
+    var EC = {};
+    function q$(id) { var e = EC[id]; if (!e || !e.isConnected) e = EC[id] = $(id); return e; }
+    function wTf(e, v) { if (e && e._tf !== v) { e._tf = v; e.style.transform = v; } }
+    function wP(e, v) { if (e && e._pv !== v) { e._pv = v; e.style.setProperty('--p', v); } }
+    function wCls(e, c) { if (e && e._cl !== c) { e._cl = c; e.setAttribute('class', c); } }
+    function wTog(e, c, on) { if (e && e.classList.contains(c) !== on) e.classList.toggle(c, on); }
+    function wSt(e, k, v) { if (!e) return; var kk = '_s' + k; if (e[kk] !== v) { e[kk] = v; e.style[k] = v; } }
+    function sc(f) { return 'scaleX(' + (Math.round(f * 200) / 200) + ')'; }      // крок 0,5% — без зайвих записів
+
+    // показ / приховування HUD: 4 рази на секунду (поза боєм більше нічого не робимо)
+    function guard() {
         var on = inGame();
-        if (on !== shown) { shown = on; root.classList.toggle('bh-on', on); if (on) { build(); applyScale(); lastHp = -1; } }
-        if (!on) { if (mm) mm.classList.add('hidden'); if (cap) cap.classList.add('hidden'); if (dashBtn) dashBtn.classList.remove('show'); return; }
-        if (!built) build();
-        var now = Date.now(), pn = performance.now(), t = touch();
+        if (on !== shown) { shown = on; root.classList.toggle('bh-on', on); if (on) { build(); applyScale(); lastHp = -1; lastHud = 0; lastDraw = 0; } }
+        if (!on) { if (mm) wTog(mm, 'hidden', true); if (cap) wTog(cap, 'hidden', true); if (dashBtn) wTog(dashBtn, 'show', false); }
+        return on;
+    }
+    setInterval(guard, 250);
+
+    // Виклик з ігрового циклу ПІСЛЯ малювання кадру. За один кадр — щонайбільше одна «важка» справа (міні-мапа АБО панелі),
+    // тож робота HUD рівномірно розкладається між кадрами і не «рве» картинку (раніше окремий таймер падав на випадкові кадри).
+    var lastHud = 0, lastBoards = 0;
+    function frame() {
+        if (!shown && !guard()) return; if (!inGame()) return; if (!built) build();
+        var now = Date.now(), ti = tier();
         if (bigUntil && now > bigUntil) setBig(false, 0);
-        mm.classList.toggle('hidden', !mmOn && !t); mm.classList.toggle('off', !mmOn);
+        var mmEvery = ti === 'low' ? 250 : ti === 'medium' ? 160 : 100;
+        if (mmOn && now - lastDraw >= mmEvery && now - lastHud > 12) { lastDraw = now; try { drawMini(); } catch (e) { console.error('minimap', e); } return; }
+        var hudEvery = ti === 'low' ? 160 : 100;
+        if (now - lastHud >= hudEvery) { var dt = lastHud ? Math.min(0.3, (now - lastHud) / 1000) : 0.1; lastHud = now; hudDom(now, dt); }
+    }
+    function hudDom(now, dt) {
+        var pn = performance.now(), t = touch();
+        wTog(mm, 'hidden', !mmOn && !t); wTog(mm, 'off', !mmOn);
         // на телефоні без міні-мапи дуга HP все одно потрібна: лишаємо коло, але без мапи
-        if (t && !mmOn) { mm.classList.remove('off'); cv.style.visibility = 'hidden'; } else cv.style.visibility = '';
-        cap.classList.toggle('hidden', t);
-        dashBtn.classList.toggle('show', t && canDash());
+        if (t && !mmOn) { wTog(mm, 'off', false); wSt(cv, 'visibility', 'hidden'); } else wSt(cv, 'visibility', '');
+        wTog(cap, 'hidden', t);
+        wTog(dashBtn, 'show', t && canDash());
         // HP
         var mHp = Math.round((typeof MAX_HP !== 'undefined' ? MAX_HP : 500) * (window.GameData ? GameData.statMult(myEquipped, 'hp') : 1) * (window.ClassFX ? ClassFX.hpMul() : 1)), hp = Math.max(0, Math.ceil(myLocalTank.hp || 0)), f = mHp ? Math.min(1, hp / mHp) : 0;
         var cls = f < 0.3 ? 'low' : f < 0.6 ? 'mid' : '';
         if (hp !== lastHp || mHp !== lastHpMax) {
-            hpLag = lastHp < 0 ? f : hpLag;
             lastHp = hp; lastHpMax = mHp;
-            var hf = $('bh-hpf'); if (hf) { hf.style.transform = 'scaleX(' + f.toFixed(3) + ')'; hf.className = cls; }
-            var hs = $('bh-hps'); if (hs) hs.style.transform = 'scaleX(' + f.toFixed(3) + ')';
-            var ht = $('bh-hpt'); if (ht) ht.innerHTML = hp + '<small>/' + mHp + '</small>';
-            var ha = arc && arc.querySelector('.hp'); if (ha) { ha.style.strokeDashoffset = String(100 - f * 100); ha.setAttribute('class', 'hp ' + cls); }
-            var hm = $('bh-hpm'); if (hm) hm.textContent = hp;
+            var hf = q$('bh-hpf'); wTf(hf, sc(f)); wCls(hf, cls);
+            wTf(q$('bh-hps'), sc(f));
+            var ht = q$('bh-hpt'); if (ht) ht.innerHTML = hp + '<small>/' + mHp + '</small>';
+            var ha = arc && (arc._hp || (arc._hp = arc.querySelector('.hp'))); if (ha) { wSt(ha, 'strokeDashoffset', String(Math.round(100 - f * 100))); wCls(ha, 'hp ' + cls); }
+            var hm = q$('bh-hpm'); if (hm) hm.textContent = hp;
         }
-        // перезарядка / ривок / бонус
-        var rl = reloadInfo(pn), cf = $('bh-cdf'), ca = arc && arc.querySelector('.cd'), hOn = heatOn();
-        heatTick(pn, 0.05);
+        // перезарядка / перегрів / ривок / бонус
+        var rl = reloadInfo(pn), cf = q$('bh-cdf'), cw = cf && cf.parentElement, ca = arc && (arc._cd || (arc._cd = arc.querySelector('.cd'))), hOn = heatOn();
+        heatTick(pn, dt);
         if (hOn && rl !== null) {      // швидкострільні: замість перезарядки — шкала перегріву
             var hh = heat.h / 100, lk = pn < heat.lock;
-            if (cf) { cf.parentElement.style.visibility = ''; cf.style.transform = 'scaleX(' + hh.toFixed(3) + ')'; cf.className = 'heat' + (lk ? ' lock' : ''); }
-            if (ca) { ca.style.visibility = ''; ca.style.strokeDashoffset = String(100 - hh * 100); ca.setAttribute('class', 'cd heat' + (lk ? ' lock' : '')); ca.style.stroke = lk ? '#ef4444' : hh > 0.7 ? '#f97316' : hh > 0.4 ? '#facc15' : '#38bdf8'; }
-        } else if (rl === null) { if (cf) cf.parentElement.style.visibility = 'hidden'; if (ca) ca.style.visibility = 'hidden'; }
+            wSt(cw, 'visibility', ''); wTf(cf, sc(hh)); wCls(cf, 'heat' + (lk ? ' lock' : ''));
+            if (ca) { wSt(ca, 'visibility', ''); wSt(ca, 'strokeDashoffset', String(Math.round(100 - hh * 100))); wCls(ca, 'cd heat' + (lk ? ' lock' : '')); wSt(ca, 'stroke', lk ? '#ef4444' : hh > 0.7 ? '#f97316' : hh > 0.4 ? '#facc15' : '#38bdf8'); }
+        } else if (rl === null) { wSt(cw, 'visibility', 'hidden'); wSt(ca, 'visibility', 'hidden'); }
         else {
-            if (cf && cf.className.indexOf('heat') >= 0) cf.className = ''; if (ca) ca.style.stroke = '';
-            if (cf) { cf.parentElement.style.visibility = ''; cf.style.transform = 'scaleX(' + rl.toFixed(3) + ')'; cf.classList.toggle('full', rl >= 1); }
-            if (ca) { ca.style.visibility = ''; ca.style.strokeDashoffset = String(100 - rl * 100); ca.setAttribute('class', rl >= 1 ? 'cd full' : 'cd'); }
+            wSt(cw, 'visibility', ''); wTf(cf, sc(rl)); wCls(cf, rl >= 1 ? 'full' : '');
+            if (ca) { wSt(ca, 'stroke', ''); wSt(ca, 'visibility', ''); wSt(ca, 'strokeDashoffset', String(Math.round(100 - rl * 100))); wCls(ca, rl >= 1 ? 'cd full' : 'cd'); }
         }
-        var dp = pn >= dash.cdEnd ? 1 : 1 - (dash.cdEnd - pn) / DASH_CD, di = $('bh-dashi');
-        if (di) { di.style.setProperty('--p', dp.toFixed(3)); di.classList.toggle('cd', dp < 1); }
-        dashBtn.style.setProperty('--p', dp.toFixed(3)); dashBtn.classList.toggle('cd', dp < 1);
-        var bOn = !!(myLocalTank.buff && myLocalTank.buffProgress > 0), ic = bOn ? ((window.BUFF_ICONS && BUFF_ICONS[myLocalTank.buff]) || '✨') : '';
-        [$('bh-buff'), $('bh-buffm')].forEach(function (bf) {      // ПК — у капсулі, телефон — біля міні-мапи
-            if (!bf) return; bf.classList.toggle('off', !bOn); if (!bOn) return;
-            if (bf._i !== ic) { bf._i = ic; bf.textContent = ic; } bf.style.setProperty('--p', myLocalTank.buffProgress.toFixed(3));
-        });
-        paintBoards();
-        // міні-мапа: частота за рівнем графіки
-        var every = tier() === 'low' ? 250 : tier() === 'medium' ? 125 : 66;
-        if (mmOn && now - lastDraw >= every) { lastDraw = now; try { drawMini(); } catch (e) { console.error('minimap', e); } }
+        var dp = pn >= dash.cdEnd ? 1 : 1 - (dash.cdEnd - pn) / DASH_CD, dps = (Math.round(dp * 50) / 50).toFixed(2), di = q$('bh-dashi');
+        wP(di, dps); wTog(di, 'cd', dp < 1); wP(dashBtn, dps); wTog(dashBtn, 'cd', dp < 1);
+        var bOn = !!(myLocalTank.buff && myLocalTank.buffProgress > 0), ic = bOn ? ((window.BUFF_ICONS && BUFF_ICONS[myLocalTank.buff]) || '✨') : '', bp = bOn ? (Math.round(myLocalTank.buffProgress * 50) / 50).toFixed(2) : '';
+        var bfs = [q$('bh-buff'), q$('bh-buffm')];      // ПК — у капсулі, телефон — біля міні-мапи
+        for (var i = 0; i < 2; i++) { var bf = bfs[i]; if (!bf) continue; wTog(bf, 'off', !bOn); if (!bOn) continue; if (bf._i !== ic) { bf._i = ic; bf.textContent = ic; } wP(bf, bp); }
+        if (now - lastBoards >= 300) { lastBoards = now; paintBoards(); }      // табло — 3 рази на секунду досить
     }
-    setInterval(tick, 50);
     window.addEventListener('resize', function () { applyScale(); lastDraw = 0; });
 
     // =====================================================================
@@ -734,7 +771,7 @@
     }
     function miniB(g, X, Y, sc, dot, edge, now) {
         var A = ev.art; if (A && now < A.end) { g.fillStyle = 'rgba(239,68,68,.3)'; g.strokeStyle = 'rgba(248,113,113,.95)'; g.lineWidth = 1.5; g.beginPath(); g.arc(X(A.x), Y(A.y), Math.max(3, A.r * sc), 0, Math.PI * 2); g.fill(); g.stroke(); }
-        var Dn = ev.drone; if (Dn) { var f = (now - Dn.t0) / Dn.dur; if (f >= 0 && f <= 1) { var p = dot(Dn.x0 + (Dn.x1 - Dn.x0) * f, Dn.y0 + (Dn.y1 - Dn.y0) * f, 3.5, '#38bdf8', '#fff', 6); g.font = '9px Arial'; g.textAlign = 'center'; g.fillText('🚁', p[0], p[1] - 9); } }
-        if (leaderId && leaderId !== myId) { var lp = opponents[leaderId]; if (lp && lp.hp > 0) { var q = dot(lp.x, lp.y, 4, '#facc15', '#78350f', 7); g.font = '9px Arial'; g.textAlign = 'center'; g.fillText('👑', q[0], q[1] - 8); } }
+        var Dn = ev.drone; if (Dn) { var f = (now - Dn.t0) / Dn.dur; if (f >= 0 && f <= 1) { var p = dot(Dn.x0 + (Dn.x1 - Dn.x0) * f, Dn.y0 + (Dn.y1 - Dn.y0) * f, 3.5, '#38bdf8', '#fff', 6); emo(g, '🚁', p[0], p[1] - 9); } }
+        if (leaderId && leaderId !== myId) { var lp = opponents[leaderId]; if (lp && lp.hp > 0) { var q = dot(lp.x, lp.y, 4, '#facc15', '#78350f', 7); emo(g, '👑', q[0], q[1] - 8); } }
     }
 })();
