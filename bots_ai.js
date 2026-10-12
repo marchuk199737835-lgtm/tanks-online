@@ -146,13 +146,13 @@ module.exports = function createAI(ctx, CFG) {
     }
 
     // ---------- шкода / снаряди ----------
-    function hitPlayer(room, b, v, dmgBase) {
+    function hitPlayer(room, b, v, dmgBase, ang) {      // ang — напрям прямого снаряда (кут броні); у вибуху — немає
         if (!v || v.hp <= 0 || v.out || v.buff === 'shield') return false;
         const atk = room.players[b.owner]; if (!atk) return false;
         if (isFrozen(room)) return true;
         if (ctx.isTeamPvp(room.mode) && atk.team && atk.team === v.team) return false;
         if (Modes.has(room.mode) && (atk.hp <= 0 || atk.out)) return true;      // снаряд «з'їдається», але шкоди немає (так само відхиляє registerHit)
-        const fD = dmgBase * SM(atk.equipped, 'dmg'), now = Date.now();
+        const side = ctx.armorSide && ang != null ? ctx.armorSide(v, ang) : 0, fD = dmgBase * SM(atk.equipped, 'dmg') * (ctx.ARM_MUL ? ctx.ARM_MUL[side] : 1), now = Date.now();
         const BTt = BT[b.type] || BT.none;
         if (BTt.fire) v.onFire = { end: now + 5000, nextTick: now + 1000, owner: b.owner };
         v.hp = Math.max(0, v.hp - fD);
@@ -170,7 +170,7 @@ module.exports = function createAI(ctx, CFG) {
         }
     }
     function stepBullets(room, RS, dt) {
-        const map = mapOf(room), arr = RS.bullets, bnd = boundsOf(map);
+        const map = mapOf(room), arr = RS.bullets, bnd = boundsOf(map), dA = ctx.objDead ? ctx.objDead(room) : null, bo = dA ? { skipWater: true, doorOpen: () => false, dead: dA } : BULLETOPT;
         for (let i = arr.length - 1; i >= 0; i--) {
             const b = arr[i], T = BT[b.type] || BT.none; let dead = false;
             b.life -= dt; if (b.life <= 0) { arr.splice(i, 1); continue; }
@@ -178,7 +178,8 @@ module.exports = function createAI(ctx, CFG) {
             const sp = Math.hypot(b.vx, b.vy), n = Math.max(1, Math.ceil(sp * dt / 12)), sdt = dt / n;
             for (let k = 0; k < n && !dead; k++) {
                 b.x += b.vx * sdt; b.y += b.vy * sdt;
-                if (T.walls) { if (MapObj.collides(map, b.x, b.y, 4, BULLETOPT)) { dead = true; break; } }
+                if (T.walls) { if (MapObj.collides(map, b.x, b.y, 4, bo)) {      // стіна; руйнівний об'єкт (ящик, бочка) отримує шкоду
+                    dead = true; if (ctx.objDamage && room.mode !== 'prophunt') { const di = MapObj.destrAt(map, b.x, b.y, 6, dA); if (di >= 0) ctx.objDamage(room, di, (T.dmg || 75) * SM((room.players[b.owner] || {}).equipped, 'dmg'), b.owner); } break; } }
                 else if (b.x - 4 < 0 || b.x + 4 > map.size || b.y - 4 < 0 || b.y + 4 > map.size || (MapObj.hasShape(map) && !MapObj.circleInPoly(map.shape, b.x, b.y, 4))) { dead = true; break; }
                 if (b.ghost) continue;
                 const hr = HIT_R + 4 + (T.extra || 0);
@@ -187,8 +188,8 @@ module.exports = function createAI(ctx, CFG) {
                     if (q.hp <= 0 || q.out || q.buff === 'shield' || q.isDisguised) continue;
                     if (Math.hypot(b.x - q.x, b.y - q.y) >= hr) continue;
                     if (ctx.isTeamPvp(room.mode) && room.players[b.owner] && room.players[b.owner].team === q.team) continue;
-                    if (T.pierce) { if (b.pierced.indexOf(id) >= 0) continue; b.pierced.push(id); hitPlayer(room, b, q, T.dmg); continue; }
-                    hitPlayer(room, b, q, T.dmg);
+                    if (T.pierce) { if (b.pierced.indexOf(id) >= 0) continue; b.pierced.push(id); hitPlayer(room, b, q, T.dmg, Math.atan2(b.vy, b.vx)); continue; }
+                    hitPlayer(room, b, q, T.dmg, Math.atan2(b.vy, b.vx));
                     if (T.splash) explode(room, b, b.x, b.y, id);
                     dead = true; break;
                 }
@@ -657,6 +658,7 @@ module.exports = function createAI(ctx, CFG) {
         const hpF = p.hp / ownMaxHp(p);
         let spdMul = SM(p.equipped, 'speed');
         if (p.buff === 'speed') spdMul *= 1.5; else if (p.buff === 'samurai') spdMul *= 1.6; else if (p.buff === 'boss') spdMul *= 0.6;
+        spdMul *= MapObj.surfSpeed(mapOf(room), p.x, p.y);      // покриття: дорога +10%, бруд / пісок / сніг −15%
         const wish = wishDir(room, B, p, now);
         let moved = 0, exp = 0;
         if (wish) {
@@ -756,6 +758,7 @@ module.exports = function createAI(ctx, CFG) {
             for (const id in r.players) {
                 const p = r.players[id]; if (!p.isBot) continue;
                 const B = brainOf(p); nBots++;
+                if ((p.stunUntil || 0) > now) continue;      // оглушений тараном: не їде, не стріляє
                 physics(r, RS, B, p, dtAll, now);
                 if (p.hp > 0 && now >= B.nextThink && now >= B.startAt) due.push([r, RS, B, p]);
             }

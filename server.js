@@ -251,7 +251,66 @@ function roomActors(room) {
 
 function checkCollisionServer(mapName, x, y, r, ignoreList = [], room = null) {
     let cM = MAP_DATA[mapName] ? mapName : 'epic_map';
-    return MapObj.collides(MAP_DATA[cM], x, y, r, { ignore: ignoreList, doorOpen: room ? (o => MapObj.doorNear(o, roomActors(room))) : (() => false) });
+    const O = room && room._obj, dead = O && O.map === MAP_DATA[cM] ? O.dead : null;      // знищені в цій кімнаті об'єкти не заважають (мапа спільна для всіх кімнат)
+    return MapObj.collides(MAP_DATA[cM], x, y, r, { ignore: ignoreList, dead, doorOpen: room ? (o => MapObj.doorNear(o, roomActors(room))) : (() => false) });
+}
+
+// ===== РУЙНІВНІ ОБ'ЄКТИ: ящики, паркани, бочки… Стан окремо для кожної кімнати (об'єкти мапи спільні — їх не змінюємо) =====
+// Знищене не відновлюється до кінця бою (у раундах — з нового раунду). Бочки й балони вибухають: шкода всім поруч (і союзникам, і собі), ланцюгові вибухи.
+function objState(r) {
+    const map = MAP_DATA[r.map] || MAP_DATA['epic_map']; let O = r._obj;
+    if (!O || O.map !== map) O = hiddenSet(r, '_obj', { map, hp: new Map(), dead: new Uint8Array(map.solids.length), list: [] });
+    return O;
+}
+function objDead(r) { const O = r && r._obj; return O ? O.dead : null; }
+function objReset(r) { if (r._obj && r._obj.list.length) io.to(r.id).emit('objReset'); hiddenSet(r, '_obj', null); }
+function objDamage(r, i, dmg, by) {
+    if (!r || r.status !== 'playing' || r.mode === 'prophunt') return;
+    const O = objState(r), s = O.map.solids[i]; if (!s || O.dead[i]) return; const D = MapObj.DESTR[s.type]; if (!D) return;
+    const hp = (O.hp.has(i) ? O.hp.get(i) : D.hp) - Math.max(0, dmg);
+    if (hp > 0) { O.hp.set(i, hp); return; }
+    O.dead[i] = 1; O.list.push(i); O.hp.delete(i);
+    io.to(r.id).emit('objBreak', { i, by: by || null });
+    if (D.ex) objExplode(r, O, s, D.ex, by);
+}
+function objExplode(r, O, s, ex, by) {
+    const w = s.w || 50, h = s.h || 50, cx = s.x + w / 2, cy = s.y + h / 2, dmg = ex[0], R = ex[1], pve = ModeInfo.isPve(r.mode);
+    const atk = by && r.players[by] ? by : null, aBot = atk && r.players[atk].isBot;
+    for (const id in r.players) {      // гравці поруч: шкода спадає від центру до краю (100% → 40%)
+        const p = r.players[id]; if (p.hp <= 0 || p.out || p.buff === 'shield') continue;
+        const d = Math.hypot(p.x - cx, p.y - cy); if (d > R + 22) continue;
+        let hit = Math.round(dmg * (1 - 0.6 * Math.min(1, d / R)));
+        if (pve) hit = Math.round(Classes.taken(r, p, Modes.dmgTaken(r, id, hit)));
+        p.hp = Math.max(0, p.hp - hit);
+        if (atk && !aBot && atk !== id) io.to(atk).emit('dmgN', { x: Math.round(p.x), y: Math.round(p.y), v: hit, k: p.hp === 0 ? 2 : 0 });
+        if (p.hp > 0) { if (p.isBot) pushServer(r, p, cx, cy, 30, 24); else { io.to(id).emit('knock', { x: Math.round(cx), y: Math.round(cy), f: 30 }); grantMove(p, 50); } }
+        else processPlayerDeath(r, id, atk, { weapon: 'explosive' });
+        if (r.status !== 'playing') return;      // смерть від вибуху могла завершити матч
+    }
+    if (pve) for (const zid in r.zombies) {      // зомбі поруч
+        const z = r.zombies[zid]; if (!z || z.hp <= 0) continue; const d = Math.hypot(z.x - cx, z.y - cy); if (d > R + 20) continue;
+        zombieHitFor(atk || '__env', { roomId: r.id, zid, dmg: Math.round(dmg * (1 - 0.6 * Math.min(1, d / R))), type: 'explosive' }, true);
+    }
+    // ланцюг: сусідні руйнівні об'єкти отримують шкоду з невеликою затримкою (бочки підривають одна одну)
+    const arr = O.map.solids, l = MapObj.destrList(O.map);
+    for (let k = 0; k < l.length; k++) {
+        const j = l[k]; if (O.dead[j]) continue; const q = arr[j], qx = q.x + (q.w || 50) / 2, qy = q.y + (q.h || 50) / 2, d = Math.hypot(qx - cx, qy - cy);
+        if (d > R + 30) continue;
+        const dj = Math.round(dmg * 1.5 * (1 - 0.5 * Math.min(1, d / R)));
+        setTimeout(() => { if (rooms[r.id] === r && r._obj === O) objDamage(r, j, dj, by); }, 110 + Math.floor(Math.random() * 140));
+    }
+}
+// влучання снаряда / таран від клієнта: перевіряємо тип, відстань і частоту (до ~15 влучань на секунду)
+function objHitFor(socket, d) {
+    if (!d || typeof d !== 'object') return;
+    const r = rooms[d.roomId], p = r && r.players[socket.id]; if (!p || r.status !== 'playing' || p.hp <= 0 || p.out || r.mode === 'prophunt' || Modes.frozen(r)) return;
+    const O = objState(r), i = d.i | 0, s = O.map.solids[i]; if (!s || s.type !== d.t || !MapObj.DESTR[s.type] || O.dead[i]) return;
+    const now = Date.now(); let bk = p._ohB; if (!bk) bk = hiddenSet(p, '_ohB', { n: 20, t: now }); bk.n = Math.min(20, bk.n + (now - bk.t) * 0.015); bk.t = now; if (bk.n < 1) return; bk.n--;
+    const cx = s.x + (s.w || 50) / 2, cy = s.y + (s.h || 50) / 2, dist = Math.hypot(p.x - cx, p.y - cy);
+    let dmg;
+    if (d.ram) { if (now - (p._dashUse || 0) > 600 || dist > 170) return; dmg = 160; }      // таран ривком: дерево ламається одразу
+    else { if (dist > 1800) return; dmg = Math.min(500, Math.max(1, +d.dmg || 0)) * GameData.statMult(p.equipped, 'dmg'); }
+    objDamage(r, i, dmg, socket.id);
 }
 
 function getValidSpawn(m, r, t = 'spawn_player') {
@@ -458,7 +517,7 @@ function processPlayerDeath(r, victimId, killerId, meta) {
     }
     if (r.mode === 'team_deathmatch') {
         if (atk && atk.team && atk.team !== v.team) {
-            r.teamScores[atk.team]++;
+            r.teamScores[atk.team] += finalMul(r);      // фінальна хвилина: ×2
             if (r.teamScores[atk.team] >= r.tdmScore) {
                 endTDMGame(r, atk.team);
                 return;
@@ -473,7 +532,7 @@ function processPlayerDeath(r, victimId, killerId, meta) {
                     let rx = ts.x + (Math.random() * 80 - 40), ry = ts.y + (Math.random() * 80 - 40);
                     sp = checkCollisionServer(r.map, rx, ry, 24) ? { x: ts.x, y: ts.y } : { x: rx, y: ry };
                 }
-                v.x = sp.x; v.y = sp.y;
+                sp = finalSpawn(r, sp); v.x = sp.x; v.y = sp.y;
                 io.to(r.id).emit('playerRespawn', v);
             }
         }, 3000);
@@ -485,7 +544,7 @@ function processPlayerDeath(r, victimId, killerId, meta) {
         setTimeout(() => {
             if (rooms[r.id] && rooms[r.id].players[victimId] && rooms[r.id].status === 'playing') {
                 v.hp = getMaxHp(v.equipped);
-                let sp = getValidSpawn(r.map, 24, 'spawn_player');
+                let sp = finalSpawn(r, getValidSpawn(r.map, 24, 'spawn_player'));
                 v.x = sp.x; v.y = sp.y;
                 io.to(r.id).emit('playerRespawn', v);
             }
@@ -523,7 +582,7 @@ function clampInt(v, min, max, def) {
 const ModeInfo = require('./public/js/modeinfo.js');   // спільне з клієнтом: режими, параметри, нагороди
 const VALID_MODES = ModeInfo.ORDER.slice();
 const Modes = require('./modes.js')({ io, rooms, dbUsers, MAP_DATA, MapObj, Nav, Z_TYPES, waveScale, getValidSpawn, getValidEdgeSpawn, checkCollisionServer, getMaxHp,
-    grantXp, rollDrop, saveUser, ecoPayload, pushRooms, zombieTick, processPlayerDeath, emitMatchEnd, applyEventBonus, ZOMBIE_CAP, ZOMBIE_SPAWN_BASE, ZOMBIE_SPAWN_STEP });
+    grantXp, rollDrop, saveUser, ecoPayload, pushRooms, zombieTick, processPlayerDeath, emitMatchEnd, applyEventBonus, effCtx, finalMul, finalSpawn, objReset, ZOMBIE_CAP, ZOMBIE_SPAWN_BASE, ZOMBIE_SPAWN_STEP });
 const Classes = require('./classes_srv.js')({ io, rooms, getMaxHp, GameData, Modes, checkCollisionServer, onZDeath: (r, z, o) => onZDeath(r, z, o) });   // класи танків у кооперативі
 Modes.setElite((r, ids, wave, d, n) => eliteMix(r, ids, wave, d, n), (r, z, o) => onZDeath(r, z, o));   // еліт-зомбі в нових кооп-режимах
 const teamsOf = r => r.mode === 'rounds' || r.ranked ? 2 : r.mode === 'capture_points' ? Math.max(2, Math.min(4, r.cpTeams || 2)) : Math.max(2, Math.min(4, r.tdmTeams || 2));
@@ -664,6 +723,8 @@ function startRoomGame(roomId, notify) {
             }
             Classes.onStart(r, pK, Date.now());      // кооп: клас → характеристики танка (HP уже з урахуванням класу)
             mapEvInit(r, Date.now()); hiddenSet(r, '_leader', null); hiddenSet(r, '_ldAt', 0);   // події на мапі, ціль-лідер
+            hiddenSet(r, '_obj', null);      // руйнівні об'єкти — знову цілі
+            hiddenSet(r, '_fin', null); r.dmEnd = r.mode === 'deathmatch' ? Date.now() + 4000 + (r.dmTime || 480) * 1000 : 0;      // фінальна хвилина, ліміт часу детматчу
             io.to(roomId).emit('gameStarting', r);
             pushRooms();
             return true;
@@ -724,9 +785,92 @@ function dashFor(socket, d) {
     if (p.isDisguised || (r.mode === 'prophunt' && (p.team === 'hider' || r.state !== 'seeking')) || Modes.frozen(r)) return;
     const now = Date.now(); if (now < (p._dashAt || 0)) return;
     Object.defineProperty(p, '_dashAt', { value: now + DASH_CD - 150, writable: true, configurable: true, enumerable: false });
+    hiddenSet(p, '_dashUse', now);      // для тарану: таран зараховується лише під час цього ривка
     let s = AC.get(p); if (!s || s.room !== r.id) { s = { x: p.x, y: p.y, t: now, bud: 60, room: r.id, bad: 0, badAt: 0, fixAt: 0, ext: 0, extUntil: 0 }; AC.set(p, s); }
     s.ext = DASH_DIST + 60; s.extUntil = now + 700; s.bud += DASH_DIST + 30;
     const a = +d.a; socket.to(r.id).emit('dashFx', { id: p.id, x: Math.round(p.x), y: Math.round(p.y), a: Number.isFinite(a) ? Math.round(a * 100) / 100 : 0 });
+}
+
+// влучання по зомбі (снаряд гравця або таран; flat — без множників екіпіровки й класу: таран завжди ≈75)
+function zombieHitFor(sid, d, flat) {
+    if (!d || typeof d !== 'object') return;
+    let r = rooms[d.roomId];
+    if (r && r.status === 'playing' && r.zombies[d.zid] && r.zombies[d.zid].hp > 0) {
+        let fD = Math.min(600, Math.max(0, +d.dmg || 0)), aP = r.players[sid], norm = fD;
+        if (aP && !flat) { const eq = GameData.statMult(aP.equipped, 'dmg'); norm = fD * eq * Classes.baseMul(r, aP); fD *= eq * Classes.dmgMul(r, aP); }   // norm — звичайна шкода цього танка (без тіні/критів)
+        if (Modes.has(r.mode) && !flat) fD *= Modes.dmgMult(r, sid);
+        if (aP) Classes.onHit(r, aP, d.zid, fD, d.type);      // внесок у бій + осколки бомбардира
+        if (!r.zombies[d.zid]) return;
+        if (d.type === 'incendiary') r.zombies[d.zid].onFire = { end: Date.now() + 5000, nextTick: Date.now() + 1000, owner: sid };
+        const zz = r.zombies[d.zid], ZTz = Z_TYPES[zz.type] || {}, nowZ = Date.now();
+        if (zz.chainUntil > nowZ) { zz.chainUntil = 0; io.to(d.roomId).emit('chainBreak', { zid: d.zid }); }      // влучання по тягуну рве ланцюг
+        // добивання (кооп): лише міцні (еліт, танкери) з < 15% HP поруч; +50 HP не частіше ніж раз на 2 с
+        let fin = false;
+        if (aP && aP.hp > 0 && !ZTz.isBoss && (ZTz.elite || ZTz.hp >= 90) && zz.hp / Math.max(1, zz.maxHp) < 0.15 && Math.hypot(aP.x - zz.x, aP.y - zz.y) <= 170) { fD = Math.max(fD, zz.hp); fin = true; }
+        const shown = Math.round(Math.min(Math.max(0, zz.hp), fD));
+        zz.hp -= fD;
+        io.to(sid).emit('dmgN', { x: Math.round(zz.x), y: Math.round(zz.y), v: shown, k: zz.hp <= 0 ? 2 : (fD >= 1.5 * norm ? 1 : 0) });   // цифри шкоди; 1 — крит (тінь, критичний удар арени)
+        if (fin && zz.hp <= 0) {
+            if (nowZ >= (aP._finAt || 0)) { aP.hp = Math.min(getMaxHp(aP.equipped), aP.hp + 50); hiddenSet(aP, '_finAt', nowZ + 2000); }
+            io.to(d.roomId).emit('finisher', { x: Math.round(zz.x), y: Math.round(zz.y), by: sid });
+        }
+        if (zz.hp <= 0) {
+            if (zz.type === 'bomber') io.to(d.roomId).emit('bomberExplode', { x: zz.x, y: zz.y, dmg: Math.round(50 * (zz.dmgMult || 1)) });
+            if (Modes.has(r.mode)) Modes.onZombieKill(r, sid, zz);
+            delete r.zombies[d.zid]; onZDeath(r, zz, sid);
+            io.to(sid).emit('zKill', { x: Math.round(zz.x), y: Math.round(zz.y), b: Z_TYPES[zz.type] && Z_TYPES[zz.type].isBoss ? 1 : 0 });
+        } else if (aP && !(Z_TYPES[zz.type] && Z_TYPES[zz.type].isBoss)) {      // легка віддача: зомбі трохи відкидає від стрільця
+            const dx = zz.x - aP.x, dy = zz.y - aP.y, l = Math.hypot(dx, dy);
+            if (l > 1) { const nx = zz.x + dx / l * 7, ny = zz.y + dy / l * 7; if (!checkCollisionServer(r.map, nx, ny, (Z_TYPES[zz.type] || {}).radius || 15, [], r)) { zz.x = nx; zz.y = ny; } }
+        }
+    }
+}
+
+// ===== Кути броні: лоб ×1, борт ×1,15, корма ×1,3 =====
+// Снаряд, що летить у напрямку a, влучає з того боку цілі, звідки прилетів (a + π). Порівнюємо цей бік із напрямком корпусу:
+// до 55° — лоб, від 125° — корма, між ними — борт. Вибухи (уламки) кут не враховують.
+const ARM_FRONT = 55 * Math.PI / 180, ARM_REAR = 125 * Math.PI / 180, ARM_MUL = [1, 1.15, 1.3];
+function armorSide(v, a) {
+    if (!v || !Number.isFinite(a) || !Number.isFinite(v.bodyAngle) || v.buff === 'boss' || v.isDisguised) return 0;
+    let d = a + Math.PI - v.bodyAngle; d = Math.abs(Math.atan2(Math.sin(d), Math.cos(d)));
+    return d <= ARM_FRONT ? 0 : d >= ARM_REAR ? 2 : 1;      // 0 — лоб, 1 — борт, 2 — корма
+}
+
+// ===== Таран: ривок у ворога — 75 шкоди, відкидання обох, оглушення цілі на 0,6 с (не їде й не стріляє) =====
+// Зіткнення помічає клієнт того, хто робить ривок; сервер перевіряє, що ривок щойно був (≤ 0,5 с), один таран за ривок і відстань.
+const RAM_DMG = 75, RAM_STUN = 600;
+function pushServer(r, o, fromX, fromY, dist, rad) {      // відштовхнути бота / зомбі від точки (з перевіркою стін)
+    const dx = o.x - fromX, dy = o.y - fromY, l = Math.hypot(dx, dy) || 1;
+    for (let k = 1; k >= 0.25; k -= 0.25) { const nx = o.x + dx / l * dist * k, ny = o.y + dy / l * dist * k; if (!checkCollisionServer(r.map, nx, ny, rad, [], r)) { o.x = nx; o.y = ny; return; } }
+}
+function ramFor(socket, d) {
+    if (!d || typeof d !== 'object') return;
+    const r = rooms[d.roomId], p = r && r.players[socket.id]; if (!p || r.status !== 'playing' || p.hp <= 0 || p.out || r.mode === 'prophunt' || Modes.frozen(r)) return;
+    const now = Date.now(), du = p._dashUse || 0; if (now - du > 500 || p._ramOf === du) return;
+    if (d.zid != null) {      // кооп: таран зомбі / боса
+        const zz = r.zombies[d.zid], ZT = zz && Z_TYPES[zz.type]; if (!zz || zz.hp <= 0 || !ZT || Math.hypot(p.x - zz.x, p.y - zz.y) > ZT.radius + 100) return;
+        hiddenSet(p, '_ramOf', du);
+        const zx = Math.round(zz.x), zy = Math.round(zz.y);
+        zombieHitFor(socket.id, { roomId: r.id, zid: d.zid, dmg: RAM_DMG, type: 'ram' }, true);
+        if (r.zombies[d.zid] && !ZT.isBoss) { hiddenSet(zz, 'stunUntil', now + RAM_STUN); pushServer(r, zz, p.x, p.y, 45, ZT.radius); }
+        io.to(r.id).emit('ramFx', { x: zx, y: zy, by: socket.id, zid: d.zid, ms: ZT.isBoss ? 0 : RAM_STUN });
+        grantMove(p, 60);      // сам нападник відскакує локально (клієнт), сервер лише дає запас античиту
+        return;
+    }
+    const v = r.players[d.tid]; if (!v || v === p || v.hp <= 0 || v.out || v.buff === 'shield' || ModeInfo.isPve(r.mode)) return;
+    if (isTeamPvp(r.mode) && p.team && p.team === v.team) return;
+    if (Math.hypot(p.x - v.x, p.y - v.y) > 140) return;
+    hiddenSet(p, '_ramOf', du);
+    const hp0 = v.hp; v.hp = Math.max(0, v.hp - RAM_DMG);
+    if (r.ranked) r.ranked.dmg[socket.id] = (r.ranked.dmg[socket.id] || 0) + Math.min(hp0, RAM_DMG);
+    hiddenSet(v, 'stunUntil', now + RAM_STUN);
+    io.to(socket.id).emit('hitConfirmed');
+    io.to(socket.id).emit('dmgN', { x: Math.round(v.x), y: Math.round(v.y), v: Math.round(Math.min(hp0, RAM_DMG)), k: v.hp === 0 ? 2 : 1 });
+    io.to(r.id).emit('ramFx', { x: Math.round((p.x + v.x) / 2), y: Math.round((p.y + v.y) / 2), by: socket.id, tid: v.id, ms: RAM_STUN });
+    if (v.isBot) pushServer(r, v, p.x, p.y, 46, 24);
+    else if (v.hp > 0) { io.to(v.id).emit('knock', { x: Math.round(p.x), y: Math.round(p.y), f: 46 }); grantMove(v, 90); }
+    grantMove(p, 60);      // нападник відскакує локально (клієнт), сервер лише дає запас античиту
+    if (v.hp === 0) processPlayerDeath(r, v.id, socket.id, { weapon: 'ram' });
 }
 
 // Запис гравця-людини в кімнаті (лобі, швидка гра, рейтинговий матч)
@@ -767,30 +911,92 @@ function joinRoomFor(socket, roomId, quiet) {
 function collectTokenFor(roomId, sockId, tid) {
     let r = rooms[roomId];
     if (!r || r.status !== 'playing' || !r.tokens[tid] || !r.tokens[tid].active || !r.players[sockId] || r.players[sockId].hp <= 0) return;
-    r.tokens[tid].active = false; r.players[sockId].score += 1;
+    r.tokens[tid].active = false; r.players[sockId].score += finalMul(r);      // фінальна хвилина: жетон ×2
     
     if (r.players[sockId].score >= r.winScore && r.mode === 'deathmatch') {
-        r.status = 'finished';
-        let mt = 1 + Math.max(0, r.winScore - 5) * 0.10, bW = Math.round(10 * mt), bL = Math.round(2 * mt), rw = {}, xpm = {}, drp = {}, ocm = {};
-        Object.values(r.players).forEach(p => {
-            let a = Math.round(p.id === sockId ? bW : bL); rw[p.id] = a; ocm[p.id] = p.id === sockId ? 'win' : 'loss';
-            if (dbUsers[p.name]) {
-                dbUsers[p.name].bucks += a; dbUsers[p.name].stats.earned += a; dbUsers[p.name].stats.matches++;
-                xpm[p.id] = grantXp(p.name, p.id === sockId ? 'win' : 'loss');
-                let dr = rollDrop(p.name); drp[p.id] = dr; saveUser(p.name);
-                io.to(p.id).emit('economyUpdate', ecoPayload(p.name));
-                if (dr) io.to(p.id).emit('dropReceived', dr);
-            }
-        });
         io.to(roomId).emit('tokenCollected', { tid: tid, playerId: sockId, score: r.players[sockId].score });
-        const evb = applyEventBonus(r, rw, xpm);
-        io.to(roomId).emit('gameOver', { winner: sockId, name: r.players[sockId] ? r.players[sockId].name : 'ГРАВЕЦЬ', rewards: rw, xp: xpm, isTeamWin: false, ev: evb });
-        emitMatchEnd(r, { outcomes: ocm, rewards: rw, xp: xpm, drops: drp });
-        pushRooms();
+        endDM(r, sockId);
     } else {
         io.to(roomId).emit('tokenCollected', { tid: tid, playerId: sockId, score: r.players[sockId].score });
     }
     delete r.tokens[tid];
+}
+
+// кінець детматчу: хтось зібрав жетони або вийшов час (тоді перемагає найбільше жетонів, за рівності — більше вбивств)
+function endDM(r, winId) {
+    r.status = 'finished'; const EF = effCtx(r);
+    let mt = 1 + Math.max(0, r.winScore - 5) * 0.10, bW = Math.round(10 * mt), bL = Math.round(2 * mt), rw = {}, xpm = {}, drp = {}, ocm = {};
+    Object.values(r.players).forEach(p => {
+        let a = EF(p, Math.round(p.id === winId ? bW : bL)); rw[p.id] = a; ocm[p.id] = p.id === winId ? 'win' : 'loss';
+        if (dbUsers[p.name]) {
+            dbUsers[p.name].bucks += a; dbUsers[p.name].stats.earned += a; dbUsers[p.name].stats.matches++;
+            xpm[p.id] = grantXp(p.name, p.id === winId ? 'win' : 'loss');
+            let dr = rollDrop(p.name); drp[p.id] = dr; saveUser(p.name);
+            io.to(p.id).emit('economyUpdate', ecoPayload(p.name));
+            if (dr) io.to(p.id).emit('dropReceived', dr);
+        }
+    });
+    const evb = applyEventBonus(r, rw, xpm);
+    io.to(r.id).emit('gameOver', { winner: winId, name: r.players[winId] ? r.players[winId].name : 'ГРАВЕЦЬ', rewards: rw, xp: xpm, isTeamWin: false, ev: evb, eff: EF.eff });
+    emitMatchEnd(r, { outcomes: ocm, rewards: rw, xp: xpm, drops: drp });
+    pushRooms();
+}
+function dmTimeUp(r) {
+    const t = matchTally.get(r.id), kd = t ? t.kd : {};
+    const ps = Object.values(r.players).sort((a, b) => ((b.score | 0) - (a.score | 0)) || (((kd[b.name] || {}).k | 0) - ((kd[a.name] || {}).k | 0)));
+    if (ps.length) endDM(r, ps[0].id);
+}
+
+// ===== Ефективність у PvP: вбивства додають до +4 кредитів, смерті трохи знижують; підсумок не вище за максимум, показаний у лобі =====
+// Рахує ModeInfo.effAdjust (спільна формула). Повертає функцію (гравець, базова нагорода) → нагорода; fn.eff — бонус кожного (для вікна результату).
+function effCtx(r) {
+    const t = matchTally.get(r.id), kd = t ? t.kd : {}; let maxE = 0;
+    Object.values(r.players).forEach(p => { const q = kd[p.name]; if (q) maxE = Math.max(maxE, q.k - 0.3 * q.d); });
+    let cap = 0; try { cap = ModeInfo.rewardRange(r.mode, r).win; } catch (e) { }
+    const eff = {};
+    const fn = (p, a) => { const res = ModeInfo.effAdjust(r.mode, a, kd[p.name] || { k: 0, d: 0 }, maxE, cap); if (res !== a) eff[p.id] = res - a; return res; };
+    fn.eff = eff; return fn;
+}
+
+// ===== ФІНАЛЬНА ХВИЛИНА: за 60 с до кінця або коли лідер набрав 80% цілі — очки ×2 і зона, що стискається до центру мапи =====
+// Детматч, командний бій, захоплення точок, «Ціль». Поза зоною — 6% здоров'я щосекунди; відроджуються всередині зони.
+const FINAL_MODES = new Set(['deathmatch', 'team_deathmatch', 'capture_points', 'bounty']), FINAL_MS = 60000;
+function finalMul(r) { return r && r._fin ? 2 : 1; }
+function finalProgress(r, now) {      // { left — мс до кінця, prog — частка цілі в лідера, live — бій уже йде (не відлік) }
+    let m = 0;
+    switch (r.mode) {
+        case 'deathmatch': for (const id in r.players) m = Math.max(m, r.players[id].score | 0); return { left: r.dmEnd ? r.dmEnd - now : Infinity, prog: m / Math.max(1, r.winScore), live: !r.dmEnd || now > r.dmEnd - (r.dmTime || 480) * 1000 };
+        case 'team_deathmatch': for (const t in r.teamScores || {}) m = Math.max(m, r.teamScores[t]); return { left: r.timeEndTime - now, prog: m / Math.max(1, r.tdmScore), live: now > r.timeEndTime - r.tdmTime * 1000 };
+        case 'capture_points': { const S = Modes.MS.get(r.id); if (!S || !S.sc) return null; for (const t in S.sc) m = Math.max(m, S.sc[t]); return { left: S.end - now, prog: m / Math.max(1, S.goal), live: now > S.end - r.cpTime * 1000 }; }
+        case 'bounty': { const S = Modes.MS.get(r.id); if (!S || !S.end) return null; for (const id in r.players) m = Math.max(m, r.players[id].score | 0); return { left: S.end - now, prog: m / Math.max(1, r.bnScore), live: now > S.end - r.bnTime * 1000 }; }
+    }
+    return null;
+}
+function finalRadius(F, now) { const k = Math.min(1, Math.max(0, (now - F.t0) / F.dur)); return F.r0 + (F.r1 - F.r0) * k; }
+function finalTick(r, now) {
+    if (!FINAL_MODES.has(r.mode) || r.status !== 'playing') return;
+    let F = r._fin;
+    if (!F) {
+        const P = finalProgress(r, now); if (!P || !P.live || (P.left > FINAL_MS && P.prog < 0.8)) return;
+        const map = MAP_DATA[r.map] || MAP_DATA['epic_map'], b = MapObj.hasShape(map) ? MapObj.shapeBounds(map.shape) : { x0: 0, y0: 0, x1: map.size, y1: map.size }, w = b.x1 - b.x0, h = b.y1 - b.y0;
+        F = hiddenSet(r, '_fin', { t0: now, dur: Math.max(25000, Math.min(FINAL_MS, P.left)), cx: (b.x0 + b.x1) / 2, cy: (b.y0 + b.y1) / 2, r0: Math.hypot(w, h) / 2 + 60, r1: Math.max(420, Math.min(w, h) * 0.2), dmgAt: now + 1000, why: P.left <= FINAL_MS ? 't' : 's' });
+        return;
+    }
+    if (now < F.dmgAt) return;
+    F.dmgAt = now + 1000; const R = finalRadius(F, now);
+    for (const id in r.players) {
+        const p = r.players[id]; if (p.hp <= 0 || p.out || p.buff === 'shield') continue;
+        if (Math.hypot(p.x - F.cx, p.y - F.cy) <= R) continue;
+        p.hp = Math.max(0, p.hp - Math.round(getMaxHp(p.equipped) * 0.06));
+        if (p.hp === 0) processPlayerDeath(r, id, null, { weapon: 'zone' });
+    }
+}
+// точка відродження під час фіналу — всередині зони (інакше танк з'явиться в «газі»)
+function finalSpawn(r, sp) {
+    const F = r && r._fin; if (!F || !sp) return sp;
+    const R = finalRadius(F, Date.now() + 3000) - 120; if (Math.hypot(sp.x - F.cx, sp.y - F.cy) <= R) return sp;
+    for (let i = 0; i < 40; i++) { const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * Math.max(60, R), x = F.cx + Math.cos(a) * d, y = F.cy + Math.sin(a) * d; if (!checkCollisionServer(r.map, x, y, 28)) return { x, y }; }
+    return sp;
 }
 
 io.on('connection', (socket) => {
@@ -1286,6 +1492,7 @@ socket.on('selectProp', (data) => {
                 r.mines[mId] = { id: mId, x: data.x, y: data.y, owner: socket.id, time: Date.now() };
                 return;
             }
+            if ((p.stunUntil || 0) > Date.now()) return;      // оглушений тараном — не стріляє
             data.owner = socket.id; data.pierced = [];
             { const nowS = Date.now(); trimShots(nowS); data.bid = shotSeq++; SHOTS.set(data.bid, { owner: socket.id, type: cleanWeapon(data.type), kills: 0, t: nowS }); }
             io.to(data.roomId).emit('spawnBullet', data);
@@ -1312,6 +1519,8 @@ socket.on('selectProp', (data) => {
         } else {
             if (atk) fD *= GameData.statMult(atk.equipped, 'dmg');   // екіпіровка гравця в кімнаті (у королівському бою — підібрані модулі)
         }
+        // кут броні: прямий снаряд (не уламки вибуху) у борт / корму б'є сильніше
+        const side = (r.mode === 'prophunt' || data.sp) ? 0 : armorSide(v, +data.a); fD *= ARM_MUL[side];
         
         if (data.type === 'incendiary') v.onFire = { end: Date.now() + 5000, nextTick: Date.now() + 1000, owner: socket.id };
         
@@ -1323,7 +1532,7 @@ socket.on('selectProp', (data) => {
         if (fin && v.hp === 0) { atk.hp = Math.min(getMaxHp(atk.equipped), atk.hp + 50); io.to(r.id).emit('finisher', { x: Math.round(v.x), y: Math.round(v.y), by: socket.id }); }
         io.to(socket.id).emit('hitConfirmed');
         // цифри шкоди (нападнику) і легка віддача (жертві); k: 1 — сильне влучання, 2 — вбивство
-        io.to(socket.id).emit('dmgN', { x: Math.round(v.x), y: Math.round(v.y), v: Math.round(Math.min(hp0, fD)), k: v.hp === 0 ? 2 : (fD >= 2 * Math.min(500, Math.max(1, +data.amt || 1)) ? 1 : 0) });
+        io.to(socket.id).emit('dmgN', { x: Math.round(v.x), y: Math.round(v.y), v: Math.round(Math.min(hp0, fD)), k: v.hp === 0 ? 2 : (fD >= 2 * Math.min(500, Math.max(1, +data.amt || 1)) ? 1 : 0), s: side });
         if (!v.isBot && v.hp > 0) io.to(data.targetId).emit('knock', { x: Math.round(atk.x), y: Math.round(atk.y) });
         
         if (v.hp === 0) {
@@ -1373,40 +1582,9 @@ socket.on('selectProp', (data) => {
         }
     });
 
-    socket.on('zombieHit', (d) => {
-        if (!d || typeof d !== 'object') return;
-        let r = rooms[d.roomId];
-        if (r && r.status === 'playing' && r.zombies[d.zid] && r.zombies[d.zid].hp > 0) {
-            let fD = Math.min(600, Math.max(0, +d.dmg || 0)), aP = r.players[socket.id], norm = fD;
-            if (aP) { const eq = GameData.statMult(aP.equipped, 'dmg'); norm = fD * eq * Classes.baseMul(r, aP); fD *= eq * Classes.dmgMul(r, aP); }   // norm — звичайна шкода цього танка (без тіні/критів)
-            if (Modes.has(r.mode)) fD *= Modes.dmgMult(r, socket.id);
-            if (aP) Classes.onHit(r, aP, d.zid, fD, d.type);      // внесок у бій + осколки бомбардира
-            if (!r.zombies[d.zid]) return;
-            if (d.type === 'incendiary') r.zombies[d.zid].onFire = { end: Date.now() + 5000, nextTick: Date.now() + 1000, owner: socket.id };
-            const zz = r.zombies[d.zid], ZTz = Z_TYPES[zz.type] || {}, nowZ = Date.now();
-            if (zz.chainUntil > nowZ) { zz.chainUntil = 0; io.to(d.roomId).emit('chainBreak', { zid: d.zid }); }      // влучання по тягуну рве ланцюг
-            // добивання (кооп): лише міцні (еліт, танкери) з < 15% HP поруч; +50 HP не частіше ніж раз на 2 с
-            let fin = false;
-            if (aP && aP.hp > 0 && !ZTz.isBoss && (ZTz.elite || ZTz.hp >= 90) && zz.hp / Math.max(1, zz.maxHp) < 0.15 && Math.hypot(aP.x - zz.x, aP.y - zz.y) <= 170) { fD = Math.max(fD, zz.hp); fin = true; }
-            const shown = Math.round(Math.min(Math.max(0, zz.hp), fD));
-            zz.hp -= fD;
-            io.to(socket.id).emit('dmgN', { x: Math.round(zz.x), y: Math.round(zz.y), v: shown, k: zz.hp <= 0 ? 2 : (fD >= 1.5 * norm ? 1 : 0) });   // цифри шкоди; 1 — крит (тінь, критичний удар арени)
-            if (fin && zz.hp <= 0) {
-                if (nowZ >= (aP._finAt || 0)) { aP.hp = Math.min(getMaxHp(aP.equipped), aP.hp + 50); hiddenSet(aP, '_finAt', nowZ + 2000); }
-                io.to(d.roomId).emit('finisher', { x: Math.round(zz.x), y: Math.round(zz.y), by: socket.id });
-            }
-            if (zz.hp <= 0) {
-                if (zz.type === 'bomber') io.to(d.roomId).emit('bomberExplode', { x: zz.x, y: zz.y, dmg: Math.round(50 * (zz.dmgMult || 1)) });
-                if (Modes.has(r.mode)) Modes.onZombieKill(r, socket.id, zz);
-                delete r.zombies[d.zid]; onZDeath(r, zz, socket.id);
-                io.to(socket.id).emit('zKill', { x: Math.round(zz.x), y: Math.round(zz.y), b: Z_TYPES[zz.type] && Z_TYPES[zz.type].isBoss ? 1 : 0 });
-            } else if (aP && !(Z_TYPES[zz.type] && Z_TYPES[zz.type].isBoss)) {      // легка віддача: зомбі трохи відкидає від стрільця
-                const dx = zz.x - aP.x, dy = zz.y - aP.y, l = Math.hypot(dx, dy);
-                if (l > 1) { const nx = zz.x + dx / l * 7, ny = zz.y + dy / l * 7; if (!checkCollisionServer(r.map, nx, ny, (Z_TYPES[zz.type] || {}).radius || 15, [], r)) { zz.x = nx; zz.y = ny; } }
-            }
-        }
-    });
-
+    socket.on('zombieHit', (d) => zombieHitFor(socket.id, d, false));
+    socket.on('ram', (d) => ramFor(socket, d));                          // таран ривком
+    socket.on('objHit', (d) => objHitFor(socket, d));                    // влучання в руйнівний об'єкт
     socket.on('pickPerk', (d) => { if (d && rooms[d.roomId]) Modes.pickPerk(rooms[d.roomId], socket.id, d.id); });
     socket.on('setClass', (d) => Classes.setClass(socket, d));          // кооп: вибір класу в лобі
     socket.on('dash', (d) => dashFor(socket, d));                        // ривок
@@ -1432,9 +1610,9 @@ socket.on('selectProp', (data) => {
 });
 
 function endPropHuntGame(r, wT) {
-    r.status = 'finished'; let rew = {}, wId = null, xpm = {}, drp = {}, ocm = {};
+    r.status = 'finished'; const EF = effCtx(r); let rew = {}, wId = null, xpm = {}, drp = {}, ocm = {};
     Object.values(r.players).forEach(p => {
-        let isW = (p.team === wT), a = isW ? 15 : 3; rew[p.id] = a; ocm[p.id] = isW ? 'win' : 'loss'; if (isW && !wId) wId = p.id;
+        let isW = (p.team === wT), a = EF(p, isW ? 15 : 3); rew[p.id] = a; ocm[p.id] = isW ? 'win' : 'loss'; if (isW && !wId) wId = p.id;
         if (dbUsers[p.name]) {
             dbUsers[p.name].bucks += a; dbUsers[p.name].stats.earned += a; dbUsers[p.name].stats.matches++;
             xpm[p.id] = grantXp(p.name, isW ? 'win' : 'loss');
@@ -1444,15 +1622,15 @@ function endPropHuntGame(r, wT) {
         }
     });
     const evb = applyEventBonus(r, rew, xpm);
-    io.to(r.id).emit('gameOver', { winner: wId || 'TEAM', name: wT === 'hunter' ? 'КОМАНДА МИСЛИВЦІВ' : 'ТІ, ХТО ХОВАВСЯ', rewards: rew, xp: xpm, isTeamWin: true, wins: ocm, ev: evb });
+    io.to(r.id).emit('gameOver', { winner: wId || 'TEAM', name: wT === 'hunter' ? 'КОМАНДА МИСЛИВЦІВ' : 'ТІ, ХТО ХОВАВСЯ', rewards: rew, xp: xpm, isTeamWin: true, wins: ocm, ev: evb, eff: EF.eff });
     emitMatchEnd(r, { outcomes: ocm, rewards: rew, xp: xpm, drops: drp });
     pushRooms();
 }
 
 function endTDMGame(r, wT) {
-    r.status = 'finished'; let rew = {}, wId = null, xpm = {}, drp = {}, ocm = {}, isD = (wT === 'draw');
+    r.status = 'finished'; const EF = effCtx(r); let rew = {}, wId = null, xpm = {}, drp = {}, ocm = {}, isD = (wT === 'draw');
     Object.values(r.players).forEach(p => {
-        let isW = !isD && (p.team === wT), a = isD ? 10 : (isW ? 20 : 5); rew[p.id] = a; ocm[p.id] = isD ? 'draw' : (isW ? 'win' : 'loss'); if (isW && !wId) wId = p.id;
+        let isW = !isD && (p.team === wT), a = EF(p, isD ? 10 : (isW ? 20 : 5)); rew[p.id] = a; ocm[p.id] = isD ? 'draw' : (isW ? 'win' : 'loss'); if (isW && !wId) wId = p.id;
         if (dbUsers[p.name]) {
             dbUsers[p.name].bucks += a; dbUsers[p.name].stats.earned += a; dbUsers[p.name].stats.matches++;
             xpm[p.id] = grantXp(p.name, isD ? 'draw' : (isW ? 'win' : 'loss'));
@@ -1462,7 +1640,7 @@ function endTDMGame(r, wT) {
         }
     });
     const evb = applyEventBonus(r, rew, xpm);
-    io.to(r.id).emit('gameOver', { winner: isD ? 'DRAW' : (wT || 'TEAM'), name: isD ? 'НІЧИЯ' : `КОМАНДА ${typeof wT === 'string' ? wT.toUpperCase() : 'ПОБЕДИТЕЛЬ'}`, rewards: rew, xp: xpm, isTeamWin: !isD, wins: ocm, ev: evb });
+    io.to(r.id).emit('gameOver', { winner: isD ? 'DRAW' : (wT || 'TEAM'), name: isD ? 'НІЧИЯ' : `КОМАНДА ${typeof wT === 'string' ? wT.toUpperCase() : 'ПОБЕДИТЕЛЬ'}`, rewards: rew, xp: xpm, isTeamWin: !isD, wins: ocm, ev: evb, eff: EF.eff });
     emitMatchEnd(r, { outcomes: ocm, rewards: rew, xp: xpm, drops: drp, score: Object.assign({}, r.teamScores || {}) });
     pushRooms();
 }
@@ -1481,6 +1659,7 @@ function zombieTick(r, rId, now, dt, aP, X) {
                 if (z.hp <= 0) { if (z.type === 'bomber') io.to(rId).emit('bomberExplode', { x: z.x, y: z.y, dmg: Math.round(50 * (z.dmgMult || 1)) }); delete r.zombies[zid]; onZDeath(r, z, z.onFire && z.onFire.owner); continue; }
             }
         }
+        if ((z.stunUntil || 0) > now) continue;      // оглушений тараном: стоїть і не атакує
         // вибір цілі: класові здібності (тінь / бастіон) змінюють лише пріоритет, а відстань для атаки лишається справжньою
         let bw = Infinity;
         aP.forEach(pl => { let d = Math.hypot(pl.x - z.x, pl.y - z.y); if (pl.buff === 'invisible') d *= 3; const w = pl._cs ? Classes.weight(pl, d, now) : d; if (w < bw) { bw = w; mD = d; t = pl; } });
@@ -1658,6 +1837,12 @@ function buildSync(r, now) {
     chg('pu', r.powerups || {}, 'pu'); chg('tk', r.tokens || {}, 'tk'); chg('mn', r.mines || {}, 'mn');
     if (Modes.has(r.mode)) { const md = Modes.md(r, now); if (md) chg('md', md, 'md'); }
     if (r.mode === 'prophunt') { const t = Math.max(0, Math.ceil((r.phaseEndTime - now) / 1000)), j = r.state + ':' + t; if (full || S.ph !== j) { S.ph = j; out.phState = r.state; out.phTimeLeft = t; any = true; } }
+    {   // фінальна хвилина: параметри зони — один раз (el — скільки мс уже минуло), далі клієнт рахує сам
+        const F = r._fin, k = F ? String(F.t0) : '';
+        if (full || S.fin !== k) { S.fin = k; out.fin = F ? { cx: Math.round(F.cx), cy: Math.round(F.cy), r0: Math.round(F.r0), r1: Math.round(F.r1), dur: F.dur, el: now - F.t0, why: F.why } : 0; any = true; }
+    }
+    if (full && r._obj && r._obj.list.length) { out.od = r._obj.list.slice(); any = true; }      // уже знищені об'єкти (тому, хто повернувся в бій)
+    if (r.mode === 'deathmatch' && r.dmEnd && (full || now - (S.dm || 0) >= 1000)) { S.dm = now; out.dmMsLeft = Math.max(0, r.dmEnd - now); any = true; }
     if (r.mode === 'team_deathmatch') {
         chg('tdm', { teamScores: r.teamScores, timeEndTime: r.timeEndTime }, 'tdm');
         if (full || now - S.tm >= 1000) { S.tm = now; out.tdmMsLeft = Math.max(0, r.timeEndTime - now); any = true; }
@@ -1716,6 +1901,8 @@ setInterval(() => {
                 continue;
             }
         }
+        if (r.mode === 'deathmatch' && r.dmEnd && now >= r.dmEnd) { dmTimeUp(r); continue; }      // детматч: вийшов час
+        finalTick(r, now);
 
         for (let mid in r.mines) {
             let m = r.mines[mid];
@@ -1848,7 +2035,7 @@ setInterval(() => {
     const ctx = {
         io, rooms, dbUsers, globalPlayers, Events, GameData, MODULES, CASES, ModeInfo, Modes, MAP_DATA, MapObj, Nav, VALID_MODES, MAX_HP,
         saveUser, sendEconomy, ecoPayload, grantXp, rollDrop, playerLevel, getMaxHp, pushRooms, hashPwd, validateUser, NAME_RE, LOGIN_RE_NEW, PASS_RE_NEW,
-        checkCollisionServer, getValidSpawn, processPlayerDeath, removePlayer, resetRoomToLobby, getRandomModuleFromCase,
+        checkCollisionServer, getValidSpawn, processPlayerDeath, removePlayer, resetRoomToLobby, getRandomModuleFromCase, armorSide, ARM_MUL, objDamage, objDead,
         hooks, displayName: nickOf, onConnection: f => connHooks.push(f), getDb: () => dbRef, onlineSocketsOf, isOnline: name => _sockByName.has(name),
         get BANS() { return BANS; }, get TICK_RATE() { return TICK_RATE; }, get SYNCS() { return SYNCS; }, startRoomGame, collectTokenFor, emitMatchEnd, teamsOf, isTeamPvp, powerupsOn, pickMap, clampInt, BUFF_DURATION, VALID_COLORS, TDM_TEAMS,
         newPlayerEntry, joinRoomFor, ipHashOf, getRandomModuleFromCase, matchTally: () => matchTally,

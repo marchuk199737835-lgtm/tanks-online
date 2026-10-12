@@ -89,7 +89,7 @@ module.exports = function createModes(D) {
     function respawn(r, v, delay, posFn) {
         setTimeout(() => {
             const R = rooms[r.id]; if (!R || R !== r || r.status !== 'playing' || !r.players[v.id] || v.hp > 0 || v.out) return;
-            v.hp = getMaxHp(v.equipped); v.buff = null; v.onFire = null; place(v, posFn()); emit(r, 'playerRespawn', v);
+            const sp = posFn(); v.hp = getMaxHp(v.equipped); v.buff = null; v.onFire = null; place(v, D.finalSpawn ? D.finalSpawn(r, sp) : sp); emit(r, 'playerRespawn', v);      // фінальна хвилина — всередині зони
         }, delay);
     }
 
@@ -98,10 +98,12 @@ module.exports = function createModes(D) {
     function finish(r, o) {
         if (r.status !== 'playing') return;
         const S0 = MS.get(r.id), n0 = (S0 && S0.n0) || Object.keys(r.players).length;
+        const EF = D.effCtx && !ModeInfo.isPve(r.mode) ? D.effCtx(r) : null;      // PvP: бонус за ефективність (рахується до очищення статистики матчу)
         r.status = 'finished'; restoreEq(r); const rw = {}, xpm = {}, oc = {}, per = {}, drp = {}, crd = {};
         Object.values(r.players).forEach(p => {
             const out = o.outcomes[p.id] || 'loss', base = ModeInfo.reward(r.mode, r, out, Object.assign({ n: n0 }, o.ctx ? o.ctx(p) : {}));
-            const amt = contribMul ? Math.max(1, Math.round(base * contribMul(r, p))) : base;      // кооп: хто майже нічого не зробив (AFK) — отримує менше
+            let amt = contribMul ? Math.max(1, Math.round(base * contribMul(r, p))) : base;      // кооп: хто майже нічого не зробив (AFK) — отримує менше
+            if (EF) amt = EF(p, amt);
             rw[p.id] = amt; oc[p.id] = out; if (o.per) per[p.id] = o.per(p);
             if (dbUsers[p.name]) {
                 const u = dbUsers[p.name]; u.bucks += amt; u.stats.earned += amt; u.stats.matches++; crd[p.id] = amt;
@@ -111,12 +113,13 @@ module.exports = function createModes(D) {
         });
         MS.delete(r.id);
         const evb = D.applyEventBonus ? D.applyEventBonus(r, crd, xpm, rw) : null;      // подія адміністрації: ×креди / ×досвід — уже у вікні результату
-        emit(r, 'gameOver', { winner: o.winner || 'TEAM', name: o.name || '', rewards: rw, xp: xpm, isTeamWin: false, mode: r.mode, outcomes: oc, msg: o.msg || '', lines: o.lines || [], per, team: o.teamWin || null, ev: evb });
+        emit(r, 'gameOver', { winner: o.winner || 'TEAM', name: o.name || '', rewards: rw, xp: xpm, isTeamWin: false, mode: r.mode, outcomes: oc, msg: o.msg || '', lines: o.lines || [], per, team: o.teamWin || null, ev: evb, eff: EF ? EF.eff : null });
         let wvs = null, plc = {};
         try { const f0 = Object.values(r.players)[0]; if (o.ctx && f0) { const c0 = o.ctx(f0); if (c0 && c0.waves != null) wvs = c0.waves | 0; } Object.keys(per).forEach(k => { if (per[k] && per[k].place) plc[k] = per[k].place; }); } catch (e) { }
         emitMatchEnd(r, { outcomes: oc, rewards: crd, xp: xpm, drops: drp, place: plc, waves: wvs, score: o.score || null });
         pushRooms();
     }
+    const FM = r => D.finalMul ? D.finalMul(r) : 1;      // фінальна хвилина: очки ×2
     const allOutcome = (r, out) => { const m = {}; Object.keys(r.players).forEach(id => m[id] = out); return m; };
 
     // ---------- запуск ----------
@@ -239,6 +242,7 @@ module.exports = function createModes(D) {
         return S.teams.some(t => S.teams.every(o => o === t || S.sc[t] + 1 > S.sc[o] + left)) ? 'mp' : 'n';   // комусь вистачить одного раунду — «матч-пойнт»
     }
     function rdBegin(r, S, now, first) {
+        if (S.round > 0 && D.objReset) D.objReset(r);      // новий раунд — руйнівні об'єкти знову цілі
         S.round++; S.state = 'fz'; S.fzEnd = now + RD_FREEZE; S.end = S.fzEnd + r.rdTime * 1000; S.lb = rdLabel(r, S);
         r.powerups = {}; r.mines = {};
         Object.values(r.players).forEach(p => {
@@ -351,7 +355,7 @@ module.exports = function createModes(D) {
             }
             case 'capture_points': {
                 const atk = killerId && r.players[killerId];
-                if (atk && atk.team && atk.team !== v.team && S.sc[atk.team] !== undefined) { S.sc[atk.team] += 3; S.kills[atk.id] = (S.kills[atk.id] || 0) + 1; checkCP(r, S, now); }
+                if (atk && atk.team && atk.team !== v.team && S.sc[atk.team] !== undefined) { S.sc[atk.team] += 3 * FM(r); S.kills[atk.id] = (S.kills[atk.id] || 0) + 1; checkCP(r, S, now); }
                 respawn(r, v, 4000, () => { const ts = r.teamSpawns && r.teamSpawns[v.team]; return ts ? ringSpot(r, ts, 0, 80, 24) : getValidSpawn(r.map, 24, 'spawn_player'); });
                 break;
             }
@@ -359,8 +363,8 @@ module.exports = function createModes(D) {
                 const atk = killerId && r.players[killerId];
                 if (atk && atk.id !== v.id) {
                     S.kills[atk.id] = (S.kills[atk.id] || 0) + 1; S.streak[atk.id] = (S.streak[atk.id] || 0) + 1;
-                    if (v.id === S.target) { atk.score += S.bv; S.bk[atk.id] = (S.bk[atk.id] || 0) + 1; note(r, 'bountyClaimed', { by: atk.name, tg: v.name, v: S.bv }); S.target = null; S.next = now + 3000; }
-                    else atk.score += 1;
+                    if (v.id === S.target) { atk.score += S.bv * FM(r); S.bk[atk.id] = (S.bk[atk.id] || 0) + 1; note(r, 'bountyClaimed', { by: atk.name, tg: v.name, v: S.bv }); S.target = null; S.next = now + 3000; }
+                    else atk.score += FM(r);
                 } else if (v.id === S.target) { S.target = null; S.next = now + 3000; }
                 S.streak[v.id] = 0;
                 if (!checkBounty(r, S, now)) respawn(r, v, 3000, () => getValidSpawn(r.map, 24, 'spawn_player'));
@@ -507,7 +511,7 @@ module.exports = function createModes(D) {
                 if (now < S.end - r.bnTime * 1000) return false;   // зворотний відлік перед боєм (4 с)
                 if (checkBounty(r, S, now)) return true;
                 if (now >= S.next) {
-                    if (S.target && r.players[S.target] && r.players[S.target].hp > 0) { const t = r.players[S.target]; t.score += 2; note(r, 'bountySurvived', { tg: t.name }); S.prev = S.target; S.target = null; S.next = now + 2500; if (checkBounty(r, S, now)) return true; }
+                    if (S.target && r.players[S.target] && r.players[S.target].hp > 0) { const t = r.players[S.target]; t.score += 2 * FM(r); note(r, 'bountySurvived', { tg: t.name }); S.prev = S.target; S.target = null; S.next = now + 2500; if (checkBounty(r, S, now)) return true; }
                     else {
                         const cand = al.filter(p => p.id !== S.prev); const pool = cand.length ? cand : al;
                         if (pool.length) {
@@ -537,7 +541,7 @@ module.exports = function createModes(D) {
         if (S.hold === 0) {   // їдемо за маршрутом (найкоротший шлях у обхід перешкод)
             const wp = Nav.steer(mapOf(r), S.nav, 'cvDest', S.B.x, S.B.y, cv.x, cv.y, 30, now), dx = wp.x - cv.x, dy = wp.y - cv.y, l = Math.max(Math.hypot(dx, dy), 0.001), sp = r.cvSpeed * dt;
             const nx = cv.x + dx / l * sp, ny = cv.y + dy / l * sp;
-            if (!checkCollisionServer(r.map, nx, cv.y, 30)) cv.x = nx; if (!checkCollisionServer(r.map, cv.x, ny, 30)) cv.y = ny;
+            if (!checkCollisionServer(r.map, nx, cv.y, 30, [], r)) cv.x = nx; if (!checkCollisionServer(r.map, cv.x, ny, 30, [], r)) cv.y = ny;      // з кімнатою: знищені ящики не заважають
             cv.a = Math.atan2(dy, dx);
         }
         // прогрес — за відстанню по сітці до кінцевої точки
@@ -758,7 +762,7 @@ module.exports = function createModes(D) {
                 else { pt.w = t; pt.p = Math.min(100, pt.p + rate); if (pt.p >= 100) { pt.o = t; note(r, 'capture', { t, i: pt.i + 1 }); al.forEach(p => { if (p.team === t && Math.hypot(p.x - pt.x, p.y - pt.y) < pt.r) p.caps = (p.caps || 0) + 1; }); } }
             } else if (ts.length === 0 && !pt.o && pt.p > 0) pt.p = Math.max(0, pt.p - 5 * dt);
         });
-        S.acc += dt; if (S.acc >= 1) { S.acc -= 1; S.pts.forEach(pt => { if (pt.o && S.sc[pt.o] !== undefined) S.sc[pt.o] += 1; }); }
+        S.acc += dt; if (S.acc >= 1) { S.acc -= 1; const fm = FM(r); S.pts.forEach(pt => { if (pt.o && S.sc[pt.o] !== undefined) S.sc[pt.o] += fm; }); }
         return checkCP(r, S, now);
     }
 
