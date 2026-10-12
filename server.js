@@ -713,7 +713,8 @@ function startRoomGame(roomId, notify) {
                 const L = ModeInfo.livesN(r.svLives); pK.forEach(id => { r.players[id].lives = L; r.players[id].out = false; });
             } else if (r.mode === 'prophunt') {
                 r.state = 'hiding'; r.phaseEndTime = Date.now() + 4000 + (r.hideTime * 1000);
-                const prps = Array.from(MapObj.DISGUISE_IDS);
+                // рулетка: лише ті предмети, що справді стоять на цій мапі (клієнт крутить рулетку з того самого пулу й зупиняється на виданому)
+                const prps = MapObj.phInfo(MAP_DATA[r.map] || MAP_DATA['epic_map']).pool;
                 pK.forEach(id => {
                     if (r.players[id].team === 'hider') {
                         r.players[id].propType = prps[Math.floor(Math.random() * prps.length)];
@@ -1430,11 +1431,7 @@ io.on('connection', (socket) => {
         const r = rooms[roomId];
         if (r && r.hostSocket === socket.id) startRoomGame(roomId, msg => socket.emit('joinError', msg));
     });
-socket.on('selectProp', (data) => {
-        if (!data || !data.roomId) return;
-        let r = rooms[data.roomId];
-        if (r && r.status === 'playing' && r.mode === 'prophunt' && r.players[socket.id]) { if (typeof data.type === 'string' && MapObj.DISGUISE_IDS.has(data.type)) r.players[socket.id].propType = data.type; }
-    });
+    // 'selectProp' (ручний вибір маскування) більше не приймаємо: предмет визначає рулетка на старті матчу
 
     socket.on('updateDisguise', (data) => {
         if (!data || !data.roomId) return;

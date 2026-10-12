@@ -4,7 +4,7 @@
 'use strict';
 module.exports = function (def, L) {
     const { rr, ri, pick, TAU } = L, MO = L.MO;
-    const SURV = ['base_defense', 'survival'], RAID = ['boss_raid', 'survival'], SOLO = ['solo_arena', 'boss_duel', 'survival'];
+    const SURV = ['base_defense', 'survival'], RAID = ['boss_raid', 'survival'], SOLO = ['solo_arena', 'boss_duel'];
     const deco = (m, rect, n, kinds, rad, rot) => m.scatter(n, rect, rad || 40, (x, y) => { const k = pick(kinds); m.prop(k[0], x - k[1] / 2, y - k[2] / 2, k[1], k[2], rot ? ri(0, 3) * 45 : 0); }, 60);
     // точки зомбі по краю фігурної мапи (трохи всередині)
     const edgeZ = (m, n, inset) => { const sh = m.m.shape; if (!sh) return; const cx = sh.reduce((a, p) => a + p.x, 0) / sh.length, cy = sh.reduce((a, p) => a + p.y, 0) / sh.length; for (let i = 0; i < n; i++) { const p = sh[Math.floor(i / n * sh.length)], dx = cx - p.x, dy = cy - p.y, l = Math.hypot(dx, dy) || 1; m.Z(p.x + dx / l * (inset || 160), p.y + dy / l * (inset || 160)); } };

@@ -31,6 +31,32 @@ const src = fs.readFileSync(FILE, 'utf8'), head = src.slice(0, src.indexOf('modu
 delete require.cache[require.resolve(FILE)];
 const maps = require(FILE);
 Object.assign(maps, made);
+// ===== ЧІТКИЙ РОЗПОДІЛ МАП ЗА РЕЖИМАМИ (кожна мапа — у своїй групі; королівський бій — лише 3 найбільші мапи) =====
+const FFA = ['deathmatch', 'bounty', 'prophunt'], TEAM = ['team_deathmatch', 'capture_points', 'rounds'];
+const MODES_BY_MAP = {
+    // кожен сам за себе: детматч, «Ціль», хованки
+    'Neon City': FFA, 'Old Town': FFA, 'Harbor': FFA, 'Emerald Island': FFA, 'Frostbite Peak': FFA, 'Dust Bowl': FFA,
+    'Warehouse 9': FFA, 'Night Market': FFA, 'Steel Works': FFA, 'Dacha Village': FFA,
+    // лише хованки (tools/genhide.js): асиметрична мапа з обманками
+    'Decoy Yard': ['prophunt'],
+    // команди: командний бій, захоплення точок, раунди
+    'Crossroads': TEAM, 'Factory Zone': TEAM, 'Frozen Lake': TEAM, 'Metro Line': TEAM, 'Cargo Port': TEAM, 'Army Base': TEAM, 'Ruined City': TEAM,
+    // королівський бій — лише найбільші мапи
+    'Grand Expanse': ['battle_royale'], 'Frozen Valley': ['battle_royale'], 'TV Center': ['battle_royale'],
+    // кооператив: оборона бази + виживання (мапи з ядром)
+    'Iron Bastion': ['base_defense', 'survival'], 'Frozen Outpost': ['base_defense', 'survival'], 'Desert Fort': ['base_defense', 'survival'],
+    'Orbital Station': ['base_defense', 'survival'], 'Starship': ['base_defense', 'survival'], 'Tropic Island': ['base_defense', 'survival'],
+    // кооператив: рейд на боса + виживання
+    'Throne Hall': ['boss_raid', 'survival'], 'Volcano Crater': ['boss_raid', 'survival'], 'Haunted Swamp': ['boss_raid', 'survival'], 'Alien Crater': ['boss_raid', 'survival'], 'Sunken Ship': ['boss_raid', 'survival'],
+    // кооператив: конвой (мапи-коридори з маршрутом)
+    'Highway Run': ['convoy'], 'Frozen Pass': ['convoy'], 'Canyon Express': ['convoy'], 'Jungle Run': ['convoy'], 'Mars Canyon': ['convoy'],
+    // соло: арена хвиль і дуель з босами
+    'Colosseum': ['solo_arena'], 'Neon Grid': ['solo_arena'], 'Ruined Plaza': ['solo_arena'],
+    'Duelist Pit': ['boss_duel'], 'Ice Cathedral': ['boss_duel'], 'Lava Pit': ['boss_duel'],
+    'Orbital Arena': ['solo_arena', 'boss_duel'], 'Volcano Core': ['solo_arena', 'boss_duel'], 'Ice Cave': ['solo_arena', 'boss_duel']
+};
+for (const k in maps) { if (MODES_BY_MAP[k]) maps[k].modes = MODES_BY_MAP[k].slice(); else console.warn('⚠️ мапа без групи режимів:', k); }
+require('./phgrid.js').apply(maps, true);      // хованки: дрібний декор — по сітці 50 px, як маскування гравців
 fs.writeFileSync(FILE, head + 'module.exports = ' + JSON.stringify(maps) + ';\n');
 for (const k in made) { const m = made[k], d = MO.destrList(m).length; console.log(k.padEnd(16), String(m.size).padEnd(5), m.theme.padEnd(8), (m.modes || []).join(',').padEnd(46), 'об\'єктів', m.solids.length, 'руйнівних', d); }
 console.log('Нових мап:', Object.keys(made).length, '· усього в maps_modes.js:', Object.keys(maps).length);
