@@ -8,7 +8,9 @@ if (window.GFX) GFX.attach(ctx);
 const VIEW_H_DESKTOP = 800, VIEW_H_TOUCH = 420, VIEW_MAX_ASPECT = 2.0, VIEW_TOUCH_DEFAULT = 1.2, VIEW_TOUCH_MAXZOOM = 1.8;
 let viewZoom = VIEW_TOUCH_DEFAULT;
 try { const _z = parseFloat(localStorage.getItem('viewZoom')); if (_z >= 1 && _z <= VIEW_TOUCH_MAXZOOM) viewZoom = _z; } catch (e) {}
-let VS = 1; // множник «одиниця світу -> піксель екрана»
+let VS = 1; // множник «одиниця світу -> піксель екрана» (базовий; під нього будуються кеші мапи й спрайтів)
+let VZ = 1; // те саме з урахуванням динамічного масштабу камери (VS × зум) — для меж видимої області й екранних координат
+window.getVZ = () => VZ;
 let GW = window.innerWidth, GH = window.innerHeight, RS = 1; // GW/GH — логічний розмір (CSS-пікселі), RS — масштаб внутрішнього розширення полотна (налаштування графіки)
 function fitCanvas() {
     RS = (window.GFX && GFX.rs) || 1; GW = window.innerWidth; GH = window.innerHeight;
@@ -149,6 +151,7 @@ function updatePhys(now, dt) {
     
     if (myLocalTank.hp <= 0) {
         if (joysticks.left.active || joysticks.right.active || joysticks.left.force) resetJoysticks();
+        myLocalTank._v = null;      // після відродження — з місця, без «інерції» з минулого життя
         if (spectatingId && opponents[spectatingId]) {
             camera.x += (opponents[spectatingId].x - camera.x) * 5 * dt;
             camera.y += (opponents[spectatingId].y - camera.y) * 5 * dt;
@@ -162,7 +165,8 @@ function updatePhys(now, dt) {
             my = Math.sin(joysticks.left.angle) * joysticks.left.force;
         }
         const _frz = !!(window.ModesFX && ModesFX.frozen && ModesFX.frozen());   // раунди: відлік перед раундом — стоїмо
-        if (_frz) { mx = 0; my = 0; }
+        const _stn = !!(window.BHUD && BHUD.stunned());                          // оглушення від тарану
+        if (_frz || _stn) { mx = 0; my = 0; }
 
         if (mx !== 0 || my !== 0) {
             if (currentRoomData.mode === 'prophunt' && myLocalTank.team === 'hider' && myLocalTank.isDisguised) {
@@ -172,10 +176,22 @@ function updatePhys(now, dt) {
             let len = Math.hypot(mx, my);
             if (len > 1 && !joysticks.left.active) { mx /= len; my /= len; }
             myLocalTank.bodyAngle = Math.atan2(my, mx);
-            let nX = myLocalTank.x + mx * spd * dt, nY = myLocalTank.y + my * spd * dt, isB = myLocalTank.buff === 'boss';
-            
-            if (!checkCollision(nX, myLocalTank.y, myRad, true, isB) && !checkPCollision(nX, myLocalTank.y, myRad) || isB) myLocalTank.x = nX;
-            if (!checkCollision(myLocalTank.x, nY, myRad, true, isB) && !checkPCollision(myLocalTank.x, nY, myRad) || isB) myLocalTank.y = nY;
+        }
+        {   // вага танка: швидкість не стрибає, а набирається ~0,2 с і гасне ~0,15 с — на поворотах танк трохи «ковзає» дугою.
+            // Модуль швидкості ніколи не перевищує звичайну (змішуємо вектори), тож античит сервера це не зачіпає.
+            // покриття під танком: дорога +10%, бруд / пісок / сніг −15%, лід — майже без зчеплення (довго розганяється й ковзає)
+            const _mp = MAP_DATA[currentRoomData.map] || MAP_DATA['epic_map'], _sc = MapObj.surfAt(_mp, myLocalTank.x, myLocalTank.y), _ice = _sc === 5;
+            const _sp = spd * (_sc ? MapObj.SURF[_sc].spd : 1);
+            const v = myLocalTank._v || (myLocalTank._v = { x: 0, y: 0 }), tx = mx * _sp, ty = my * _sp;
+            const k = 1 - Math.exp(-((mx || my) ? (_ice ? 2.6 : 14) : (_ice ? 1.1 : 20)) * dt);
+            v.x += (tx - v.x) * k; v.y += (ty - v.y) * k;
+            if (!tx && Math.abs(v.x) < 2) v.x = 0; if (!ty && Math.abs(v.y) < 2) v.y = 0;
+            if (_frz || myLocalTank.isDisguised) { v.x = 0; v.y = 0; }
+            if (v.x || v.y) {
+                const nX = myLocalTank.x + v.x * dt, nY = myLocalTank.y + v.y * dt, isB = myLocalTank.buff === 'boss';
+                if (!checkCollision(nX, myLocalTank.y, myRad, true, isB) && !checkPCollision(nX, myLocalTank.y, myRad) || isB) myLocalTank.x = nX; else v.x = 0;
+                if (!checkCollision(myLocalTank.x, nY, myRad, true, isB) && !checkPCollision(myLocalTank.x, nY, myRad) || isB) myLocalTank.y = nY; else v.y = 0;
+            }
         }
         
         if (window.BHUD && !_frz) BHUD.dashStep(dt, myRad, myLocalTank.buff === 'boss');   // ривок (Shift / кнопка на телефоні)
@@ -217,7 +233,7 @@ function updatePhys(now, dt) {
                 myLocalTank.isDisguised = true;
                 myLocalTank.x = Math.round((myLocalTank.x - 25) / 50) * 50 + 25;
                 myLocalTank.y = Math.round((myLocalTank.y - 25) / 50) * 50 + 25;
-                myLocalTank.bodyAngle = 0; myLocalTank.turretAngle = 0;
+                myLocalTank.bodyAngle = 0; myLocalTank.turretAngle = 0; myLocalTank._v = null;
                 socket.emit('updateDisguise', { roomId: currentRoomId, state: true, x: myLocalTank.x, y: myLocalTank.y });
                 keys.space = false; keys.lmb = false; joysticks.right.released = false;
             }
@@ -232,7 +248,7 @@ function updatePhys(now, dt) {
         let rt = window.getReloadTime();
         if (fCfg.type !== 'none' && fCfg.cd) rt = (fCfg.cd < 500 ? fCfg.cd : rt);
         
-        if (sh && !_frz && (now - lastShootTime >= rt) && !(window.BHUD && BHUD.heatLocked(now)) && !(currentRoomData.mode === 'prophunt' && currentRoomData.state !== 'seeking')) {
+        if (sh && !_frz && !_stn && (now - lastShootTime >= rt) && !(window.BHUD && BHUD.heatLocked(now)) && !(currentRoomData.mode === 'prophunt' && currentRoomData.state !== 'seeking')) {
             fireBull(now, myHitRad, fCfg, tR);
             if (window.BHUD) BHUD.heatShot(now);      // перегрів (Штурмовик, мінігун, швидкий вогонь)
         } else if (isMobile && !isMg && joysticks.right.released) {
@@ -275,8 +291,15 @@ function updatePhys(now, dt) {
 
         let hW = false, bC = window.BUFFS[b.type] || window.BUFFS['none'], isP = (b.type === 'samurai' || b.type === 'homing' || b.type.includes('piercing') || b.type === 'ghost_melee' || b.type === 'boss_proj');
         hW = checkCollision(b.x, b.y, 4, !isP, true);
+        // руйнівний об'єкт (ящик, паркан, бочка…): снаряд не рикошетить, а б'є по ньому; шкоду рахує сервер (повідомляє лише власник снаряда)
+        const _di = (hW && b.owner !== 'zombie' && currentRoomData.mode !== 'prophunt') ? MapObj.destrAt(MAP_DATA[currentRoomData.map] || MAP_DATA['epic_map'], b.x, b.y, 6) : -1;
+        if (_di >= 0 && b.owner === myId) {
+            const _bd = (window.BUFFS[b.type] ? window.BUFFS[b.type].dmg : 75) * (myLocalTank.buff === 'double_dmg' ? 2 : 1);
+            socket.emit('objHit', { roomId: currentRoomId, i: _di, t: (MAP_DATA[currentRoomData.map] || MAP_DATA['epic_map']).solids[_di].type, dmg: Math.round(_bd) });
+            if (window.BHUD) BHUD.objChip(_di, b.x, b.y);
+        }
         // рикошет: звичайний снаряд гравця один раз відбивається від стіни (дзеркально по осі зіткнення); однаково на всіх клієнтах
-        if (hW && b.type === 'none' && !b.rb && b.owner !== 'zombie' && b.life > 0) {
+        if (hW && _di < 0 && b.type === 'none' && !b.rb && b.owner !== 'zombie' && b.life > 0) {
             const hx = checkCollision(b.x, _bpy, 4, true, true), hy = checkCollision(_bpx, b.y, 4, true, true);
             if (hx || !hy) b.vx = -b.vx; if (hy || !hx) b.vy = -b.vy;
             b.x = _bpx; b.y = _bpy; b.rb = 1;
@@ -305,7 +328,7 @@ function updatePhys(now, dt) {
                     if (b.owner === myId) {
                         if (isTeamM(currentRoomData.mode) && myLocalTank.team === op.team) continue;
                         // Відправляємо обчислений урон
-                        socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: actualDmg, type: b.type, bid: b.bid });
+                        socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: actualDmg, type: b.type, bid: b.bid, a: Math.round(Math.atan2(b.vy, b.vx) * 100) / 100 });   // a — напрям снаряда (кути броні)
                     }
                     break;
                 }
@@ -364,7 +387,7 @@ function updatePhys(now, dt) {
                     if (opponents[oid].hp > 0 && opponents[oid].buff !== 'shield' && Math.hypot(b.x - opponents[oid].x, b.y - opponents[oid].y) < sR) {
                         if (isTeamM(currentRoomData.mode) && opponents[oid].team === myLocalTank.team) continue;
                         let expDmg = window.BUFFS['explosive'] ? window.BUFFS['explosive'].dmg : 250;
-                        socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: expDmg, type: 'explosive', bid: b.bid });
+                        socket.emit('registerHit', { roomId: currentRoomId, targetId: oid, amt: expDmg, type: 'explosive', bid: b.bid, sp: 1 });   // sp — уламки вибуху (без кута броні)
                     }
                 }
             }
@@ -422,10 +445,10 @@ function fireBull(now, mR, fC, tR) {
 // кулі: світіння (shadowBlur) на кожну кулю кожного кадру — дорого; тепер готовий спрайт «куля + ореол» на тип
 const _bsp = new Map(); let _bspKey = '';
 function bulletSprite(type) {
-    const gf = window.GFX, k0 = _curS.toFixed(3) + '|' + (gf ? gf.tier + gf.blur : '');
+    const gf = window.GFX, k0 = _cacheS.toFixed(3) + '|' + (gf ? gf.tier + gf.blur : '');
     if (k0 !== _bspKey) { _bspKey = k0; _bsp.clear(); }
     let e = _bsp.get(type); if (e) return e;
-    const s = _curS, tri = type === 'piercing' || type === 'fast' || type === 'minigun' || type === 'homing', r = tri ? 0 : type === 'acid' ? 8 : type === 'boss_proj' ? 10 : 6;
+    const s = _cacheS, tri = type === 'piercing' || type === 'fast' || type === 'minigun' || type === 'homing', r = tri ? 0 : type === 'acid' ? 8 : type === 'boss_proj' ? 10 : 6;
     const col = type === 'fast' || type === 'minigun' ? '#38bdf8' : type === 'explosive' || type === 'boss_proj' ? '#fb923c' : type === 'incendiary' ? '#ef4444' : type === 'piercing' ? '#d946ef' : type === 'acid' ? '#a3e635' : type === 'shotgun' ? '#f8fafc' : type === 'homing' ? '#10b981' : type === 'hunter_gun' ? '#ef4444' : '#fef08a';
     const bx0 = tri ? 0 : -r, bx1 = tri ? 20 : r, by0 = tri ? -4 : -r, by1 = tri ? 4 : r, blur = gf ? (gf.shadow ? 10 * gf.blur : 0) : 10;
     const pad = Math.ceil(blur * 1.5) + 2, W = Math.ceil((bx1 - bx0) * s) + pad * 2, H = Math.ceil((by1 - by0) * s) + pad * 2;
@@ -441,17 +464,17 @@ function bulletSprite(type) {
 // Модулі з світінням (епічні й вище) малювались через shadowBlur — по кілька розмитих проходів на кожен танк у кожному кадрі.
 // Тепер кожна частина (гусениці, корпус, гармата, башта) малюється один раз у спрайт (з супер-семплінгом), далі кадр = drawImage із поворотом.
 // «Дихання» світіння легендарних/міфічних: два спрайти (слабке/сильне світіння), що плавно змішуються по alpha.
-let _curS = 1, _curOx = 0, _curOy = 0;   // масштаб полотна (RS*VS) і піксельний зсув світу — виставляє draw()
+let _curS = 1, _curOx = 0, _curOy = 0, _cacheS = 1;   // масштаб полотна (RS*VS*зум), піксельний зсув світу і базовий масштаб кешів (RS*VS) — виставляє draw()
 const _msp = new Map(); let _mspKey = '';
 // parts: [[тип, модуль], ...] — які частини об'єднуємо в один спрайт (гусениці+корпус, гармата+башта)
 function _modSprite(parts) {
-    const gf = window.GFX, k0 = _curS.toFixed(3) + '|' + (gf ? gf.tier + gf.blur : '');
+    const gf = window.GFX, k0 = _cacheS.toFixed(3) + '|' + (gf ? gf.tier + gf.blur : '');
     if (k0 !== _mspKey) { _mspKey = k0; _msp.clear(); }
     let id = ''; for (const q of parts) id += q[0] + ':' + (q[1] ? q[1].id : '') + '|';
     let e = _msp.get(id); if (e !== undefined) return e;
     e = null;
     try {
-        const s = _curS, rho = Math.min(3, Math.max(1, Math.round(s * 1.5 * 4) / 4));   // густина пікселів спрайта (трохи вища за екранну: гарне згладжування при зменшенні)
+        const s = _cacheS, rho = Math.min(3, Math.max(1, Math.round(s * 1.5 * 4) / 4));   // густина пікселів спрайта (трохи вища за екранну: гарне згладжування при зменшенні)
         let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, tier = 0, anyGlow = false;
         const ex = (x, y) => { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; };
         for (const q of parts) {
@@ -494,10 +517,10 @@ function drModPair(arr, ta, a, tb, b, T, raw) {
 const _lbl = new Map(); let _lblKey = '';
 try { if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', () => _lbl.clear()); } catch (e) { }
 function drLabel(nm, cH, x, y) {
-    const k0 = _curS.toFixed(3); if (k0 !== _lblKey) { _lblKey = k0; _lbl.clear(); }
+    const k0 = _cacheS.toFixed(3); if (k0 !== _lblKey) { _lblKey = k0; _lbl.clear(); }
     const id = cH + '|' + nm; let e = _lbl.get(id);
     if (e === undefined) {
-        const s = _curS, f = '14px Russo One';
+        const s = _cacheS, f = '14px Russo One';
         ctx.font = f; const tw = Math.ceil(ctx.measureText(nm).width) + 8, ww = Math.min(400, tw), hh = 24;
         const cv = document.createElement('canvas'); cv.width = Math.ceil(ww * s); cv.height = Math.ceil(hh * s);
         const g = cv.getContext('2d'); g.setTransform(s, 0, 0, s, 0, 0); g.fillStyle = cH; g.font = f; g.textAlign = 'center'; g.fillText(nm, ww / 2, 17);
@@ -505,8 +528,8 @@ function drLabel(nm, cH, x, y) {
         if (_lbl.size > 160) _lbl.clear(); _lbl.set(id, e);
     }
     // без дробового зсуву: підпис лягає на цілі пікселі полотна (інакше растровий текст розмивається при плавному русі танка)
-    const s = _curS, dx = Math.round(s * (x - e.hw) + _curOx), dy = Math.round(s * (y - 62) + _curOy);
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(e.cv, dx, dy); ctx.setTransform(s, 0, 0, s, _curOx + s * x, _curOy + s * y);
+    const s = _curS, dx = Math.round(s * (x - e.hw) + _curOx), dy = Math.round(s * (y - 62) + _curOy), zk = s / _cacheS;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); if (Math.abs(zk - 1) < 0.004) ctx.drawImage(e.cv, dx, dy); else ctx.drawImage(e.cv, dx, dy, Math.round(e.cv.width * zk), Math.round(e.cv.height * zk)); ctx.setTransform(s, 0, 0, s, _curOx + s * x, _curOy + s * y);
 }
 
 function drTnk(x, y, bA, tA, cH, nm, iM, hp, bf, eq, dN = true) {
@@ -626,6 +649,9 @@ socket.on('sync2', (data) => {
             }
         }
     }
+    if (data.fin !== undefined && window.BHUD && BHUD.final) BHUD.final(data.fin);      // фінальна хвилина: зона й ×2
+    if (data.od) data.od.forEach(i => objBreakLocal(i | 0));      // повна синхронізація: уже знищені об'єкти (повернення в бій / перепідключення)
+    if (data.dmMsLeft !== undefined) currentRoomData.dmEndLocal = Date.now() + data.dmMsLeft;      // детматч: залишок часу від сервера
     if (currentRoomData.mode === 'team_deathmatch') {
         if (data.tdm) { currentRoomData.teamScores = data.tdm.teamScores; currentRoomData.timeEndTime = data.tdm.timeEndTime; }
         if (data.tdmMsLeft !== undefined) currentRoomData.tdmEndLocal = Date.now() + data.tdmMsLeft; // залишок від сервера, не залежить від годинника клієнта
@@ -940,6 +966,7 @@ const WC = (function () {
     }
     function obj2(c, o, tm, th, low) {               // верхній шар: стіни, дерева, декор (з тінню)
         c.save(); MapObj.applyRot(c, o);
+        if (o._dead) { MapObj.drawRubble(c, o); c.restore(); return; }      // знищений об'єкт — уламки
         const k = MapFX.solidKind(o);
         if (k === 'block') MapFX.drawBlock(c, o, th, { low });
         else if (k === 'tree') MapFX.drawTree(c, o, th, { low });
@@ -981,6 +1008,7 @@ const WC = (function () {
     // mode 0: земля + весь нижній шар наживо; mode 1: земля + статичний нижній шар (для чанка)
     function paintUnder(c, R, mode, tm, th, low, view) {
         ground(c, R);
+        MapObj.drawSurfaces(c, an.map, R, low);      // бруд / пісок / сніг / лід
         const ids = query({ x0: R.x0 - M, x1: R.x1 + M, y0: R.y0 - M, y1: R.y1 + M }, _ids), so = an.map.solids; let n = 0;
         for (let k = 0; k < ids.length; k++) {
             const i = ids[k]; if (an.pc[i] !== 1) continue;
@@ -993,7 +1021,7 @@ const WC = (function () {
     function paintOver(c, R, mode, tm, th, low) {
         const ids = query({ x0: R.x0 - M, x1: R.x1 + M, y0: R.y0 - M, y1: R.y1 + M }, _ids), so = an.map.solids; let n = 0;
         if (mode === 1) for (let k = 0; k < ids.length; k++) { const i = ids[k]; if (an.pc[i] === 1 && an.ow[i]) { obj1(c, so[i], tm, th, low, null, false); n++; } }
-        for (let k = 0; k < ids.length; k++) { const i = ids[k]; if (an.pc[i] !== 2 || (mode === 1 && an.dy[i])) continue; obj2(c, so[i], tm, th, low); n++; }
+        for (let k = 0; k < ids.length; k++) { const i = ids[k]; if (an.pc[i] !== 2 || (mode === 1 && an.dy[i] && !so[i]._dead)) continue; obj2(c, so[i], tm, th, low); n++; }
         if (mode === 0) for (let k = 0; k < ids.length; k++) { const i = ids[k]; if (an.pc[i] === 3) obj3(c, so[i], tm); }
         return n;
     }
@@ -1035,6 +1063,15 @@ const WC = (function () {
         }
     }
     function reset() { for (const e of store.values()) if (e !== EMPTY) pool.push(e); store.clear(); nEmpty = 0; }
+    // перемалювати лише чанки, що перетинають прямокутник (знищений об'єкт) — решта кешу лишається
+    function invalidate(x0, y0, x1, y1) {
+        if (!an || !S) return;
+        const i0 = Math.max(0, Math.floor(x0 * S / P)), i1 = Math.floor(x1 * S / P), j0 = Math.max(0, Math.floor(y0 * S / P)), j1 = Math.floor(y1 * S / P);
+        for (let l = 0; l < 2; l++) for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+            const k = (l * 4096 + i) * 4096 + j, e = store.get(k); if (e === undefined) continue;
+            store.delete(k); if (e === EMPTY) nEmpty--; else pool.push(e);
+        }
+    }
     function prepare(mp, name, s, now) {
         const low = window.GFX && GFX.tier === 'low' ? 1 : 0, key = name + '|' + s.toFixed(4) + '|' + low + '|' + (window.GFX ? GFX.blur : 1);
         if (!an || an.map !== mp || an.n !== mp.solids.length) { an = analyze(mp); reset(); tk = ''; }
@@ -1045,12 +1082,13 @@ const WC = (function () {
 
     // ---- API для draw() ----
     // Малює шар (0 — під, 1 — над) чанками, що перетинають видиму область. Координати: (ox,oy) — зсув світу в пікселях полотна (цілі).
-    function blit(c, layer, vx0, vx1, vy0, vy1, ox, oy) {
-        const mS = an.map.size, ni = Math.ceil(mS * S / P) - 1;
+    function blit(c, layer, vx0, vx1, vy0, vy1, ox, oy, z) {   // z — динамічний масштаб камери: чанки не перебудовуються, а малюються трохи розтягнутими
+        const mS = an.map.size, ni = Math.ceil(mS * S / P) - 1; z = z || 1; const zs = Math.abs(z - 1) > 0.002;
         const i0 = Math.max(0, Math.floor(vx0 * S / P)), i1 = Math.min(ni, Math.floor(vx1 * S / P)), j0 = Math.max(0, Math.floor(vy0 * S / P)), j1 = Math.min(ni, Math.floor(vy1 * S / P));
         for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
             const e = get(layer, i, j, true); if (e === EMPTY) continue;
-            c.drawImage(e.cv, i * P + ox, j * P + oy);
+            if (!zs) c.drawImage(e.cv, i * P + ox, j * P + oy);
+            else { const X0 = Math.round(i * P * z + ox), Y0 = Math.round(j * P * z + oy); c.drawImage(e.cv, X0, Y0, Math.round((i + 1) * P * z + ox) - X0, Math.round((j + 1) * P * z + oy) - Y0); }   // спільні цілі краї — без щілин
         }
     }
     // Підбудова наперед: по одному шару за кадр у кільці навколо видимої області (ближчі — першими)
@@ -1069,13 +1107,13 @@ const WC = (function () {
         }
     }
     return Object.assign(api, {
-        prepare, blit, prefetch, get, get an() { return an; },
+        prepare, blit, prefetch, get, invalidate, reset, get an() { return an; },
         paintUnder, paintOver, obj1, obj3, query,
         drawDyn(c, pass, view, tm, th, low) {   // нерухомі в чанках об'єкти, що живуть: вода (хвилі), двері, вогнище, радар, неон
             const list = pass === 1 ? an.d1 : pass === 2 ? an.d2 : an.d3, so = an.map.solids, b = an.bb;
             for (let k = 0; k < list.length; k++) {
                 const i = list[k]; if (b[i * 4 + 2] < view[0] || b[i * 4] > view[1] || b[i * 4 + 3] < view[2] || b[i * 4 + 1] > view[3]) continue;
-                const o = so[i];
+                const o = so[i]; if (o._dead) continue;      // знищений — його уламки вже в статичному шарі
                 if (pass === 1) {
                     if (an.dy[i] === 2) {
                         c.save();
@@ -1097,6 +1135,24 @@ const WC = (function () {
 
 const _viewA = [0, 0, 0, 0], _RV = { x0: 0, x1: 0, y0: 0, y1: 0 }; let _PF = 0, _PFok = false;
 
+// ===== РУЙНІВНІ ОБ'ЄКТИ: знищене позначаємо прапорцем _dead (зіткнення його пропускають), перемальовуємо лише сусідні чанки =====
+function _curMap() { return currentRoomData ? (MAP_DATA[currentRoomData.map] || MAP_DATA['epic_map']) : null; }
+function objBreakLocal(i, fx) {
+    const mp = _curMap(), o = mp && mp.solids[i]; if (!o || o._dead || !MapObj.isDestr(o)) return null;
+    o._dead = true;
+    const w = o.w || 50, h = o.h || 50, cx = o.x + w / 2, cy = o.y + h / 2, R = Math.hypot(w, h) / 2 + 110;
+    WC.invalidate(cx - R, cy - R, cx + R, cy + R);
+    return o;
+}
+function objClearAll() {      // усі мапи (порядок обробників gameStarting не важливий — нова мапа гарантовано ціла)
+    let any = false;
+    for (const k in MAP_DATA) { const mp = MAP_DATA[k]; if (mp && mp.solids) for (const o of mp.solids) if (o._dead) { o._dead = false; any = true; } }
+    if (any) WC.reset();
+}
+socket.on('objBreak', d => { if (!d || !currentRoomData) return; const o = objBreakLocal(d.i | 0); if (o && window.BHUD && BHUD.objBreakFx) BHUD.objBreakFx(o, d); });
+socket.on('objReset', () => objClearAll());      // раунди: новий раунд — мапа знову ціла
+socket.on('gameStarting', () => objClearAll());
+
 function draw(now) {
     if (!currentRoomData) return;
     ctx.setTransform(RS, 0, 0, RS, 0, 0); ctx.clearRect(0, 0, GW, GH);
@@ -1106,28 +1162,29 @@ function draw(now) {
         const _sdt = Math.min(0.1, Math.max(0, (now - (draw._sh || now)) / 1000)); draw._sh = now;
         if (shakeTime > 0) { const _a = 20 * Math.min(1, shakeTime / 0.12) * (window.GFX && GFX.tier === 'low' ? 0.6 : 1); shX = (Math.random() - 0.5) * _a; shY = (Math.random() - 0.5) * _a; shakeTime -= 1.8 * _sdt; }
     }
-    const _s = RS * VS; _curS = _s; const _ox = Math.round(GW * RS / 2 - _s * (camera.x - shX)), _oy = Math.round(GH * RS / 2 - _s * (camera.y - shY)); _curOx = _ox; _curOy = _oy;   // цілий піксельний зсув: чанки й живі об'єкти лягають без розмиття
+    const _cz = window.BHUD && BHUD.zoom ? BHUD.zoom() : 1; VZ = VS * _cz; _cacheS = RS * VS;   // динамічний масштаб камери (швидкість, вороги поруч, ривок)
+    const _s = RS * VZ; _curS = _s; const _ox = Math.round(GW * RS / 2 - _s * (camera.x - shX)), _oy = Math.round(GH * RS / 2 - _s * (camera.y - shY)); _curOx = _ox; _curOy = _oy;   // цілий піксельний зсув: чанки й живі об'єкти лягають без розмиття
     ctx.setTransform(_s, 0, 0, _s, _ox, _oy);
 
     const cMap = MAP_DATA[currentRoomData.map] ? currentRoomData.map : 'epic_map', _mp = MAP_DATA[cMap];
     // видима область у координатах світу (із запасом на тінь/світіння)
-    const _vw = GW / VS / 2 + 70, _vh = GH / VS / 2 + 70, VX0 = camera.x - _vw, VX1 = camera.x + _vw, VY0 = camera.y - _vh, VY1 = camera.y + _vh;
+    const _vw = GW / VZ / 2 + 70, _vh = GH / VZ / 2 + 70, VX0 = camera.x - _vw, VX1 = camera.x + _vw, VY0 = camera.y - _vh, VY1 = camera.y + _vh;
     const _fx = typeof MapFX !== 'undefined', _th = _fx ? MapFX.themeOf(_mp) : null, _low = !!(window.GFX && GFX.tier === 'low');
     let tm = Date.now() / 1000;
     const _view = _viewA; _view[0] = VX0; _view[1] = VX1; _view[2] = VY0; _view[3] = VY1;
     let _cached = false;
     if (_fx) {
-        const _R = _RV; _R.x0 = camera.x - GW / VS / 2 - 24; _R.x1 = camera.x + GW / VS / 2 + 24; _R.y0 = camera.y - GH / VS / 2 - 24; _R.y1 = camera.y + GH / VS / 2 + 24;   // +24 — запас на тряску камери
+        const _R = _RV; _R.x0 = camera.x - GW / VZ / 2 - 24; _R.x1 = camera.x + GW / VZ / 2 + 24; _R.y0 = camera.y - GH / VZ / 2 - 24; _R.y1 = camera.y + GH / VZ / 2 + 24;   // +24 — запас на тряску камери
         if (WC.on) {
             try {
-                WC.prepare(_mp, cMap, _s, now); _cached = true;
+                WC.prepare(_mp, cMap, _cacheS, now); _cached = true;
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
-                WC.blit(ctx, 0, _R.x0, _R.x1, _R.y0, _R.y1, _ox, _oy);
+                WC.blit(ctx, 0, _R.x0, _R.x1, _R.y0, _R.y1, _ox, _oy, _cz);
                 ctx.setTransform(_s, 0, 0, _s, _ox, _oy);
                 WC.drawDyn(ctx, 1, _view, tm, _th, _low);
             } catch (err) { console.error('WC:', err); WC.on = false; WC.reset(); _cached = false; ctx.setTransform(_s, 0, 0, _s, _ox, _oy); }
         }
-        if (!_cached) { WC.prepare(_mp, cMap, _s, now); WC.paintUnder(ctx, _R, 0, tm, _th, _low, _view); }
+        if (!_cached) { WC.prepare(_mp, cMap, _cacheS, now); WC.paintUnder(ctx, _R, 0, tm, _th, _low, _view); }
     }
 
     for (let tid in tokens) {
@@ -1144,10 +1201,10 @@ function draw(now) {
     if (_fx) {
         if (_cached) {
             ctx.setTransform(1, 0, 0, 1, 0, 0);
-            WC.blit(ctx, 1, _RV.x0, _RV.x1, _RV.y0, _RV.y1, _ox, _oy);
+            WC.blit(ctx, 1, _RV.x0, _RV.x1, _RV.y0, _RV.y1, _ox, _oy, _cz);
             ctx.setTransform(_s, 0, 0, _s, _ox, _oy);
             WC.drawDyn(ctx, 2, _view, tm, _th, _low); WC.drawDyn(ctx, 3, _view, tm, _th, _low);
-            if (_PF++ % 2 === 0 || !_PFok) { const _hw = GW / VS / 2, _hh = GH / VS / 2; _PFok = WC.prefetch(camera.x, camera.y, _hw, _hh, 2.5); }
+            if (_PF++ % 2 === 0 || !_PFok) { const _hw = GW / VZ / 2, _hh = GH / VZ / 2; _PFok = WC.prefetch(camera.x, camera.y, _hw, _hh, 2.5); }
         } else WC.paintOver(ctx, _RV, 0, tm, _th, _low);
     }
 

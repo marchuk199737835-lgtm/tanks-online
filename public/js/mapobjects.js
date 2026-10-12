@@ -31,8 +31,30 @@ var MapObj = (function () {
         { id: 'prop_statue', name: 'Статуя' }, { id: 'prop_crystal', name: 'Кристал' }, { id: 'prop_terminal', name: 'Термінал' },
         { id: 'prop_solar', name: 'Сонячна панель' }, { id: 'prop_pipe', name: 'Труба' }, { id: 'prop_hatch', name: 'Люк (без колізії)' },
         { id: 'prop_pad', name: 'Платформа (без колізії)' },
-        { id: 'prop_floor', name: 'Підлога будівлі (без колізії)' }, { id: 'prop_roof', name: 'Дах будівлі (зникає всередині)' }
+        { id: 'prop_floor', name: 'Підлога будівлі (без колізії)' }, { id: 'prop_roof', name: 'Дах будівлі (зникає всередині)' },
+        // руйнівні об'єкти для міст / будівель (телецентр, офіси)
+        { id: 'prop_gas', name: 'Газовий балон' }, { id: 'prop_glass', name: 'Скляна перегородка' }, { id: 'prop_desk', name: 'Офісний стіл' },
+        { id: 'prop_monitor', name: 'Монітори' }, { id: 'prop_shelf', name: 'Стелаж' }, { id: 'prop_vending', name: 'Торговий автомат' },
+        { id: 'prop_server', name: 'Серверна стійка' }, { id: 'prop_sofa', name: 'Диван' }, { id: 'prop_plant', name: 'Вазон' }
     ];
+    // ---------- РУЙНІВНІ ОБ'ЄКТИ ----------
+    // hp — міцність (звичайний снаряд — 75), mat — матеріал (колір уламків і звук), ex — вибух [шкода, радіус]: шкодить усім поруч і підриває сусідні бочки
+    const DESTR = {
+        prop_crate: { hp: 150, mat: 'wood' }, prop_wood_barrel: { hp: 110, mat: 'wood' }, prop_fence_wood: { hp: 110, mat: 'wood' }, prop_wood_wall: { hp: 300, mat: 'wood' },
+        prop_wood_pallet: { hp: 80, mat: 'wood' }, prop_wood_planks: { hp: 160, mat: 'wood' }, prop_wood_table: { hp: 90, mat: 'wood' }, prop_wood_bench: { hp: 80, mat: 'wood' },
+        prop_wood_cart: { hp: 220, mat: 'wood' }, prop_wood_firewood: { hp: 100, mat: 'wood' }, prop_hay: { hp: 110, mat: 'hay' }, prop_tires: { hp: 220, mat: 'rubber' },
+        prop_cone: { hp: 30, mat: 'plastic' }, prop_tent: { hp: 120, mat: 'cloth' },
+        prop_barrel: { hp: 60, mat: 'metal', ex: [120, 130] }, prop_gas: { hp: 40, mat: 'metal', ex: [150, 150] },
+        prop_glass: { hp: 40, mat: 'glass' }, prop_desk: { hp: 120, mat: 'wood' }, prop_monitor: { hp: 50, mat: 'glass' }, prop_shelf: { hp: 160, mat: 'metal' },
+        prop_vending: { hp: 220, mat: 'metal' }, prop_server: { hp: 260, mat: 'metal' }, prop_sofa: { hp: 140, mat: 'cloth' }, prop_plant: { hp: 50, mat: 'plant' }
+    };
+    const isDestr = o => !!(o && DESTR[o.type]);
+    const _dl = new WeakMap();      // індекси руйнівних об'єктів мапи (для ланцюгових вибухів)
+    function destrList(map) {
+        const arr = map.solids; let e = _dl.get(arr);
+        if (!e || e.n !== arr.length) { const l = []; for (let i = 0; i < arr.length; i++) if (DESTR[arr[i].type]) l.push(i); e = { n: arr.length, l }; _dl.set(arr, e); }
+        return e.l;
+    }
     // len — довжина, thick — товщина, leaves — кількість стулок
     const DOORS = [
         { id: 'prop_door_wood_s', name: 'Дерев\'яні малі', w: 100, h: 25, leaves: 1, style: 'wood' },
@@ -233,7 +255,7 @@ var MapObj = (function () {
         const S = map.size;
         if (x - r < 0 || x + r > S || y - r < 0 || y + r > S) return true;
         if (hasShape(map) && !circleInPoly(map.shape, x, y, r)) return true;
-        const arr = map.solids, ig = opts.ignore;
+        const arr = map.solids, ig = opts.ignore, dead = opts.dead;
         if (arr.length > IDX_MIN) {   // велика мапа: перевіряємо лише об'єкти з сусідніх клітинок
             const e = idxOf(arr), mark = e.mark, st = ++e.stamp;
             const a0 = Math.floor((x - r) / IDX_CELL), a1 = Math.floor((x + r) / IDX_CELL), b0 = Math.floor((y - r) / IDX_CELL), b1 = Math.floor((y + r) / IDX_CELL);
@@ -242,7 +264,7 @@ var MapObj = (function () {
                 for (let q = 0; q < c.length; q++) {
                     const i = c[q]; if (mark[i] === st) continue; mark[i] = st;
                     if (ig && ig.length && ig.indexOf(i) >= 0) continue;
-                    const s = arr[i];
+                    const s = arr[i]; if (s._dead || (dead && dead[i])) continue;
                     if (opts.skipWater && s.type.indexOf('water') >= 0) continue;
                     if (isDoor(s)) { if (opts.doorOpen ? opts.doorOpen(s, i) : (s._open || 0) >= DOOR_PASS) continue; }
                     if (solidHit(s, x, y, r)) return true;
@@ -253,12 +275,23 @@ var MapObj = (function () {
         for (let i = 0; i < arr.length; i++) {
             const s = arr[i];
             if (ig && ig.length && ig.indexOf(i) >= 0) continue;
-            if (!isSolidType(s)) continue;
+            if (!isSolidType(s) || s._dead || (dead && dead[i])) continue;
             if (opts.skipWater && s.type.indexOf('water') >= 0) continue;
             if (isDoor(s)) { if (opts.doorOpen ? opts.doorOpen(s, i) : (s._open || 0) >= DOOR_PASS) continue; }
             if (solidHit(s, x, y, r)) return true;
         }
         return false;
+    }
+    // індекс руйнівного об'єкта, у який влучає коло (x,y,r), або -1 (снаряд у ящик / таран)
+    function destrAt(map, x, y, r, dead) {
+        const arr = map.solids, l = destrList(map);
+        for (let k = 0; k < l.length; k++) {
+            const i = l[k], s = arr[i]; if (s._dead || (dead && dead[i])) continue;
+            const cx = s.x + (s.w || 30) / 2, cy = s.y + (s.h || 30) / 2, R = Math.hypot(s.w || 30, s.h || 30) / 2 + r + 2;
+            if (Math.abs(x - cx) > R || Math.abs(y - cy) > R) continue;
+            if (solidHit(s, x, y, r)) return i;
+        }
+        return -1;
     }
     // наївна версія (без індексу) — для тестів
     function collidesNaive(map, x, y, r, opts) {
@@ -659,10 +692,151 @@ var MapObj = (function () {
                 c.globalAlpha = 1; c.fillStyle = 'rgba(34,211,238,0.9)'; c.beginPath(); c.arc(cx, cy, 4, 0, Math.PI * 2); c.fill(); break; }
             case 'prop_floor': drawFloor(c, o); break;
             case 'prop_roof': drawRoof(c, o); break;
+
+            // ===== РУЙНІВНІ: міста й будівлі =====
+            case 'prop_gas': {   // газовий балон: червоний із вентилем і попереджувальною смугою
+                const r = Math.min(w, h) / 2;
+                c.fillStyle = '#b91c1c'; c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2); c.fill();
+                c.fillStyle = '#ef4444'; c.beginPath(); c.arc(cx - r * 0.2, cy - r * 0.2, r * 0.62, 0, Math.PI * 2); c.fill();
+                c.strokeStyle = '#fde047'; c.lineWidth = Math.max(2, r * 0.18); c.beginPath(); c.arc(cx, cy, r * 0.78, 0.3, 1.6); c.stroke(); c.beginPath(); c.arc(cx, cy, r * 0.78, 3.4, 4.7); c.stroke();
+                c.fillStyle = '#d4d4d8'; c.beginPath(); c.arc(cx, cy, r * 0.28, 0, Math.PI * 2); c.fill(); c.fillStyle = '#52525b'; c.fillRect(cx - r * 0.1, cy - r * 0.45, r * 0.2, r * 0.3); break; }
+            case 'prop_glass': {   // скляна перегородка: блакитне скло з відблисками й рамою
+                c.fillStyle = 'rgba(125,211,252,0.35)'; c.fillRect(x, y, w, h); c.strokeStyle = '#94a3b8'; c.lineWidth = 2; c.strokeRect(x, y, w, h);
+                c.strokeStyle = 'rgba(255,255,255,0.6)'; c.lineWidth = 1.5; c.beginPath();
+                const hor = w >= h; for (let k = 0.2; k < 1; k += 0.35) { if (hor) { c.moveTo(x + w * k, y + h); c.lineTo(x + w * k + h, y); } else { c.moveTo(x, y + h * k + w); c.lineTo(x + w, y + h * k); } } c.stroke(); break; }
+            case 'prop_desk': {   // офісний стіл: стільниця, клавіатура, папери
+                c.fillStyle = '#57534e'; c.fillRect(x, y, w, h); c.fillStyle = '#a8a29e'; c.fillRect(x + 2, y + 2, w - 4, h - 4);
+                c.strokeStyle = '#44403c'; c.lineWidth = 1.5; c.strokeRect(x + 2, y + 2, w - 4, h - 4);
+                c.fillStyle = '#1f2937'; c.fillRect(cx - w * 0.2, y + h * 0.55, w * 0.4, h * 0.18);
+                c.fillStyle = '#f8fafc'; c.save(); c.translate(x + w * 0.2, y + h * 0.35); c.rotate(-0.2); c.fillRect(-7, -9, 14, 18); c.restore(); break; }
+            case 'prop_monitor': {   // монітори на підставках: темні екрани з синім світлом
+                const n = w >= h ? Math.max(1, Math.round(w / 34)) : 1, sw = w / n;
+                for (let k = 0; k < n; k++) { const mx = x + k * sw + 2; c.fillStyle = '#111827'; c.fillRect(mx, y + h * 0.15, sw - 4, h * 0.55); c.fillStyle = '#1d4ed8'; c.fillRect(mx + 3, y + h * 0.15 + 3, sw - 10, h * 0.55 - 6); c.fillStyle = 'rgba(255,255,255,0.25)'; c.fillRect(mx + 3, y + h * 0.15 + 3, (sw - 10) * 0.4, h * 0.55 - 6); c.fillStyle = '#374151'; c.fillRect(mx + sw / 2 - 5, y + h * 0.7, 6, h * 0.25); } break; }
+            case 'prop_shelf': {   // металевий стелаж із коробками
+                c.fillStyle = '#475569'; c.fillRect(x, y, w, h); c.strokeStyle = '#1e293b'; c.lineWidth = 2; c.strokeRect(x, y, w, h);
+                const n = Math.max(2, Math.round((w >= h ? w : h) / 30));
+                for (let k = 0; k < n; k++) { const bx = w >= h ? x + 3 + k * (w - 6) / n : x + 3, by = w >= h ? y + 3 : y + 3 + k * (h - 6) / n, bw = w >= h ? (w - 6) / n - 3 : w - 6, bh = w >= h ? h - 6 : (h - 6) / n - 3; c.fillStyle = ['#b45309', '#a16207', '#78716c'][k % 3]; c.fillRect(bx, by, bw, bh); } break; }
+            case 'prop_vending': {   // торговий автомат: корпус, вітрина з банками, кнопки
+                c.fillStyle = '#be123c'; c.fillRect(x, y, w, h); c.strokeStyle = '#881337'; c.lineWidth = 2; c.strokeRect(x, y, w, h);
+                c.fillStyle = '#0f172a'; c.fillRect(x + 4, y + 4, w * 0.62, h - 8);
+                const cols = ['#22d3ee', '#facc15', '#a3e635', '#f472b6']; for (let r2 = 0; r2 < 3; r2++) for (let k = 0; k < 3; k++) { c.fillStyle = cols[(r2 + k) % 4]; c.fillRect(x + 7 + k * (w * 0.62 - 6) / 3, y + 7 + r2 * (h - 14) / 3, (w * 0.62 - 6) / 3 - 3, (h - 14) / 3 - 3); }
+                c.fillStyle = '#fecdd3'; c.fillRect(x + w * 0.72, y + h * 0.2, w * 0.2, h * 0.12); c.fillRect(x + w * 0.72, y + h * 0.4, w * 0.2, h * 0.12); break; }
+            case 'prop_server': {   // серверна стійка: темний корпус і ряди індикаторів
+                c.fillStyle = '#0f172a'; c.fillRect(x, y, w, h); c.strokeStyle = '#334155'; c.lineWidth = 2; c.strokeRect(x, y, w, h);
+                const rows = Math.max(3, Math.round(h / 12));
+                for (let k = 0; k < rows; k++) { const ry = y + 4 + k * (h - 8) / rows; c.fillStyle = '#1e293b'; c.fillRect(x + 4, ry, w - 8, (h - 8) / rows - 2); c.fillStyle = (Math.sin(t * 4 + k * 1.7 + x) > 0.2) ? '#22c55e' : '#14532d'; c.fillRect(x + w - 12, ry + 2, 4, 3); c.fillStyle = '#38bdf8'; c.fillRect(x + w - 20, ry + 2, 4, 3); } break; }
+            case 'prop_sofa': {   // диван: спинка, підлокітники, подушки
+                c.fillStyle = '#4338ca'; c.beginPath(); c.roundRect(x, y, w, h, 8); c.fill();
+                c.fillStyle = '#3730a3'; c.fillRect(x + 3, y + 3, w - 6, h * 0.3); c.fillRect(x + 3, y + 3, w * 0.12, h - 6); c.fillRect(x + w * 0.88 - 3, y + 3, w * 0.12, h - 6);
+                c.fillStyle = '#6366f1'; const cw = (w * 0.76) / 2; c.fillRect(x + w * 0.12 + 2, y + h * 0.36, cw - 3, h * 0.56); c.fillRect(x + w * 0.12 + cw + 1, y + h * 0.36, cw - 3, h * 0.56); break; }
+            case 'prop_plant': {   // вазон: горщик і листя
+                const r = Math.min(w, h) / 2;
+                c.fillStyle = '#9a3412'; c.beginPath(); c.arc(cx, cy, r * 0.62, 0, Math.PI * 2); c.fill();
+                c.fillStyle = '#166534'; for (let a = 0; a < 6; a++) { c.beginPath(); c.ellipse(cx + Math.cos(a * 1.047) * r * 0.45, cy + Math.sin(a * 1.047) * r * 0.45, r * 0.42, r * 0.2, a * 1.047, 0, Math.PI * 2); c.fill(); }
+                c.fillStyle = '#22c55e'; c.beginPath(); c.arc(cx, cy, r * 0.25, 0, Math.PI * 2); c.fill(); break; }
             default: ok = false;
         }
         c.restore();
         return ok;
+    }
+
+    // ---------- УЛАМКИ на місці знищеного об'єкта (лягають у статичний шар мапи) ----------
+    const MAT_COL = { wood: ['#7c4a21', '#a16207', '#5b3416'], hay: ['#ca8a04', '#a16207', '#eab308'], rubber: ['#171717', '#27272a', '#3f3f46'], plastic: ['#ea580c', '#f8fafc', '#c2410c'],
+        cloth: ['#44602a', '#5d7a3a', '#3730a3'], metal: ['#52525b', '#3f3f46', '#71717a'], glass: ['#bae6fd', '#7dd3fc', '#e0f2fe'], plant: ['#166534', '#9a3412', '#22c55e'] };
+    function drawRubble(c, o) {
+        const D = DESTR[o.type]; if (!D) return;
+        const x = o.x, y = o.y, w = o.w || 50, h = o.h || 50, cx = x + w / 2, cy = y + h / 2, cols = MAT_COL[D.mat] || MAT_COL.wood, rnd = srand((x * 73856093) ^ (y * 19349663));
+        c.save();
+        if (D.ex) {      // вибух лишає випалену пляму
+            const R = Math.max(w, h) * 0.9; const g = c.createRadialGradient(cx, cy, 0, cx, cy, R); g.addColorStop(0, 'rgba(10,10,10,0.75)'); g.addColorStop(0.6, 'rgba(30,20,10,0.4)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+            c.fillStyle = g; c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.fill();
+        } else { c.fillStyle = 'rgba(0,0,0,0.18)'; c.beginPath(); c.ellipse(cx, cy, w * 0.5, h * 0.5, 0, 0, Math.PI * 2); c.fill(); }
+        const n = Math.max(5, Math.min(16, Math.round((w + h) / 9)));
+        for (let k = 0; k < n; k++) {
+            const px = x + rnd() * w, py = y + rnd() * h, s = 3 + rnd() * 7, a = rnd() * Math.PI;
+            c.fillStyle = cols[k % cols.length]; c.save(); c.translate(px, py); c.rotate(a); c.fillRect(-s, -s * 0.35, s * 2, s * 0.7); c.restore();
+        }
+        c.restore();
+    }
+
+    // ---------- ПОКРИТТЯ: дорога +10%, бруд / пісок / сніг −15%, лід — ковзання ----------
+    // Для мап без власного списку (map.surf) плями генеруються автоматично за темою (детерміновано: однаково на сервері й у клієнта),
+    // далеко від точок появи та цілей режимів. Калюжі бруду (prop_puddle) — теж бруд, дороги — об'єкти «line».
+    const SURF = { 1: { k: 'road', spd: 1.1 }, 2: { k: 'mud', spd: 0.85 }, 3: { k: 'sand', spd: 0.85 }, 4: { k: 'snow', spd: 0.85 }, 5: { k: 'ice', spd: 1, ice: true } };
+    const SURF_ID = { road: 1, mud: 2, sand: 3, snow: 4, ice: 5 };
+    const SURF_BY_THEME = { snow: [['ice', 5], ['snow', 6]], swamp: [['mud', 9]], sand: [['sand', 8]], grass: [['mud', 5]], stone: [['mud', 3]], asphalt: [['mud', 2]] };
+    const _sf = new WeakMap();
+    function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+    function surfacesOf(map) {
+        let e = _sf.get(map); if (e && e.n === map.solids.length) return e;
+        const out = [], S = map.size, solids = map.solids;
+        // явні плями з мапи
+        if (Array.isArray(map.surf)) map.surf.forEach(p => { if (SURF_ID[p.k] && Array.isArray(p.pts) && p.pts.length >= 3) out.push({ id: SURF_ID[p.k], pts: p.pts.map(q => [q.x, q.y]) }); });
+        else {
+            const keep = solids.filter(o => o.type.indexOf('spawn') === 0).map(o => ({ x: o.x, y: o.y }));
+            const water = solids.filter(o => o.type.indexOf('water') >= 0);
+            const rnd = srand(hashStr((map.title || '') + '|' + S + '|' + solids.length));
+            const area = Math.max(0.35, Math.min(5, (S / 3200) * (S / 3200)));
+            const plan = []; const add = th => { (SURF_BY_THEME[th] || []).forEach(q => plan.push(q)); };
+            if (map.biomes && map.biomes.length) { const seen = {}; map.biomes.forEach(b => { if (!seen[b.theme]) { seen[b.theme] = 1; add(b.theme); } }); add(map.theme); } else add(map.theme);
+            plan.forEach(([k, n0]) => {
+                const n = Math.min(40, Math.round(n0 * area)); let made = 0;
+                for (let tries = 0; tries < n * 8 && made < n; tries++) {
+                    const x = 200 + rnd() * (S - 400), y = 200 + rnd() * (S - 400), rx = 130 + rnd() * 190, ry = rx * (0.55 + rnd() * 0.4), rot = rnd() * Math.PI;
+                    if (hasShape(map) && !pointInPoly(map.shape, x, y)) continue;
+                    if (map.biomes && map.biomes.length) { const b = biomeAt(map, x, y), th = b ? b.theme : map.theme; if (!(SURF_BY_THEME[th] || []).some(q => q[0] === k)) continue; }
+                    let bad = false; for (let i = 0; i < keep.length && !bad; i++) if (Math.hypot(keep[i].x - x, keep[i].y - y) < rx + 230) bad = true;
+                    for (let i = 0; i < water.length && !bad; i++) if (solidHit(water[i], x, y, 20)) bad = true;
+                    if (bad) continue;
+                    const pts = [], m = 16; for (let v = 0; v < m; v++) { const a = v / m * Math.PI * 2, j = 0.82 + rnd() * 0.3, px = Math.cos(a) * rx * j, py = Math.sin(a) * ry * j; pts.push([x + px * Math.cos(rot) - py * Math.sin(rot), y + px * Math.sin(rot) + py * Math.cos(rot)]); }
+                    out.push({ id: SURF_ID[k], pts }); made++;
+                }
+            });
+        }
+        solids.forEach(o => { if (o.type === 'prop_puddle') { const w = o.w || 50, h = o.h || 50, cx = o.x + w / 2, cy = o.y + h / 2, pts = []; for (let v = 0; v < 12; v++) { const a = v / 12 * Math.PI * 2, px = Math.cos(a) * w / 2, py = Math.sin(a) * h / 3, rr = Math.PI / 4; pts.push([cx + px * Math.cos(rr) - py * Math.sin(rr), cy + px * Math.sin(rr) + py * Math.cos(rr)]); } out.push({ id: 2, pts, puddle: true }); } });
+        out.forEach(p => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; p.pts.forEach(q => { if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0]; if (q[1] < y0) y0 = q[1]; if (q[1] > y1) y1 = q[1]; }); p.bb = [x0, y0, x1, y1]; });
+        const lines = solids.filter(o => o.type === 'line' && o.points && o.points.length > 1);
+        const lb = lines.map(o => { const hw = (o.width || 10) / 2; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; o.points.forEach(q => { if (q.x < x0) x0 = q.x; if (q.x > x1) x1 = q.x; if (q.y < y0) y0 = q.y; if (q.y > y1) y1 = q.y; }); return [x0 - hw, y0 - hw, x1 + hw, y1 + hw]; });
+        const N = Math.ceil(S / 40) + 1;
+        e = { n: solids.length, list: out, lines, lb, N, grid: new Uint8Array(N * N).fill(255) }; _sf.set(map, e); return e;
+    }
+    function inPts(pts, x, y) { let ins = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const a = pts[i], b = pts[j]; if (((a[1] > y) !== (b[1] > y)) && (x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0])) ins = !ins; } return ins; }
+    // код покриття в точці (0 — звичайна земля). Сітка 40 px рахується ліниво й кешується
+    function surfAt(map, x, y) {
+        if (!map || !map.solids) return 0;
+        const e = surfacesOf(map), gx = Math.floor(x / 40), gy = Math.floor(y / 40); if (gx < 0 || gy < 0 || gx >= e.N || gy >= e.N) return 0;
+        const k = gy * e.N + gx; let v = e.grid[k]; if (v !== 255) return v;
+        const px = (gx + 0.5) * 40, py = (gy + 0.5) * 40; v = 0;
+        for (let i = e.list.length - 1; i >= 0 && !v; i--) { const p = e.list[i], b = p.bb; if (px < b[0] || px > b[2] || py < b[1] || py > b[3]) continue; if (inPts(p.pts, px, py)) v = p.id; }
+        if (!v) for (let i = 0; i < e.lines.length && !v; i++) { const lb = e.lb[i]; if (px < lb[0] || px > lb[2] || py < lb[1] || py > lb[3]) continue; const o = e.lines[i], hw = (o.width || 10) / 2; for (let q = 1; q < o.points.length; q++) if (distToSeg(px, py, o.points[q - 1].x, o.points[q - 1].y, o.points[q].x, o.points[q].y) <= hw) { v = 1; break; } }
+        e.grid[k] = v; return v;
+    }
+    const surfSpeed = (map, x, y) => { const v = surfAt(map, x, y); return v ? SURF[v].spd : 1; };
+    const surfIce = (map, x, y) => surfAt(map, x, y) === 5;
+    // малювання плям у прямокутнику R (клієнт: статичний шар мапи; редактор)
+    function drawSurfaces(c, map, R, low) {
+        const e = surfacesOf(map);
+        for (let i = 0; i < e.list.length; i++) {
+            const p = e.list[i], b = p.bb; if (p.puddle || b[2] < R.x0 || b[0] > R.x1 || b[3] < R.y0 || b[1] > R.y1) continue;
+            const pth = () => { c.beginPath(); p.pts.forEach((q, j) => j ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1])); c.closePath(); };
+            const cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2, rr = Math.max(b[2] - b[0], b[3] - b[1]) / 2, rnd = srand(Math.round(cx * 13 + cy * 7));
+            c.save(); c.lineJoin = 'round';
+            if (p.id === 2) {      // бруд: темна пляма з мокрими відблисками
+                pth(); c.fillStyle = 'rgba(58,38,20,0.82)'; c.fill(); c.strokeStyle = 'rgba(58,38,20,0.35)'; c.lineWidth = 14; c.stroke();
+                if (!low) { c.clip(); for (let k = 0; k < 7; k++) { c.fillStyle = k % 2 ? 'rgba(34,22,10,0.55)' : 'rgba(120,90,60,0.22)'; c.beginPath(); c.ellipse(cx + (rnd() - 0.5) * rr * 1.2, cy + (rnd() - 0.5) * rr * 0.8, 20 + rnd() * 40, 10 + rnd() * 18, rnd() * 3, 0, Math.PI * 2); c.fill(); } }
+            } else if (p.id === 3) {      // сипучий пісок: світла пляма з брижами
+                pth(); c.fillStyle = 'rgba(222,190,128,0.78)'; c.fill(); c.strokeStyle = 'rgba(222,190,128,0.35)'; c.lineWidth = 16; c.stroke();
+                if (!low) { c.clip(); c.strokeStyle = 'rgba(160,120,60,0.35)'; c.lineWidth = 3; for (let k = -6; k <= 6; k++) { c.beginPath(); for (let s = -1; s <= 1.01; s += 0.1) { const xx = cx + s * rr, yy = cy + k * 22 + Math.sin(s * 9 + k) * 6; if (s === -1) c.moveTo(xx, yy); else c.lineTo(xx, yy); } c.stroke(); } }
+            } else if (p.id === 4) {      // глибокий сніг: біла пляма з блакитною тінню
+                pth(); c.fillStyle = 'rgba(248,250,252,0.9)'; c.fill(); c.strokeStyle = 'rgba(226,232,240,0.5)'; c.lineWidth = 18; c.stroke();
+                if (!low) { c.clip(); for (let k = 0; k < 8; k++) { c.fillStyle = 'rgba(148,163,184,0.18)'; c.beginPath(); c.ellipse(cx + (rnd() - 0.5) * rr * 1.3, cy + (rnd() - 0.5) * rr * 0.9, 30 + rnd() * 50, 12 + rnd() * 20, rnd() * 3, 0, Math.PI * 2); c.fill(); } }
+            } else if (p.id === 5) {      // лід: блакитне скло з тріщинами й відблисками
+                pth(); c.fillStyle = 'rgba(165,215,240,0.8)'; c.fill(); c.strokeStyle = 'rgba(224,242,254,0.8)'; c.lineWidth = 4; c.stroke();
+                if (!low) { c.clip(); c.strokeStyle = 'rgba(255,255,255,0.55)'; c.lineWidth = 6; for (let k = 0; k < 3; k++) { const yy = cy + (rnd() - 0.5) * rr; c.beginPath(); c.moveTo(cx - rr, yy + rr * 0.5); c.lineTo(cx + rr, yy - rr * 0.5); c.stroke(); }
+                    c.strokeStyle = 'rgba(56,120,160,0.45)'; c.lineWidth = 1.5; for (let k = 0; k < 5; k++) { let xx = cx + (rnd() - 0.5) * rr, yy = cy + (rnd() - 0.5) * rr * 0.6; c.beginPath(); c.moveTo(xx, yy); for (let s = 0; s < 4; s++) { xx += (rnd() - 0.5) * 70; yy += (rnd() - 0.5) * 70; c.lineTo(xx, yy); } c.stroke(); } }
+            }
+            c.restore();
+        }
     }
 
     // ---------- ПЕРЕВІРКА МАПИ (сервер) ----------
@@ -729,7 +903,7 @@ var MapObj = (function () {
     const api = {
         D2R, DOOR_TRIGGER, DOOR_PASS, PROPS_BASE, PROPS_WOOD, PROPS_EXTRA, DOORS, DOOR_BY_ID, NONSOLID, ALL_TYPES,
         isDoor, isCircular, isSolidType, center, applyRot, toLocal, distToSeg, pointInPoly, circleInPoly, hasShape, pointInObject,
-        collides, collidesNaive, invalidateIndex, biomeAt, biomePoly, biomeBBox, polyOf, circleHitsPoly, DISGUISE_GROUPS, DISGUISE_IDS, DISGUISE_SHAPES, drawDisguise, doorNear, updateDoors, resetDoors, shapeBounds, drawProp, sanitizeMap, MODES, mapAllows, THEME_IDS
+        collides, collidesNaive, invalidateIndex, DESTR, isDestr, destrList, destrAt, drawRubble, SURF, surfacesOf, surfAt, surfSpeed, surfIce, drawSurfaces, biomeAt, biomePoly, biomeBBox, polyOf, circleHitsPoly, DISGUISE_GROUPS, DISGUISE_IDS, DISGUISE_SHAPES, drawDisguise, doorNear, updateDoors, resetDoors, shapeBounds, drawProp, sanitizeMap, MODES, mapAllows, THEME_IDS
     };
     return api;
 })();

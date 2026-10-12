@@ -283,7 +283,7 @@
     }
     // стрілки на краю екрана до важливих цілей
     function arrow(ctx, wx, wy, col, txt, now, sub) {
-        const sx = GW / 2 + (wx - camera.x) * VS, sy = GH / 2 + (wy - camera.y) * VS, mg = 34;
+        const _vz = window.getVZ ? getVZ() : VS, sx = GW / 2 + (wx - camera.x) * _vz, sy = GH / 2 + (wy - camera.y) * _vz, mg = 34;
         if (sx > mg && sx < GW - mg && sy > mg + 40 && sy < GH - mg) return;
         const cx = GW / 2, cy = GH / 2, dx = sx - cx, dy = sy - cy, k = Math.min((cx - mg) / Math.abs(dx || 1e-6), (cy - mg - 20) / Math.abs(dy || 1e-6)), ax = cx + dx * k, ay = cy + dy * k, a = Math.atan2(dy, dx);
         ctx.save(); ctx.translate(ax, ay); ctx.globalAlpha = .75 + .25 * Math.sin(now / 250);

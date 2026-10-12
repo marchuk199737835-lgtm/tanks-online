@@ -39,6 +39,7 @@
     const PARAMS = [
         { key: 'maxPlayers', label: 'Макс. гравців', min: 2, max: 10, def: 6, step: 1, modes: '*', desc: 'Скільки гравців може бути в сесії одночасно. У соло-режимах грає лише один гравець.' },
         { key: 'winScore', label: 'Жетони для перемоги', min: 5, max: 1000, def: 50, step: 5, modes: ['deathmatch'], desc: 'Хто першим збере стільки жетонів — виграє. Чим більше жетонів, тим довший бій і більша нагорода.' },
+        { key: 'dmTime', label: 'Тривалість бою', min: 180, max: 900, def: 480, step: 30, unit: 'с', modes: ['deathmatch'], desc: 'Максимальний час бою. Коли час вийде, перемагає гравець з найбільшою кількістю жетонів (рівні — більше вбивств). Остання хвилина — «Фінал»: жетони ×2 і зона, що стискається.' },
         { key: 'hideTime', label: 'Час на схованку', min: 30, max: 200, def: 30, step: 5, unit: 'с', modes: ['prophunt'], desc: 'Скільки секунд ті, хто ховається, мають, щоб замаскуватись, поки мисливці чекають.' },
         { key: 'seekTime', label: 'Час пошуку', min: 120, max: 600, def: 120, step: 10, unit: 'с', modes: ['prophunt'], desc: 'Скільки секунд мисливці шукають. Якщо час вийшов — перемагають ті, хто ховався.' },
         { key: 'hunterCount', label: 'Мисливців', min: 1, max: 9, def: 1, step: 1, modes: ['prophunt'], dyn: true, desc: 'Скільки гравців грає мисливцями. Не більше, ніж гравців у сесії мінус один.' },
@@ -156,6 +157,23 @@
         }
         return Math.max(1, Math.round(a));
     }
+    // ----- ЕФЕКТИВНІСТЬ У PvP -----
+    // e = вбивства − 0,3 × смерті; бонус = 4 × e / max(4, найкраще e в матчі), округлено (0…4). Менше 2 вбивств або e ≤ 0 — без бонусу.
+    // Режими, що вже платять за вбивства («Ціль», королівський бій, раунди), — лише невеликий штраф: −1 за кожні 4 смерті (до −3).
+    // Підсумок не перевищує максимум, показаний у лобі (cap), і не менший за 1.
+    const EFF = { deathmatch: 1, team_deathmatch: 1, capture_points: 1, prophunt: 1, bounty: 2, battle_royale: 2, rounds: 2 };
+    function effAdjust(mode, a, kd, maxE, cap) {
+        const kind = EFF[mode]; if (!kind) return a;
+        const k = (kd && kd.k) | 0, d = (kd && kd.d) | 0;
+        let b;
+        if (kind === 2) b = -Math.min(3, Math.floor(d / 4));
+        else { const e = k - 0.3 * d; b = (k < 2 || e <= 0) ? 0 : Math.round(4 * Math.min(1, e / Math.max(4, maxE || 0))); }
+        let out = a + b;
+        if (cap > 0) out = Math.min(out, Math.max(a, cap));
+        return Math.max(1, Math.round(out));
+    }
+    const effOn = m => !!EFF[m], effKind = m => EFF[m] | 0;
+
     // Орієнтовний діапазон для підказки в лобі: [поразка, перемога]
     // n: у лобі — реальна кількість гравців, у вікні створення — 2 (типовий загін)
     function rewardRange(mode, r) {
@@ -178,5 +196,5 @@
         heal:  { e: '❤️', n: 'Аптечка', d: 'Миттєво лікує 60% здоров’я', max: 99 }
     };
 
-    return { PERKS, MODES, ORDER, NEW, GROUPS, PVE, SOLO, PARAMS, BYKEY, BOSSES, BOSS_NAMES, MAP_ALIAS, isPve, isSolo, isTeamPvp, usesColor, minPlayers, paramOn, reward, rewardRange, mult, wavePts, livesN };
+    return { PERKS, MODES, ORDER, NEW, GROUPS, PVE, SOLO, PARAMS, BYKEY, BOSSES, BOSS_NAMES, MAP_ALIAS, isPve, isSolo, isTeamPvp, usesColor, minPlayers, paramOn, reward, rewardRange, mult, wavePts, livesN, effAdjust, effOn, effKind };
 });

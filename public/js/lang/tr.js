@@ -1,5 +1,15 @@
 // Переклад інтерфейсу: Türkçe. Ключ — український текст (як у коді), значення — переклад. Слова без перекладу беруться з англійської.
 I18N.add("tr", {
+ "ФІНАЛ!": "FİNAL!",
+ "Лідер близько до перемоги: очки ×2, зона стискається": "Lider zafere yakın: puanlar ×2, bölge daralıyor",
+ "Остання хвилина: очки ×2, зона стискається": "Son dakika: puanlar ×2, bölge daralıyor",
+ "Ви поза зоною — поверніться!": "Bölgenin dışındasın — geri dön!",
+ "Ефективність у бою": "Savaş verimliliği",
+ "Штраф за смерті": "Ölüm cezası",
+ "Ефективність": "Verimlilik",
+ "Максимальний час бою. Коли час вийде, перемагає гравець з найбільшою кількістю жетонів (рівні — більше вбивств). Остання хвилина — «Фінал»: жетони ×2 і зона, що стискається.": "Azami savaş süresi. Süre bitince en çok jetonu olan oyuncu kazanır (eşitlikte — daha çok öldürme). Son dakika “Final”dir: jetonlar ×2 ve daralan bölge.",
+ "Динамічна камера: увімкнено": "Dinamik kamera: açık",
+ "Динамічна камера: вимкнено": "Dinamik kamera: kapalı",
  "🎯 Лінія прицілу": "🎯 Nişan çizgisi",
  "🖱️ Курсор миші": "🖱️ Fare imleci",
  "Показувати лінію": "Çizgiyi göster",

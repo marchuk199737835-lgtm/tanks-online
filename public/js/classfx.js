@@ -182,7 +182,7 @@
         var d = { roomId: currentRoomId };
         // точка прицілу (артобстріл): на ПК — курсор, на телефоні — 320 px у напрямку башти
         var touch = document.documentElement.classList.contains('ctl-touch');
-        if (!touch && typeof mouseX !== 'undefined' && typeof VS !== 'undefined') { d.x = camera.x + (mouseX - GW / 2) / VS; d.y = camera.y + (mouseY - GH / 2) / VS; }
+        if (!touch && typeof mouseX !== 'undefined' && typeof VS !== 'undefined') { var _vz = window.getVZ ? getVZ() : VS; d.x = camera.x + (mouseX - GW / 2) / _vz; d.y = camera.y + (mouseY - GH / 2) / _vz; }
         else { d.x = myLocalTank.x + Math.cos(myLocalTank.turretAngle) * 320; d.y = myLocalTank.y + Math.sin(myLocalTank.turretAngle) * 320; }
         socket.emit('useAbility', d);
     }

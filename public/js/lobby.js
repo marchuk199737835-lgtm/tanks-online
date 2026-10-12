@@ -95,7 +95,7 @@
         const lv = k => { const x = val(r, MI.BYKEY[k]); return x === 'inf' ? '∞' : x; };
         const v = k => val(r, MI.BYKEY[k]), tm = k => { const t = +v(k); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); }, yn = k => v(k) ? '✓' : '✗';
         switch (r.mode) {
-            case 'deathmatch': h += rule('🎯', 'Жетонів', r.winScore) + rule('🎲', 'Події', yn('mapEvents')); break;
+            case 'deathmatch': h += rule('🎯', 'Жетонів', r.winScore) + rule('⏱', 'Час', tm('dmTime')) + rule('🎲', 'Події', yn('mapEvents')); break;
             case 'survival': h += rule('🌊', 'Хвилі', '∞') + rule('❤️', 'Життів', lv('svLives')) + rule('💪', 'Складність', v('pveDiff') + '%'); break;
             case 'prophunt': h += rule('📦', 'Схованка', (r.hideTime || 30) + 'с') + rule('🔍', 'Пошук', (r.seekTime || 120) + 'с') + rule('🔴', 'Мисливців', r.hunterCount || 1); break;
             case 'team_deathmatch': h += rule('🚩', 'Команд', r.tdmTeams || 2) + rule('⏱', 'Час', (r.tdmTime || 180) + 'с') + rule('🏁', 'Очки', r.tdmScore || 20) + rule('⚖️', 'Автобаланс', r.tdmAutoBalance ? '✓' : '✗') + rule('🎲', 'Події', yn('mapEvents')); break;
@@ -110,7 +110,7 @@
             case 'rounds': h += rule('🔁', 'Раундів', v('rdRounds')) + rule('⏱', 'Раунд', v('rdTime') + 'с') + rule('🤝', 'Нічия', yn('rdDraw')); break;
         }
         const rr = MI.rewardRange(r.mode, r);
-        h += rule(creditIcon(20), r.mode === 'survival' ? 'Нагорода (5–20 хвиль)' : 'Нагорода', rr.loss + '–' + rr.win) + (rr.draw != null ? rule('🤝', 'Нічия', creditAmount(rr.draw, 14)) : '');
+        h += rule(creditIcon(20), r.mode === 'survival' ? 'Нагорода (5–20 хвиль)' : 'Нагорода', rr.loss + '–' + rr.win) + (rr.draw != null ? rule('🤝', 'Нічия', creditAmount(rr.draw, 14)) : '') + (MI.effKind ? (MI.effKind(r.mode) === 1 ? rule('📊', 'Ефективність', '+0…4') : MI.effKind(r.mode) === 2 ? rule('💀', 'Штраф за смерті', '0…−3') : '') : '');
         // множник складності PvE: усі налаштування, що ускладнюють гру, підвищують нагороду (деталі — у підказці)
         if (MI.isPve(r.mode) && MI.mult) {
             const mu = MI.mult(r.mode, r, n), tip = mu.parts.map(x => x[0] + ' ×' + x[1]).join(' · ');
