@@ -166,7 +166,7 @@
             return;
         }
         if (e.type !== 'keydown' || !S.me) return;
-        if (e.key === 'Enter' && S.kind === 'game' && !S.touch && !e.repeat && !e.ctrlKey && !e.altKey && !busyElsewhere()) {
+        if ((window.KB ? KB.is(e, 'chat') : e.key === 'Enter') && S.kind === 'game' && !S.touch && !e.repeat && !e.ctrlKey && !e.altKey && !busyElsewhere()) {
             e.preventDefault(); e.stopPropagation();
             if (S.open && UI) { resetKeys(); UI.focus(); } else openCh();
         }

@@ -114,14 +114,48 @@ function checkCollision(x, y, r, checkS = true, isB = false) {
     return MapObj.collides(m, x, y, r, { skipWater: isB });
 }
 
+// ---- хованки: маскування має той самий розмір і вигляд, що й такі об'єкти на цій мапі (MapObj.phInfo), і стоїть по сітці 50 px ----
+const phMap = () => MAP_DATA[currentRoomData.map] || MAP_DATA['epic_map'];
+const phSz = t => MapObj.phSize(phMap(), t);
+// чи влучає точка (x,y) у замаскованого гравця p (рамка предмета + запас pad)
+const phHit = (p, x, y, pad) => { const s = phSz(p.propType); return Math.abs(x - p.x) < s[0] / 2 + pad && Math.abs(y - p.y) < s[1] / 2 + pad; };
+function drDisg(t, cx, cy, tm) {
+    const mp = phMap(), o = MapObj.phObj(mp, t, cx, cy);
+    if (typeof MapFX === 'undefined') { MapObj.drawDisguise(ctx, o, tm); return; }
+    const k = MapFX.solidKind(o), low = !!(window.GFX && GFX.tier === 'low');
+    ctx.save();
+    if (k === 'block') MapFX.drawBlock(ctx, o, MapFX.themeOf(mp), { low });      // так само, як світ малює такі ж об'єкти (obj2)
+    else { MapFX.propShadow(ctx, o); MapObj.drawProp(ctx, o, tm); }
+    ctx.restore();
+}
+// де стати замаскованим: найближча клітинка сітки (≤ 38 px — сервер приймає зсув до 40), у якій предмет не налазить на стіни / декор /
+// інших замаскованих, а корпус танка вільний (щоб потім спокійно виїхати). Немає такої — лишаємось на місці (тут танк точно не застрягне).
+function phPlace(t, x, y) {
+    const s = phSz(t), w = s[0], h = s[1], b = MapObj.phSnap(x, y, w, h), C = MapObj.PH_CELL, out = [];
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) { const cx = b.x + dx * C, cy = b.y + dy * C, d = Math.hypot(cx - x, cy - y); if (d <= 38) out.push({ x: cx, y: cy, d }); }
+    out.sort((p, q) => p.d - q.d);
+    const free = p => {
+        if (checkCollision(p.x, p.y, PLAYER_BODY_R, true) || checkPCollision(p.x, p.y, PLAYER_BODY_R)) return false;
+        for (let px = p.x - w / 2 + 3; px <= p.x + w / 2 - 3; px += 8) for (let py = p.y - h / 2 + 3; py <= p.y + h / 2 - 3; py += 8) if (checkCollision(px, py, 1, true)) return false;
+        return true;
+    };
+    return out.find(free) || { x, y };
+}
+// найбільший радіус (точність ~0,1 px), з яким у точці немає зіткнення — «наскільки глибоко» танк у перешкоді
+function freeRad(x, y, R) {
+    if (checkCollision(x, y, 0.5, true)) return 0;
+    let lo = 0.5, hi = R; for (let i = 0; i < 9; i++) { const m = (lo + hi) / 2; if (checkCollision(x, y, m, true)) hi = m; else lo = m; }
+    return lo;
+}
 function checkPCollision(nX, nY, rad) {
     if (!currentRoomData || currentRoomData.mode !== 'prophunt') return false;
     for (let id in opponents) {
         let op = opponents[id];
         if (op.hp > 0 && op.isDisguised) {
-            let pX = op.x - 25, pY = op.y - 25, tX = nX, tY = nY;
-            if (nX < pX) tX = pX; else if (nX > pX + 50) tX = pX + 50;
-            if (nY < pY) tY = pY; else if (nY > pY + 50) tY = pY + 50;
+            const s = phSz(op.propType);
+            let pX = op.x - s[0] / 2, pY = op.y - s[1] / 2, tX = nX, tY = nY;
+            if (nX < pX) tX = pX; else if (nX > pX + s[0]) tX = pX + s[0];
+            if (nY < pY) tY = pY; else if (nY > pY + s[1]) tY = pY + s[1];
             if (Math.hypot(nX - tX, nY - tY) <= rad) return true;
         }
     }
@@ -171,6 +205,10 @@ function updatePhys(now, dt) {
         if (mx !== 0 || my !== 0) {
             if (currentRoomData.mode === 'prophunt' && myLocalTank.team === 'hider' && myLocalTank.isDisguised) {
                 myLocalTank.isDisguised = false;
+                // застрягли в об'єкті (стара мапа, сусід-хованець тощо) — повертаємось туди, звідки маскувались
+                const _f = myLocalTank._phFrom;
+                if (_f && checkCollision(myLocalTank.x, myLocalTank.y, myRad, true) && !checkCollision(_f.x, _f.y, myRad, true) && Math.hypot(_f.x - myLocalTank.x, _f.y - myLocalTank.y) <= 40) { myLocalTank.x = _f.x; myLocalTank.y = _f.y; }
+                myLocalTank._phFrom = null;
                 socket.emit('updateDisguise', { roomId: currentRoomId, state: false, x: myLocalTank.x, y: myLocalTank.y });
             }
             let len = Math.hypot(mx, my);
@@ -189,8 +227,10 @@ function updatePhys(now, dt) {
             if (_frz || myLocalTank.isDisguised) { v.x = 0; v.y = 0; }
             if (v.x || v.y) {
                 const nX = myLocalTank.x + v.x * dt, nY = myLocalTank.y + v.y * dt, isB = myLocalTank.buff === 'boss';
-                if (!checkCollision(nX, myLocalTank.y, myRad, true, isB) && !checkPCollision(nX, myLocalTank.y, myRad) || isB) myLocalTank.x = nX; else v.x = 0;
-                if (!checkCollision(myLocalTank.x, nY, myRad, true, isB) && !checkPCollision(myLocalTank.x, nY, myRad) || isB) myLocalTank.y = nY; else v.y = 0;
+                // танк уже застряг в об'єкті — дозволяємо рух, що виводить назовні (вільний радіус не зменшується), а не вглиб
+                const _stk = !isB && checkCollision(myLocalTank.x, myLocalTank.y, myRad, true), _fr0 = _stk ? freeRad(myLocalTank.x, myLocalTank.y, myRad) : 0;
+                if (!checkCollision(nX, myLocalTank.y, myRad, true, isB) && !checkPCollision(nX, myLocalTank.y, myRad) || isB || (_stk && freeRad(nX, myLocalTank.y, myRad) > _fr0 - 0.05)) myLocalTank.x = nX; else v.x = 0;
+                if (!checkCollision(myLocalTank.x, nY, myRad, true, isB) && !checkPCollision(myLocalTank.x, nY, myRad) || isB || (_stk && freeRad(myLocalTank.x, nY, myRad) > _fr0 - 0.05)) myLocalTank.y = nY; else v.y = 0;
             }
         }
         
@@ -231,8 +271,9 @@ function updatePhys(now, dt) {
         if (currentRoomData.mode === 'prophunt' && myLocalTank.team === 'hider') {
             if (!myLocalTank.isDisguised && (keys.space || keys.lmb || joysticks.right.released)) {
                 myLocalTank.isDisguised = true;
-                myLocalTank.x = Math.round((myLocalTank.x - 25) / 50) * 50 + 25;
-                myLocalTank.y = Math.round((myLocalTank.y - 25) / 50) * 50 + 25;
+                const _pp = phPlace(myLocalTank.propType, myLocalTank.x, myLocalTank.y);   // кут предмета — на сітці, у ВІЛЬНІЙ клітинці (не в камені)
+                myLocalTank._phFrom = { x: myLocalTank.x, y: myLocalTank.y };            // звідки замаскувались — сюди повернемось, якщо раптом застрягнемо
+                myLocalTank.x = _pp.x; myLocalTank.y = _pp.y;
                 myLocalTank.bodyAngle = 0; myLocalTank.turretAngle = 0; myLocalTank._v = null;
                 socket.emit('updateDisguise', { roomId: currentRoomId, state: true, x: myLocalTank.x, y: myLocalTank.y });
                 keys.space = false; keys.lmb = false; joysticks.right.released = false;
@@ -323,7 +364,7 @@ function updatePhys(now, dt) {
             if (op.hp > 0 && op.buff !== 'shield') {
                 let oR = op.buff === 'boss' ? 75 : 24, hD = b.type === 'samurai' ? oR + 30 : oR + 4;
                 const _dx = b.x - op.x, _dy = b.y - op.y;
-                if (_dx * _dx + _dy * _dy < hD * hD) {
+                if (op.isDisguised && currentRoomData.mode === 'prophunt' ? phHit(op, b.x, b.y, 4) : _dx * _dx + _dy * _dy < hD * hD) {
                     hP = true;
                     if (b.owner === myId) {
                         if (isTeamM(currentRoomData.mode) && myLocalTank.team === op.team) continue;
@@ -338,7 +379,7 @@ function updatePhys(now, dt) {
         if (!hP && !_ally && myLocalTank.hp > 0 && myLocalTank.buff !== 'shield' && b.owner !== myId && b.owner !== 'zombie') {
             let mR = myLocalTank.buff === 'boss' ? 75 : 24, hD = b.type === 'samurai' ? mR + 30 : mR + 4;
             const _dx = b.x - myLocalTank.x, _dy = b.y - myLocalTank.y;
-            if (_dx * _dx + _dy * _dy < hD * hD) {
+            if (myLocalTank.isDisguised && currentRoomData.mode === 'prophunt' ? phHit(myLocalTank, b.x, b.y, 4) : _dx * _dx + _dy * _dy < hD * hD) {
                 if (isTeamM(currentRoomData.mode) && opponents[b.owner] && opponents[b.owner].team === myLocalTank.team) { } 
                 else {
                     hP = true;
@@ -1037,7 +1078,8 @@ const WC = (function () {
         const ex = 1 / S, R = { x0: i * P / S - ex, y0: j * P / S - ex, x1: (i + 1) * P / S + ex, y1: (j + 1) * P / S + ex };
         c.save();
         let n;
-        if (layer === 0) n = paintUnder(c, R, 1, 0, th, low, null) + 1; else n = paintOver(c, R, 1, 0, th, low);
+        MapObj.setClip(R);      // великі підлоги малюють лише плитки цього чанка
+        try { if (layer === 0) n = paintUnder(c, R, 1, 0, th, low, null) + 1; else n = paintOver(c, R, 1, 0, th, low); } finally { MapObj.setClip(null); }
         c.restore(); c.setTransform(1, 0, 0, 1, 0, 0);
         api.built++; api.buildMs += performance.now() - t0;
         if (!n) { pool.push(e); return EMPTY; }
@@ -1238,7 +1280,7 @@ function draw(now) {
         const p = opponents[id], sn = currentRoomData.players[id]; if (!sn) { delete opponents[id]; continue; }
         if (p.x < VX0 - 140 || p.x > VX1 + 140 || p.y < VY0 - 140 || p.y > VY1 + 140) continue;   // поза екраном (із запасом на підпис/щит)
         const cH = tankHex(sn.color, sn.color ? '#9333ea' : '#ef4444');
-        if (p.isDisguised) MapObj.drawDisguise(ctx, { type: p.propType, x: p.x - 25, y: p.y - 25, w: 50, h: 50, r: 25 }, tm);
+        if (p.isDisguised) drDisg(p.propType, p.x, p.y, tm);
         else { const _ca = window.ClassFX ? ClassFX.alpha(id) : 1; if (_ca < 1) ctx.globalAlpha = _ca; drTnk(p.x, p.y, p.bodyAngle + (window.BHUD ? BHUD.slip(id) : 0), p.turretAngle, cH, (window.dispName ? dispName(sn) : sn.name), false, p.hp, p.buff, sn.equipped, true); if (_ca < 1) ctx.globalAlpha = 1; }
         if ((myLocalTank.buff === 'homing' || myLocalTank.buff === 'autolaser') && id === homingTargetId && p.hp > 0) {
             ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(now / 300); ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3; ctx.setLineDash([15, 10]); ctx.strokeRect(-45, -45, 90, 90); ctx.restore();
@@ -1248,7 +1290,7 @@ function draw(now) {
     drAL();
     if (myLocalTank.hp > 0) {
         const mC = tankHex(myColor, myColor ? '#9333ea' : '#3b82f6');
-        if (myLocalTank.isDisguised) MapObj.drawDisguise(ctx, { type: myLocalTank.propType, x: myLocalTank.x - 25, y: myLocalTank.y - 25, w: 50, h: 50, r: 25 }, tm);
+        if (myLocalTank.isDisguised) drDisg(myLocalTank.propType, myLocalTank.x, myLocalTank.y, tm);
         else { const _ca = window.ClassFX ? ClassFX.alpha(myId) : 1; if (_ca < 1) ctx.globalAlpha = _ca; drTnk(myLocalTank.x, myLocalTank.y, myLocalTank.bodyAngle + (window.BHUD ? BHUD.slip(myId) : 0), myLocalTank.turretAngle, mC, (window.dispName ? dispName(myName) : myName), true, myLocalTank.hp, myLocalTank.buff, myEquipped, true); if (_ca < 1) ctx.globalAlpha = 1; drPCA(); }
     }
     
@@ -1281,7 +1323,7 @@ function draw(now) {
     if (_fx) {   // дахи будівель: прозорі лише для локального гравця всередині (інші танки під дахом не видно)
         const _rdt = Math.min(0.1, Math.max(0, (now - (draw._rt || now)) / 1000)); draw._rt = now;
         const _alive = myLocalTank.hp > 0;
-        MapFX.drawRoofs(ctx, MAP_DATA[cMap].solids, { x0: VX0, x1: VX1, y0: VY0, y1: VY1 }, _alive ? myLocalTank.x : camera.x, _alive ? myLocalTank.y : camera.y, _rdt);
+        MapFX.drawRoofs(ctx, MAP_DATA[cMap].solids, { x0: VX0, x1: VX1, y0: VY0, y1: VY1 }, _alive ? myLocalTank.x : camera.x, _alive ? myLocalTank.y : camera.y, _rdt, _cacheS);      // _cacheS — дахи кешуються під базовий масштаб (без зуму)
     }
     if (window.ModesFX) ModesFX.top(ctx, now, tm, _pv);
     for (let _pi = 0; _pi < particles.length; _pi++) {
@@ -1328,10 +1370,9 @@ function draw(now) {
     
     if (myLocalTank.hp <= 0 && spectatingId && opponents[spectatingId]) {
         let sN = currentRoomData.players[spectatingId] ? (window.dispName ? dispName(currentRoomData.players[spectatingId]) : currentRoomData.players[spectatingId].name) : 'ГРАВЕЦЬ', sT = opponents[spectatingId];
-        if (sT.isDisguised) MapObj.drawDisguise(ctx, { type: sT.propType, x: sT.x - 25, y: sT.y - 25, w: 50, h: 50, r: 25 }, tm);
         ctx.fillStyle = '#fff'; ctx.font = '24px Russo One'; ctx.textAlign = 'center'; ctx.shadowColor = '#000'; ctx.shadowBlur = 10;
         ctx.fillText(`${I18N.t('СПОСТЕРІГАННЯ:')} ${sN}`, GW / 2, 120);
-        if (!isMobile) { ctx.font = '14px Jura'; ctx.fillStyle = '#94a3b8'; ctx.fillText(`[A] ${I18N.t('Попередній')}  |  ${I18N.t('Наступний')} [D]`, GW / 2, 150); }
+        if (!isMobile) { ctx.font = '14px Jura'; ctx.fillStyle = '#94a3b8'; ctx.fillText(`[${window.KB ? KB.label('left') : 'A'}] ${I18N.t('Попередній')}  |  ${I18N.t('Наступний')} [${window.KB ? KB.label('right') : 'D'}]`, GW / 2, 150); }
         ctx.shadowBlur = 0;
     }
     if (window.ModesFX) ModesFX.screen(ctx, now);
@@ -1478,14 +1519,17 @@ function gameLoop(now) {
     gameLoopId = requestAnimationFrame(gameLoop);
 }
 
+// клавіші — за фізичною клавішею (KB, keybinds.js): працює на будь-якій розкладці й з перепризначеними клавішами
+const KEY_OF_ACT = { up: 'w', down: 's', left: 'a', right: 'd', fire: 'space' };
+const _typing = e => { const t = e.target; return !!(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)); };
 window.addEventListener('keydown', e => {
-    if (!e || !e.key) return;
-    const k = e.key.toLowerCase();
-    if (keys.hasOwnProperty(k) || k === ' ') { if (k === ' ') keys.space = true; else keys[k] = true; }
-    if (myLocalTank.hp <= 0 && currentRoomData && canSpecM(currentRoomData.mode)) {
-        if (k === 'a') findNextSpec(-1); if (k === 'd') findNextSpec(1);
+    if (!e || !window.KB || _typing(e)) return;
+    const act = KB.actOf(e), k = KEY_OF_ACT[act];
+    if (k) { keys[k] = true; if (/^Arrow/.test(KB.codeOf(e)) && currentRoomData && currentRoomData.status === 'playing') e.preventDefault(); }
+    if (!e.repeat && myLocalTank.hp <= 0 && currentRoomData && canSpecM(currentRoomData.mode)) {
+        if (act === 'left') findNextSpec(-1); if (act === 'right') findNextSpec(1);
     }
-    if (e.key === 'Tab') {
+    if (act === 'target') {
         e.preventDefault();
         if (myLocalTank.buff === 'homing' || myLocalTank.buff === 'autolaser') {
             let vO = Object.keys(opponents).filter(id => opponents[id].hp > 0 && !(isPveM(currentRoomData.mode) || (isTeamM(currentRoomData.mode) && opponents[id].team === myLocalTank.team)) && Math.hypot(opponents[id].x - myLocalTank.x, opponents[id].y - myLocalTank.y) < 1500);
@@ -1500,10 +1544,10 @@ window.addEventListener('keydown', e => {
 });
 
 window.addEventListener('keyup', e => {
-    if (!e || !e.key) return;
-    const k = e.key.toLowerCase();
-    if (keys.hasOwnProperty(k) || k === ' ') { if (k === ' ') keys.space = false; else keys[k] = false; }
+    if (!e || !window.KB) return;
+    const k = KEY_OF_ACT[KB.actOf(e)]; if (k) keys[k] = false;
 });
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });   // вікно втратило фокус (Alt+Tab) — клавіші не «залипають»
 window.addEventListener('mousemove', e => { if (!isMobile) { mouseX = e.clientX; mouseY = e.clientY; } });
 window.addEventListener('mousedown', e => { if (!isMobile && e.button === 0 && e.target.id === 'game-canvas') keys.lmb = true; });
 window.addEventListener('mouseup', e => { if (!isMobile && e.button === 0) keys.lmb = false; });
@@ -1511,13 +1555,14 @@ window.addEventListener('mouseup', e => { if (!isMobile && e.button === 0) keys.
 function handleTStart(e) {
     if (!isMobile) return;
     if (myLocalTank.hp <= 0) { resetJoysticks(); return; }
+    const _sw = !!(window.TouchLayout && TouchLayout.swap());   // розкладка «для лівші»: рух — праворуч, приціл — ліворуч
     for (let i = 0; i < e.changedTouches.length; i++) {
         let t = e.changedTouches[i];
-        if (t.clientX < GW / 2 && !joysticks.left.active) {
+        if ((t.clientX < GW / 2) !== _sw && !joysticks.left.active) {
             joysticks.left.active = true; joysticks.left.id = t.identifier;
             joysticks.left.startX = t.clientX; joysticks.left.startY = t.clientY;
             joysticks.left.currentX = t.clientX; joysticks.left.currentY = t.clientY;
-        } else if (t.clientX >= GW / 2 && !joysticks.right.active) {
+        } else if ((t.clientX >= GW / 2) !== _sw && !joysticks.right.active) {
             joysticks.right.active = true; joysticks.right.id = t.identifier;
             joysticks.right.startX = t.clientX; joysticks.right.startY = t.clientY;
             joysticks.right.currentX = t.clientX; joysticks.right.currentY = t.clientY;

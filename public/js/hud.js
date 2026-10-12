@@ -135,7 +135,7 @@
         // капсула (ПК)
         cap = document.createElement('div'); cap.id = 'bh-cap'; cap.className = 'hidden';
         cap.innerHTML = '<div class="r1"><i>❤</i><div class="bh-hp"><s id="bh-hps"></s><b id="bh-hpf"></b><u></u></div><span id="bh-hpt">0</span></div>' +
-            '<div class="r2"><div class="bh-cd"><b id="bh-cdf"></b></div><span class="bh-ic" id="bh-dashi">💨<small>Shift</small></span><span class="bh-ic off" id="bh-buff"></span></div>';
+            '<div class="r2"><div class="bh-cd"><b id="bh-cdf"></b></div><span class="bh-ic" id="bh-dashi">💨<small id="bh-dashk">Shift</small></span><span class="bh-ic off" id="bh-buff"></span></div>';
         gs.appendChild(cap);
         // кнопка ривка (телефон)
         dashBtn = document.createElement('button'); dashBtn.id = 'bh-dash'; dashBtn.type = 'button'; dashBtn.setAttribute('aria-label', 'Ривок'); dashBtn.textContent = '💨';
@@ -151,6 +151,8 @@
         mark($('mob-cd-container')); mark($('buff-timer-container'));
         buildBoardToggle();
         buildSettings();
+        var dk = function () { var k = $('bh-dashk'); if (k && window.KB) k.textContent = KB.label('dash'); };
+        dk(); if (window.KB) KB.on(dk);      // підпис клавіші ривка — за поточним призначенням
     }
 
     // ================= ТАБЛО: згортання =================
@@ -236,8 +238,9 @@
     }
     document.addEventListener('keydown', function (e) {
         if (e.repeat) return; var t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
-        if (e.key === 'Shift' && inGame()) { doDash(); }
-        else if ((e.code === 'KeyM' || e.key === 'm' || e.key === 'M' || e.key === 'ь' || e.key === 'Ь') && inGame() && mmOn) { setBig(!big, 0); }
+        if (!window.KB) return;
+        if (KB.is(e, 'dash') && inGame()) { doDash(); }
+        else if (KB.is(e, 'map') && inGame() && mmOn) { setBig(!big, 0); }
     });
     // виклик з game.js (updatePhys): переміщення під час ривка з перевіркою стін
     var knk = { vx: 0, vy: 0, until: 0 };

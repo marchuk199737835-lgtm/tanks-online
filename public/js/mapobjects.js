@@ -101,6 +101,32 @@ var MapObj = (function () {
         c.save(); c.fillStyle = '#166534'; c.beginPath(); c.arc(cx, cy, 25, 0, Math.PI * 2); c.fill();
         c.fillStyle = '#15803d'; c.beginPath(); c.arc(cx - 6, cy - 6, 12, 0, Math.PI * 2); c.fill(); c.restore(); return true;
     }
+    // ---------- ХОВАНКИ: маскування під об'єкти саме цієї мапи ----------
+    // Об'єкти мап для хованок стоять по сітці 50 px (tools/phgrid.js): лівий-верхній кут кратний 50, розмір 50 або 100, без повороту.
+    // Пул рулетки — типи, яких на мапі щонайменше 2 таких «сіткових» екземпляри; розмір і вигляд маскування — як у найчастішого з них.
+    // Якщо мапа не по сітці (стара / з редактора) — пул з усіх об'єктів і клітинка 50×50, як раніше.
+    const PH_CELL = 50, _ph = new WeakMap();
+    const NAMES = {}; [PROPS_BASE, PROPS_WOOD, PROPS_EXTRA, DISGUISE_SHAPES].forEach(l => l.forEach(p => NAMES[p.id] = p.name)); NAMES.tree = 'Дерево';
+    const nameOf = t => NAMES[t] || t;
+    const phAligned = o => DISGUISE_IDS.has(o.type) && o.type !== 'tree' && !((o.rot || 0) % 360) && o.x % PH_CELL === 0 && o.y % PH_CELL === 0 && (o.w === 50 || o.w === 100) && (o.h === 50 || o.h === 100);
+    function phInfo(map) {
+        const arr = map && map.solids; if (!arr) return { pool: [], size: {}, sample: {}, grid: false };
+        let e = _ph.get(arr); if (e && e.n === arr.length) return e;
+        const cnt = {}, dims = {};
+        for (const o of arr) { if (!phAligned(o)) continue; cnt[o.type] = (cnt[o.type] || 0) + 1; const k = o.w + 'x' + o.h, d = dims[o.type] || (dims[o.type] = {}); (d[k] || (d[k] = { n: 0, o })).n++; }
+        const pool = Object.keys(cnt).filter(t => cnt[t] >= 2).sort(), size = {}, sample = {};
+        pool.forEach(t => { const best = Object.values(dims[t]).sort((a, b) => b.n - a.n)[0].o, s = {}; for (const k in best) if (k !== '_dead' && k !== '_a' && k !== 'hp') s[k] = best[k]; size[t] = [best.w, best.h]; sample[t] = s; });
+        e = pool.length >= 2 ? { n: arr.length, pool, size, sample, count: cnt, grid: true } : { n: arr.length, pool: Array.from(DISGUISE_IDS).filter(t => t !== 'tree'), size: {}, sample: {}, count: {}, grid: false };
+        _ph.set(arr, e); return e;
+    }
+    const phSize = (map, t) => phInfo(map).size[t] || [PH_CELL, PH_CELL];
+    // центр маскування розміру w×h, «прилиплий» до сітки (лівий-верхній кут кратний 50)
+    const phSnap = (x, y, w, h) => ({ x: Math.round((x - w / 2) / PH_CELL) * PH_CELL + w / 2, y: Math.round((y - h / 2) / PH_CELL) * PH_CELL + h / 2 });
+    // об'єкт для малювання маскування з центром (cx, cy): копія типового об'єкта мапи (колір, смуги…) або простий 50×50
+    function phObj(map, t, cx, cy) {
+        const s = phInfo(map).sample[t], w = s ? s.w : PH_CELL, h = s ? s.h : PH_CELL;
+        return Object.assign({ type: t, w, h, r: Math.min(w, h) / 2 }, s || {}, { x: cx - w / 2, y: cy - h / 2 });
+    }
     const isDoor = o => typeof o.type === 'string' && o.type.indexOf('prop_door_') === 0;
     const isCircular = o => o.type === 'tree' || o.type === 'neon_circle' || o.type === 'neon_pillar';
     const isSolidType = o => !(o.type.indexOf('spawn') >= 0 || o.type === 'line' || NONSOLID.has(o.type));
@@ -413,35 +439,41 @@ var MapObj = (function () {
     function srand(seed) { let a = seed >>> 0; return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
     const seedOf = o => ((Math.round(o.x) * 73856093) ^ (Math.round(o.y) * 19349663)) >>> 0;
     const PLANK_K = [0.86, 0.92, 0.97, 1, 1.04, 1.09, 1.14];
+    // CLIP — прямокутник, який зараз малюється (чанк мапи): великі підлоги перебирають лише плитки в ньому, а не всю будівлю
+    let CLIP = null;
+    function setClip(r) { CLIP = r || null; }
     function drawFloor(c, o) {
         const x = o.x, y = o.y, w = o.w || 50, h = o.h || 50, base = o.color || '#a8763e';
+        const rng = (T, a0, len, lo, hi) => [CLIP ? Math.max(0, Math.floor((lo - a0) / T)) : 0, Math.min(Math.ceil(len / T), CLIP ? Math.ceil((hi - a0) / T) + 1 : Math.ceil(len / T))];
+        const out = (rx, ry, rw, rh) => CLIP && (rx > CLIP.x1 || rx + rw < CLIP.x0 || ry > CLIP.y1 || ry + rh < CLIP.y0);
         c.fillStyle = base; c.fillRect(x, y, w, h);
         c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
         if (o.neon) {   // плитка-шахматка color/neon
-            const T = 40; c.fillStyle = o.neon;
-            for (let iy = 0; iy * T < h; iy++) for (let ix = 0; ix * T < w; ix++) if ((ix + iy) & 1) c.fillRect(x + ix * T, y + iy * T, T, T);
+            const T = 40; c.fillStyle = o.neon; const [ax0, ax1] = rng(T, x, w, CLIP && CLIP.x0, CLIP && CLIP.x1), [ay0, ay1] = rng(T, y, h, CLIP && CLIP.y0, CLIP && CLIP.y1);
+            for (let iy = ay0; iy < ay1; iy++) for (let ix = ax0; ix < ax1; ix++) if ((ix + iy) & 1) c.fillRect(x + ix * T, y + iy * T, T, T);
             c.strokeStyle = 'rgba(0,0,0,0.16)'; c.lineWidth = 1; c.beginPath();
             for (let ix = 1; ix * T < w; ix++) { c.moveTo(x + ix * T, y); c.lineTo(x + ix * T, y + h); }
             for (let iy = 1; iy * T < h; iy++) { c.moveTo(x, y + iy * T); c.lineTo(x + w, y + iy * T); }
             c.stroke();
         } else if (o.fs === 'plate') {      // металеві плити 80 px зі швами й заклепками (склади, цехи, космос)
-            const T = 80, R = srand(seedOf(o));
-            for (let iy = 0; iy * T < h; iy++) for (let ix = 0; ix * T < w; ix++) { c.fillStyle = tint(base, 0.9 + R() * 0.2); c.fillRect(x + ix * T, y + iy * T, T, T); }
+            const T = 80, R0 = seedOf(o), [ax0, ax1] = rng(T, x, w, CLIP && CLIP.x0, CLIP && CLIP.x1), [ay0, ay1] = rng(T, y, h, CLIP && CLIP.y0, CLIP && CLIP.y1);
+            for (let iy = ay0; iy < ay1; iy++) for (let ix = ax0; ix < ax1; ix++) { const v = ((ix * 73856093) ^ (iy * 19349663) ^ R0) >>> 0; c.fillStyle = tint(base, 0.9 + (v % 1000) / 5000); c.fillRect(x + ix * T, y + iy * T, T, T); }
             c.strokeStyle = 'rgba(0,0,0,0.45)'; c.lineWidth = 2; c.beginPath();
             for (let ix = 1; ix * T < w; ix++) { c.moveTo(x + ix * T, y); c.lineTo(x + ix * T, y + h); }
             for (let iy = 1; iy * T < h; iy++) { c.moveTo(x, y + iy * T); c.lineTo(x + w, y + iy * T); }
             c.stroke(); c.fillStyle = 'rgba(255,255,255,0.22)';
-            for (let iy = 0; iy * T < h; iy++) for (let ix = 0; ix * T < w; ix++) { const px = x + ix * T, py = y + iy * T; c.fillRect(px + 6, py + 6, 3, 3); c.fillRect(px + T - 9, py + 6, 3, 3); c.fillRect(px + 6, py + T - 9, 3, 3); c.fillRect(px + T - 9, py + T - 9, 3, 3); }
+            for (let iy = ay0; iy < ay1; iy++) for (let ix = ax0; ix < ax1; ix++) { const px = x + ix * T, py = y + iy * T; c.fillRect(px + 6, py + 6, 3, 3); c.fillRect(px + T - 9, py + 6, 3, 3); c.fillRect(px + 6, py + T - 9, 3, 3); c.fillRect(px + T - 9, py + T - 9, 3, 3); }
         } else if (o.fs === 'tile') {       // світла плитка 40 px (хол, їдальня, крамниці)
-            const T = 40, R = srand(seedOf(o));
-            for (let iy = 0; iy * T < h; iy++) for (let ix = 0; ix * T < w; ix++) { c.fillStyle = tint(base, ((ix + iy) & 1 ? 0.94 : 1.03) + R() * 0.03); c.fillRect(x + ix * T, y + iy * T, T, T); }
+            const T = 40, R0 = seedOf(o), [ax0, ax1] = rng(T, x, w, CLIP && CLIP.x0, CLIP && CLIP.x1), [ay0, ay1] = rng(T, y, h, CLIP && CLIP.y0, CLIP && CLIP.y1);
+            for (let iy = ay0; iy < ay1; iy++) for (let ix = ax0; ix < ax1; ix++) { const v = ((ix * 73856093) ^ (iy * 19349663) ^ R0) >>> 0; c.fillStyle = tint(base, ((ix + iy) & 1 ? 0.94 : 1.03) + (v % 100) / 3300); c.fillRect(x + ix * T, y + iy * T, T, T); }
             c.strokeStyle = 'rgba(0,0,0,0.12)'; c.lineWidth = 1; c.beginPath();
             for (let ix = 1; ix * T < w; ix++) { c.moveTo(x + ix * T, y); c.lineTo(x + ix * T, y + h); }
             for (let iy = 1; iy * T < h; iy++) { c.moveTo(x, y + iy * T); c.lineTo(x + w, y + iy * T); }
             c.stroke();
         } else if (o.fs === 'carpet') {     // ковролін: однотонний із дрібною фактурою (офіси, студії)
             const R = srand(seedOf(o)), n = Math.min(900, Math.round(w * h / 300));
-            for (let k = 0; k < n; k++) { c.fillStyle = R() < 0.5 ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.05)'; c.fillRect(x + R() * w, y + R() * h, 2, 2); }
+            c.fillStyle = 'rgba(0,0,0,0.08)'; for (let k = 0; k < n; k++) { const px = x + R() * w, py = y + R() * h, d = R() < 0.5; if (d && !out(px, py, 2, 2)) c.fillRect(px, py, 2, 2); }
+            c.fillStyle = 'rgba(255,255,255,0.05)'; const R2 = srand(seedOf(o) + 7); for (let k = 0; k < n; k++) { const px = x + R2() * w, py = y + R2() * h, d = R2() < 0.5; if (d && !out(px, py, 2, 2)) c.fillRect(px, py, 2, 2); }
         } else {        // дерев'яні дошки вздовж довшої осі
             const R = srand(seedOf(o)), horiz = w >= h, len = horiz ? w : h, wid = horiz ? h : w, RH = 22;
             c.beginPath();
@@ -449,7 +481,7 @@ var MapObj = (function () {
                 const rh = Math.min(RH, wid - p); let q = -R() * 150;
                 while (q < len) {
                     const l = 110 + R() * 90, a = Math.max(q, 0), b2 = Math.min(q + l, len);
-                    if (b2 > a) { c.fillStyle = tint(base, PLANK_K[(R() * 7) | 0]); if (horiz) c.fillRect(x + a, y + p, b2 - a, rh); else c.fillRect(x + p, y + a, rh, b2 - a); }
+                    if (b2 > a) { const kk = PLANK_K[(R() * 7) | 0]; if (horiz ? !out(x + a, y + p, b2 - a, rh) : !out(x + p, y + a, rh, b2 - a)) { c.fillStyle = tint(base, kk); if (horiz) c.fillRect(x + a, y + p, b2 - a, rh); else c.fillRect(x + p, y + a, rh, b2 - a); } }
                     if (q + l < len && q + l > 0) { if (horiz) { c.moveTo(x + q + l, y + p); c.lineTo(x + q + l, y + p + rh); } else { c.moveTo(x + p, y + q + l); c.lineTo(x + p + rh, y + q + l); } }
                     q += l;
                 }
@@ -742,7 +774,7 @@ var MapObj = (function () {
             case 'prop_server': {   // серверна стійка: темний корпус і ряди індикаторів
                 c.fillStyle = '#0f172a'; c.fillRect(x, y, w, h); c.strokeStyle = '#334155'; c.lineWidth = 2; c.strokeRect(x, y, w, h);
                 const rows = Math.max(3, Math.round(h / 12));
-                for (let k = 0; k < rows; k++) { const ry = y + 4 + k * (h - 8) / rows; c.fillStyle = '#1e293b'; c.fillRect(x + 4, ry, w - 8, (h - 8) / rows - 2); c.fillStyle = (Math.sin(t * 4 + k * 1.7 + x) > 0.2) ? '#22c55e' : '#14532d'; c.fillRect(x + w - 12, ry + 2, 4, 3); c.fillStyle = '#38bdf8'; c.fillRect(x + w - 20, ry + 2, 4, 3); } break; }
+                for (let k = 0; k < rows; k++) { const ry = y + 4 + k * (h - 8) / rows; c.fillStyle = '#1e293b'; c.fillRect(x + 4, ry, w - 8, (h - 8) / rows - 2); c.fillStyle = (Math.sin(k * 1.7 + x * 0.37 + y * 0.11) > 0.2) ? '#22c55e' : '#14532d'; c.fillRect(x + w - 12, ry + 2, 4, 3); c.fillStyle = '#38bdf8'; c.fillRect(x + w - 20, ry + 2, 4, 3); } break; }      // індикатори статичні: стійка кешується в шарі мапи
             case 'prop_sofa': {   // диван: спинка, підлокітники, подушки
                 c.fillStyle = '#4338ca'; c.beginPath(); c.roundRect(x, y, w, h, 8); c.fill();
                 c.fillStyle = '#3730a3'; c.fillRect(x + 3, y + 3, w - 6, h * 0.3); c.fillRect(x + 3, y + 3, w * 0.12, h - 6); c.fillRect(x + w * 0.88 - 3, y + 3, w * 0.12, h - 6);
@@ -865,7 +897,18 @@ var MapObj = (function () {
     // нові режими успадковують дозвіл базових: кооп/соло — як «Виживання», королівський бій і полювання — як «Детматч», захоплення точок — як «Командний»
     const MODE_ALIAS = { base_defense: 'survival', boss_raid: 'survival', convoy: 'survival', solo_arena: 'survival', boss_duel: 'survival', battle_royale: 'deathmatch', bounty: 'deathmatch', capture_points: 'team_deathmatch', rounds: 'team_deathmatch' };
     // мапа, де режим названо прямо, дозволена в ньому; старі мапи (без нових режимів у списку) діють за правилами базового режиму
-    function mapAllows(m, mode) { if (!m || !Array.isArray(m.modes) || !m.modes.length) return true; return m.modes.indexOf(mode) >= 0 || (!!MODE_ALIAS[mode] && m.modes.indexOf(MODE_ALIAS[mode]) >= 0); }
+    // Вбудовані мапи мають явний список режимів (tools/genmaps2.js, таблиця MODES_BY_MAP) — дозволені лише в них.
+    // Королівський бій — тільки на мапах, де його вказано явно (найбільші мапи). Старі мапи редактора (лише базові режими)
+    // успадковують нові режими від базових, як і раніше.
+    function mapAllows(m, mode) {
+        if (!m) return false;
+        const md = Array.isArray(m.modes) ? m.modes : [];
+        if (md.indexOf(mode) >= 0) return true;
+        if (mode === 'battle_royale') return false;
+        if (!md.length) return true;
+        const legacy = !md.some(x => MODE_ALIAS[x]);
+        return legacy && !!MODE_ALIAS[mode] && md.indexOf(MODE_ALIAS[mode]) >= 0;
+    }
 
     const THEME_IDS = ['grass', 'sand', 'snow', 'stone', 'asphalt', 'metal', 'dirt', 'swamp', 'lava', 'tech', 'autumn', 'space', 'mars'];
     function sanitizeMap(raw) {
@@ -922,7 +965,7 @@ var MapObj = (function () {
     const api = {
         D2R, DOOR_TRIGGER, DOOR_PASS, PROPS_BASE, PROPS_WOOD, PROPS_EXTRA, DOORS, DOOR_BY_ID, NONSOLID, ALL_TYPES,
         isDoor, isCircular, isSolidType, center, applyRot, toLocal, distToSeg, pointInPoly, circleInPoly, hasShape, pointInObject,
-        collides, collidesNaive, invalidateIndex, DESTR, isDestr, destrList, destrAt, drawRubble, SURF, surfacesOf, surfAt, surfSpeed, surfIce, drawSurfaces, biomeAt, biomePoly, biomeBBox, polyOf, circleHitsPoly, DISGUISE_GROUPS, DISGUISE_IDS, DISGUISE_SHAPES, drawDisguise, doorNear, updateDoors, resetDoors, shapeBounds, drawProp, sanitizeMap, MODES, mapAllows, THEME_IDS
+        collides, collidesNaive, invalidateIndex, setClip, DESTR, isDestr, destrList, destrAt, drawRubble, SURF, surfacesOf, surfAt, surfSpeed, surfIce, drawSurfaces, biomeAt, biomePoly, biomeBBox, polyOf, circleHitsPoly, DISGUISE_GROUPS, DISGUISE_IDS, DISGUISE_SHAPES, drawDisguise, PH_CELL, phAligned, phInfo, phSize, phSnap, phObj, nameOf, doorNear, updateDoors, resetDoors, shapeBounds, drawProp, sanitizeMap, MODES, mapAllows, THEME_IDS
     };
     return api;
 })();

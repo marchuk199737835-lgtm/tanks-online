@@ -169,7 +169,7 @@
     function buildHud() {
         var gs = $('game-screen'); if (!gs || hud) return;
         hud = document.createElement('div'); hud.id = 'cls-hud'; hud.className = 'hidden';
-        hud.innerHTML = '<button type="button" id="cls-ab" aria-label="Здібність"><i></i><em></em><kbd>E</kbd></button><div class="cls-hud-t"><b id="cls-ab-n"></b><small id="cls-ab-s"></small></div><div id="cls-lives" class="hidden"></div>';
+        hud.innerHTML = '<button type="button" id="cls-ab" aria-label="Здібність"><i></i><em></em><kbd>' + (window.KB ? KB.label('ability') : 'E') + '</kbd></button><div class="cls-hud-t"><b id="cls-ab-n"></b><small id="cls-ab-s"></small></div><div id="cls-lives" class="hidden"></div>';
         gs.appendChild(hud); abBtn = $('cls-ab');
         var fire = function (e) { if (e) { e.preventDefault(); e.stopPropagation(); } useAbility(); };
         abBtn.addEventListener('touchstart', fire, { passive: false });
@@ -187,7 +187,7 @@
         socket.emit('useAbility', d);
     }
     document.addEventListener('keydown', function (e) {
-        if (e.repeat || (e.key !== 'e' && e.key !== 'E' && e.key !== 'у' && e.key !== 'У' && e.code !== 'KeyE')) return;
+        if (e.repeat || !window.KB || !KB.is(e, 'ability')) return;
         var t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
         if (!active()) return; e.preventDefault(); useAbility();
     });

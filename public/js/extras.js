@@ -67,11 +67,11 @@
     window.addEventListener('keydown', function (e) {
         var tg = e.target, typing = tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA' || tg.isContentEditable);
         if (typing || !inGame()) return;
-        var k = (e.key || '').toLowerCase();
-        if (k === 'q' || k === 'й') { e.preventDefault(); menuOpen() ? closeMenu() : openMenu(); return; }
+        if (window.KB && KB.is(e, 'emote')) { if (!e.repeat) { e.preventDefault(); menuOpen() ? closeMenu() : openMenu(); } return; }
         if (menuOpen()) {
-            if (/^[1-6]$/.test(e.key)) { e.preventDefault(); sendEmo(+e.key - 1); }
-            else if (k === 'escape') { e.preventDefault(); closeMenu(); }
+            var dg = window.KB ? KB.digit(e) : (/^[1-6]$/.test(e.key) ? +e.key : -1);
+            if (dg >= 1 && dg <= 6) { e.preventDefault(); sendEmo(dg - 1); }
+            else if (e.key === 'Escape') { e.preventDefault(); closeMenu(); }
         }
     }, true);
     // кнопка для дотику

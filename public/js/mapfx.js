@@ -523,9 +523,11 @@ var MapFX = (function () {
         return e;
     }
     // view {x0,x1,y0,y1}; (px,py) — центр локального танка (або камери, якщо мертвий); dt — секунди
-    function drawRoofs(c, solids, view, px, py, dt) {
+    // baseS — базовий масштаб (без динамічного зуму камери): спрайти дахів будуються під нього й лише розтягуються під зум.
+    // Раніше спрайт прив'язувався до поточного масштабу, тож кожна зміна зуму (швидкість, вороги поруч) перемальовувала всі видимі дахи — на великих мапах це «вбивало» FPS.
+    function drawRoofs(c, solids, view, px, py, dt, baseS) {
         const list = roofsOf(solids), k = Math.min(1, (dt || 0.016) * 7);
-        const T = c.getTransform(), sc = Math.round(T.a * 10000) / 10000, flat = !T.b && !T.c && T.a === T.d;
+        const T = c.getTransform(), flat = !T.b && !T.c && T.a === T.d, sc = baseS ? Math.round(baseS * 10000) / 10000 : Math.round(T.a * 10000) / 10000, zk = T.a / sc, zs = Math.abs(zk - 1) > 0.002;
         for (let i = 0; i < list.length; i++) {
             const o = list[i], w = o.w || 50, h = o.h || 50;
             const cx = o.x + w / 2, cy = o.y + h / 2, rr = Math.hypot(w, h) / 2 + 60;
@@ -540,7 +542,8 @@ var MapFX = (function () {
             if (!sp) { c.save(); MO.applyRot(c, o); MO.drawProp(c, o, 0); c.restore(); continue; }   // надвеликий дах — як раніше, наживо
             if (a < 0.999) c.globalAlpha = a;
             if (o.rot || !flat) { c.save(); MO.applyRot(c, o); c.drawImage(sp.cv, sp.bx, sp.by, sp.w, sp.h); c.restore(); }
-            else { c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(sp.cv, Math.round(T.e + sc * sp.bx), Math.round(T.f + sc * sp.by)); c.setTransform(T); }   // 1:1 по пікселях — без розмиття
+            else if (!zs) { c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(sp.cv, Math.round(T.e + sc * sp.bx), Math.round(T.f + sc * sp.by)); c.setTransform(T); }   // 1:1 по пікселях — без розмиття
+            else { c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(sp.cv, Math.round(T.e + T.a * sp.bx), Math.round(T.f + T.a * sp.by), Math.round(sp.pw * zk), Math.round(sp.ph * zk)); c.setTransform(T); }   // під зум камери — розтягуємо готовий спрайт
             c.globalAlpha = 1;
         }
     }

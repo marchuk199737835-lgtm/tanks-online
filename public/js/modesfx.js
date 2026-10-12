@@ -185,7 +185,7 @@
         const t0 = performance.now(), bar = perkEl.querySelector('.pk-time i');
         perkT = setInterval(() => { const k = 1 - (performance.now() - t0) / d.ms; if (bar) bar.style.width = Math.max(0, k * 100) + '%'; if (k <= 0) closePerk(); }, 100);
     }
-    window.addEventListener('keydown', e => { if (perkEl && perkEl._ids && /^[1-3]$/.test(e.key)) { const id = perkEl._ids[+e.key - 1]; if (id) perkEl._pick(id); } });
+    window.addEventListener('keydown', e => { const dg = window.KB ? KB.digit(e) : (/^[1-3]$/.test(e.key) ? +e.key : -1); if (perkEl && perkEl._ids && dg >= 1 && dg <= 3) { const id = perkEl._ids[dg - 1]; if (id) perkEl._pick(id); } });
     socket.on('perkOffer', showPerks);
     socket.on('perkState', d => { window.PERK = { spd: d.spd || 1, cd: d.cd || 1 }; });
     socket.on('modeEvent', onEvent);
