@@ -80,7 +80,7 @@ function buildSettingsPanel() {
         <label class="side-label">Текстура землі (стиль)</label>
         <select id="set-theme" class="side-input">
             <option value="">— плоска (стара) —</option><option value="grass">🌿 Трава</option><option value="sand">🏜 Пісок</option><option value="snow">❄️ Сніг</option><option value="stone">🏛 Кам'яні плити</option>
-            <option value="asphalt">🛣 Асфальт</option><option value="metal">⚙️ Метал</option><option value="dirt">🟤 Ґрунт</option><option value="swamp">🐸 Болото</option><option value="lava">🌋 Лава / вулкан</option><option value="tech">🔷 Техно</option><option value="autumn">🍂 Осінь</option>
+            <option value="asphalt">🛣 Асфальт</option><option value="metal">⚙️ Метал</option><option value="dirt">🟤 Ґрунт</option><option value="swamp">🐸 Болото</option><option value="lava">🌋 Лава / вулкан</option><option value="tech">🔷 Техно</option><option value="autumn">🍂 Осінь</option><option value="space">🚀 Космос / станція</option><option value="mars">🪐 Марс</option>
         </select>
         <label class="side-label">Підлога (основний колір)</label><input type="color" id="set-bg" class="w-full h-8 mb-3 bg-transparent cursor-pointer">
         <label class="side-label">Сітка</label><input type="color" id="set-grid" class="w-full h-8 mb-3 bg-transparent cursor-pointer">

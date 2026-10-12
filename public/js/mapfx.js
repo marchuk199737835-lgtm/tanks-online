@@ -45,10 +45,14 @@ var MapFX = (function () {
         lava:    { kind: 'lava',    water: ['#7c1d0b', '#f97316', '#fde68a'], tree: { kind: 'dead', cols: ['#1c1917', '#292524', '#44403c', '#78716c'] }, wall: '#3f3a40' },
         tech:    { kind: 'tech',    water: ['#082f49', '#0ea5e9', '#a5f3fc'], tree: { kind: 'leaf', cols: ['#134e4a', '#0f766e', '#14b8a6', '#5eead4'] }, wall: '#334155' },
         // осінь: бура/охриста земля з опалим листям; дерева — рудо-червоні, помаранчеві й жовті (3 варіанти палітри)
-        autumn:  { kind: 'autumn',  water: ['#0b5f86', '#38a3c8', '#d9f4ff'], tree: { kind: 'leaf', cols: ['#7a2a10', '#b8431a', '#e0801e', '#fcd34d'], alts: [['#7a2a10', '#b8431a', '#e0801e', '#fcd34d'], ['#6b3a0c', '#c2640f', '#e9a020', '#fde68a'], ['#6a1d12', '#a3281b', '#d4501f', '#fbbf6a']] }, wall: '#7a5a3c' }
+        autumn:  { kind: 'autumn',  water: ['#0b5f86', '#38a3c8', '#d9f4ff'], tree: { kind: 'leaf', cols: ['#7a2a10', '#b8431a', '#e0801e', '#fcd34d'], alts: [['#7a2a10', '#b8431a', '#e0801e', '#fcd34d'], ['#6b3a0c', '#c2640f', '#e9a020', '#fde68a'], ['#6a1d12', '#a3281b', '#d4501f', '#fbbf6a']] }, wall: '#7a5a3c' },
+        // космос: палуба станції / корабля — темні сталеві плити, світлові смуги, попереджувальна розмітка; «вода» — енергетичне поле
+        space:   { kind: 'space',   water: ['#1e1b4b', '#6366f1', '#e0e7ff'], tree: { kind: 'leaf', cols: ['#134e4a', '#0f766e', '#14b8a6', '#5eead4'] }, wall: '#2b3448' },
+        // Марс: руда пилюка, каміння й кратери
+        mars:    { kind: 'mars',    water: ['#3b0d0c', '#9a3412', '#fdba74'], tree: { kind: 'dead', cols: ['#3f1d14', '#52261a', '#6b3424', '#a8563a'] }, wall: '#7a3b26' }
     };
     // типові кольори землі теми (коли в біома немає свого bg)
-    const DEFBG = { grass: '#5c8a45', sand: '#cfae72', snow: '#dce8f1', stone: '#8a8378', asphalt: '#44474c', metal: '#566270', dirt: '#7b5d3e', swamp: '#3b5440', lava: '#2a2220', tech: '#0e1a2b', autumn: '#8f6a3b' };
+    const DEFBG = { grass: '#5c8a45', sand: '#cfae72', snow: '#dce8f1', stone: '#8a8378', asphalt: '#44474c', metal: '#566270', dirt: '#7b5d3e', swamp: '#3b5440', lava: '#2a2220', tech: '#0e1a2b', autumn: '#8f6a3b', space: '#1b2131', mars: '#a4512f' };
     function themeOf(map) { return map && map.theme && THEMES[map.theme] || null; }
 
     // ---------- ЗЕМЛЯ (патерн 512×512 без швів) ----------
@@ -165,6 +169,28 @@ var MapFX = (function () {
             for (let i = 0; i < 640; i++) leaf(R() * TILE, R() * TILE, 2.2 + R() * 2.6, R() * 3.14, lc[(R() * 7) | 0], 0.55 + R() * 0.4);
             for (let i = 0; i < 26; i++) { const cx = R() * TILE, cy = R() * TILE, rad = 12 + R() * 16; for (let k = 0; k < 22; k++) { const a = R() * 6.283, d = Math.sqrt(R()) * rad; leaf(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 2.4 + R() * 2.4, R() * 3.14, lc[(R() * 7) | 0], 0.75 + R() * 0.25); } }
             for (let i = 0; i < 30; i++) { g.strokeStyle = rgba('#3b2410', 0.4); g.lineWidth = 1.2; W(R() * TILE, R() * TILE, 12, (px, py) => { const a = R() * 3.14, l = 5 + R() * 8; g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(a) * l, py + Math.sin(a) * l); g.stroke(); }); }
+        },
+        space(g, b, R) {      // плити 128 px зі швами, заклепками, вентиляційними ґратками й світловими смугами
+            const S = 128;
+            for (let gy = 0; gy < TILE / S; gy++) for (let gx = 0; gx < TILE / S; gx++) {
+                const x0 = gx * S, y0 = gy * S; g.fillStyle = shade(b, 0.88 + R() * 0.24); g.fillRect(x0, y0, S, S);
+                const gr = g.createLinearGradient(x0, y0, x0 + S, y0 + S); gr.addColorStop(0, 'rgba(255,255,255,0.06)'); gr.addColorStop(1, 'rgba(0,0,0,0.18)'); g.fillStyle = gr; g.fillRect(x0, y0, S, S);
+                g.fillStyle = 'rgba(0,0,0,0.6)'; g.fillRect(x0, y0, S, 2); g.fillRect(x0, y0, 2, S); g.fillStyle = 'rgba(148,163,184,0.16)'; g.fillRect(x0 + 2, y0 + 2, S - 3, 1); g.fillRect(x0 + 2, y0 + 2, 1, S - 3);
+                [[8, 8], [S - 8, 8], [8, S - 8], [S - 8, S - 8]].forEach(p => { g.fillStyle = 'rgba(0,0,0,0.5)'; g.beginPath(); g.arc(x0 + p[0] + 0.6, y0 + p[1] + 0.6, 2.2, 0, 6.283); g.fill(); g.fillStyle = shade(b, 1.5); g.beginPath(); g.arc(x0 + p[0], y0 + p[1], 1.7, 0, 6.283); g.fill(); });
+                const k = R();
+                if (k < 0.18) { g.fillStyle = 'rgba(0,0,0,0.45)'; g.fillRect(x0 + 34, y0 + 34, 60, 60); g.fillStyle = 'rgba(148,163,184,0.18)'; for (let q = 0; q < 6; q++) g.fillRect(x0 + 38, y0 + 40 + q * 9, 52, 3); }
+                else if (k < 0.3) { g.fillStyle = 'rgba(56,189,248,0.22)'; g.fillRect(x0 + 10, y0 + S / 2 - 3, S - 20, 6); g.fillStyle = 'rgba(165,243,252,0.55)'; g.fillRect(x0 + 10, y0 + S / 2 - 1, S - 20, 2); }
+                else if (k < 0.36) { g.save(); g.beginPath(); g.rect(x0 + 6, y0 + S - 22, S - 12, 14); g.clip(); for (let q = -20; q < S; q += 16) { g.fillStyle = (q / 16 | 0) % 2 ? '#facc15' : '#1f2937'; g.beginPath(); g.moveTo(x0 + q, y0 + S - 8); g.lineTo(x0 + q + 8, y0 + S - 22); g.lineTo(x0 + q + 16, y0 + S - 22); g.lineTo(x0 + q + 8, y0 + S - 8); g.fill(); } g.restore(); }
+            }
+            for (let i = 0; i < 900; i++) { g.fillStyle = R() < 0.5 ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.035)'; g.fillRect(R() * TILE, R() * TILE, 1.5, 1); }
+            blotches(g, R, 10, '#000000', 0.12, 50, 120);
+        },
+        mars(g, b, R) {       // руда пилюка з дрібним камінням, розводами й маленькими кратерами
+            blotches(g, R, 30, shade(b, 1.25), 0.18, 50, 140); blotches(g, R, 30, shade(b, 0.62), 0.24, 50, 140); blotches(g, R, 10, '#3b0d0c', 0.12, 60, 140);
+            g.lineCap = 'round';
+            for (let i = 0; i < 30; i++) { const x = R() * TILE, y = R() * TILE, n = 6 + (R() * 8 | 0), pts = []; for (let k = 0; k < n; k++) pts.push([x + k * 15, y + Math.sin(k * 0.7 + i) * 4]); g.strokeStyle = rgba(shade(b, 0.7), 0.35); g.lineWidth = 1.5; polyline(g, pts, 200); }
+            for (let i = 0; i < 12; i++) { const x = R() * TILE, y = R() * TILE, r = 8 + R() * 14; W(x, y, r + 4, (px, py) => { g.fillStyle = rgba(shade(b, 0.5), 0.35); g.beginPath(); g.arc(px, py, r, 0, 6.283); g.fill(); g.strokeStyle = rgba(shade(b, 1.35), 0.35); g.lineWidth = 2; g.beginPath(); g.arc(px - 1, py - 1, r, 3.6, 5.6); g.stroke(); }); }
+            for (let i = 0; i < 380; i++) { const r = 0.8 + R() * 2.2; g.fillStyle = R() < 0.5 ? rgba(shade(b, 0.45), 0.55) : rgba(shade(b, 1.4), 0.45); W(R() * TILE, R() * TILE, 4, (px, py) => { g.beginPath(); g.ellipse(px, py, r, r * 0.7, 0, 0, 6.283); g.fill(); }); }
         }
     };
     function groundTile(kind, base) {

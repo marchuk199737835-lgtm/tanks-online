@@ -424,6 +424,24 @@ var MapObj = (function () {
             for (let ix = 1; ix * T < w; ix++) { c.moveTo(x + ix * T, y); c.lineTo(x + ix * T, y + h); }
             for (let iy = 1; iy * T < h; iy++) { c.moveTo(x, y + iy * T); c.lineTo(x + w, y + iy * T); }
             c.stroke();
+        } else if (o.fs === 'plate') {      // металеві плити 80 px зі швами й заклепками (склади, цехи, космос)
+            const T = 80, R = srand(seedOf(o));
+            for (let iy = 0; iy * T < h; iy++) for (let ix = 0; ix * T < w; ix++) { c.fillStyle = tint(base, 0.9 + R() * 0.2); c.fillRect(x + ix * T, y + iy * T, T, T); }
+            c.strokeStyle = 'rgba(0,0,0,0.45)'; c.lineWidth = 2; c.beginPath();
+            for (let ix = 1; ix * T < w; ix++) { c.moveTo(x + ix * T, y); c.lineTo(x + ix * T, y + h); }
+            for (let iy = 1; iy * T < h; iy++) { c.moveTo(x, y + iy * T); c.lineTo(x + w, y + iy * T); }
+            c.stroke(); c.fillStyle = 'rgba(255,255,255,0.22)';
+            for (let iy = 0; iy * T < h; iy++) for (let ix = 0; ix * T < w; ix++) { const px = x + ix * T, py = y + iy * T; c.fillRect(px + 6, py + 6, 3, 3); c.fillRect(px + T - 9, py + 6, 3, 3); c.fillRect(px + 6, py + T - 9, 3, 3); c.fillRect(px + T - 9, py + T - 9, 3, 3); }
+        } else if (o.fs === 'tile') {       // світла плитка 40 px (хол, їдальня, крамниці)
+            const T = 40, R = srand(seedOf(o));
+            for (let iy = 0; iy * T < h; iy++) for (let ix = 0; ix * T < w; ix++) { c.fillStyle = tint(base, ((ix + iy) & 1 ? 0.94 : 1.03) + R() * 0.03); c.fillRect(x + ix * T, y + iy * T, T, T); }
+            c.strokeStyle = 'rgba(0,0,0,0.12)'; c.lineWidth = 1; c.beginPath();
+            for (let ix = 1; ix * T < w; ix++) { c.moveTo(x + ix * T, y); c.lineTo(x + ix * T, y + h); }
+            for (let iy = 1; iy * T < h; iy++) { c.moveTo(x, y + iy * T); c.lineTo(x + w, y + iy * T); }
+            c.stroke();
+        } else if (o.fs === 'carpet') {     // ковролін: однотонний із дрібною фактурою (офіси, студії)
+            const R = srand(seedOf(o)), n = Math.min(900, Math.round(w * h / 300));
+            for (let k = 0; k < n; k++) { c.fillStyle = R() < 0.5 ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.05)'; c.fillRect(x + R() * w, y + R() * h, 2, 2); }
         } else {        // дерев'яні дошки вздовж довшої осі
             const R = srand(seedOf(o)), horiz = w >= h, len = horiz ? w : h, wid = horiz ? h : w, RH = 22;
             c.beginPath();
@@ -764,7 +782,7 @@ var MapObj = (function () {
     // далеко від точок появи та цілей режимів. Калюжі бруду (prop_puddle) — теж бруд, дороги — об'єкти «line».
     const SURF = { 1: { k: 'road', spd: 1.1 }, 2: { k: 'mud', spd: 0.85 }, 3: { k: 'sand', spd: 0.85 }, 4: { k: 'snow', spd: 0.85 }, 5: { k: 'ice', spd: 1, ice: true } };
     const SURF_ID = { road: 1, mud: 2, sand: 3, snow: 4, ice: 5 };
-    const SURF_BY_THEME = { snow: [['ice', 5], ['snow', 6]], swamp: [['mud', 9]], sand: [['sand', 8]], grass: [['mud', 5]], stone: [['mud', 3]], asphalt: [['mud', 2]] };
+    const SURF_BY_THEME = { snow: [['ice', 5], ['snow', 6]], swamp: [['mud', 9]], sand: [['sand', 8]], grass: [['mud', 5]], stone: [['mud', 3]], asphalt: [['mud', 2]], mars: [['sand', 7]], dirt: [['mud', 5]], autumn: [['mud', 4]] };
     const _sf = new WeakMap();
     function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
     function surfacesOf(map) {
@@ -849,7 +867,7 @@ var MapObj = (function () {
     // мапа, де режим названо прямо, дозволена в ньому; старі мапи (без нових режимів у списку) діють за правилами базового режиму
     function mapAllows(m, mode) { if (!m || !Array.isArray(m.modes) || !m.modes.length) return true; return m.modes.indexOf(mode) >= 0 || (!!MODE_ALIAS[mode] && m.modes.indexOf(MODE_ALIAS[mode]) >= 0); }
 
-    const THEME_IDS = ['grass', 'sand', 'snow', 'stone', 'asphalt', 'metal', 'dirt', 'swamp', 'lava', 'tech', 'autumn'];
+    const THEME_IDS = ['grass', 'sand', 'snow', 'stone', 'asphalt', 'metal', 'dirt', 'swamp', 'lava', 'tech', 'autumn', 'space', 'mars'];
     function sanitizeMap(raw) {
         if (!raw || typeof raw !== 'object') throw new Error('Порожні дані мапи');
         const size = Math.round(num(raw.size, 1000, 8000, 3000));
@@ -891,6 +909,7 @@ var MapObj = (function () {
                 if (o.r !== undefined) c.r = Math.round(num(o.r, 1, 2000, 30));
                 if (COLOR_RE.test(o.color)) c.color = o.color;
                 if (COLOR_RE.test(o.neon)) c.neon = o.neon; if (COLOR_RE.test(o.stripe)) c.stripe = o.stripe;
+                if (o.fs === 'plate' || o.fs === 'tile' || o.fs === 'carpet') c.fs = o.fs;      // вигляд підлоги будівлі
                 const rot = ((Math.round(num(o.rot, -3600, 3600, 0)) % 360) + 360) % 360; if (rot) c.rot = rot;
             }
             out.solids.push(c);
