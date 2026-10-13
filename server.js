@@ -894,11 +894,17 @@ function collectTokenFor(roomId, sockId, tid) {
 }
 
 // кінець детматчу: хтось зібрав жетони або вийшов час (тоді перемагає найбільше жетонів, за рівності — більше вбивств)
-function endDM(r, winId) {
+// Нагорода росте з метою (до DM_MAX_SCORE жетонів). Якщо час вийшов раніше — кожен отримує частку нагороди пропорційно зібраним жетонам
+// (раніше повна нагорода за мету 100+ жетонів давалась і тому, хто набрав 3 й дочекався таймера).
+const DM_MAX_SCORE = 50;
+function endDM(r, winId, timeUp) {
     r.status = 'finished'; const EF = effCtx(r);
-    let mt = 1 + Math.max(0, r.winScore - 5) * 0.10, bW = Math.round(10 * mt), bL = Math.round(2 * mt), rw = {}, xpm = {}, drp = {}, ocm = {};
+    const target = Math.max(5, Math.min(DM_MAX_SCORE, r.winScore | 0));
+    let mt = 1 + Math.max(0, target - 5) * 0.10, bW = Math.round(10 * mt), bL = Math.round(2 * mt), rw = {}, xpm = {}, drp = {}, ocm = {};
+    const share = p => timeUp ? Math.min(1, Math.max(0, (p.score | 0) / target)) : 1;
     Object.values(r.players).forEach(p => {
-        let a = EF(p, Math.round(p.id === winId ? bW : bL)); rw[p.id] = a; ocm[p.id] = p.id === winId ? 'win' : 'loss';
+        const base = p.id === winId ? Math.max(2, Math.round(bW * share(p))) : Math.max(1, Math.round(bL * share(p)));
+        let a = EF(p, base); rw[p.id] = a; ocm[p.id] = p.id === winId ? 'win' : 'loss';
         if (dbUsers[p.name]) {
             dbUsers[p.name].bucks += a; dbUsers[p.name].stats.earned += a; dbUsers[p.name].stats.matches++;
             xpm[p.id] = grantXp(p.name, p.id === winId ? 'win' : 'loss');
@@ -915,7 +921,7 @@ function endDM(r, winId) {
 function dmTimeUp(r) {
     const t = matchTally.get(r.id), kd = t ? t.kd : {};
     const ps = Object.values(r.players).sort((a, b) => ((b.score | 0) - (a.score | 0)) || (((kd[b.name] || {}).k | 0) - ((kd[a.name] || {}).k | 0)));
-    if (ps.length) endDM(r, ps[0].id);
+    if (ps.length) endDM(r, ps[0].id, true);
 }
 
 // ===== Ефективність у PvP: вбивства додають до +4 кредитів, смерті трохи знижують; підсумок не вище за максимум, показаний у лобі =====
@@ -1249,7 +1255,7 @@ io.on('connection', (socket) => {
             id: rId, hostName: n, hostSocket: socket.id, mode: VALID_MODES.includes(c.mode) ? c.mode : 'deathmatch',
             map: pickMap(c.map, VALID_MODES.includes(c.mode) ? c.mode : 'deathmatch'),
             maxPlayers: Math.max(2, Math.min(10, parseInt(c.maxPlayers) || 6)),
-            winScore: clampInt(c.winScore, 5, 1000, 50),
+            winScore: clampInt(c.winScore, 5, DM_MAX_SCORE, 50),
             hideTime: clampInt(c.hideTime, 30, 200, 30), seekTime: clampInt(c.seekTime, 120, 600, 120),
             hunterCount: clampInt(c.hunterCount, 1, 9, 1), tdmTeams: clampInt(c.tdmTeams, 2, 4, 2),
             tdmTime: clampInt(c.tdmTime, 60, 300, 180), tdmScore: clampInt(c.tdmScore, 5, 50, 20),
@@ -1319,7 +1325,7 @@ io.on('connection', (socket) => {
             }
             if (d.map) r.map = pickMap(d.map, r.mode);
             if (d.maxPlayers) { r.mpPref = Math.max(2, Math.min(10, parseInt(d.maxPlayers) || 6)); if (!ModeInfo.isSolo(r.mode)) r.maxPlayers = r.mpPref; }
-            if (d.winScore) r.winScore = clampInt(d.winScore, 5, 1000, 50);
+            if (d.winScore) r.winScore = clampInt(d.winScore, 5, DM_MAX_SCORE, 50);
             if (d.hunterCount) {
                 r.hunterCount = Math.max(1, Math.min(9, Object.keys(r.players).length - 1, clampInt(d.hunterCount, 1, 9, 1)));
                 // якщо мисливців стало більше за ліміт - зайвих повертаємо до вибору команди

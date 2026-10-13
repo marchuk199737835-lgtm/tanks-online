@@ -234,7 +234,7 @@ module.exports = function (ctx) {
     }
     function randomCfg(mode) {
         const c = {};
-        if (mode === 'deathmatch') c.winScore = pick([15, 20, 30, 50, 50, 100]);
+        if (mode === 'deathmatch') c.winScore = pick([15, 20, 30, 40, 50, 50]);
         if (mode === 'team_deathmatch') { c.tdmTeams = Math.random() < 0.8 ? 2 : 3; c.tdmTime = pick([120, 180, 180, 240]); c.tdmScore = pick([10, 20, 20, 30]); c.tdmAutoBalance = Math.random() < 0.85; }
         if (mode === 'capture_points') { c.cpTeams = 2; c.cpPoints = pick([2, 3, 3, 4]); c.cpScore = pick([200, 300, 300, 400]); c.cpTime = pick([180, 300, 300]); }
         if (mode === 'battle_royale') { c.brTime = pick([180, 240, 300, 300]); c.brDmg = pick([4, 4, 5, 6]); c.brLoot = Math.random() < 0.8; }
@@ -245,7 +245,7 @@ module.exports = function (ctx) {
     function buildRoom(id, host, mode, map, maxPlayers, cfg) {
         const r = {
             id, hostName: host.name, hostSocket: host.id, mode, map, maxPlayers: clamp(maxPlayers, 2, 10),
-            winScore: ctx.clampInt(cfg.winScore, 5, 1000, 50), hideTime: 30, seekTime: 120, hunterCount: 1, tdmTeams: ctx.clampInt(cfg.tdmTeams, 2, 4, 2),
+            winScore: ctx.clampInt(cfg.winScore, 5, 50, 50), hideTime: 30, seekTime: 120, hunterCount: 1, tdmTeams: ctx.clampInt(cfg.tdmTeams, 2, 4, 2),
             tdmTime: ctx.clampInt(cfg.tdmTime, 60, 300, 180), tdmScore: ctx.clampInt(cfg.tdmScore, 5, 50, 20), tdmAutoBalance: cfg.tdmAutoBalance !== undefined ? !!cfg.tdmAutoBalance : true,
             status: 'lobby', state: 'waiting', phaseEndTime: 0, players: {}, powerups: {}, tokens: {}, zombies: {}, mines: {}, wave: 1, nextWaveTime: 0, lastPowerupSpawn: Date.now()
         };
