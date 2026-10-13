@@ -24,6 +24,10 @@
         { id: 'ranked', src: 'js/ranked.js', re: /^rk/,
           ev: ['rkInfo', 'rkQueue', 'rkError', 'rkFound', 'rkResult', 'rkClaimed'],
           cards: [{ id: 'mm-ranked', icon: '🏆', title: 'РЕЙТИНГОВИЙ РЕЖИМ', sub: 'Ранги · ліги · сезони', color: 'pink', bg: '⚔️' }] },
+        // «Арена ставок»: вантажиться й за першою подією (виклик на дуель від друга має з'явитись, навіть якщо розділ ще не відкривали)
+        { id: 'stakes', src: 'js/stakes.js', re: /^stk/, auto: true,
+          ev: ['stkState', 'stkMe', 'stkMsg', 'stkDuInv', 'stkDuGo', 'stkDuRes', 'stkDuGone', 'stkDuFail'],
+          cards: [{ id: 'mm-stakes', icon: '🎰', title: 'АРЕНА СТАВОК', sub: 'Батли кейсів · дуелі · джекпот', color: 'rose', bg: '💰' }] },
         { id: 'referral', src: 'js/referral.js', re: /^ref/,
           ev: ['refInfo', 'refError', 'refNotify'],
           cards: [{ id: 'mm-referral', icon: '🤝', title: 'ЗАПРОСИ ДРУГА', sub: 'Креди та кейси за друзів', color: 'teal', bg: '🎁' }] }

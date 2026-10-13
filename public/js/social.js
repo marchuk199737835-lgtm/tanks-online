@@ -52,6 +52,7 @@
         '.sc-b{font:inherit;font-size:11px;padding:7px 10px;border-radius:9px;border:1px solid rgba(148,163,184,.3);background:rgba(15,23,42,.8);color:#cbd5e1;cursor:pointer;transition:.18s;white-space:nowrap;min-height:32px}' +
         '.sc-b:hover:not(:disabled){border-color:#60a5fa;color:#fff;box-shadow:0 0 12px rgba(59,130,246,.4)}.sc-b:disabled{opacity:.38;cursor:not-allowed}' +
         '.sc-b.go{background:linear-gradient(135deg,#16a34a,#15803d);border-color:#4ade80;color:#fff}.sc-b.inv{background:linear-gradient(135deg,#f59e0b,#d97706);border-color:#fbbf24;color:#1c1202}.sc-b.no{border-color:rgba(248,113,113,.5);color:#fca5a5}.sc-b.ico{padding:7px 9px}' +
+        '.sc-b.duel{background:linear-gradient(135deg,#e11d48,#7c3aed);border-color:#fb7185;color:#fff}' +
         '.sc-b.no:hover:not(:disabled){border-color:#f87171;box-shadow:0 0 12px rgba(248,113,113,.45)}' +
         '.sc-empty{text-align:center;color:#64748b;padding:34px 18px;font-size:13px;line-height:1.6}.sc-empty big{display:block;font-size:44px;margin-bottom:8px;filter:grayscale(.3)}' +
         '.sc-add{padding:6px 4px}.sc-me{position:relative;padding:16px;border-radius:16px;margin:8px 0 14px;text-align:center;border:1px solid rgba(96,165,250,.4);background:radial-gradient(120% 140% at 50% 0,rgba(59,130,246,.28),rgba(15,23,42,.7))}' +
@@ -173,6 +174,9 @@
         if (f.online) {
             if (canJoin) acts += '<button class="sc-b go" data-a="join" data-l="' + esc(f.login) + '">➜ Приєднатись</button>';
             acts += '<button class="sc-b inv" data-a="inv" data-l="' + esc(f.login) + '"' + (canInv ? '' : ' disabled') + ' title="' + (canInviteNow() ? '' : 'Запрошувати можна, перебуваючи в лобі кімнати з вільними місцями') + '">⚔ Запросити</button>';
+            // дуель на кредити («Арена ставок»): лише з меню, коли обидва не в бою
+            var canDu = !bt && !(s && s.t === 'battle') && !mineId;
+            acts += '<button class="sc-b duel" data-a="duel" data-l="' + esc(f.login) + '" data-n="' + esc(dname(f)) + '"' + (canDu ? '' : ' disabled') + ' title="Дуель 1×1 на кредити">💰 Дуель</button>';
         }
         if (window.Profile && Profile.open) acts += '<button class="sc-b ic" data-a="prof" data-l="' + esc(f.login) + '" title="Профіль">👤</button>';
         acts += '<button class="sc-b ico no" data-a="del" data-l="' + esc(f.login) + '" title="Видалити з друзів">✕</button>';
@@ -243,6 +247,10 @@
         else if (a === 'inv') invite(l, b);
         else if (a === 'join') { emit('socialJoinFriend', { login: l }); }
         else if (a === 'prof') { try { Profile.open(l); } catch (er) {} }
+        else if (a === 'duel') {      // «Арена ставок»: вікно виклику (модуль підвантажується за потреби)
+            var nm = b.dataset.n || l, go2 = function () { if (window.Stakes && Stakes.duel) Stakes.duel(l, nm); };
+            if (window.Stakes) go2(); else if (window.Lazy) { Lazy.load('stakes'); var k = 0, w = setInterval(function () { if (window.Stakes || ++k > 60) { clearInterval(w); go2(); } }, 100); }
+        }
         else if (a === 'del') {
             var f = S.friends.filter(function (x) { return x.login === l; })[0];
             var go = function () { emit('socialRemove', { login: l }); };

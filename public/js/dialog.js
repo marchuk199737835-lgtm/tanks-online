@@ -78,8 +78,13 @@
     function inMatch() { return typeof currentRoomData !== 'undefined' && currentRoomData && currentRoomData.status === 'playing' && typeof currentRoomId !== 'undefined' && currentRoomId; }
     function leaveMatch() {
         if (!inMatch()) return;
-        const ranked = !!currentRoomData.rk;
-        uiDialog.confirm(ranked ? {
+        const ranked = !!currentRoomData.rk, duel = !!currentRoomData.du;
+        uiDialog.confirm(duel ? {
+            kind: 'danger', icon: '🚪', title: 'Покинути дуель?',
+            text: 'Вихід із дуелі зараховується як поразка: ваша ставка дістанеться суперникові.',
+            rows: [['Ставка', '— ' + currentRoomData.du, 'bad']],
+            cancelText: 'Залишитись', okText: 'Здатися', danger: true
+        } : ranked ? {
             kind: 'danger', icon: '🚪', title: 'Покинути рейтинговий бій?',
             text: 'Вихід зараховується як поразка зі штрафом до рейтингу, а черга буде недоступна 3 хвилини. Ваше місце в команді займе інший танк.',
             rows: [['Рейтинг', '— поразка', 'bad'], ['Креди', '— 0', 'bad'], ['Черга', '3 хв', 'bad']],
@@ -97,6 +102,7 @@
             if (window.resetLobbyUI) resetLobbyUI();
             if (window.ModesFX) ModesFX.reset();
             if (typeof switchMusicState === 'function') switchMusicState('loby');
+            if (duel) { showScreen('main-menu-screen'); return; }
             if (ranked) { showScreen('main-menu-screen'); if (window.RankedUI) RankedUI.open(); if (window.uiToast) uiToast('Ви покинули рейтинговий бій: зараховано поразку', true); return; }
             showScreen('room-browser-screen');
             if (window.uiToast) uiToast('Ви вийшли з матчу без нагороди', true);

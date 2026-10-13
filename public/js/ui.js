@@ -14,7 +14,7 @@ const navU=document.getElementById('nav-upgrader-btn');if(navU)navU.onclick=()=>
 // 2) При переході на інший екран (особливо на старт матчу) закриваються всі вікна, відкриті поверх попереднього (профіль, картка гравця, клани, гаманець…).
 window.screenBusy=function(){const vis=id=>{const e=document.getElementById(id);return e&&!e.classList.contains('hidden');};if(vis('upgrader-screen')&&upgBusy)return 'Зачекай — йде синтез…';if(vis('roulette-modal'))return 'Зачекай — кейс ще відкривається…';return '';};
 window.closeOverlays=function(toGame){
-    ['Profile','Ranking','PlayerCard','Social','Referral','Credits','Progress','Wallet','RankedUI','Clans'].forEach(k=>{const o=window[k];if(o&&typeof o.close==='function'){try{o.close();}catch(e){}}});
+    ['Profile','Ranking','PlayerCard','Social','Referral','Credits','Progress','Wallet','RankedUI','Clans','Stakes'].forEach(k=>{const o=window[k];if(o&&typeof o.close==='function'){try{o.close();}catch(e){}}});
     try{if(window.LV&&LV.closeRewards)LV.closeRewards();}catch(e){}
     ['case-info-modal','case-confirm-modal','upg-error-modal','advent-modal','context-menu','create-room-modal','reward-modal','roulette-modal'].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.add('hidden');});
     // результати, що ще «в дорозі» (анімація рулетки/апгрейду), більше не вискочать на новому екрані

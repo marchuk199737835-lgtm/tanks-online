@@ -381,7 +381,11 @@ canvas { display: block; cursor: crosshair; }
 /* порядок карток (модулі додають їх у різний час) */
 #mm-quick { order: 0; } #nav-sessions-btn { order: 1; } #mm-ranked { order: 2; } #nav-hangar-btn { order: 3; } #nav-shop-btn { order: 4; } #nav-upgrader-btn { order: 5; }
 #mm-progress { order: 6; } #mm-profile-card { order: 7; } #mm-rating-card { order: 8; } #mm-clans { order: 9; } #mm-referral { order: 10; }
-#main-menu-screen .mm-grid-nav > .mm-card:not([id^="nav-"]):not(#mm-quick):not(#mm-ranked):not(#mm-progress):not(#mm-profile-card):not(#mm-rating-card):not(#mm-clans):not(#mm-referral) { order: 20; }
+#mm-stakes { order: 2; }
+#main-menu-screen .mm-grid-nav > .mm-card:not([id^="nav-"]):not(#mm-quick):not(#mm-ranked):not(#mm-progress):not(#mm-profile-card):not(#mm-rating-card):not(#mm-clans):not(#mm-referral):not(#mm-stakes) { order: 20; }
+/* «Арена ставок» — неонова картка з золотим відблиском */
+#mm-stakes { background: radial-gradient(120% 130% at 90% 0%, rgba(250,204,21,.55), rgba(225,29,72,.55) 42%, rgba(15,23,42,.95)); border-color: rgba(251,191,36,.75); }
+#mm-stakes .mm-card-ico { filter: drop-shadow(0 0 14px rgba(250,204,21,.8)); }
 /* ===== БАНЕР ПОДІЇ ===== */
 .ars-ev { width: 100%; max-width: 680px; flex-shrink: 0; }
 .evb { position: relative; overflow: hidden; border-radius: 16px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; min-height: 62px; color: #fff; }

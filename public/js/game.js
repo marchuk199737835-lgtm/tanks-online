@@ -825,6 +825,11 @@ socket.on('gameOver', (data) => {
         if (window.ModesFX) ModesFX.reset();
         if (window.RankedUI) RankedUI.onGameOver(data); return;
     }
+    if (currentRoomData && currentRoomData.du) {   // дуель на ставку: результат показує «Арена ставок» (stakes.js, подія stkDuRes)
+        document.getElementById('winner-modal').classList.add('hidden'); document.getElementById('damage-vignette').style.opacity = 0;
+        if (window.ModesFX) ModesFX.reset();
+        return;
+    }
     document.getElementById('winner-modal').classList.remove('hidden'); document.getElementById('damage-vignette').style.opacity = 0;
     if (window.LV) LV.animateXp((data.xp && data.xp[myId]) || null);
     let dN = document.getElementById('drop-notification');
