@@ -1,5 +1,5 @@
-/* stakes.js — «Арена ставок» (клієнт): батл кейсів, койнфліп, джекпот, краш, колесо, мінне поле, контракт обміну, лотерея, дуелі з друзями.
- * Сервер — stakes.js у корені, правила й числа — js/stakesinfo.js. Підвантажується ліниво (lazy.js), картка в меню — «АРЕНА СТАВОК».
+/* stakes.js — «Фортуна» (клієнт): батл кейсів, койнфліп, джекпот, колесо фортуни, дуелі з друзями.
+ * Сервер — stakes.js у корені, правила й числа — js/stakesinfo.js. Підвантажується ліниво (lazy.js), картка в меню — «ФОРТУНА».
  * Візуал легкий: CSS-анімації й два невеликі canvas (краш, колесо), що малюються лише коли їхня вкладка відкрита. */
 (function () {
     'use strict';
@@ -111,14 +111,8 @@
         '.wh-bets{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.wh-b{padding:9px 4px;border-radius:12px;border:1px solid color-mix(in srgb,var(--c) 70%,transparent);background:linear-gradient(160deg,color-mix(in srgb,var(--c) 45%,transparent),rgba(2,6,23,.85));color:#fff;cursor:pointer;text-align:center}' +
         '.wh-b b{display:block;font:400 18px "Russo One",Arial}.wh-b small{display:block;font-size:10.5px;color:#e2e8f0;margin-top:2px}.wh-b em{display:block;font-style:normal;font-size:10.5px;color:#fde68a;min-height:13px}.wh-b:disabled{opacity:.5;cursor:not-allowed}' +
         '.wh-hist{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}.wh-hist i{width:16px;height:16px;border-radius:5px;display:block}' +
-        // міни
-        '.mn-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;width:min(100%,380px);margin:0 auto}' +
-        '.mn-c{aspect-ratio:1;border-radius:12px;border:1px solid rgba(148,163,184,.25);background:linear-gradient(160deg,#312e81,#0f172a);font-size:clamp(20px,4.5vw,30px);color:#fff;cursor:pointer;transition:transform .12s,background .2s}.mn-c:hover:not(:disabled){transform:translateY(-2px);border-color:#a78bfa}' +
-        '.mn-c.ok{background:radial-gradient(circle,#065f46,#022c22);border-color:#34d399;animation:skPop .3s}.mn-c.boom{background:radial-gradient(circle,#b91c1c,#450a0a);border-color:#f87171;animation:skPop .3s}.mn-c.mine{background:radial-gradient(circle,#3f1d1d,#1c0a0a);opacity:.75}.mn-c:disabled{cursor:default}' +
-        '.mn-st{display:flex;justify-content:space-around;gap:8px;text-align:center;margin:8px 0}.mn-st b{display:block;font:400 20px "Russo One",Arial;color:#fde68a}.mn-st small{color:#a8a2c8;font-size:11px}' +
         // контракт / лотерея / скринька
         '.ct-slots{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px;margin:6px 0}.ct-slot{aspect-ratio:1;border-radius:9px;border:1px dashed rgba(148,163,184,.35);display:flex;align-items:center;justify-content:center}.ct-slot .sk-it{width:100%;height:100%}' +
-        '.ct-res{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px}.ct-res .sk-it{width:110px;height:110px;animation:ctIn 1.2s cubic-bezier(.2,1.3,.3,1)}.ct-res .sk-it .sk-pr{font-size:13px}@keyframes ctIn{0%{transform:scale(.2) rotate(-180deg);opacity:0}60%{transform:scale(1.15) rotate(10deg);opacity:1}100%{transform:none}}' +
         '.lt-big{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;text-align:center}.lt-big div{padding:10px 6px;border-radius:12px;background:rgba(2,6,23,.5)}.lt-big b{display:block;font:400 clamp(16px,3vw,24px) "Russo One",Arial;color:#fde68a}.lt-big small{color:#a8a2c8;font-size:11px}' +
         '.lt-pr{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:10px;background:rgba(2,6,23,.45);font-size:12.5px;margin-top:5px}.lt-pr b{font:400 16px "Russo One",Arial;width:24px;text-align:center}' +
         '.sk-hist{display:flex;flex-direction:column;gap:4px}.sk-hr{display:flex;gap:8px;align-items:center;font-size:12px;padding:5px 8px;border-radius:9px;background:rgba(2,6,23,.4)}.sk-hr .x{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#cbd5e1}.sk-hr .p{color:#4ade80;font-weight:800}.sk-hr .m{color:#f87171;font-weight:800}' +
@@ -133,18 +127,21 @@
         '#stk-dres h1{margin:0;font:400 clamp(34px,8vw,72px)/1 "Russo One",Arial;letter-spacing:.14em}#stk-dres.win h1{background:linear-gradient(180deg,#fff7cc,#fbbf24 60%,#b45309);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 22px rgba(251,191,36,.6))}#stk-dres.loss h1{color:#fca5a5}' +
         '#stk-dres p{font-size:15px;color:#e2e8f0}#stk-dres .pz{font:400 clamp(22px,4vw,34px) "Russo One",Arial;margin:12px 0}' +
         '@media (max-width:820px){.sk-grid2{grid-template-columns:1fr}}' +
+        // вузький телефон: компактна шапка, батл на 3–4 гравців — по 2 колонки
+        '@media (max-width:520px){.sk-hd{gap:5px}.sk-back{padding:8px 10px}.sk-back span:last-child{display:none}.sk-ttl h2{font-size:17px;letter-spacing:.08em}.sk-ttl small{font-size:9.5px}.sk-hbtn{padding:6px 8px;font-size:14px}.sk-bal{padding:6px 8px;font-size:12.5px}' +
+        '.cb-cols{grid-template-columns:repeat(2,minmax(0,1fr))!important}.cb-top .sk-note{display:none}.sk-ft{font-size:10px}.sk-game{gap:7px}.sk-pz{margin-left:0;width:100%;justify-content:space-between}}' +
         '@media (orientation:landscape) and (max-height:520px){.sk-ttl small,.sk-ft p{display:none}.sk-hd{padding-top:5px}.cr-wrap canvas{height:190px}.cb-reel{height:74px}.cb-tape .sk-it{width:46px;height:46px}.sk-grid2{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr)}}' +
         'html.gfx-low #stk-ov:before{display:none}html.gfx-low .sk-tab.on,html.gfx-low .sk-btn{box-shadow:none}';
     var sEl = document.createElement('style'); sEl.id = 'stk-css'; sEl.textContent = css; document.head.appendChild(sEl);
 
     // ================= КАРКАС =================
-    var TABS = [['cb', '⚔️', 'Батл кейсів'], ['cf', '🪙', 'Койнфліп'], ['jp', '💰', 'Джекпот'], ['cr', '🚀', 'Краш'], ['wh', '🎡', 'Колесо'], ['mn', '💣', 'Мінне поле'], ['ct', '📜', 'Контракт'], ['lt', '🎟️', 'Лотерея'], ['du', '🤝', 'Дуелі']];
+    var TABS = [['cb', '⚔️', 'Батл кейсів'], ['cf', '🪙', 'Койнфліп'], ['jp', '💰', 'Джекпот'], ['wh', '🎡', 'Колесо фортуни'], ['du', '🤝', 'Дуелі']];
     if (!TABS.some(function (t) { return t[0] === ST.tab; })) ST.tab = 'cb';
     var ov = null, body = null, loopRaf = 0;
     function build() {
         ov = document.createElement('div'); ov.id = 'stk-ov'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
         ov.innerHTML = '<header class="sk-hd"><button type="button" class="sk-back" data-a="close"><span>←</span> <span>Меню</span></button>' +
-            '<div class="sk-ttl"><h2>АРЕНА СТАВОК</h2><small id="sk-lim"></small></div>' +
+            '<div class="sk-ttl"><h2>ФОРТУНА</h2><small id="sk-lim"></small></div>' +
             '<button type="button" class="sk-hbtn" data-a="box" title="Скринька виграшу">🎁<i id="sk-boxn" style="display:none"></i></button>' +
             '<button type="button" class="sk-hbtn" data-a="hist" title="Історія ставок">📜</button>' +
             '<div class="sk-bal" id="sk-bal"></div></header>' +
@@ -174,8 +171,8 @@
     function setTab(t) { ST.tab = t; ST.view = null; try { localStorage.setItem('stkTab', t); } catch (e) {} paintHead(); render(); body.scrollTop = 0; }
     function render() {
         if (!isOpen()) return;
-        var f = { cb: rCb, cf: rCf, jp: rJp, cr: rCr, wh: rWh, mn: rMn, ct: rCt, lt: rLt, du: rDu }[ST.tab] || rCb;
-        if (ST.me && ST.me.lvl < SI.MIN_LEVEL && ST.tab !== 'du') { body.innerHTML = '<div class="sk-card sk-empty" style="margin-top:20px">🔒 ' + tt('Арена ставок відкривається з') + ' <b>' + SI.MIN_LEVEL + '</b> ' + tt('рівня') + '.<br><br>' + tt('Грайте бої, щоб підвищити рівень!') + '</div>'; return; }
+        var f = { cb: rCb, cf: rCf, jp: rJp, wh: rWh, du: rDu }[ST.tab] || rCb;
+        if (ST.me && ST.me.lvl < SI.MIN_LEVEL && ST.tab !== 'du') { body.innerHTML = '<div class="sk-card sk-empty" style="margin-top:20px">🔒 ' + tt('Фортуна відкривається з') + ' <b>' + SI.MIN_LEVEL + '</b> ' + tt('рівня') + '.<br><br>' + tt('Грайте бої, щоб підвищити рівень!') + '</div>'; return; }
         f();
     }
     // постійний цикл анімацій лише для живих вкладок (краш, колесо, таймери)
@@ -189,8 +186,7 @@
     }
     var lastTimerPaint = 0;
     function tick() {
-        if (ST.tab === 'cr') crFrame();
-        else if (ST.tab === 'wh') whFrame();
+        if (ST.tab === 'wh') whFrame();
         else if (ST.tab === 'cb' && ST.view) cbFrame();
         var t = performance.now(); if (t - lastTimerPaint > 250) { lastTimerPaint = t; paintTimers(); }
     }
@@ -227,22 +223,12 @@
             case 'cfback': ST.view = null; return rCf();
             case 'amt': { var inp = $(d.for); if (!inp) return; var cur = +inp.value || 0, v = d.v === 'x2' ? cur * 2 : d.v === 'half' ? Math.floor(cur / 2) : d.v === 'max' ? Math.min(SI.MAX_BET, bucks()) : +d.v; inp.value = Math.max(SI.MIN_BET, Math.min(SI.MAX_BET, v)); return; }
             case 'jpbet': return guard(function () { emit('stkJpBet', { amt: +($('jp-amt').value) }); });
-            case 'crbet': return guard(function () { emit('stkCrBet', { amt: +($('cr-amt').value), auto: +($('cr-auto').value) || 0 }); });
-            case 'crout': return emit('stkCrOut');
             case 'whbet': return guard(function () { emit('stkWhBet', { sect: d.k, amt: +($('wh-amt').value) }); });
-            case 'mnm': ST.mnM = +d.m; return rMn();
-            case 'mnnew': return guard(function () { emit('stkMnNew', { amt: +($('mn-amt').value), m: ST.mnM || 3 }); });
-            case 'mnc': usnd('ui_tick'); return emit('stkMnPick', { i: +d.i });
-            case 'mnout': return emit('stkMnOut');
-            case 'ctpick': return ctToggle(d.id, +d.i);
-            case 'ctgo': return ctGo();
-            case 'ctclr': ST.ct = []; return rCt();
-            case 'ltbuy': return guard(function () { emit('stkLtBuy', { n: +($('lt-n').value) || 1 }); });
             case 'friends': close(); if (window.Social && Social.open) Social.open('friends'); else { var t = $('sc-top'); if (t) t.click(); } return;
             case 'verify': return verify(d);
         }
     }
-    function onInput(e) { if (e.target.id === 'lt-n') { var n = Math.max(1, Math.min(SI.LT.MAX, +e.target.value || 1)); var c = $('lt-cost'); if (c) c.innerHTML = crI(n * SI.LT.PRICE); } }
+    function onInput() {}
     // перед ставкою — правила (один раз)
     function guard(fn) { if (ST.me && !ST.me.acc) return rulesDlg(fn); fn(); }
     function amtBox(id, def) {
@@ -250,7 +236,7 @@
             '<div class="sk-chips" style="margin-top:6px"><button type="button" class="sk-chip" data-a="amt" data-for="' + id + '" data-v="50">50</button><button type="button" class="sk-chip" data-a="amt" data-for="' + id + '" data-v="100">100</button><button type="button" class="sk-chip" data-a="amt" data-for="' + id + '" data-v="500">500</button><button type="button" class="sk-chip" data-a="amt" data-for="' + id + '" data-v="1000">1000</button><button type="button" class="sk-chip" data-a="amt" data-for="' + id + '" data-v="half">½</button><button type="button" class="sk-chip" data-a="amt" data-for="' + id + '" data-v="x2">×2</button><button type="button" class="sk-chip" data-a="amt" data-for="' + id + '" data-v="max">MAX</button></div>';
     }
     // збереження введених сум між перемальовуваннями
-    function keepVals(fn) { var v = {}; ['jp-amt', 'cr-amt', 'cr-auto', 'wh-amt', 'mn-amt', 'lt-n'].forEach(function (id) { var e = $(id); if (e) v[id] = e.value; }); fn(); Object.keys(v).forEach(function (id) { var e = $(id); if (e) e.value = v[id]; }); }
+    function keepVals(fn) { var v = {}; ['jp-amt', 'wh-amt'].forEach(function (id) { var e = $(id); if (e) v[id] = e.value; }); fn(); Object.keys(v).forEach(function (id) { var e = $(id); if (e) e.value = v[id]; }); }
 
     // ================= МОДАЛЬНІ =================
     var modEl = null;
@@ -265,8 +251,8 @@
 
     function rulesDlg(after) {
         var acc = ST.me && ST.me.acc;
-        modal('<h3>📜 ' + tt('Правила Арени ставок') + '</h3><div class="sk-rules"><ul>' +
-            '<li>' + tt('Арена ставок — розважальний розділ гри. Усі ставки робляться лише ігровою валютою (кредити) та ігровими предметами.') + '</li>' +
+        modal('<h3>📜 ' + tt('Правила Фортуни') + '</h3><div class="sk-rules"><ul>' +
+            '<li>' + tt('Фортуна — розважальний розділ гри. Усі ставки робляться лише ігровою валютою (кредити) та ігровими предметами.') + '</li>' +
             '<li><b>' + tt('Кредити й предмети не мають грошової вартості. Їх неможливо вивести з гри, обміняти чи продати за реальні гроші — ні через гру, ні через адміністрацію.') + '</b></li>' +
             '<li>' + tt('Продаж, купівля й передача акаунтів заборонені — за це акаунт блокується без повернення.') + '</li>' +
             '<li>' + tt('Доступ — з 3 рівня. Ставка — від') + ' ' + SI.MIN_BET + ' ' + tt('до') + ' ' + fmt(SI.MAX_BET) + ' ' + tt('кредитів, не більше') + ' ' + SI.DAILY + ' ' + tt('ставок на добу.') + '</li>' +
@@ -296,8 +282,7 @@
     }
     function fairDlg() {
         var rows = [];
-        (ST.cr && ST.cr.hist || []).slice(0, 6).forEach(function (h) { rows.push({ k: 'cr', t: tt('Краш') + ' ×' + h.p.toFixed(2), hash: h.hash, ss: h.ss, cs: h.id, n: 'crash' }); });
-        (ST.wh && ST.wh.hist || []).slice(0, 6).forEach(function (h) { rows.push({ k: 'wh', t: tt('Колесо') + ' ' + SI.sect(h.k).m + '×', hash: h.hash, ss: h.ss, cs: h.id, n: 'spin' }); });
+        (ST.wh && ST.wh.hist || []).slice(0, 6).forEach(function (h) { rows.push({ k: 'wh', t: tt('Колесо фортуни') + ' ' + SI.sect(h.k).m + '×', hash: h.hash, ss: h.ss, cs: h.id, n: 'spin' }); });
         (ST.jp && ST.jp.hist || []).slice(0, 4).forEach(function (h) { rows.push({ k: 'jp', t: tt('Джекпот') + ' · ' + h.nick, hash: h.hash, ss: h.ss, cs: h.cs, n: 'win' }); });
         (ST.cfHist || []).slice(0, 4).forEach(function (h) { rows.push({ k: 'cf', t: tt('Койнфліп') + ' · ' + (h.win ? h[h.win].nick : ''), hash: h.hash, ss: h.ss, cs: h.cs, n: 'flip' }); });
         modal('<h3>🛡️ ' + tt('Перевірка чесності') + '</h3><p class="sk-note">' + tt('Перед кожною грою сервер фіксує секретний ключ і показує його SHA-256 хеш. Після гри ключ відкривається. Результат = HMAC-SHA256(ключ, сіль:номер) → число від 0 до 1. Натисніть «Перевірити» — ваш браузер сам перерахує результат.') + '</p>' +
@@ -307,7 +292,7 @@
                 if (b.dataset.m !== 'v') return; var r = rows[+b.dataset.i], out = $('fv-' + b.dataset.i); if (!r || !out) return;
                 if (!r.ss) { out.textContent = tt('Ключ ще не відкрито'); return; }
                 Promise.all([sha256(r.ss), hmacFloat(r.ss, r.cs, r.n)]).then(function (x) {
-                    var okH = x[0] === r.hash, f = x[1], res = r.k === 'cr' ? '×' + SI.crashPoint(f).toFixed(2) : r.k === 'wh' ? SI.sect(SI.wheel[Math.floor(f * SI.wheel.length)]).m + '×' : f.toFixed(6);
+                    var okH = x[0] === r.hash, f = x[1], res = r.k === 'wh' ? SI.sect(SI.wheel[Math.floor(f * SI.wheel.length)]).m + '×' : f.toFixed(6);
                     out.innerHTML = (okH ? '✅ ' + tt('Хеш збігається') : '❌ ' + tt('Хеш НЕ збігається')) + ' · ' + tt('Результат') + ': <b style="color:#fde68a">' + esc(res) + '</b>';
                 }).catch(function () { out.textContent = tt('Ваш браузер не підтримує перевірку (потрібне HTTPS-з’єднання)'); });
             });
@@ -315,7 +300,7 @@
     function verify() { fairDlg(); }
 
     // ================= ІСТОРІЯ / СКРИНЬКА =================
-    var KN = { cb: 'Батл кейсів', cf: 'Койнфліп', jp: 'Джекпот', cr: 'Краш', wh: 'Колесо', mn: 'Мінне поле', ct: 'Контракт', lt: 'Лотерея', du: 'Дуель', box: 'Скринька' };
+    var KN = { cb: 'Батл кейсів', cf: 'Койнфліп', jp: 'Джекпот', wh: 'Колесо фортуни', du: 'Дуель', box: 'Скринька' };
     function histRows(list) {
         return list && list.length ? list.map(function (h) { return '<div class="sk-hr"><span>' + esc(tt(KN[h.k] || h.k)) + '</span><span class="x">' + esc(tt(h.x || '')) + '</span><span class="' + (h.d >= 0 ? 'p' : 'm') + '">' + (h.d > 0 ? '+' : '') + fmt(h.d) + '</span></div>'; }).join('') : '<div class="sk-empty">' + tt('Ще немає ставок') + '</div>';
     }
@@ -387,7 +372,7 @@
     }
     // ---- перегляд батлу: колонки гравців з рулетками ----
     var cbAnim = { id: null, k: -1, built: false };
-    function cbSig(b) { return (b.st === 'open' ? 'o' : 'r') + b.slots.map(function (s) { return s ? s.nick : '-'; }).join('|'); }
+    function cbSig(b) { return (b.st === 'open' ? 'o' : b.st === 'done' ? 'd' : 'r') + b.slots.map(function (s) { return s ? s.nick : '-'; }).join('|'); }
     function cbViewHtml(b) {
         var cols = b.n <= 2 ? 2 : b.n;
         body.innerHTML = '<div class="sk-card cb-v" data-cb="' + b.id + '"><div class="cb-top"><button type="button" class="sk-btn sm ghost" data-a="cbback">← ' + tt('До списку') + '</button><span class="sk-tag">' + esc(tt(CBM[b.mode])) + '</span><div class="cb-rd" id="cb-rd">' + b.cases.map(function (c, k) { return caseHtml(c, 'sm').replace('sk-case sm', 'sk-case sm r' + k); }).join('') + '</div><small class="sk-note" style="margin-left:auto">' + tt('Вхід') + ' ' + crI(b.price, 12) + '</small></div>' +
@@ -540,57 +525,12 @@
         if (window.UISFX && UISFX.roll) UISFX.roll(tape);
     }
 
-    // ================= КРАШ =================
-    var crCv = null, crG = null;
-    function rCr() {
-        var C = ST.cr; if (!C) { body.innerHTML = '<div class="sk-empty">…</div>'; return; }
-        var my = (C.bets || []).filter(function (b) { return b.l === me(); })[0];
-        keepVals(function () {
-            body.innerHTML = '<div class="sk-grid2"><div class="sk-card"><div class="sk-h"><h3>🚀 ' + tt('Краш') + '</h3><small>' + tt('Множник росте — заберіть до вибуху!') + '</small></div>' +
-                '<div class="cr-wrap"><canvas id="cr-cv" width="800" height="420"></canvas><div class="cr-m" id="cr-m"></div></div>' +
-                '<div class="cr-hist">' + (C.hist || []).map(function (h) { var c = h.p >= 10 ? '#facc15' : h.p >= 2 ? '#4ade80' : '#f87171'; return '<span style="color:' + c + '">×' + h.p.toFixed(2) + '</span>'; }).join('') + '</div>' + fairRow(C.hash, C.ss, C.st === 'crash' ? C.id : null) + '</div>' +
-                '<div class="sk-card"><div class="sk-h"><h3>' + tt('Ставка') + '</h3></div>' + amtBox('cr-amt', 100) +
-                '<span class="sk-lbl">' + tt('Автовиведення (×, необов’язково)') + '</span><div class="sk-in"><input id="cr-auto" type="number" step="0.1" min="1.01" placeholder="2.00"></div>' +
-                '<div id="cr-act" style="margin-top:10px"></div>' +
-                '<span class="sk-lbl">' + tt('Гравці раунду') + '</span><div class="cr-bets">' + ((C.bets || []).length ? C.bets.map(function (b) { return '<div class="cr-bet"><span class="nm">' + esc(b.nick) + '</span><span>' + crI(b.amt, 11) + '</span>' + (b.out ? '<span class="ok">×' + b.out.toFixed(2) + '</span>' : C.st === 'crash' ? '<span class="no">✕</span>' : (b.auto ? '<span style="color:#a8a2c8">↗' + b.auto.toFixed(2) + '</span>' : '')) + '</div>'; }).join('') : '<div class="sk-empty">' + tt('Ставок ще немає') + '</div>') + '</div></div></div>';
-        });
-        crCv = $('cr-cv'); crG = crCv.getContext('2d'); ST._crAct = null; crFrame();
-    }
-    function crFrame() {
-        var C = ST.cr; if (!C || !crCv || !document.body.contains(crCv)) return;
-        var g = crG, W = crCv.width, H = crCv.height, t = srvNow(), my = (C.bets || []).filter(function (b) { return b.l === me(); })[0];
-        var el = C.st === 'run' ? Math.max(0, t - C.t0) : C.st === 'crash' ? SI.crashTime(C.point) : 0, m = C.st === 'crash' ? C.point : C.st === 'run' ? SI.crashAt(el) : 1;
-        g.clearRect(0, 0, W, H);
-        var xMax = Math.max(10000, el * 1.15), yMax = Math.max(2, m * 1.25);
-        g.strokeStyle = 'rgba(148,163,184,.12)'; g.lineWidth = 1; g.font = '600 18px Jura,Arial'; g.fillStyle = 'rgba(203,213,225,.5)';
-        for (var yv = 1; yv <= yMax; yv += yMax > 10 ? Math.ceil(yMax / 5) : yMax > 4 ? 1 : 0.5) { var yy = H - 30 - (yv - 1) / (yMax - 1) * (H - 60); g.beginPath(); g.moveTo(50, yy); g.lineTo(W, yy); g.stroke(); g.fillText('×' + yv.toFixed(yv % 1 ? 1 : 0), 4, yy + 5); }
-        if (C.st !== 'bet') {
-            g.beginPath(); var pts = 60; for (var i = 0; i <= pts; i++) { var tt0 = el * i / pts, x = 50 + tt0 / xMax * (W - 70), y = H - 30 - (SI.crashAt(tt0) - 1) / (yMax - 1) * (H - 60); if (i) g.lineTo(x, y); else g.moveTo(x, y); }
-            var col = C.st === 'crash' ? '#f87171' : '#4ade80'; g.strokeStyle = col; g.lineWidth = 5; g.shadowColor = col; g.shadowBlur = lowGfx() ? 0 : 14; g.stroke(); g.shadowBlur = 0;
-            var ex = 50 + el / xMax * (W - 70), ey = H - 30 - (m - 1) / (yMax - 1) * (H - 60);
-            g.font = '40px "Segoe UI Emoji",Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(C.st === 'crash' ? '💥' : '🚀', ex, ey - 6); g.textAlign = 'left'; g.textBaseline = 'alphabetic';
-        }
-        var mEl = $('cr-m');
-        var txt = C.st === 'bet' ? '<small>' + tt('Старт через') + '</small>' + Math.max(0, Math.ceil((C.betEnd - t) / 1000)) : C.st === 'crash' ? '×' + C.point.toFixed(2) + '<small>' + tt('ВИБУХ!') + '</small>' : '×' + m.toFixed(2);
-        if (mEl.__t !== txt) { mEl.__t = txt; mEl.innerHTML = txt; mEl.classList.toggle('boom', C.st === 'crash'); }
-        // кнопка дії
-        var act = C.st === 'bet' ? (my ? 'wait' : 'bet') : C.st === 'run' && my && !my.out ? 'out' : 'none', a = $('cr-act');
-        var key = act + (act === 'out' ? Math.floor(my.amt * m) : '');
-        if (a && ST._crAct !== key) {
-            ST._crAct = key;
-            a.innerHTML = act === 'bet' ? '<button type="button" class="sk-btn gold" style="width:100%" data-a="crbet">' + tt('Поставити') + '</button>' :
-                act === 'out' ? '<button type="button" class="sk-btn green" style="width:100%;font-size:16px" data-a="crout">' + tt('Забрати') + ' ' + crI(Math.floor(my.amt * m), 14) + '</button>' :
-                act === 'wait' ? '<button type="button" class="sk-btn" style="width:100%" disabled>' + tt('Ставку прийнято') + ' · ' + crI(my.amt, 12) + '</button>' :
-                '<button type="button" class="sk-btn" style="width:100%" disabled>' + (my && my.out ? tt('Виведено') + ' ×' + my.out.toFixed(2) : tt('Чекайте наступного раунду')) + '</button>';
-        }
-    }
-
     // ================= КОЛЕСО =================
     var whCv = null, whG = null, whRot = 0, whSpin = null;
     function rWh() {
         var Wh = ST.wh; if (!Wh) { body.innerHTML = '<div class="sk-empty">…</div>'; return; }
         keepVals(function () {
-            body.innerHTML = '<div class="sk-grid2"><div class="sk-card"><div class="sk-h"><h3>🎡 ' + tt('Колесо') + '</h3><small>' + tt('Один спільний оберт кожні 30 с') + '</small></div>' +
+            body.innerHTML = '<div class="sk-grid2"><div class="sk-card"><div class="sk-h"><h3>🎡 ' + tt('Колесо фортуни') + '</h3><small>' + tt('Один спільний оберт кожні 30 с') + '</small></div>' +
                 '<div class="wh-wrap"><div class="wh-ptr"></div><canvas id="wh-cv" width="520" height="520"></canvas><div class="wh-c" id="wh-c"></div></div>' +
                 '<div class="wh-hist">' + (Wh.hist || []).map(function (h) { return '<i style="background:' + SI.sect(h.k).c + '" title="×' + SI.sect(h.k).m + '"></i>'; }).join('') + '</div>' + fairRow(Wh.hash, Wh.ss, Wh.st === 'done' ? Wh.id : null) + '</div>' +
                 '<div class="sk-card"><div class="sk-h"><h3>' + tt('Ставка') + '</h3></div>' + amtBox('wh-amt', 100) +
@@ -624,64 +564,6 @@
         if (Wh.st === 'bet') txt = '<small>' + tt('Оберт через') + '</small>' + Math.max(0, Math.ceil((Wh.spinAt - t) / 1000));
         else { var s = SI.sect(SI.wheel[Wh.idx]); txt = (t - Wh.spinAt > SI.WH.SPIN - 400 ? '<span style="color:' + s.c + '">×' + s.m + '</span>' : '…') + '<small>' + tt('Наступний оберт скоро') + '</small>'; }
         if (c.__t !== txt) { c.__t = txt; c.innerHTML = txt; }
-    }
-
-    // ================= МІННЕ ПОЛЕ =================
-    function rMn() {
-        var g = ST.me && ST.me.mine, play = g && g.st === 'play', mm = ST.mnM || 3;
-        keepVals(function () {
-            var cells = ''; for (var i = 0; i < SI.MN.N; i++) {
-                var open = g && g.open.indexOf(i) >= 0, isMine = g && g.mines && g.mines.indexOf(i) >= 0, boom = g && g.st === 'boom' && g.boom === i;
-                var cls = open ? 'ok' : boom ? 'boom' : isMine ? 'mine' : '', ic = open ? '💎' : boom ? '💥' : isMine ? '💣' : '';
-                cells += '<button type="button" class="mn-c ' + cls + '" data-a="mnc" data-i="' + i + '"' + (play && !open ? '' : ' disabled') + '>' + ic + '</button>';
-            }
-            body.innerHTML = '<div class="sk-grid2"><div class="sk-card"><div class="sk-h"><h3>💣 ' + tt('Мінне поле') + '</h3><small>' + tt('Відкривайте клітинки — кожна безпечна збільшує множник. Влучили в міну — ставка згоряє.') + '</small></div>' +
-                (g ? '<div class="mn-st"><div><b>×' + g.mult.toFixed(2) + '</b><small>' + tt('зараз') + '</small></div><div><b>×' + g.next.toFixed(2) + '</b><small>' + tt('наступна') + '</small></div><div><b>' + g.open.length + '</b><small>' + tt('відкрито') + '</small></div></div>' : '') +
-                '<div class="mn-grid">' + cells + '</div>' + (g ? '<div class="cb-res" style="margin-top:8px">' + (g.st === 'boom' ? '💥 ' + tt('Міна! Ставку втрачено') : g.st === 'cash' ? '💎 ' + tt('Виграш') + ' ' + crI(Math.floor(g.amt * g.mult), 18) : '') + '</div>' + fairRow(g.hash, g.ss, g.cs) : '') + '</div>' +
-                '<div class="sk-card"><div class="sk-h"><h3>' + tt('Нова гра') + '</h3></div>' + amtBox('mn-amt', 100) +
-                '<span class="sk-lbl">' + tt('Кількість мін') + '</span><div class="sk-chips">' + SI.MN.MINES.map(function (m) { return '<button type="button" class="sk-chip' + (mm === m ? ' on' : '') + '" data-a="mnm" data-m="' + m + '"' + (play ? ' disabled' : '') + '>' + m + '</button>'; }).join('') + '</div>' +
-                '<p class="sk-note" style="margin-top:6px">' + tt('Перша клітинка') + ': ×' + SI.minesMult(mm, 1).toFixed(2) + ' · 5 ' + tt('клітинок') + ': ×' + SI.minesMult(mm, Math.min(5, SI.MN.N - mm)).toFixed(2) + '</p>' +
-                (play ? '<button type="button" class="sk-btn green" style="width:100%;margin-top:10px" data-a="mnout"' + (g.open.length ? '' : ' disabled') + '>' + tt('Забрати') + ' ' + crI(Math.floor(g.amt * g.mult), 14) + '</button>' :
-                    '<button type="button" class="sk-btn gold" style="width:100%;margin-top:10px" data-a="mnnew">' + tt('Почати гру') + '</button>') + '</div></div>';
-        });
-    }
-
-    // ================= КОНТРАКТ =================
-    function rCt() {
-        if (!ST.ct) ST.ct = [];
-        var I = inv(), sel = ST.ct.filter(function (j) { return j < I.length; }), rar = sel.length ? M(I[sel[0]]).rarity : null, RO = GameData.RARITY_ORDER, next = rar ? RO[RO.indexOf(rar) + 1] : null;
-        var v = sel.reduce(function (s, j) { return s + priceOf(I[j]); }, 0);
-        var slots = ''; for (var z = 0; z < SI.CT.NEED; z++) slots += '<div class="ct-slot">' + (sel[z] != null ? item(I[sel[z]], 'sm') : '') + '</div>';
-        body.innerHTML = '<div class="sk-card"><div class="sk-h"><div><h3>📜 ' + tt('Контракт обміну') + '</h3><small>' + tt('Здайте') + ' ' + SI.CT.NEED + ' ' + tt('предметів однієї рідкості — отримайте 1 випадковий предмет вищої рідкості.') + '</small></div></div>' +
-            '<div class="ct-slots">' + slots + '</div>' +
-            '<div class="sk-row" style="justify-content:space-between"><span class="sk-note">' + tt('Обрано') + ': <b>' + sel.length + '/' + SI.CT.NEED + '</b> · ' + tt('вартість') + ' ' + crI(v, 12) + (next ? ' → <b style="color:' + RARITY[next].color + '">' + esc(tt(RARITY[next].name)) + '</b>' : '') + '</span>' +
-            '<span class="sk-row"><button type="button" class="sk-btn sm ghost" data-a="ctclr">' + tt('Очистити') + '</button><button type="button" class="sk-btn sm gold" data-a="ctgo"' + (sel.length === SI.CT.NEED ? '' : ' disabled') + '>' + tt('Підписати контракт') + '</button></span></div>' +
-            '<div id="ct-res"></div><span class="sk-lbl">' + tt('Ваш інвентар (міфічні не обмінюються)') + '</span>' +
-            (I.length ? '<div class="sk-inv" style="max-height:none">' + I.map(function (id, j) { var m = M(id), bad = m.rarity === 'mythic' || (rar && m.rarity !== rar); return '<div data-a="ctpick" data-id="' + id + '" data-i="' + j + '"' + (bad ? ' disabled' : '') + '>' + item(id, 'pick' + (sel.indexOf(j) >= 0 ? ' sel' : '') + (bad ? ' dis' : '')) + '</div>'; }).join('') + '</div>' : '<div class="sk-empty">' + tt('Інвентар порожній') + '</div>') + '</div>';
-    }
-    function ctToggle(id, j) { var p = ST.ct.indexOf(j); if (p >= 0) ST.ct.splice(p, 1); else if (ST.ct.length < SI.CT.NEED) ST.ct.push(j); rCt(); }
-    function ctGo() {
-        var I = inv(), ids = ST.ct.map(function (j) { return I[j]; });
-        uiDialog.confirm({ kind: 'warn', icon: '📜', title: tt('Підписати контракт?'), text: tt('10 обраних предметів зникнуть назавжди, натомість ви отримаєте 1 випадковий предмет вищої рідкості.'), okText: tt('Підписати') }).then(function (ok) { if (ok) { emit('stkCt', { items: ids }); ST.ct = []; } });
-    }
-
-    // ================= ЛОТЕРЕЯ =================
-    function rLt() {
-        var L = ST.lt; if (!L) { body.innerHTML = '<div class="sk-empty">…</div>'; return; }
-        var my = ST.me && ST.me.lot ? ST.me.lot.n : 0, left = SI.LT.MAX - my;
-        keepVals(function () {
-            body.innerHTML = '<div class="sk-grid2"><div class="sk-card"><div class="sk-h"><h3>🎟️ ' + tt('Лотерея сезону') + '</h3><small>' + tt('Розіграш щонеділі о 20:00 (Київ)') + '</small></div>' +
-                '<div class="lt-big"><div><b data-until="' + L.at + '"></b><small>' + tt('до розіграшу') + '</small></div><div><b>' + crI(L.pool, 18) + '</b><small>' + tt('призовий фонд') + '</small></div><div><b>' + fmt(L.tickets) + '</b><small>' + tt('квитків') + ' · ' + L.players + ' ' + tt('гравців') + '</small></div></div>' +
-                '<span class="sk-lbl">' + tt('Призи') + '</span>' +
-                '<div class="lt-pr"><b>🥇</b><span>' + tt('Міфічний модуль') + ' + ' + Math.round(SI.LT.SHARES[0] * 100) + '% ' + tt('фонду') + ' (' + crI(Math.floor(L.pool * SI.LT.SHARES[0]), 12) + ')</span></div>' +
-                '<div class="lt-pr"><b>🥈</b><span>' + Math.round(SI.LT.SHARES[1] * 100) + '% ' + tt('фонду') + ' (' + crI(Math.floor(L.pool * SI.LT.SHARES[1]), 12) + ')</span></div>' +
-                '<div class="lt-pr"><b>🥉</b><span>' + Math.round(SI.LT.SHARES[2] * 100) + '% ' + tt('фонду') + ' (' + crI(Math.floor(L.pool * SI.LT.SHARES[2]), 12) + ')</span></div>' +
-                (L.last ? '<span class="sk-lbl">' + tt('Минулий розіграш') + ' · ' + esc(L.last.d) + '</span>' + (L.last.winners || []).map(function (w) { return '<div class="lt-pr"><b>' + ['🥇', '🥈', '🥉'][w.place - 1] + '</b><span style="flex:1">' + esc(w.nick) + '</span>' + crI(w.cr, 12) + (w.mod && M(w.mod) ? ' + ' + esc(M(w.mod).name) : '') + '</div>'; }).join('') + fairRow(L.last.hash, L.last.ss, L.last.cs) : '') + '</div>' +
-                '<div class="sk-card"><div class="sk-h"><h3>' + tt('Ваші квитки') + ': ' + my + ' / ' + SI.LT.MAX + '</h3></div><p class="sk-note">' + tt('Ціна квитка') + ': ' + crI(SI.LT.PRICE, 12) + '. ' + tt('Більше квитків — більший шанс. Один гравець може виграти лише одне місце.') + '</p>' +
-                '<span class="sk-lbl">' + tt('Кількість') + '</span><div class="sk-in"><input id="lt-n" type="number" min="1" max="' + Math.max(1, left) + '" value="1"' + (left > 0 ? '' : ' disabled') + '></div>' +
-                '<button type="button" class="sk-btn gold" style="width:100%;margin-top:10px" data-a="ltbuy"' + (left > 0 ? '' : ' disabled') + '>' + tt('Купити за') + ' <span id="lt-cost">' + crI(SI.LT.PRICE) + '</span></button></div></div>';
-        });
-        onInput({ target: $('lt-n') || {} });
     }
 
     // ================= ДУЕЛІ =================
@@ -733,20 +615,18 @@
 
     // ================= ПОДІЇ СЕРВЕРА =================
     socket.on('stkState', function (d) {
-        if (!d) return; syncT(d); ST.me = d.me; ST.cb = d.cb || ST.cb; ST.cf = d.cf || ST.cf; ST.jp = d.jp; ST.cr = d.cr; ST.wh = d.wh; ST.lt = d.lt; ST.cbHist = d.cbHist || []; ST.cfHist = d.cfHist || [];
+        if (!d) return; syncT(d); ST.me = d.me; ST.cb = d.cb || ST.cb; ST.cf = d.cf || ST.cf; ST.jp = d.jp; ST.wh = d.wh; ST.cbHist = d.cbHist || []; ST.cfHist = d.cfHist || [];
         if (d.me && d.me.news && d.me.news.length) d.me.news.forEach(function (n) { toast(n.x); });
         paintHead(); render(); if (ST.me && !ST.me.acc && isOpen()) rulesDlg();
     });
     socket.on('stkMe', function (d) {
         if (!d) return; var was = ST.me; ST.me = d;
-        if (d.news && d.news.length) d.news.forEach(function (n) { if (window.uiDialog) uiDialog.show({ kind: 'success', icon: '🎰', title: tt('Арена ставок'), text: n.x }); });
-        // результат мінного поля
-        if (d.mine && was && was.mine && was.mine.st === 'play' && d.mine.st !== 'play') { if (d.mine.st === 'boom') snd('explosion'); else snd('powerup'); }
-        paintHead(); if (ST.tab === 'mn' || ST.tab === 'lt' || ST.tab === 'du') render();
+        if (d.news && d.news.length) d.news.forEach(function (n) { if (window.uiDialog) uiDialog.show({ kind: 'success', icon: '🎰', title: tt('Фортуна'), text: n.x }); });
+        paintHead(); if (ST.tab === 'du') render();
     });
     socket.on('stkMsg', function (d) { if (d && d.t) { toast(d.t, d.bad); if (d.bad) snd('ui_error'); } });
     socket.on('stkMsgAll', function (d) { if (d && d.t && isOpen()) toast(d.t); });
-    socket.on('stkOk', function (d) { if (!d) return; if (d.ev === 'stkCbNew' || d.ev === 'stkCbJoin') { snd('ui_buy'); } if (d.ev === 'stkLtBuy') toast('🎟 Квитки куплено!'); if (d.ev === 'stkPrize') boxDlg(); if (d.ev === 'stkCfNew') toast('Койнфліп створено — чекаємо суперника'); });
+    socket.on('stkOk', function (d) { if (!d) return; if (d.ev === 'stkCbNew' || d.ev === 'stkCbJoin') { snd('ui_buy'); } if (d.ev === 'stkPrize') boxDlg(); if (d.ev === 'stkCfNew') toast('Койнфліп створено — чекаємо суперника'); });
     socket.on('stk_cb', function (d) { if (!d) return; syncT(d); var prev = ST.cb; ST.cb = d;
         // мій батл щойно стартував — відкриваємо перегляд
         (d.list || []).forEach(function (b) { if (b.st === 'run' && b.slots.some(function (s) { return s && s.l === me(); })) { var p = (prev.list || []).filter(function (x) { return x.id === b.id; })[0]; if (p && p.st === 'open' && isOpen() && ST.tab === 'cb') ST.view = b.id; } });
@@ -756,15 +636,7 @@
         if (isOpen() && ST.tab === 'cf') { var cur = ST.view && (d.list || []).filter(function (x) { return x.id === ST.view; })[0]; if (cur && cfAnim[cur.id]) return; rCf(); } });
     socket.on('stk_jp', function (d) { if (!d) return; syncT(d); var was = ST.jp; ST.jp = d; if (isOpen() && ST.tab === 'jp') { if (was && was.st === 'spin' && d.st === 'spin' && jpAnim.id === d.id) return; rJp(); }
         if (d.st === 'done' && d.win && d.win.l === me() && (!was || was.st !== 'done')) { snd('powerup'); toast('💰 ' + tt('Ви виграли джекпот') + ': ' + fmt(d.win.amt)); } });
-    socket.on('stk_cr', function (d) { if (!d) return; syncT(d); var was = ST.cr; ST.cr = d; if (isOpen() && ST.tab === 'cr') { if (was && was.st === d.st && was.id === d.id && was.bets.length === d.bets.length && JSON.stringify(was.bets) === JSON.stringify(d.bets)) return; rCr(); }
-        if (was && was.st === 'run' && d.st === 'crash' && isOpen() && ST.tab === 'cr') snd('explosion'); });
     socket.on('stk_wh', function (d) { if (!d) return; syncT(d); var was = ST.wh; ST.wh = d; if (isOpen() && ST.tab === 'wh') rWh(); if (was && was.id !== d.id) whSpin = null; });
-    socket.on('stk_lt', function (d) { if (!d) return; syncT(d); ST.lt = d; if (isOpen() && ST.tab === 'lt') rLt(); });
-    socket.on('stkCtRes', function (d) {
-        if (!d || !M(d.mod)) return; snd('powerup');
-        var r = $('ct-res'); if (r) r.innerHTML = '<div class="ct-res">' + item(d.mod) + '<b style="color:' + rc(d.mod) + ';font:400 16px Russo One,Arial">' + esc(M(d.mod).name) + '</b></div>';
-        setTimeout(function () { if (ST.tab === 'ct' && isOpen()) { var keep = $('ct-res') ? $('ct-res').innerHTML : ''; rCt(); var rr = $('ct-res'); if (rr) rr.innerHTML = keep; } }, 400);
-    });
     socket.on('stkDuInv', onInvite);
     socket.on('stkDuGone', function (d) { if (d && invT[d.id] && window.uiDialog && uiDialog.isOpen()) uiDialog.close(); });
     socket.on('stkDuGo', function (d) {
@@ -787,10 +659,10 @@
         };
     });
     socket.on('stkDuFail', function () { showScreen('main-menu-screen'); });
-    socket.on('economyUpdate', function () { if (isOpen()) { paintHead(); if (ST.tab === 'ct' || ST.tab === 'cf') render(); } });
+    socket.on('economyUpdate', function () { if (isOpen()) { paintHead(); if (ST.tab === 'cf') render(); } });
 
     window.Stakes = { open: open, close: close, duel: duelDlg, rules: rulesDlg, state: ST };
-    if (window.MenuHub) MenuHub.addCard({ id: 'mm-stakes', icon: '🎰', title: 'АРЕНА СТАВОК', sub: 'Батли кейсів · дуелі · джекпот', color: 'rose', bg: '💰', onClick: function () { open(); } });
+    if (window.MenuHub) MenuHub.addCard({ id: 'mm-stakes', icon: '🎰', title: 'ФОРТУНА', sub: 'Батли кейсів · дуелі · колесо', color: 'rose', bg: '💰', onClick: function () { open(); } });
     // стан (ліміти, прийняття правил, новини) — одразу після завантаження модуля
     if (typeof socket !== 'undefined' && socket.connected) { socket.emit('stkHello'); setTimeout(function () { if (!isOpen()) socket.emit('stkBye'); }, 1500); }
 })();

@@ -34,7 +34,7 @@
     }
     function render() {
         if (!S.authed) return loginView();
-        var T = [['dash', '📊 Огляд'], ['users', '👥 Гравці'], ['event', '🔥 Подія'], ['ann', '📢 Оголошення'], ['log', '📜 Журнал']];
+        var T = [['dash', '📊 Огляд'], ['users', '👥 Гравці'], ['promo', '🎟 Промокоди'], ['event', '🔥 Подія'], ['ann', '📢 Оголошення'], ['log', '📜 Журнал']];
         root.innerHTML = '<div class="w"><div class="top"><h1>PULS · ADMIN<small>●  LIVE</small></h1><span class="sp"></span><button id="ad-out">Вийти</button><button id="ad-x">✕</button></div>' +
             '<div class="tabs">' + T.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (S.tab === t[0] ? 'on' : '') + '">' + t[1] + '</button>'; }).join('') + '</div><div id="ad-b"></div></div>';
         $('#ad-x').onclick = close; $('#ad-out').onclick = function () { socket.emit('admLogout'); S.authed = false; clearInterval(iv); render(); };
@@ -69,6 +69,38 @@
         } else if (S.tab === 'ann') {
             b.innerHTML = '<div class="card"><h3>Оголошення всім гравцям онлайн</h3><textarea id="an-t" maxlength="200" placeholder="Текст (до 200 символів)"></textarea><div class="row" style="margin-top:8px"><button class="p" id="an-go">📢 Надіслати</button></div></div>';
             $('#an-go').onclick = function () { var t = $('#an-t').value.trim(); if (t && confirm('Надіслати оголошення всім гравцям?')) socket.emit('admAnnounce', { text: t }); };
+        } else if (S.tab === 'promo') {
+            var E = S.pedit || {};
+            b.innerHTML = '<div class="card"><h3>' + (E.code ? '✏️ Редагувати ' + esc(E.code) : '➕ Новий промокод') + '</h3>' +
+                '<div class="row"><input id="pr-c" placeholder="КОД (латиниця, цифри, _ -)" maxlength="24" style="flex:1;min-width:160px;text-transform:uppercase" value="' + esc(E.code || '') + '"' + (E.code ? ' disabled' : '') + '>' +
+                '<button id="pr-gen" ' + (E.code ? 'disabled' : '') + '>🎲 Згенерувати</button></div>' +
+                '<div class="row"><label>Кредити <input id="pr-cr" type="number" min="1" max="100000" style="width:110px" value="' + (E.credits || 100) + '"></label>' +
+                '<label>Ліміт активацій <input id="pr-max" type="number" min="0" style="width:110px" value="' + (E.maxUses || 0) + '"></label>' +
+                '<label>Діє до <input id="pr-exp" type="date" value="' + esc(E.expires || '') + '"></label>' +
+                '<label><input id="pr-once" type="checkbox"' + (E.once === false ? '' : ' checked') + '> раз на акаунт</label></div>' +
+                '<div class="row"><input id="pr-note" placeholder="Нотатка (для себе: для кого / звідки код)" maxlength="80" style="flex:1" value="' + esc(E.note || '') + '"></div>' +
+                '<div class="row"><button class="g" id="pr-save">' + (E.code ? '💾 Зберегти зміни' : '➕ Створити') + '</button>' + (E.code ? '<button id="pr-cancel">Скасувати</button>' : '') + '</div>' +
+                '<p style="color:#94a3b8;font-size:12px">Ліміт 0 — без обмежень. Порожня дата — безстроковий. Гравці вводять код у гаманці (натиснути на баланс → «Промокод»).</p></div>' +
+                '<div class="card"><h3>Усі промокоди (' + (S.promos || []).length + ')</h3><table><tr><th>Код</th><th>Кредити</th><th>Активацій</th><th>Діє до</th><th>Стан</th><th>Нотатка</th><th></th></tr>' +
+                (S.promos || []).map(function (p, i) {
+                    var st = p.off ? '<span class="bad">вимкнено</span>' : p.expired ? '<span class="bad">минув</span>' : p.maxUses && p.uses >= p.maxUses ? '<span class="bad">вичерпано</span>' : '<span class="ok">активний</span>';
+                    return '<tr><td><b>' + esc(p.code) + '</b>' + (p.builtin ? ' <small style="color:#64748b">вбуд.</small>' : '') + '</td><td>' + p.credits + '</td><td>' + p.uses + ' / ' + (p.maxUses || '∞') + (p.once ? '' : ' <small style="color:#64748b">(багаторазовий)</small>') + '</td><td>' + (p.expires || '—') + '</td><td>' + st + '</td><td style="max-width:180px;word-break:break-word;color:#94a3b8">' + esc(p.note || '') + '</td>' +
+                        '<td style="white-space:nowrap"><button data-p="edit" data-i="' + i + '">✏️</button> <button data-p="tog" data-i="' + i + '">' + (p.off ? 'Увімкнути' : 'Вимкнути') + '</button>' + (p.builtin ? '' : ' <button class="d" data-p="del" data-i="' + i + '">🗑</button>') + '</td></tr>';
+                }).join('') + '</table></div>';
+            $('#pr-gen') && ($('#pr-gen').onclick = function () { var A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', s = ''; for (var k = 0; k < 8; k++) s += A[Math.floor(Math.random() * A.length)]; $('#pr-c').value = s; });
+            $('#pr-cancel') && ($('#pr-cancel').onclick = function () { S.pedit = null; body(); });
+            $('#pr-save').onclick = function () {
+                var code = $('#pr-c').value.trim().toUpperCase();
+                socket.emit('admPromoSave', { code: code, credits: +$('#pr-cr').value, maxUses: +$('#pr-max').value || 0, expires: $('#pr-exp').value || null, once: $('#pr-once').checked, note: $('#pr-note').value, off: E.code ? !!E.off : false, edit: !!E.code });
+            };
+            b.querySelectorAll('button[data-p]').forEach(function (bt) {
+                bt.onclick = function () {
+                    var p = S.promos[+bt.dataset.i]; if (!p) return;
+                    if (bt.dataset.p === 'edit') { S.pedit = p; body(); window.scrollTo(0, 0); }
+                    else if (bt.dataset.p === 'tog') socket.emit('admPromoToggle', { code: p.code });
+                    else if (bt.dataset.p === 'del' && confirm('Видалити промокод ' + p.code + '? Хто вже активував — кредити збережуться.')) socket.emit('admPromoDel', { code: p.code });
+                };
+            });
         } else if (S.tab === 'log') {
             b.innerHTML = '<div class="card"><h3>Журнал дій</h3><table><tr><th>Час</th><th>Хто</th><th>Дія</th><th>Ціль</th><th>Деталі</th></tr>' + S.log.map(function (e) { return '<tr><td>' + fmtT(e.t) + '</td><td>' + esc(e.by) + '</td><td>' + esc(e.act) + '</td><td>' + esc(e.target) + '</td><td style="max-width:320px;word-break:break-word">' + esc(e.detail ? JSON.stringify(e.detail) : '') + '</td></tr>'; }).join('') + '</table></div>';
         }
@@ -93,7 +125,7 @@
             };
         });
     }
-    function refresh() { if (!S.authed) return; if (S.tab === 'dash') socket.emit('admStats'); if (S.tab === 'log') socket.emit('admLog'); clearInterval(iv); if (S.tab === 'dash') iv = setInterval(function () { if (root.classList.contains('on')) socket.emit('admStats'); }, 5000); }
+    function refresh() { if (!S.authed) return; if (S.tab === 'dash') socket.emit('admStats'); if (S.tab === 'log') socket.emit('admLog'); if (S.tab === 'promo') socket.emit('admPromos'); clearInterval(iv); if (S.tab === 'dash') iv = setInterval(function () { if (root.classList.contains('on')) socket.emit('admStats'); }, 5000); }
     socket.on('admAuth', function (d) {
         if (!d) return; if (!d.ok) { var m = $('#ad-m'); if (m) { m.textContent = d.msg || 'Доступ заборонено'; m.className = 'msg bad'; } var g = $('#ad-go'); if (g) g.disabled = false; return; }
         S.authed = true; S.stats = d.stats; S.cases = d.cases || []; S.modes = d.modes || []; render(); refresh();
@@ -101,7 +133,8 @@
     socket.on('admStats', function (d) { S.stats = d; if (S.tab === 'dash') body(); });
     socket.on('admFind', function (d) { S.list = (d && d.list) || []; users(); });
     socket.on('admLog', function (d) { S.log = d || []; if (S.tab === 'log') body(); });
-    socket.on('admOk', function (d) { toast(d.msg || 'Готово'); if (d.list) { S.list = d.list; users(); } if (d.stats) { S.stats = d.stats; body(); } });
+    socket.on('admPromos', function (d) { S.promos = d || []; if (S.tab === 'promo') body(); });
+    socket.on('admOk', function (d) { toast(d.msg || 'Готово'); if (d.list) { S.list = d.list; users(); } if (d.stats) { S.stats = d.stats; body(); } if (d.promos) { S.promos = d.promos; S.pedit = null; if (S.tab === 'promo') body(); } });
     socket.on('admErr', function (d) { toast((d && d.msg) || 'Помилка', true); if (d && d.relog) { S.authed = false; render(); } });
     window.AdminUI = { open: open, close: close };
     open();
