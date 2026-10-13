@@ -2271,3 +2271,7 @@ I18N.add("pt", {
  "Запас квитків повний — спершу покрутіть колесо": "Seu estoque de bilhetes está cheio — gire a roda primeiro",
  "Помилка сервера, спробуйте ще раз": "Erro do servidor, tente novamente"
 }, [["Дуелі відкриваються з (\\d+) рівня","Os duelos são liberados no nível $1"],["Ваш друг ще не має (\\d+) рівня","Seu amigo ainda não tem o nível $1"],["Ліміт дуелей на сьогодні вичерпано \\((\\d+)\\)\\. Повертайтесь завтра!","O limite de duelos de hoje acabou ($1). Volte amanhã!"],["Квиток → (\\d+)","Bilhete → $1"],["З цим другом сьогодні вже зіграно (\\d+) дуелі\\. Спробуйте завтра","Você já jogou $1 duelos com este amigo hoje. Tente amanhã"],["Ставка від (\\d+) до (\\d+)","Aposta de $1 a $2"],["(\\d+) / (\\d+) · у запасі квитків: (\\d+)","$1 / $2 · bilhetes disponíveis: $3"],["Забагато невдалих спроб входу\\. Спробуйте через (\\d+) хв","Muitas tentativas de login falharam. Tente em $1 min"]]);
+// 2026-10: детматч — максимум 50 жетонів, нагорода пропорційна
+I18N.add("pt", {
+ "Хто першим збере стільки жетонів — виграє. Чим більше жетонів, тим довший бій і більша нагорода. Якщо час вийде раніше — нагорода пропорційна зібраним жетонам.": "Vence quem juntar primeiro essa quantidade de fichas. Mais fichas — batalha mais longa e recompensa maior. Se o tempo acabar antes, a recompensa é proporcional às fichas coletadas."
+});

@@ -2382,3 +2382,7 @@ I18N.add("en", {
  "Запас квитків повний — спершу покрутіть колесо": "Your ticket stock is full — spin the wheel first",
  "Помилка сервера, спробуйте ще раз": "Server error, please try again"
 }, [["Дуелі відкриваються з (\\d+) рівня","Duels unlock at level $1"],["Ваш друг ще не має (\\d+) рівня","Your friend isn’t level $1 yet"],["Ліміт дуелей на сьогодні вичерпано \\((\\d+)\\)\\. Повертайтесь завтра!","Today’s duel limit is used up ($1). Come back tomorrow!"],["Квиток → (\\d+)","Ticket → $1"],["З цим другом сьогодні вже зіграно (\\d+) дуелі\\. Спробуйте завтра","You’ve already played $1 duels with this friend today. Try tomorrow"],["Ставка від (\\d+) до (\\d+)","Stake from $1 to $2"],["(\\d+) / (\\d+) · у запасі квитків: (\\d+)","$1 / $2 · tickets in stock: $3"],["Забагато невдалих спроб входу\\. Спробуйте через (\\d+) хв","Too many failed login attempts. Try again in $1 min"]]);
+// 2026-10: детматч — максимум 50 жетонів, нагорода пропорційна
+I18N.add("en", {
+ "Хто першим збере стільки жетонів — виграє. Чим більше жетонів, тим довший бій і більша нагорода. Якщо час вийде раніше — нагорода пропорційна зібраним жетонам.": "Whoever collects this many tokens first wins. More tokens — a longer battle and a bigger reward. If time runs out first, the reward is proportional to the tokens collected."
+});
