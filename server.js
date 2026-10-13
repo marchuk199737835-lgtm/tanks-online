@@ -59,8 +59,7 @@ if (mongoUri) {
         const db = client.db("tanks_db"); dbRef = db;
         dbUsersCol = db.collection("users");
         dbMapsCol = db.collection("maps");
-        promoCol = db.collection("promo_uses");
-        promoCol.find({}).toArray().then(rows => { rows.forEach(r => { if (r && r._id) promoUses[r._id] = Math.max(promoUses[r._id] || 0, r.uses | 0); }); }).catch(e => console.error('❌ Лічильники промокодів:', e.message));
+        Promo.attachDb(db);
         if (editorApi) editorApi.loadSaved().catch(e => console.error('❌ Не вдалося завантажити мапи з БД:', e.message));
         dbUsersCol.find({}).toArray().then(users => {
             users.forEach(u => { if (!u || typeof u.name !== 'string') return; if (!dbUsers[u.name]) dbUsers[u.name] = u; savedSnap.set(u.name, snapOf(u)); });
@@ -127,7 +126,14 @@ async function gracefulExit(sig) {
 process.on('SIGTERM', () => gracefulExit('SIGTERM'));
 process.on('SIGINT', () => gracefulExit('SIGINT'));
 
-function hashPwd(pwd) { return crypto.createHash('sha256').update(pwd).digest('hex'); }
+// Паролі: scrypt із сіллю (auth.js); старі SHA-256 тихо перезаписуються при першому вдалому вході
+const Auth = require('./auth.js');
+async function checkPwd(name, pwd) {
+    const u = dbUsers[name]; if (!u) return false;
+    const v = await Auth.verify(u.password, pwd);
+    if (v.ok && v.upgrade && dbUsers[name] === u) { u.password = await Auth.makeHash(pwd); saveUser(name, true); }
+    return !!v.ok;
+}
 // Вхід за токеном без перебору всіх акаунтів: індекс токен → логін (самовідновлюваний: промах → одноразова перебудова, не частіше 1/с)
 const tokenIdx = new Map(); let tokenIdxAt = 0;
 function loginByToken(token) {
@@ -155,53 +161,13 @@ function ipHashOf(socket) {
     } catch (e) { return ''; }
 }
 
-// ===== ПРОМОКОДИ =====
-// Коди й суми живуть лише на сервері (клієнту суму не довіряємо). credits — скільки Кредів (поле bucks) дає код;
-// maxUses — загальний ліміт активацій (0 = без ліміту); expires — 'YYYY-MM-DD' (включно, UTC) або null; once — один раз на акаунт.
-// Лічильники використань: колекція promo_uses у MongoDB (або пам'ять, якщо БД нема); застосовані коди акаунта — u.usedPromos.
-const PROMO_CODES = {
-    'WELCOME':   { credits: 50,  maxUses: 0,    expires: null,         once: true },
-    'BONUS25':   { credits: 25,  maxUses: 1000, expires: '2026-12-31', once: true },
-    'ALEX-TOP1': { credits: 200, maxUses: 0,    expires: null,         once: true },  // старий код (раніше був зашитий у usePromo)
-    'START':     { credits: 200, maxUses: 0,    expires: null,         once: true }   // промокод навчання новачка
-};
-let promoCol = null;
-const promoUses = Object.create(null);
-const promoRate = Object.create(null);   // за ім'ям акаунта: { last, fails, windowStart, blockedUntil }
-const PROMO_MIN_GAP = 1500, PROMO_MAX_FAILS = 8, PROMO_WINDOW = 10 * 60 * 1000, PROMO_BLOCK = 5 * 60 * 1000;
-function redeemPromoCode(name, rawCode, now) {
-    now = now || Date.now();
-    const u = dbUsers[name];
-    if (!u) return { ok: false, msg: 'Спершу увійдіть в акаунт' };
-    const rt = promoRate[name] || (promoRate[name] = { last: 0, fails: 0, windowStart: now, blockedUntil: 0 });
-    if (now < rt.blockedUntil) return { ok: false, msg: 'Забагато невдалих спроб. Спробуйте пізніше' };
-    if (now - rt.last < PROMO_MIN_GAP) return { ok: false, msg: 'Не так швидко! Зачекайте секунду' };
-    rt.last = now;
-    if (now - rt.windowStart > PROMO_WINDOW) { rt.windowStart = now; rt.fails = 0; }
-    const fail = msg => { if (++rt.fails >= PROMO_MAX_FAILS) { rt.blockedUntil = now + PROMO_BLOCK; rt.fails = 0; } return { ok: false, msg }; };
-    if (typeof rawCode !== 'string') return fail('Невірний промокод');
-    const code = rawCode.trim().toUpperCase();
-    if (!code) return { ok: false, msg: 'Введіть промокод' };
-    if (code.length > 40 || !Object.prototype.hasOwnProperty.call(PROMO_CODES, code)) return fail('Невірний промокод');
-    const p = PROMO_CODES[code];
-    if (p.off) return fail('Невірний промокод');      // вимкнений в адмінці
-    if (p.expires && now > Date.parse(p.expires + 'T23:59:59.999Z')) return fail('Термін дії промокоду минув');
-    if (!Array.isArray(u.usedPromos)) u.usedPromos = [];
-    if (p.once !== false && u.usedPromos.some(x => String(x).toUpperCase() === code)) return fail('Цей промокод уже використано');
-    if (p.maxUses > 0 && (promoUses[code] || 0) >= p.maxUses) return fail('Ліміт активацій цього промокоду вичерпано');
-    const amt = Math.max(0, Math.floor(p.credits)) || 0;
-    promoUses[code] = (promoUses[code] || 0) + 1;
-    if (promoCol) promoCol.updateOne({ _id: code }, { $inc: { uses: 1 } }, { upsert: true }).catch(e => console.error('❌ Лічильник промокоду', code, e.message));
-    u.usedPromos.push(code);
-    u.bucks += amt; u.stats.earned += amt;
-    rt.fails = 0;
-    return { ok: true, msg: 'Успішно! +' + amt + ' кредів', amount: amt, bucks: u.bucks };
-}
+// ===== ПРОМОКОДИ — promo.js =====
+const Promo = require('./promo.js')(dbUsers), { PROMO_CODES, promoUses, redeemPromoCode } = Promo;
 
 // --- КОНСТАНТИ ---
 const MAP_DATA={"epic_map":{size:3000,bg:"#565a6c",grid:"#494d55",solids:[{type:"wall_square",x:850,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1150,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1150,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1800,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:850,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:1700,y:1050,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:1850,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:1800,y:1800,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1950,w:50,h:50,color:"#353940"},{type:"wall_square",x:1700,y:1900,w:50,h:50,color:"#353940"},{type:"wall_square",x:1700,y:1950,w:50,h:50,color:"#353940"},{type:"wall_square",x:1850,y:1800,w:50,h:50,color:"#353940"},{type:"wall_square",x:1850,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:1750,y:1000,w:50,h:50,color:"#353940"},{type:"wall_square",x:1850,y:1150,w:50,h:50,color:"#353940"},{type:"wall_square",x:1700,y:1000,w:50,h:50,color:"#353940"},{type:"wall_square",x:800,y:1100,w:50,h:50,color:"#353940"},{type:"wall_square",x:800,y:1150,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1000,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1000,w:50,h:50,color:"#353940"},{type:"wall_square",x:800,y:1850,w:50,h:50,color:"#353940"},{type:"wall_square",x:950,y:1950,w:50,h:50,color:"#353940"},{type:"wall_square",x:900,y:1950,w:50,h:50,color:"#353940"},{type:"wall_square",x:800,y:1800,w:50,h:50,color:"#353940"},{type:"shape_rhombus",x:1150,y:1300,w:400,h:400,color:"#353940"},{type:"shape_rhombus",x:1250,y:1350,w:200,h:300,color:"#22252a"},{type:"tree",x:0,y:700,r:424.26},{type:"tree",x:2650,y:2550,r:180.27},{type:"tree",x:300,y:2400,r:158.11},{type:"tree",x:2850,y:750,r:364.00},{type:"neon_circle",x:850,y:1100,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:900,y:1050,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:1750,y:1050,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:1800,y:1100,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:1800,y:1850,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:1750,y:1900,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:850,y:1850,w:50,h:50,color:"#21252c"},{type:"neon_circle",x:900,y:1900,w:50,h:50,color:"#21252c"},{type:"prop_crate",x:3000,y:2950,w:50,h:50},{type:"spawn_player",x:250,y:2750},{type:"spawn_player",x:2850,y:2850},{type:"spawn_player",x:1500,y:2750},{type:"spawn_powerup",x:1500,y:1500},{type:"spawn_powerup",x:800,y:800},{type:"spawn_powerup",x:2200,y:800},{type:"spawn_powerup",x:1500,y:2200}]},'Бій Насмерть':{size:2500,bg:'#3e2604',grid:'#1e293b',solids:[{type:"spawn_player",x:1400,y:1450},{type:"spawn_player",x:100,y:1350},{type:"spawn_player",x:1400,y:750},{type:"spawn_player",x:100,y:700},{type:"spawn_powerup",x:700,y:700},{type:"spawn_powerup",x:1800,y:700},{type:"spawn_powerup",x:700,y:1800},{type:"spawn_powerup",x:1800,y:1800}]}};
 // Вбудовані мапи під нові режими (редактор бачить їх як звичайні; збережена в редакторі версія замінює вбудовану)
-try { const MM = require('./maps_modes.js'); Object.keys(MM).forEach(k => { const m = MapObj.sanitizeMap(JSON.parse(JSON.stringify(MM[k]))); if (m) MAP_DATA[k] = m; }); } catch (e) { console.warn('maps_modes.js:', e.message); }
+try { const MM = require('./maps').readAll(); Object.keys(MM).forEach(k => { const m = MapObj.sanitizeMap(MM[k]); if (m) MAP_DATA[k] = m; }); } catch (e) { console.warn('maps/:', e.message); }      // вбудовані мапи — по файлу на мапу в maps/
 editorApi = mountEditor(app, { MAP_DATA: MAP_DATA, getMapsCol: () => dbMapsCol });
 if (!mongoUri) editorApi.loadSaved().catch(e => console.error('❌ Не вдалося завантажити мапи:', e.message));
 const Z_TYPES={normal:{hp:25,speed:120,dmg:10,radius:15,color:'#22c55e'},runner:{hp:15,speed:250,dmg:5,radius:12,color:'#84cc16'},tanker:{hp:100,speed:60,dmg:25,radius:25,color:'#15803d'},spitter:{hp:40,speed:90,dmg:15,radius:15,color:'#a3e635',ranged:true},bomber:{hp:30,speed:140,dmg:50,radius:18,color:'#dc2626',explode:true},ghost:{hp:20,speed:100,dmg:10,radius:15,color:'#cbd5e1',ghost:true},puller:{hp:90,speed:95,dmg:15,radius:22,color:'#a855f7',elite:'puller',name:'ТЯГУН'},shielder:{hp:150,speed:70,dmg:20,radius:24,color:'#38bdf8',elite:'shielder',name:'ЩИТОНОСЕЦЬ'},splitter:{hp:110,speed:105,dmg:15,radius:22,color:'#f43f5e',elite:'splitter',name:'РОЗЩЕПЛЮВАЧ'},mini:{hp:12,speed:230,dmg:5,radius:11,color:'#fb7185'},pikus:{isBoss:true,name:'ПІКУС',hp:1000,speed:294,dmg:100,radius:30,color:'#9333ea',bullets:3,cd:3000},shurik:{isBoss:true,name:'ШУРІК',hp:2000,speed:280,dmg:100,radius:22.5,color:'#f43f5e',bullets:10,cd:3000},oneshot:{isBoss:true,name:'ВАНШОТУС',hp:3000,speed:294,dmg:1000,radius:30,color:'#fbbf24',bullets:2,cd:2000},padlo:{isBoss:true,name:'ПАДЛО',hp:5000,speed:280,dmg:75,radius:15,color:'#10b981',bullets:25,cd:1500,ring:true},titan:{isBoss:true,name:'ТИТАН',hp:8000,speed:270,dmg:120,radius:36,color:'#38bdf8',bullets:18,cd:1400,ring:true}};
@@ -448,13 +414,12 @@ function rollDrop(name) {
 }
 
 // ===== Події прогресу: підрахунок вбивств/смертей за матч, 'kill', 'multikill', 'matchEnd' =====
-const WEAPON_TYPES = new Set(['normal', 'explosive', 'fast', 'piercing', 'homing', 'shotgun', 'minigun', 'incendiary', 'samurai', 'melee', 'acid', 'hunter_gun', 'boss_proj', 'mine', 'laser']);
+const WEAPON_TYPES = new Set(['normal', 'explosive', 'fast', 'piercing', 'homing', 'shotgun', 'minigun', 'incendiary', 'samurai', 'melee', 'acid', 'hunter_gun', 'boss_proj', 'mine', 'laser', 'ram']);
 const cleanWeapon = t => (typeof t === 'string' && WEAPON_TYPES.has(t)) ? t : null;
 const matchTally = new Map();   // roomId -> { t0, kd: { [name]: { k, d } } }
 const tallyOf = r => { let t = matchTally.get(r.id); if (!t) { t = { t0: Date.now(), kd: Object.create(null) }; matchTally.set(r.id, t); } return t; };
 const kdOf = (t, name) => t.kd[name] || (t.kd[name] = { k: 0, d: 0 });
-const SHOTS = new Map(); let shotSeq = 1;   // постріли (id снаряда), щоб розпізнати «один снаряд — кілька вбивств»
-function trimShots(now) { for (const [k, s] of SHOTS) { if (now - s.t > 8000) SHOTS.delete(k); else break; } }
+const Combat = require('./combat.js'), shotT = Combat.shotT;   // постріли гравців: таблиця зброї й перевірка влучань (id снаряда видає сервер)
 // o: { outcomes:{socketId:'win'|'loss'|'draw'}, rewards:{}, xp:{}, drops:{}, place:{}, wave, waves }
 function emitMatchEnd(r, o) {
     try {
@@ -467,7 +432,7 @@ function emitMatchEnd(r, o) {
                 xp: (o.xp && o.xp[p.id]) || null, dropped: (o.drops && o.drops[p.id]) || null, place: (o.place && o.place[p.id]) || (order.indexOf(p) + 1),
                 team: p.team || null, caps: p.caps | 0, brPicks: p.brPicks | 0 };
         });
-        Ev.emit('matchEnd', { roomId: r.id, mode: r.mode, durationMs: Math.max(0, Date.now() - t.t0), players: list, wave: o.wave == null ? null : o.wave, waves: o.waves == null ? null : o.waves, score: o.score || null });
+        Ev.emit('matchEnd', { roomId: r.id, mode: r.mode, ranked: !!r.ranked, duel: !!r.duel, durationMs: Math.max(0, Date.now() - t.t0), players: list, wave: o.wave == null ? null : o.wave, waves: o.waves == null ? null : o.waves, score: o.score || null });
     } catch (e) { console.error('❌ matchEnd:', e && e.message); }
 }
 
@@ -490,7 +455,7 @@ function processPlayerDeath(r, victimId, killerId, meta) {
         const ta = tallyOf(r);
         kdOf(ta, v.name).d++;
         if (atk && atk.name !== v.name) kdOf(ta, atk.name).k++;
-        Ev.emit('kill', { roomId: r.id, mode: r.mode, killerName: atk ? atk.name : null, killerBot: !!(atk && atk.isBot), victimName: v.name, victimBot: !!v.isBot, weapon: cleanWeapon(meta && meta.weapon) });
+        Ev.emit('kill', { roomId: r.id, mode: r.mode, killerName: atk ? atk.name : null, killerBot: !!(atk && atk.isBot), victimName: v.name, victimBot: !!v.isBot, weapon: cleanWeapon(meta && meta.weapon), fin: !!(meta && meta.fin), rear: !!(meta && meta.rear), ranked: !!r.ranked, duel: !!r.duel, killerTeam: atk ? atk.team || null : null });
     } catch (e) { console.error('❌ kill event:', e && e.message); }
 
     Classes.reset(v);      // здібність гасне разом із танком
@@ -502,6 +467,7 @@ function processPlayerDeath(r, victimId, killerId, meta) {
         else if (r.mode === 'capture_points') { const S = Modes.MS.get(r.id); if (S && S.sc && S.sc[atk.team] !== undefined) S.sc[atk.team] += 3; }
         const u = !atk.isBot && dbUsers[atk.name]; if (u) { u.bucks += 5; u.stats.earned = (u.stats.earned | 0) + 5; saveUser(atk.name); io.to(atk.id).emit('economyUpdate', ecoPayload(atk.name)); }
         io.to(r.id).emit('leaderDown', { by: nickOf(atk.name), tg: nickOf(v.name), byId: atk.id });
+        if (!atk.isBot) Ev.emit('leaderDown', { roomId: r.id, mode: r.mode, killerName: atk.name });
     }
     if (Modes.has(r.mode)) { Modes.onDeath(r, v, killerId); return; }
     if (r.mode === 'survival') {   // життя: відродження через 6 с біля живого союзника; останнє — гравець вибуває
@@ -565,11 +531,12 @@ function readCreds(data) {
     return { name: data.name.trim(), password: data.password };
 }
 // Пошук акаунта для входу: точний збіг, інакше без урахування регістру (клієнт деякий час надсилав логін ВЕЛИКИМИ літерами)
-function findLogin(name, pwdHash) {
+async function findLogin(name, pwd) {
     if (!name) return null;
-    if (Object.prototype.hasOwnProperty.call(dbUsers, name) && dbUsers[name].password === pwdHash) return name;
+    if (Object.prototype.hasOwnProperty.call(dbUsers, name)) return (await checkPwd(name, pwd)) ? name : null;
     const low = name.toLowerCase();
-    return Object.keys(dbUsers).find(k => k.toLowerCase() === low && dbUsers[k].password === pwdHash) || null;
+    for (const k of Object.keys(dbUsers).filter(k => k.toLowerCase() === low).slice(0, 5)) if (await checkPwd(k, pwd)) return k;
+    return null;
 }
 // Штраф мисливцю за промах у хованках. 0 = вимкнено. Наприклад 10 = мінус 10 HP за промах (HP не опуститься нижче 1).
 const HUNTER_MISS_PENALTY = 0;
@@ -618,6 +585,7 @@ function removePlayer(rId, sockId) {
     if (!r || !r.players[sockId]) return;
     const left = r.players[sockId];
     delete r.players[sockId];
+    if (r.status === 'playing' && !left.isBot) Ev.emit('matchQuit', { roomId: rId, mode: r.mode, name: left.name, ranked: !!r.ranked, duel: !!r.duel });      // аналітика: де кидають бій
     if (r.ranked && hooks.rankedLeave) { try { hooks.rankedLeave(r, left); } catch (e) { console.error('❌ rankedLeave', e && e.message); } }   // рейтинг: дезертирство = поразка, місце займає бот
     if (r.duel && hooks.duelLeave) { try { hooks.duelLeave(r, left); } catch (e) { console.error('❌ duelLeave', e && e.message); } }         // дуель на ставку: утікач програє, банк — суперникові
     const ids = Object.keys(r.players);
@@ -1011,15 +979,22 @@ io.on('connection', (socket) => {
     let initAsks = 0;
     socket.on('getInit', () => { if (++initAsks > 20) return; rescanMusicSoon(); socket.emit('initMusic', musicData); socket.emit('initZombies', Z_TYPES_CLIENT); });
 
-    socket.on('register', (data) => {
+    let authBusy = false;      // поки рахується scrypt, повторні register/login з цього сокета ігноруються
+    const nameTakenNow = name => Object.prototype.hasOwnProperty.call(dbUsers, name) || (hooks.botNames && hooks.botNames.has(name.toLowerCase())) || (hooks.nameTaken && hooks.nameTaken(name));
+    socket.on('register', async (data) => {
         const creds = readCreds(data);
         if (!creds) return socket.emit('joinError', 'Некоректні дані!');
         const { name, password } = creds;
         if (!LOGIN_RE_NEW.test(name)) return socket.emit('joinError', 'Логін: 3-12 символів, лише латиниця, цифри, _ та -');
         if (!PASS_RE_NEW.test(password)) return socket.emit('joinError', 'Пароль: 4-128 символів, лише латиниця, цифри та знаки (без пробілів і кирилиці)');
-        if (Object.prototype.hasOwnProperty.call(dbUsers, name) || (hooks.botNames && hooks.botNames.has(name.toLowerCase())) || (hooks.nameTaken && hooks.nameTaken(name))) return socket.emit('joinError', 'Цей логін вже зайнятий!');
+        if (nameTakenNow(name)) return socket.emit('joinError', 'Цей логін вже зайнятий!');
+        if (authBusy) return; authBusy = true;
+        let pwHash; try { pwHash = await Auth.makeHash(password); } catch (e) { authBusy = false; return socket.emit('joinError', 'Помилка сервера, спробуйте ще раз'); }
+        authBusy = false;
+        if (!socket.connected) return;
+        if (nameTakenNow(name)) return socket.emit('joinError', 'Цей логін вже зайнятий!');      // хтось зайняв, поки рахувався хеш
         const token = crypto.randomUUID();
-        dbUsers[name] = validateUser({ name: name, password: hashPwd(password), token: token, bucks: 0, lang: cleanLang(data && data.lang) });
+        dbUsers[name] = validateUser({ name: name, password: pwHash, token: token, bucks: 0, lang: cleanLang(data && data.lang) });
         globalPlayers[socket.id] = name;
         // новий акаунт: реферальний код (запрошення друга) і навчання новачка — обробляють referral.js / tutorial.js
         Ev.emit('register', { name, socketId: socket.id, ref: data && (typeof data.ref === 'string' || typeof data.ref === 'number') ? String(data.ref).slice(0, 16) : null, ip: ipHashOf(socket) });
@@ -1030,13 +1005,19 @@ io.on('connection', (socket) => {
         Ev.emit('login', { name, socketId: socket.id });
     });
 
-    socket.on('login', (data) => {
+    socket.on('login', async (data) => {
         const creds = readCreds(data);
         if (!creds) return socket.emit('joinError', 'Невірний логін або пароль!');
-        const { password } = creds;
-        const name = findLogin(creds.name, hashPwd(password));
+        const { password } = creds, ip = ipHashOf(socket) || socket.id;
+        const wait = Auth.lockedFor(ip, creds.name);
+        if (wait) return socket.emit('joinError', 'Забагато невдалих спроб входу. Спробуйте через ' + Math.ceil(wait / 60000) + ' хв');
+        if (authBusy || password.length > 200) return; authBusy = true;
+        let name = null; try { name = await findLogin(creds.name, password); } catch (e) { console.error('❌ login', e && e.message); }
+        authBusy = false;
+        if (!socket.connected) return;
         let u = name ? dbUsers[name] : null;
-        if (!u) return socket.emit('joinError', 'Невірний логін або пароль!');
+        if (!u) { Auth.failed(ip, creds.name); return socket.emit('joinError', 'Невірний логін або пароль!'); }
+        Auth.succeeded(ip, creds.name);
         const bn = banInfo(u); if (bn) return socket.emit('joinError', bn);
         const token = crypto.randomUUID();
         if (u.token) tokenIdx.delete(u.token);
@@ -1493,9 +1474,19 @@ io.on('connection', (socket) => {
                 return;
             }
             if ((p.stunUntil || 0) > Date.now()) return;      // оглушений тараном — не стріляє
-            data.owner = socket.id; data.pierced = [];
-            { const nowS = Date.now(); trimShots(nowS); data.bid = shotSeq++; SHOTS.set(data.bid, { owner: socket.id, type: cleanWeapon(data.type), kills: 0, t: nowS }); }
-            io.to(data.roomId).emit('spawnBullet', data);
+            if (p.hp <= 0 || p.out || Modes.frozen(r)) return;  // загиблий не стріляє; снаряди, випущені до смерті, долітають
+            // тип, позицію й швидкість снаряда визначає сервер; від клієнта беремо лише напрям, ціль самонаведення й дальність
+            const nowS = Date.now(), type = r.mode === 'prophunt' ? 'hunter_gun' : (p.buff || 'none'), T = shotT(type);
+            if (nowS - (p._shotAt || 0) < (ModeInfo.isPve(r.mode) ? 70 : (T.gap || 250))) return;      // кооп: класи (Штурмовик з адреналіном) стріляють дуже часто
+            hiddenSet(p, '_shotAt', nowS);
+            let x = +data.x, y = +data.y, vx = +data.vx, vy = +data.vy;
+            if (!Number.isFinite(x) || !Number.isFinite(y) || Math.hypot(x - p.x, y - p.y) > 110) { x = p.x; y = p.y; }
+            let vl = Math.hypot(vx, vy); if (!Number.isFinite(vl) || vl < 1e-6) { vx = Math.cos(p.turretAngle || 0); vy = Math.sin(p.turretAngle || 0); vl = 1; }
+            const spd = Combat.BULLET_SPEED * (T.spd || 1) / (type === 'shotgun' ? 1.2 : 1), lm = Math.min(3, Math.max(0.3, +data.lifeMult || 1));
+            const out = { roomId: r.id, id: typeof data.id === 'number' && Number.isFinite(data.id) ? data.id : nowS + Math.random(), x, y, vx: vx / vl * spd, vy: vy / vl * spd, type, lifeMult: lm, owner: socket.id, pierced: [] };
+            if (typeof data.targetId === 'string' && r.players[data.targetId]) out.targetId = data.targetId;
+            out.bid = Combat.add({ owner: socket.id, room: r.id, type, lm, x, y, t: nowS, hits: new Map(), kills: 0 });
+            io.to(r.id).emit('spawnBullet', out);
         }
     });
 
@@ -1511,7 +1502,12 @@ io.on('connection', (socket) => {
         if (Modes.frozen(r)) return;                              // раунди: підготовка / пауза між раундами
 
         if (!atk) return;                                         // влучати можуть лише гравці цієї кімнати
-        let fD = Math.min(500, Math.max(0, +data.amt || 0));      // базова шкода снаряда (макс. — баф «бос» 500); NaN/рядки → 0
+        // снаряд має бути справжнім (id видав сервер у 'shoot'), належати нападнику, встигнути долетіти; одна ціль — одне влучання
+        // (дріб — до 20 дробин, вибух — ще й уламки). Шкоду бере сервер із таблиці SHOT_T, а не з клієнта.
+        const splash = !!data.sp, sh = Combat.claimHit(data.bid, socket.id, r.id, data.targetId, v, splash, Date.now());
+        if (!sh) return;
+        const ST = shotT(sh.type);
+        let fD = splash ? ST.splash : ST.dmg;
 
         if (r.mode === 'prophunt') {
             if (r.state !== 'seeking' || !atk || atk.team !== 'hunter' || v.team === 'hunter') return;
@@ -1522,7 +1518,7 @@ io.on('connection', (socket) => {
         // кут броні: прямий снаряд (не уламки вибуху) у борт / корму б'є сильніше
         const side = (r.mode === 'prophunt' || data.sp) ? 0 : armorSide(v, +data.a); fD *= ARM_MUL[side];
         
-        if (data.type === 'incendiary') v.onFire = { end: Date.now() + 5000, nextTick: Date.now() + 1000, owner: socket.id };
+        if (sh.type === 'incendiary') v.onFire = { end: Date.now() + 5000, nextTick: Date.now() + 1000, owner: socket.id };
         
         // добивання: у ворога < 15% HP і він поруч (≤ 170 px) — постріл знищує миттєво, нападник отримує +50 HP
         let fin = false;
@@ -1532,16 +1528,13 @@ io.on('connection', (socket) => {
         if (fin && v.hp === 0) { atk.hp = Math.min(getMaxHp(atk.equipped), atk.hp + 50); io.to(r.id).emit('finisher', { x: Math.round(v.x), y: Math.round(v.y), by: socket.id }); }
         io.to(socket.id).emit('hitConfirmed');
         // цифри шкоди (нападнику) і легка віддача (жертві); k: 1 — сильне влучання, 2 — вбивство
-        io.to(socket.id).emit('dmgN', { x: Math.round(v.x), y: Math.round(v.y), v: Math.round(Math.min(hp0, fD)), k: v.hp === 0 ? 2 : (fD >= 2 * Math.min(500, Math.max(1, +data.amt || 1)) ? 1 : 0), s: side });
+        io.to(socket.id).emit('dmgN', { x: Math.round(v.x), y: Math.round(v.y), v: Math.round(Math.min(hp0, fD)), k: v.hp === 0 ? 2 : (fD >= 2 * (splash ? ST.splash : ST.dmg) ? 1 : 0), s: side });
         if (!v.isBot && v.hp > 0) io.to(data.targetId).emit('knock', { x: Math.round(atk.x), y: Math.round(atk.y) });
-        
+
         if (v.hp === 0) {
-            processPlayerDeath(r, data.targetId, socket.id, { weapon: data.type });
-            const sh = (typeof data.bid === 'number') ? SHOTS.get(data.bid) : null;   // один снаряд (id видає сервер у 'shoot') — кілька вбивств
-            if (sh && sh.owner === socket.id) {
-                sh.kills++;
-                if (sh.kills >= 2 && atk) Ev.emit('multikill', { roomId: r.id, mode: r.mode, killerName: atk.name, killerBot: !!atk.isBot, weapon: sh.type || cleanWeapon(data.type), count: sh.kills });
-            }
+            processPlayerDeath(r, data.targetId, socket.id, { weapon: sh.type === 'none' ? 'normal' : sh.type, fin, rear: side === 2 });
+            sh.kills++;      // один снаряд — кілька вбивств
+            if (sh.kills >= 2) Ev.emit('multikill', { roomId: r.id, mode: r.mode, killerName: atk.name, killerBot: !!atk.isBot, weapon: cleanWeapon(sh.type), count: sh.kills });
         }
     });
 
@@ -1582,7 +1575,12 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('zombieHit', (d) => zombieHitFor(socket.id, d, false));
+    socket.on('zombieHit', (d) => {      // снаряд гравця по зомбі: той самий справжній постріл, що й для registerHit; шкода — не більше табличної
+        if (!d || typeof d !== 'object') return;
+        const r = rooms[d.roomId], z = r && r.zombies[d.zid], sh = z ? Combat.claimHit(d.bid, socket.id, r.id, 'z' + d.zid, z, false, Date.now()) : null;
+        if (!sh) return;
+        zombieHitFor(socket.id, { roomId: r.id, zid: d.zid, dmg: Math.min(Math.max(0, +d.dmg || 0), shotT(sh.type).dmg), type: sh.type }, false);
+    });
     socket.on('ram', (d) => ramFor(socket, d));                          // таран ривком
     socket.on('objHit', (d) => objHitFor(socket, d));                    // влучання в руйнівний об'єкт
     socket.on('pickPerk', (d) => { if (d && rooms[d.roomId]) Modes.pickPerk(rooms[d.roomId], socket.id, d.id); });
@@ -1727,6 +1725,7 @@ function eliteMix(r, ids, wave, d, n) {
 // загибель зомбі (усі шляхи: постріл, вогонь, здібності, міни): розщеплювач → 3 малих; еліт — 50% шанс ремкомплекту
 function onZDeath(r, z, ownerId) {
     const now = Date.now(), ZT = Z_TYPES[z.type]; if (!ZT) return;
+    { const kp = ownerId && r.players[ownerId]; if (kp && !kp.isBot) Ev.emit('zkill', { roomId: r.id, mode: r.mode, name: kp.name, boss: !!ZT.isBoss }); }      // досягнення «Санітар», «Гроза босів»
     if (z.type === 'splitter') {
         const hm = z.maxHp / ZT.hp;
         for (let i = 0; i < 3; i++) {
@@ -2034,14 +2033,14 @@ setInterval(() => {
     const onlineSocketsOf = name => { const s = _sockByName.get(name); return s ? Array.from(s) : []; };
     const ctx = {
         io, rooms, dbUsers, globalPlayers, Events, GameData, MODULES, CASES, ModeInfo, Modes, MAP_DATA, MapObj, Nav, VALID_MODES, MAX_HP,
-        saveUser, sendEconomy, ecoPayload, grantXp, rollDrop, playerLevel, getMaxHp, pushRooms, hashPwd, validateUser, NAME_RE, LOGIN_RE_NEW, PASS_RE_NEW,
+        saveUser, sendEconomy, ecoPayload, grantXp, rollDrop, playerLevel, getMaxHp, pushRooms, checkPwd, makePwdHash: Auth.makeHash, validateUser, NAME_RE, LOGIN_RE_NEW, PASS_RE_NEW,
         checkCollisionServer, getValidSpawn, processPlayerDeath, removePlayer, resetRoomToLobby, getRandomModuleFromCase, armorSide, ARM_MUL, objDamage, objDead,
         hooks, displayName: nickOf, onConnection: f => connHooks.push(f), getDb: () => dbRef, onlineSocketsOf, isOnline: name => _sockByName.has(name),
         get BANS() { return BANS; }, get TICK_RATE() { return TICK_RATE; }, get SYNCS() { return SYNCS; }, startRoomGame, collectTokenFor, emitMatchEnd, teamsOf, isTeamPvp, powerupsOn, pickMap, clampInt, BUFF_DURATION, VALID_COLORS, TDM_TEAMS,
         newPlayerEntry, joinRoomFor, ipHashOf, getRandomModuleFromCase, matchTally: () => matchTally,
         banInfo, dbStat, dirtyCount: () => dirtyUsers.size, flushUsers, PROMO_CODES, promoUses
     };
-    ['handles', 'progress', 'profile', 'social', 'clans', 'chat', 'playercard', 'bots', 'ranked', 'referral', 'stakes', 'tutorial', 'emotes', 'notify', 'admin'].forEach(f => {
+    ['handles', 'progress', 'profile', 'social', 'clans', 'chat', 'playercard', 'bots', 'ranked', 'referral', 'stakes', 'tutorial', 'emotes', 'notify', 'analytics', 'admin'].forEach(f => {
         if (!fs.existsSync(path.join(__dirname, f + '.js'))) return;
         try { require('./' + f + '.js')(ctx); console.log('✅ Модуль', f); } catch (e) { console.error('❌ Модуль', f, e && e.stack || e); }
     });

@@ -2,13 +2,13 @@
 // кожна зона своя, без дзеркальності. Увесь дрібний декор стоїть по сітці 50 px (як маскування хованців), а серед нього —
 // «обманки»: поодинокі ящики / бочки / тюки там, де їх не чекаєш (посеред лугу, на роздоріжжі, в отворі ряду, біля входу),
 // тож мисливець не може просто стріляти в кожен «підозрілий» предмет (промах коштує HP).
-// Запуск: node tools/genhide.js — додає (або оновлює) мапу в maps_modes.js.
+// Запуск: node tools/genhide.js — додає (або оновлює) мапу в maps/.
 'use strict';
 const fs = require('fs'), path = require('path');
 const MO = require('../public/js/mapobjects.js');
 const L = require('./maplib.js');
 const PH = require('./phgrid.js');
-const FILE = path.join(__dirname, '..', 'maps_modes.js');
+const Store = require('../maps');
 const NAME = 'Decoy Yard', C = 50;
 
 function make() {
@@ -153,7 +153,6 @@ PH.gridify(out);      // контроль: дрібний декор уже по
 const sm = MO.sanitizeMap(JSON.parse(JSON.stringify(out)));
 if (sm.solids.length !== out.solids.length) throw new Error('sanitizeMap губить об\'єкти');
 const inf = MO.phInfo(sm);
-const src = fs.readFileSync(FILE, 'utf8'), head = src.slice(0, src.indexOf('module.exports'));
-const maps = require(FILE); maps[NAME] = out;
-fs.writeFileSync(FILE, head + 'module.exports = ' + JSON.stringify(maps) + ';\n');
+const maps = Store.readAll(); maps[NAME] = out;
+Store.writeAll(maps);
 console.log(NAME, out.size, 'об\'єктів', out.solids.length, '· рулетка:', inf.pool.map(t => MO.nameOf(t) + '×' + inf.count[t]).join(', '));

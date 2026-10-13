@@ -1,4 +1,4 @@
-// Генератор 20 нових мап (2026-10). Запуск: node tools/genmaps2.js — ДОДАЄ (або оновлює за назвою) мапи в maps_modes.js,
+// Генератор 20 нових мап (2026-10). Запуск: node tools/genmaps2.js — ДОДАЄ (або оновлює за назвою) мапи в maps/,
 // не чіпаючи наявних (на відміну від genmaps.js, що перезаписує файл повністю). Розстановка детермінована: зерно — назва мапи.
 //  • tools/maps2/pvp.js   — 8 мап: детматч / «Ціль» / хованки (4) і командний / точки / раунди (4)
 //  • tools/maps2/br.js    — 2 мапи королівського бою 7500×7500 (зимова долина, телецентр)
@@ -7,7 +7,7 @@
 const fs = require('fs'), path = require('path');
 const MO = require('../public/js/mapobjects.js');
 const L = require('./maplib.js');
-const FILE = path.join(__dirname, '..', 'maps_modes.js');
+const Store = require('../maps');
 
 const made = {};
 // мапи нових режимів дозволяємо й у схожих класичних (як у genmaps.js), щоб жоден режим не лишався без мап
@@ -27,9 +27,7 @@ require('./maps2/pvp.js')(def, L);
 require('./maps2/br.js')(def, L);
 require('./maps2/coop.js')(def, L);
 
-const src = fs.readFileSync(FILE, 'utf8'), head = src.slice(0, src.indexOf('module.exports'));
-delete require.cache[require.resolve(FILE)];
-const maps = require(FILE);
+const maps = Store.readAll();
 Object.assign(maps, made);
 // ===== ЧІТКИЙ РОЗПОДІЛ МАП ЗА РЕЖИМАМИ (кожна мапа — у своїй групі; королівський бій — лише 3 найбільші мапи) =====
 const FFA = ['deathmatch', 'bounty', 'prophunt'], TEAM = ['team_deathmatch', 'capture_points', 'rounds'];
@@ -57,6 +55,6 @@ const MODES_BY_MAP = {
 };
 for (const k in maps) { if (MODES_BY_MAP[k]) maps[k].modes = MODES_BY_MAP[k].slice(); else console.warn('⚠️ мапа без групи режимів:', k); }
 require('./phgrid.js').apply(maps, true);      // хованки: дрібний декор — по сітці 50 px, як маскування гравців
-fs.writeFileSync(FILE, head + 'module.exports = ' + JSON.stringify(maps) + ';\n');
+Store.writeAll(maps);
 for (const k in made) { const m = made[k], d = MO.destrList(m).length; console.log(k.padEnd(16), String(m.size).padEnd(5), m.theme.padEnd(8), (m.modes || []).join(',').padEnd(46), 'об\'єктів', m.solids.length, 'руйнівних', d); }
-console.log('Нових мап:', Object.keys(made).length, '· усього в maps_modes.js:', Object.keys(maps).length);
+console.log('Нових мап:', Object.keys(made).length, '· усього в maps/:', Object.keys(maps).length);

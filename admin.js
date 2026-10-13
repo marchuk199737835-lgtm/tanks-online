@@ -9,7 +9,7 @@
  *  6. Сесія адміна — лише для цього сокета: 20 хв бездіяльності або 2 год максимум; кожна дія перевіряє сесію наново.
  *  7. Відповіді «Доступ заборонено» однакові для всіх причин (не видно, чи акаунт — адмін). Усі дії пишуться в журнал (пам'ять + консоль сервера).
  *
- * Можливості: статистика онлайну/сервера/БД · пошук гравця · бан (з причиною й терміном) / розбан · вигнати з гри · видати кредити або кейс ·
+ * Можливості: статистика онлайну/сервера/БД · аналітика (analytics.js) · пошук гравця · бан (з причиною й терміном) / розбан · вигнати з гри · видати кредити, кейс або квитки колеса ·
  *             подія (множник кредитів/досвіду для всіх або одного режиму, з таймером) · оголошення всім гравцям · журнал дій ·
  *             промокоди (список з лічильниками активацій, створення, редагування, вимкнення, видалення; зберігаються в meta/promos).
  * Подія зберігається в MongoDB (meta/event) лише при зміні — 1 запис. */
@@ -151,14 +151,15 @@ module.exports = function (ctx) {
         A('admKick', (by, d) => { const t = dbUsers[d.login] ? d.login : null; if (!t || ADMINS.has(t)) return; kickOut(t, 'Вас відключено адміністратором'); log(by, 'kick', t); ok('Гравця ' + t + ' відключено'); });
         A('admGive', (by, d) => {
             const t = dbUsers[d.login] ? d.login : null; if (!t) return socket.emit('admErr', { msg: 'Гравця не знайдено' });
-            const u = dbUsers[t], cr = Math.max(0, Math.min(100000, Math.floor(+d.cr || 0))), cid = d.caseId && GameData.CASES[d.caseId] ? +d.caseId : null;
-            if (!cr && !cid) return socket.emit('admErr', { msg: 'Вкажіть кредити або кейс' });
+            const u = dbUsers[t], cr = Math.max(0, Math.min(100000, Math.floor(+d.cr || 0))), cid = d.caseId && GameData.CASES[d.caseId] ? +d.caseId : null, tk = Math.max(0, Math.min(30, Math.floor(+d.tk || 0)));
+            if (!cr && !cid && !tk) return socket.emit('admErr', { msg: 'Вкажіть кредити, кейс або квитки' });
             if (cid && u.inventory.length >= 30) return socket.emit('admErr', { msg: 'Інвентар гравця повний' });
+            if (tk && ctx.Stakes) ctx.Stakes.addTicket(t, tk, 'admin');
             const modId = cid ? ctx.getRandomModuleFromCase(cid) : null;
             if (cr) { u.bucks += cr; if (u.stats) u.stats.earned = (u.stats.earned | 0) + cr; } if (modId) u.inventory.push(modId);
             saveUser(t, true);
             ctx.onlineSocketsOf(t).forEach(sid => { ctx.sendEconomy(sid, t); io.to(sid).emit('admGift', { cr, mod: modId }); });
-            log(by, 'give', t, { cr, caseId: cid, modId }); ok('Видано: ' + (cr ? cr + ' кредитів ' : '') + (modId ? '+ модуль' : ''), { list: findUsers(t) });
+            log(by, 'give', t, { cr, caseId: cid, modId, tk }); ok('Видано: ' + (cr ? cr + ' кредитів ' : '') + (modId ? '+ модуль ' : '') + (tk ? '+ ' + tk + ' квитк.' : ''), { list: findUsers(t) });
         });
         A('admEvent', (by, d) => {
             const hours = Math.max(0.25, Math.min(168, +d.hours || 1)), cr = Math.max(1, Math.min(5, +d.cr || 1)), xp = Math.max(1, Math.min(5, +d.xp || 1));
@@ -166,7 +167,8 @@ module.exports = function (ctx) {
             if (cr === 1 && xp === 1) return socket.emit('admErr', { msg: 'Множник має бути більшим за ×1' });
             EVENT = { title, cr: Math.round(cr * 100) / 100, xp: Math.round(xp * 100) / 100, mode, until: Date.now() + hours * 3600e3 }; evSave();
             io.emit('gameEvent', evPublic()); log(by, 'event', mode || 'all', EVENT);
-            try { if (ctx.Notify && ctx.Notify.sendAll) ctx.Notify.sendAll('event', { n: title, t: (cr > 1 ? '×' + EVENT.cr + ' 💰 ' : '') + (xp > 1 ? '×' + EVENT.xp + ' XP' : '') }); } catch (e) {}   // push усім підписаним, хто не в мережі ok('Подію запущено', { stats: stats() });
+            try { if (ctx.Notify && ctx.Notify.sendAll) ctx.Notify.sendAll('event', { n: title, t: (cr > 1 ? '×' + EVENT.cr + ' 💰 ' : '') + (xp > 1 ? '×' + EVENT.xp + ' XP' : '') }); } catch (e) {}   // push усім підписаним, хто не в мережі
+            ok('Подію запущено', { stats: stats() });
         });
         A('admEventStop', (by) => { EVENT = null; evSave(); io.emit('gameEvent', null); log(by, 'event-stop'); ok('Подію зупинено', { stats: stats() }); });
         A('admAnnounce', (by, d) => {
@@ -197,6 +199,7 @@ module.exports = function (ctx) {
             OVR[code] = null; applyOvr(code, null); promoSave();
             log(by, 'promo-del', code); ok('Промокод ' + code + ' видалено', { promos: promoList() });
         });
+        A('admAnalytics', () => socket.emit('admAnalytics', ctx.Analytics ? ctx.Analytics.report() : null));
         A('admFlush', (by) => { if (ctx.flushUsers) ctx.flushUsers(); log(by, 'db-flush'); ok('Запис у БД запущено'); });
         A('admLogout', () => { sess.delete(socket.id); ok('Вихід з адмінки'); });
         socket.on('disconnect', () => sess.delete(socket.id));

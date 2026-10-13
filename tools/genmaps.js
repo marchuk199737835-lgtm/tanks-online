@@ -1,4 +1,4 @@
-// Генератор мап (24 шт., по 3 на кожен режим). Запуск: node tools/genmaps.js → пише maps_modes.js (його підключає server.js).
+// Генератор мап (24 шт., по 3 на кожен режим). Запуск: node tools/genmaps.js → пише maps/*.json (їх підключає server.js).
 // Усі мапи — звичайні мапи редактора: їх можна відкрити в /editor.html, змінити й зберегти.
 const fs = require('fs'), path = require('path');
 const MO = require('../public/js/mapobjects.js');
@@ -709,6 +709,6 @@ def('Harbor', 3200, 'metal', ['bounty'], '#5a6572', m => {
     if (sm.solids.length !== br.solids.length || (sm.biomes || []).length !== (br.biomes || []).length) throw new Error('Grand Expanse: sanitizeMap гублює дані');
     maps[br.title] = br;
 }
-const outFile = path.join(__dirname, '..', 'maps_modes.js');
-fs.writeFileSync(outFile, '// Вбудовані мапи під режими (створено tools/genmaps.js). Це звичайні мапи редактора: відкрийте /editor.html, змініть і збережіть.\n// Якщо мапу з такою назвою збережено в редакторі, вона замінює цю.\nmodule.exports = ' + JSON.stringify(maps) + ';\n');
+// ПОВНА перебудова всіх вбудованих мап (мапи, додані genmaps2.js / genhide.js, після цього треба згенерувати ще раз)
+require('../maps').writeAll(maps);
 console.log('maps:', Object.keys(maps).length, Object.keys(maps).map(k => k + ' (' + maps[k].solids.length + ')').join(', '));

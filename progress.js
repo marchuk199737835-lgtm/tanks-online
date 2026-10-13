@@ -7,8 +7,9 @@
  *   u.quests = { day:<ключ дня>, list:[{t,a,goal,reward,p,c,seen}], rerolled, prev:[ids] }
  *   u.ach    = { done:{id:ts}, claimed:{id:ts} }
  *
- * Сокет (клієнт → сервер): getProgress, claimDaily, claimQuest(i), rerollQuest(i), claimAch(id)
- * Сокет (сервер → клієнт): progressState, dailyClaimed, questProgress, questClaimed, questRerolled, achUnlocked, achClaimed, progressError
+ * Сокет (клієнт → сервер): getProgress, claimDaily, claimQuest(i), rerollQuest(i), claimTicket, claimAch(id)
+ * Сокет (сервер → клієнт): progressState, dailyClaimed, questProgress, questClaimed, questRerolled, ticketClaimed, achUnlocked, achClaimed, progressError
+ * «Квиток дня» (u.quests.tk): усі щоденні завдання виконано → 1 квиток на колесо фортуни (квитки зберігає stakes.js, u.stk.tk).
  */
 'use strict';
 const OP = Object.prototype;
@@ -39,7 +40,7 @@ module.exports = function (ctx) {
     const syncEco = name => sockets(name).forEach(id => sendEconomy(id, name));
     const modeName = m => (ModeInfo.MODES && ModeInfo.MODES[m] && ModeInfo.MODES[m].n) || m;
     const MODE_SET = new Set(ModeInfo.ORDER);
-    const WEAPONS = new Set(['normal', 'explosive', 'fast', 'piercing', 'homing', 'shotgun', 'minigun', 'incendiary', 'samurai', 'melee', 'acid', 'hunter_gun', 'boss_proj', 'mine', 'laser']);
+    const WEAPONS = new Set(['normal', 'explosive', 'fast', 'piercing', 'homing', 'shotgun', 'minigun', 'incendiary', 'samurai', 'melee', 'acid', 'hunter_gun', 'boss_proj', 'mine', 'laser', 'ram']);
 
     // відкладене збереження (часті події в бою не б'ють по БД)
     const pending = new Map();
@@ -51,7 +52,8 @@ module.exports = function (ctx) {
 
     // ---------- СТАТИСТИКА ----------
     const NUMS = ['games', 'wins', 'losses', 'draws', 'kills', 'deaths', 'playMs', 'brWins', 'brKills', 'upOk', 'upFail',
-        'equips', 'sells', 'freeCases', 'curStreak', 'bestStreak', 'mkAny', 'mkPierce', 'brTop3', 'brNoMods', 'questsDone', 'bestMatchKills'];
+        'equips', 'sells', 'freeCases', 'curStreak', 'bestStreak', 'mkAny', 'mkPierce', 'brTop3', 'brNoMods', 'questsDone', 'bestMatchKills',
+        'ramKills', 'finKills', 'rearKills', 'leaderKills', 'zKills', 'bossKills', 'phFound', 'phHideWins', 'capsTotal', 'rankedWins', 'brBestKills', 'tickets', 'spins', 'duelWins'];
     function ensureStats(u) {
         const fresh = !u.pstats || typeof u.pstats !== 'object';
         const s = fresh ? (u.pstats = {}) : u.pstats;
@@ -178,7 +180,14 @@ module.exports = function (ctx) {
         else q.list = q.list.filter(x => x && has(QT, x.t)).slice(0, 3);
         const Q = u.quests;
         Q.list.forEach(x => { x.p = num(x.p); x.goal = Math.max(1, num(x.goal, 1)); x.reward = num(x.reward); x.c = x.c ? 1 : 0; if (!Array.isArray(x.seen)) x.seen = []; });
+        Q.tk = Q.tk ? 1 : 0;
         return Q;
+    }
+    // «Квиток дня»: виконай усі щоденні завдання → 1 квиток на оберт колеса фортуни (раз на добу; квитки зберігає stakes.js)
+    const TICKET_GOAL = 3;
+    function ticketView(name, Q) {
+        const p = Q.list.filter(q => q.p >= q.goal).length;
+        return { p: Math.min(p, TICKET_GOAL), goal: TICKET_GOAL, done: p >= TICKET_GOAL, claimed: !!Q.tk, have: ctx.Stakes ? ctx.Stakes.tickets(name) : 0 };
     }
     const questView = (q, i) => { const t = QT[q.t]; return { i, t: q.t, ico: t.ico, text: t.text(q.a), goal: q.goal, p: Math.min(q.p, q.goal), reward: q.reward, done: q.p >= q.goal, claimed: !!q.c, cat: t.cat }; };
     const questsFor = name => { const u = humanU(name); if (!u) return []; return ensureQuests(u, name, Date.now()).list.map(questView); };
@@ -225,9 +234,30 @@ module.exports = function (ctx) {
         A('kills2000', 'legend', 'combat', '🌋', 'Танковий апокаліпсис', 'Знищ 2000 гравців', 2000, (s) => s.kills, 500, 14),
         A('wins200', 'legend', 'battle', '🔱', 'Незламний', 'Виграй 200 боїв', 200, (s) => s.wins, 600, 16),
         A('modes10', 'legend', 'battle', '🌐', 'Майстер усіх режимів', 'Здобудь перемоги в 10 різних режимах', 10, (s) => winModes(s), 700, 20),
-        A('lvl15', 'legend', 'misc', '💎', 'Легенда полігону', 'Досягни максимального рівня', GameData.MAX_LEVEL, (s, u) => lvlOf(u), 400, 15)
+        A('lvl15', 'legend', 'misc', '💎', 'Легенда полігону', 'Досягни максимального рівня', GameData.MAX_LEVEL, (s, u) => lvlOf(u), 400, 15),
+        // ---- 2026-10: механіки (таран, добивання, броня, лідер), режими (зомбі, хованки, точки, рейтинг, королівський бій) і Фортуна — по 5 у кожен рівень ----
+        A('ram1', 'easy', 'combat', '💨', 'Перший таран', 'Знищ ворога тараном — ривком (Shift) у його танк', 1, (s) => s.ramKills, 40),
+        A('fin1', 'easy', 'combat', '🪓', 'Добивання', 'Добий ворога, в якого менше 15% міцності, пострілом зблизька', 1, (s) => s.finKills, 30),
+        A('zomb50', 'easy', 'battle', '🧟', 'Санітар', 'Знищ 50 зомбі', 50, (s) => s.zKills, 50),
+        A('ph_hide1', 'easy', 'battle', '📦', 'Невидимка', 'Виграй хованки за команду тих, хто ховається', 1, (s) => s.phHideWins, 40),
+        A('wheel1', 'easy', 'eco', '🎡', 'Перший оберт', 'Покрути колесо фортуни за квиток', 1, (s) => s.spins, 30),
+        A('ram25', 'medium', 'combat', '🐏', 'Живий таран', 'Знищ 25 ворогів тараном', 25, (s) => s.ramKills, 150),
+        A('rear25', 'medium', 'combat', '🎯', 'Удар у спину', 'Знищ 25 ворогів пострілом у корму', 25, (s) => s.rearKills, 150),
+        A('leader5', 'medium', 'combat', '👑', 'Мисливець за лідерами', 'Повали ціль-лідера 5 разів', 5, (s) => s.leaderKills, 120),
+        A('caps25', 'medium', 'battle', '🚩', 'Окупант', 'Захопи 25 точок у режимі захоплення', 25, (s) => s.capsTotal, 150),
+        A('duel1', 'medium', 'eco', '🤝', 'Дуелянт', 'Виграй дуель з другом', 1, (s) => s.duelWins, 100),
+        A('ram100', 'hard', 'combat', '☄️', 'Таранний удар', 'Знищ 100 ворогів тараном', 100, (s) => s.ramKills, 350),
+        A('fin100', 'hard', 'combat', '⚰️', 'Кат', 'Добий 100 ворогів', 100, (s) => s.finKills, 300),
+        A('zomb1000', 'hard', 'battle', '☣️', 'Карантин', 'Знищ 1000 зомбі', 1000, (s) => s.zKills, 300),
+        A('ranked25', 'hard', 'battle', '🏆', 'Рейтинговий ветеран', 'Виграй 25 рейтингових боїв', 25, (s) => s.rankedWins, 350),
+        A('br_match5', 'hard', 'br', '🦅', 'Різанина на острові', 'Зроби 5 вбивств за один королівський бій', 5, (s) => s.brBestKills, 300),
+        A('ph_hunt100', 'legend', 'battle', '🔦', 'Нюх мисливця', 'Знайди 100 гравців у хованках, граючи мисливцем', 100, (s) => s.phFound, 500),
+        A('boss25', 'legend', 'battle', '🐉', 'Гроза босів', 'Знищ 25 босів', 25, (s) => s.bossKills, 600, 16),
+        A('duel25', 'legend', 'eco', '⚔️', 'Майстер дуелей', 'Виграй 25 дуелей з друзями', 25, (s) => s.duelWins, 600),
+        A('wheel100', 'legend', 'eco', '🎰', 'Улюбленець фортуни', 'Покрути колесо фортуни 100 разів', 100, (s) => s.spins, 500),
+        A('play100h', 'legend', 'misc', '⏳', 'Сто годин у строю', 'Проведи в боях 100 годин', 100, (s) => Math.floor(s.playMs / 3600000), 700, 20)
     ];
-    if (ACH.length !== 30) throw new Error('Очікується рівно 30 досягнень, зараз ' + ACH.length);
+    if (ACH.length !== 50) throw new Error('Очікується рівно 50 досягнень, зараз ' + ACH.length);
     const ACH_BY = Object.create(null); ACH.forEach(a => { ACH_BY[a.id] = a; });
     const TIER_RARITY = { easy: 'common', medium: 'rare', hard: 'epic', legend: 'legendary' };
 
@@ -277,9 +307,9 @@ module.exports = function (ctx) {
     function stateOf(name) {
         const u = humanU(name); if (!u) return null;
         const now = Date.now(), dv = dailyView(u, now), Q = ensureQuests(u, name, now), A_ = ensureAch(u);
-        const quests = Q.list.map(questView), ach = ACH.map(a => achMeta(a, u));
-        const badge = { daily: dv.canClaim ? 1 : 0, quests: quests.filter(q => q.done && !q.claimed).length, ach: ach.filter(a => a.done && !a.claimed).length };
-        return { now, next: nextMidnight(now), daily: dv, quests, rerolled: Q.rerolled ? 1 : 0, ach, badge };
+        const quests = Q.list.map(questView), ach = ACH.map(a => achMeta(a, u)), ticket = ticketView(name, Q);
+        const badge = { daily: dv.canClaim ? 1 : 0, quests: quests.filter(q => q.done && !q.claimed).length + (ticket.done && !ticket.claimed ? 1 : 0), ach: ach.filter(a => a.done && !a.claimed).length };
+        return { now, next: nextMidnight(now), daily: dv, quests, rerolled: Q.rerolled ? 1 : 0, ticket, ach, badge };
     }
     function pushState(name, why) { const st = stateOf(name); if (st) { st.why = why || ''; toUser(name, 'progressState', st); } }
 
@@ -319,6 +349,10 @@ module.exports = function (ctx) {
         const w = (typeof e.weapon === 'string' && WEAPONS.has(e.weapon)) ? e.weapon : null;
         if (w) s.kw[w] = num(s.kw[w]) + 1;
         if (e.mode === 'battle_royale') s.brKills++;
+        if (w === 'ram') s.ramKills++;
+        if (e.fin) s.finKills++;
+        if (e.rear) s.rearKills++;
+        if (e.mode === 'prophunt' && e.killerTeam === 'hunter') s.phFound++;
         bumpQuests(e.killerName, k, 'kill', e);
         checkAch(e.killerName, k);
     }));
@@ -343,6 +377,10 @@ module.exports = function (ctx) {
             else { s.losses++; s.curStreak = 0; }
             if (e.mode === 'battle_royale' && p.place <= 3) s.brTop3++;
             s.bestMatchKills = Math.max(s.bestMatchKills, p.kills | 0);
+            if (e.mode === 'battle_royale') s.brBestKills = Math.max(s.brBestKills, p.kills | 0);
+            if (e.mode === 'capture_points') s.capsTotal += Math.max(0, p.caps | 0);
+            if (p.outcome === 'win' && e.ranked) s.rankedWins++;
+            if (p.outcome === 'win' && e.mode === 'prophunt' && p.team === 'hider') s.phHideWins++;
             bumpQuests(p.name, u, 'matchEnd', e, p);
             checkAch(p.name, u);
             flush(p.name);
@@ -363,6 +401,13 @@ module.exports = function (ctx) {
         const s = ensureStats(u); if (e.win) s.upOk++; else s.upFail++;
         bumpQuests(e.name, u, 'upgradeDone', e); checkAch(e.name, u); touch(e.name);
     }));
+    // нові лічильники досягнень: зомбі / боси, ціль-лідер, Фортуна (колесо, квитки, дуелі)
+    const bump = (name, f) => { const u = humanU(name); if (!u) return; f(ensureStats(u)); checkAch(name, u); touch(name); };
+    Events.on('zkill', safe(e => bump(e.name, s => { s.zKills++; if (e.boss) s.bossKills++; })));
+    Events.on('leaderDown', safe(e => bump(e.killerName, s => { s.leaderKills++; })));
+    Events.on('wheelSpin', safe(e => bump(e.name, s => { s.spins++; })));
+    Events.on('wheelTicket', safe(e => bump(e.name, s => { s.tickets += Math.max(0, e.n | 0); })));
+    Events.on('duelEnd', safe(e => bump(e.winner, s => { s.duelWins++; })));
     Events.on('moduleEquipped', safe(e => { const u = humanU(e.name); if (!u) return; ensureStats(u).equips++; bumpQuests(e.name, u, 'moduleEquipped', e); checkAch(e.name, u); touch(e.name); }));
     Events.on('moduleSold', safe(e => { const u = humanU(e.name); if (!u) return; ensureStats(u).sells++; bumpQuests(e.name, u, 'moduleSold', e); checkAch(e.name, u); touch(e.name); }));
 
@@ -406,6 +451,16 @@ module.exports = function (ctx) {
             q.c = 1; u.bucks += q.reward; u.stats.earned += q.reward; flush(n); syncEco(n);
             socket.emit('questClaimed', { i, reward: q.reward, bucks: u.bucks });
             pushState(n, 'quest');
+        });
+        socket.on('claimTicket', () => {
+            const n = who(); if (!n || !gate(socket, 'ct', 500)) return;
+            const u = dbUsers[n], Q = ensureQuests(u, n, Date.now()), T = ticketView(n, Q);
+            if (T.claimed) return socket.emit('progressError', { msg: 'Квиток дня вже отримано. Новий — завтра' });
+            if (!T.done) return socket.emit('progressError', { msg: 'Спершу виконайте всі щоденні завдання' });
+            if (!ctx.Stakes || !ctx.Stakes.addTicket(n, 1, 'quest')) return socket.emit('progressError', { msg: 'Запас квитків повний — спершу покрутіть колесо' });
+            Q.tk = 1; flush(n);
+            socket.emit('ticketClaimed', { have: ctx.Stakes.tickets(n) });
+            pushState(n, 'ticket');
         });
         socket.on('rerollQuest', (i) => {
             const n = who(); if (!n || !gate(socket, 'rq', 500)) return;

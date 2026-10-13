@@ -9,6 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const zlib = require('zlib');
 const MapObj = require('./public/js/mapobjects.js');
 
 const NAME_RE = /^[\p{L}\p{N} _\-]{1,32}$/u;
@@ -71,6 +72,7 @@ module.exports = function mountEditor(app, ctx) {
         });
         if (n) console.log('🗺️  Завантажено мап з редактора: ' + n);
         hideBuiltin();
+        md = null;      // /mapdata.js зібрати заново (новий ETag)
     }
 
     // ---------- допоміжне ----------
@@ -91,8 +93,25 @@ module.exports = function mountEditor(app, ctx) {
     function ok(req) { delete attempts[ipOf(req)]; }
 
     // ---------- /mapdata.js для клієнтів ----------
+    // Вміст змінюється лише після старту (loadSaved), тож його збираємо й стискаємо один раз, а браузер перевіряє ETag:
+    // повторний вхід у гру — відповідь 304 без тіла (раніше кожне відкриття сторінки качало всі мапи й заново стискало їх на сервері).
+    let md = null;
+    function mdBuild() {
+        const raw = Buffer.from('(function(){var d=' + JSON.stringify(Object.assign({}, BUILTIN, applied)).replace(/</g, '\\u003c') + ';var h=' + JSON.stringify(hidden) + ';for(var k in d){MAP_DATA[k]=d[k];}h.forEach(function(k){delete MAP_DATA[k];});if(window.onMapDataLoaded)window.onMapDataLoaded();})();', 'utf8');
+        const m = { raw, etag: '"md-' + crypto.createHash('sha1').update(raw).digest('hex').slice(0, 20) + '"', gzip: zlib.gzipSync(raw, { level: 9 }), br: null };
+        zlib.brotliCompress(raw, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 11, [zlib.constants.BROTLI_PARAM_MODE]: zlib.constants.BROTLI_MODE_TEXT } }, (e, b) => { if (!e) m.br = b; });
+        return m;
+    }
     app.get('/mapdata.js', (req, res) => {
-        send(res, 200, '(function(){var d=' + JSON.stringify(Object.assign({}, BUILTIN, applied)).replace(/</g, '\\u003c') + ';var h=' + JSON.stringify(hidden) + ';for(var k in d){MAP_DATA[k]=d[k];}h.forEach(function(k){delete MAP_DATA[k];});if(window.onMapDataLoaded)window.onMapDataLoaded();})();', 'application/javascript; charset=utf-8');
+        if (!md) md = mdBuild();
+        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache'); res.setHeader('Vary', 'Accept-Encoding'); res.setHeader('ETag', md.etag);
+        const inm = String(req.headers['if-none-match'] || '');
+        if (inm && inm.split(',').some(t => t.trim().replace(/^W\//, '') === md.etag)) { res.statusCode = 304; return res.end(); }
+        const ae = String(req.headers['accept-encoding'] || ''), enc = md.br && /\bbr\b/.test(ae) ? 'br' : /\bgzip\b/.test(ae) ? 'gzip' : null;
+        const body = enc ? md[enc] : md.raw;
+        if (enc) res.setHeader('Content-Encoding', enc);
+        res.setHeader('Content-Length', body.length); res.statusCode = 200; res.end(body);
     });
 
     // ---------- API редактора ----------

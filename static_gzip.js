@@ -12,7 +12,7 @@
  *    звуки/картинки/шрифти → тиждень; sw.js і manifest → завжди `no-cache`;
  *  - index.html «на льоту» отримує `?v=<хеш вмісту>` для всіх локальних js/css (хеш змінюється лише коли змінився файл), тож після деплою
  *    браузер бере нові файли, а незмінені — з кешу без жодного запиту. Також у <head> додається `window.__AV` (мапа шлях → хеш) для ліниво завантажуваних модулів і мов;
- *  - /mapdata.js (динамічний) стискається «на виході»; у index.html підключення socket.io переписується на socket.io.min.js (у 3–4 рази легше).
+ *  - /mapdata.js стискає й кешує editor-server.js; у index.html підключення socket.io переписується на socket.io.min.js (у 3–4 рази легше).
  * Нічого не вимагає окрім вбудованих zlib/fs/crypto/path. */
 'use strict';
 const fs = require('fs');
@@ -191,23 +191,7 @@ module.exports = function mountStatic(app, express, opts) {
     }
     app.use(handler);
 
-    // /mapdata.js та інші динамічні скрипти: стискаємо «на виході», не змінюючи самі маршрути
-    app.use('/mapdata.js', (req, res, next) => {
-        if (req.method !== 'GET') return next();
-        const enc = pickEncoding(req.headers['accept-encoding']);
-        if (enc === 'identity') return next();
-        const origEnd = res.end.bind(res);
-        res.setHeader('Vary', 'Accept-Encoding');
-        res.end = function (chunk, encoding, cb) {
-            res.end = origEnd;
-            if (chunk == null || typeof chunk === 'function' || res.headersSent || res.statusCode !== 200) return origEnd(chunk, encoding, cb);
-            const data = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk), typeof encoding === 'string' ? encoding : 'utf8');
-            if (data.length < MIN_SIZE) return origEnd(data);
-            compress(enc, data).then(buf => { res.setHeader('Content-Encoding', enc); res.setHeader('Content-Length', buf.length); origEnd(buf); }, () => origEnd(data));
-            return res;
-        };
-        next();
-    });
+    // /mapdata.js стискає й кешує (ETag) сам editor-server.js — один раз після старту, а не на кожен запит
 
     // решта (картинки, звуки, іконки): express.static із Range/ETag/Last-Modified і довгим кешем
     app.use(express.static(publicDir, {

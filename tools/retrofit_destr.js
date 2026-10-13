@@ -1,11 +1,11 @@
-// Доповнює вбудовані мапи (maps_modes.js) руйнівними об'єктами: стоси ящиків, вибухові бочки, паркани, сіно, шини…
+// Доповнює вбудовані мапи (maps/) руйнівними об'єктами: стоси ящиків, вибухові бочки, паркани, сіно, шини…
 // Розстановка детермінована (той самий результат при повторному запуску), лише на вільному місці, далеко від точок появи й цілей режимів.
 // Повторний запуск нічого не дублює (позначка map.destrV). Запуск: node tools/retrofit_destr.js
 'use strict';
 const fs = require('fs'), path = require('path');
-const FILE = path.join(__dirname, '..', 'maps_modes.js');
+const Store = require('../maps');
 const MapObj = require('../public/js/mapobjects.js');
-const maps = require(FILE);
+const maps = Store.readAll();
 const VER = 1;
 
 function srand(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -64,6 +64,5 @@ for (const name in maps) {
     m.destrV = VER; total += made;
     console.log(name.padEnd(18), 'груп додано:', made, '/', n);
 }
-const src = fs.readFileSync(FILE, 'utf8'), head = src.slice(0, src.indexOf('module.exports'));
-fs.writeFileSync(FILE, head + 'module.exports = ' + JSON.stringify(maps) + ';\n');
+Store.writeAll(maps);
 console.log('Разом груп:', total);

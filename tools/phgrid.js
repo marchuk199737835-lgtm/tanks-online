@@ -2,7 +2,7 @@
 // Раніше об'єкти стояли де завгодно (x=137, поворот 8°, розмір 80×70), а маскування — завжди 50×50 по сітці, тож хованця було видно одразу.
 // Тепер на мапах із режимом prophunt кожен дрібний об'єкт: розмір — 50 або 100 по кожній осі (один розмір на тип у межах мапи),
 // лівий-верхній кут кратний 50, без повороту. Якщо в клітинці тісно — пробуємо сусідні, інакше об'єкт прибираємо.
-// Використання: node tools/phgrid.js — оновлює maps_modes.js на місці (детерміновано, повторний запуск нічого не змінює).
+// Використання: node tools/phgrid.js — оновлює maps/ на місці (детерміновано, повторний запуск нічого не змінює).
 //                require('./phgrid.js').apply(maps) — з genmaps2.js / genhide.js.
 'use strict';
 const MO = require('../public/js/mapobjects.js');
@@ -102,9 +102,7 @@ function apply(maps, log) {
 module.exports = { apply, gridify };
 
 if (require.main === module) {
-    const fs = require('fs'), path = require('path'), FILE = path.join(__dirname, '..', 'maps_modes.js');
-    const src = fs.readFileSync(FILE, 'utf8'), head = src.slice(0, src.indexOf('module.exports'));
-    const maps = require(FILE);
+    const Store = require('../maps'), maps = Store.readAll();
     apply(maps, true);
-    fs.writeFileSync(FILE, head + 'module.exports = ' + JSON.stringify(maps) + ';\n');
+    Store.writeAll(maps);
 }

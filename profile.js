@@ -16,7 +16,7 @@
 const crypto = require('crypto');
 
 module.exports = function (ctx) {
-    const { io, dbUsers, Events, GameData, ModeInfo, rooms, saveUser, sendEconomy, hashPwd } = ctx;
+    const { io, dbUsers, Events, GameData, ModeInfo, rooms, saveUser, sendEconomy } = ctx;
     const NAME_RE = ctx.NAME_RE;
     const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
     const now = () => Date.now();
@@ -287,7 +287,8 @@ module.exports = function (ctx) {
             io.emit('nickUpdate', { name: me, nick: n });
         });
 
-        socket.on('changePassword', d => {
+        let pwBusy = false;
+        socket.on('changePassword', async d => {
             const me = ctx.globalPlayers[socket.id], u = me && dbUsers[me];
             const fail = msg => socket.emit('passwordResult', { ok: false, msg });
             if (!u) return;
@@ -299,13 +300,19 @@ module.exports = function (ctx) {
             if (!op || !np) return fail('Заповніть усі поля');
             if (!ctx.PASS_RE_NEW.test(np)) return fail('Новий пароль: 4–128 символів, лише латиниця, цифри та знаки (без пробілів і кирилиці)');
             if (np !== cf) return fail('Підтвердження не збігається з новим паролем');
-            if (u.password !== hashPwd(op)) {
+            if (pwBusy) return; pwBusy = true;
+            let okOld = false, nh = null;
+            try { okOld = await ctx.checkPwd(me, op); if (okOld && op !== np) nh = await ctx.makePwdHash(np); } catch (e) { console.error('❌ changePassword', e && e.message); }
+            pwBusy = false;
+            if (dbUsers[me] !== u) return;
+            if (!okOld) {
                 tr.n++; if (tr.n >= PW_MAX) { tr.n = 0; tr.until = t + PW_LOCK; return fail('Забагато невдалих спроб. Спробуйте через ' + fmtLeft(PW_LOCK)); }
                 return fail('Старий пароль невірний (залишилось спроб: ' + (PW_MAX - tr.n) + ')');
             }
             if (op === np) return fail('Новий пароль збігається зі старим');
+            if (!nh) return fail('Помилка сервера, спробуйте ще раз');
             tr.n = 0; tr.until = 0;
-            u.password = hashPwd(np); u.token = crypto.randomUUID();
+            u.password = nh; u.token = crypto.randomUUID();
             saveUser(me);
             socket.emit('passwordResult', { ok: true, msg: 'Пароль змінено', token: u.token });
             ctx.onlineSocketsOf(me).forEach(sid => { if (sid !== socket.id) io.to(sid).emit('profileToken', { token: u.token }); });
