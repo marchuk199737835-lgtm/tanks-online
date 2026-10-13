@@ -34,7 +34,7 @@
     }
     function render() {
         if (!S.authed) return loginView();
-        var T = [['dash', '📊 Огляд'], ['users', '👥 Гравці'], ['promo', '🎟 Промокоди'], ['event', '🔥 Подія'], ['ann', '📢 Оголошення'], ['log', '📜 Журнал']];
+        var T = [['dash', '📊 Огляд'], ['an', '📈 Аналітика'], ['users', '👥 Гравці'], ['promo', '🎟 Промокоди'], ['event', '🔥 Подія'], ['ann', '📢 Оголошення'], ['log', '📜 Журнал']];
         root.innerHTML = '<div class="w"><div class="top"><h1>PULS · ADMIN<small>●  LIVE</small></h1><span class="sp"></span><button id="ad-out">Вийти</button><button id="ad-x">✕</button></div>' +
             '<div class="tabs">' + T.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (S.tab === t[0] ? 'on' : '') + '">' + t[1] + '</button>'; }).join('') + '</div><div id="ad-b"></div></div>';
         $('#ad-x').onclick = close; $('#ad-out').onclick = function () { socket.emit('admLogout'); S.authed = false; clearInterval(iv); render(); };
@@ -52,6 +52,9 @@
                 '<div class="card"><h3>Сервер і база даних</h3><div class="grid">' + st(up(s.uptime), 'працює') + st(s.mem + ' МБ', 'пам’ять (heap ' + s.heap + ')') + st(s.db.on ? '<span class="ok">ON</span>' : '<span class="bad">OFF</span>', 'MongoDB') + st(s.db.perMin, 'записів/хв') + st(s.db.writes, 'записів усього') + st(s.db.skipped, 'пропущено (без змін)') + st(s.db.pending, 'чекають запису') + st(s.db.errors ? '<span class="bad">' + s.db.errors + '</span>' : 0, 'помилок БД') + '</div><div class="row" style="margin-top:10px"><button id="ad-fl">Записати в БД зараз</button></div></div>' +
                 '<div class="card"><h3>Подія</h3>' + (s.event ? '🔥 <b>' + esc(s.event.title) + '</b> · ×' + s.event.cr + ' кредитів · ×' + s.event.xp + ' XP · ' + (s.event.mode || 'усі режими') + ' · до ' + fmtT(s.event.until) : 'Немає активної події') + '</div>';
             $('#ad-fl').onclick = function () { socket.emit('admFlush'); };
+        } else if (S.tab === 'an') {
+            b.innerHTML = anHtml();
+            var rf = $('#an-r'); if (rf) rf.onclick = function () { socket.emit('admAnalytics'); };
         } else if (S.tab === 'users') {
             b.innerHTML = '<div class="card"><div class="row"><input id="ad-q" placeholder="Логін, нік або ID" value="' + esc(S.q) + '" style="flex:1"><button class="p" id="ad-s">Знайти</button></div><div id="ad-l"></div></div>';
             var find = function () { S.q = $('#ad-q').value.trim(); if (S.q) socket.emit('admFind', { q: S.q }); };
@@ -105,6 +108,32 @@
             b.innerHTML = '<div class="card"><h3>Журнал дій</h3><table><tr><th>Час</th><th>Хто</th><th>Дія</th><th>Ціль</th><th>Деталі</th></tr>' + S.log.map(function (e) { return '<tr><td>' + fmtT(e.t) + '</td><td>' + esc(e.by) + '</td><td>' + esc(e.act) + '</td><td>' + esc(e.target) + '</td><td style="max-width:320px;word-break:break-word">' + esc(e.detail ? JSON.stringify(e.detail) : '') + '</td></tr>'; }).join('') + '</table></div>';
         }
     }
+    // ---------- аналітика (analytics.js на сервері) ----------
+    function anHtml() {
+        var A = S.an; if (!A) return '<div class="card">Завантаження…</div>';
+        var st = function (v, l) { return '<div class="st"><b>' + v + '</b><small>' + l + '</small></div>'; };
+        var pct = function (a, b) { return b ? Math.round(a / b * 1000) / 10 + '%' : '—'; };
+        var bar = function (v, max, col) { return '<div style="height:8px;border-radius:5px;background:#1e293b;overflow:hidden;min-width:60px"><i style="display:block;height:100%;width:' + (max ? Math.round(v / max * 100) : 0) + '%;background:' + (col || '#818cf8') + '"></i></div>'; };
+        var today = A.days[A.days.length - 1] || { dau: 0, reg: 0, peak: 0, games: 0, avgSess: 0, quits: 0, fo: {} };
+        var F = A.funnel, Mm = A.mem, memPct = Mm.limit ? Math.round(Mm.heap / Mm.limit * 100) : 0;
+        var h = '<div class="row"><button id="an-r">⟳ Оновити</button><span style="color:#94a3b8;font-size:12px">' + (A.saved ? 'дані зберігаються в MongoDB (meta/analytics), 45 днів' : 'без MongoDB — лише з моменту запуску сервера') + '</span></div>';
+        h += '<div class="card"><h3>Сьогодні</h3><div class="grid">' + st(A.online, 'онлайн зараз') + st(today.dau, 'гравців за день (DAU)') + st(today.reg, 'нових реєстрацій') + st(today.peak, 'пік онлайну') + st(today.games, 'боїв') + st(today.avgSess + ' хв', 'середня сесія') + st(today.quits, 'виходів посеред бою') + '</div></div>';
+        var maxDau = Math.max.apply(null, A.days.map(function (d) { return d.dau; }).concat([1]));
+        h += '<div class="card"><h3>Останні 14 днів</h3><table><tr><th>День</th><th>DAU</th><th></th><th>Нові</th><th>Пік</th><th>Боїв</th><th>Виходів з бою</th><th>Сесія</th><th>Колесо / дуелі</th></tr>' +
+            A.days.slice().reverse().map(function (d) { return '<tr><td>' + esc(d.day.slice(5)) + '</td><td><b>' + d.dau + '</b></td><td style="width:120px">' + bar(d.dau, maxDau) + '</td><td>' + d.reg + '</td><td>' + d.peak + '</td><td>' + d.games + '</td><td>' + d.quits + '</td><td>' + d.avgSess + ' хв</td><td>' + ((d.fo && d.fo.spins) | 0) + ' / ' + ((d.fo && d.fo.duels) | 0) + '</td></tr>'; }).join('') + '</table></div>';
+        var maxG = Math.max.apply(null, A.modes.map(function (m) { return m.games; }).concat([1]));
+        h += '<div class="card"><h3>Режими за 7 днів — що грають і де кидають бій</h3>' + (A.modes.length ? '<table><tr><th>Режим</th><th>Боїв</th><th></th><th>Гравців</th><th>Середній бій</th><th>Покинули бій</th></tr>' +
+            A.modes.map(function (m) { var bad = m.quitPct >= 25; return '<tr><td>' + esc(m.name) + '</td><td><b>' + m.games + '</b></td><td style="width:140px">' + bar(m.games, maxG) + '</td><td>' + m.players + '</td><td>' + m.avgMin + ' хв</td><td class="' + (bad ? 'bad' : '') + '">' + m.quits + ' (' + m.quitPct + '%)' + (bad ? ' ⚠️' : '') + '</td></tr>'; }).join('') + '</table><p style="color:#94a3b8;font-size:12px">«Покинули бій» — гравець вийшов посеред матчу (закрив вкладку, вийшов у меню). Високий відсоток — режим затягнутий, незбалансований або незрозумілий новачкам.</p>' : '<p style="color:#94a3b8">Ще немає зіграних боїв</p>') + '</div>';
+        var steps = [['Зареєструвались', F.reg], ['Пройшли навчання', F.tut], ['Зіграли 1 бій', F.g1], ['Зіграли 3 бої', F.g3], ['Зіграли 10 боїв', F.g10]];
+        h += '<div class="card"><h3>Воронка новачків (зареєстровані за 30 днів)</h3><table>' + steps.map(function (s, i) { return '<tr><td>' + s[0] + '</td><td><b>' + s[1] + '</b></td><td style="width:45%">' + bar(s[1], F.reg, i ? '#22c55e' : '#818cf8') + '</td><td>' + pct(s[1], F.reg) + (i ? ' <small style="color:#94a3b8">(від попер. ' + pct(s[1], steps[i - 1][1]) + ')</small>' : '') + '</td></tr>'; }).join('') + '</table>' +
+            '<div class="grid" style="margin-top:10px">' + st(pct(F.d1, F.d1n), 'повернулись на 1-й день (з ' + F.d1n + ')') + st(pct(F.d7, F.d7n), 'повернулись на 7-й день (з ' + F.d7n + ')') + '</div>' +
+            '<p style="color:#94a3b8;font-size:12px">Боїв у новачків: 0 — ' + F.gamesHist[0] + ' · 1 — ' + F.gamesHist[1] + ' · 2 — ' + F.gamesHist[2] + ' · 3–5 — ' + F.gamesHist[3] + ' · 6–10 — ' + F.gamesHist[4] + ' · 10+ — ' + F.gamesHist[5] + '. Найбільше падіння між кроками воронки — місце, де гравці кидають гру. Повернення рахуються для акаунтів, які заходили після оновлення.</p></div>';
+        var fo = A.days.reduce(function (a, d) { var f = d.fo || {}; a.spins += f.spins | 0; a.cr += f.cr | 0; a.tk += f.tk | 0; a.duels += f.duels | 0; a.stake += f.stake | 0; return a; }, { spins: 0, cr: 0, tk: 0, duels: 0, stake: 0 });
+        h += '<div class="card"><h3>Фортуна за 14 днів</h3><div class="grid">' + st(fo.tk, 'квитків видано') + st(fo.spins, 'обертів колеса') + st(fo.cr, 'кредитів з колеса') + st(fo.duels, 'дуелей') + st(fo.stake, 'кредитів у банках дуелей') + '</div></div>';
+        h += '<div class="card"><h3>Пам’ять сервера й акаунти</h3><div class="grid">' + st(Mm.users, 'акаунтів у пам’яті') + st(Mm.avgKb + ' КБ', 'середній акаунт (JSON)') + st('≈' + Mm.estMb + ' МБ', 'займають акаунти') + st(Mm.rss + ' МБ', 'RSS процесу') + st('<span class="' + (memPct >= 70 ? 'bad' : 'ok') + '">' + Mm.heap + ' / ' + Mm.limit + ' МБ</span>', 'heap / межа (' + memPct + '%)') + '</div>' +
+            '<p style="color:#94a3b8;font-size:12px">Усі акаунти тримаються в пам’яті (дані надійно лежать у MongoDB). Коли heap стабільно вище 70% межі — час вмикати вивантаження неактивних акаунтів.</p></div>';
+        return h;
+    }
     function users() {
         var l = $('#ad-l'); if (!l) return;
         if (!S.list.length) { l.innerHTML = S.q ? '<p style="color:#94a3b8">Нікого не знайдено</p>' : ''; return; }
@@ -113,7 +142,7 @@
                 '<div>Рівень ' + u.lvl + ' · ' + u.bucks + ' кредитів · ' + u.matches + ' боїв · ' + u.rp + ' ОР</div>' + (u.ban ? '<div class="ban">⛔ ' + esc(u.ban) + '</div>' : '') +
                 '<div class="row"><input data-i="' + i + '" class="r" placeholder="Причина бану" maxlength="120" style="flex:1;min-width:140px"><select class="m"><option value="60">1 год</option><option value="1440">1 доба</option><option value="10080">7 днів</option><option value="43200">30 днів</option><option value="0">Назавжди</option></select>' +
                 (u.ban ? '<button class="g" data-a="unban" data-i="' + i + '">Розбанити</button>' : '<button class="d" data-a="ban" data-i="' + i + '"' + (u.admin ? ' disabled' : '') + '>Забанити</button>') + '<button data-a="kick" data-i="' + i + '"' + (u.admin ? ' disabled' : '') + '>Вигнати</button></div>' +
-                '<div class="row"><input class="cr" type="number" min="0" max="100000" placeholder="Кредити" style="width:120px"><select class="cs"><option value="">— без кейса —</option>' + S.cases.map(function (c) { return '<option value="' + c.id + '">' + esc(c.n) + ' (' + c.p + ')</option>'; }).join('') + '</select><button class="p" data-a="give" data-i="' + i + '">Видати</button></div></div>';
+                '<div class="row"><input class="cr" type="number" min="0" max="100000" placeholder="Кредити" style="width:120px"><input class="tk" type="number" min="0" max="30" placeholder="🎟 Квитки" style="width:110px"><select class="cs"><option value="">— без кейса —</option>' + S.cases.map(function (c) { return '<option value="' + c.id + '">' + esc(c.n) + ' (' + c.p + ')</option>'; }).join('') + '</select><button class="p" data-a="give" data-i="' + i + '">Видати</button></div></div>';
         }).join('');
         l.querySelectorAll('button[data-a]').forEach(function (bt) {
             bt.onclick = function () {
@@ -121,16 +150,17 @@
                 if (bt.dataset.a === 'ban') { if (confirm('Заблокувати ' + u.login + '?')) socket.emit('admBan', { login: u.login, mins: +box.querySelector('.m').value, reason: box.querySelector('.r').value }); }
                 else if (bt.dataset.a === 'unban') socket.emit('admUnban', { login: u.login });
                 else if (bt.dataset.a === 'kick') { if (confirm('Відключити ' + u.login + ' від гри?')) socket.emit('admKick', { login: u.login }); }
-                else if (bt.dataset.a === 'give') { var cr = +box.querySelector('.cr').value || 0, cs = box.querySelector('.cs').value; if ((cr || cs) && confirm('Видати ' + u.login + ': ' + (cr ? cr + ' кредитів ' : '') + (cs ? '+ кейс' : '') + '?')) socket.emit('admGive', { login: u.login, cr: cr, caseId: cs ? +cs : null }); }
+                else if (bt.dataset.a === 'give') { var cr = +box.querySelector('.cr').value || 0, tk = +box.querySelector('.tk').value || 0, cs = box.querySelector('.cs').value; if ((cr || cs || tk) && confirm('Видати ' + u.login + ': ' + (cr ? cr + ' кредитів ' : '') + (cs ? '+ кейс ' : '') + (tk ? '+ ' + tk + ' квитк.' : '') + '?')) socket.emit('admGive', { login: u.login, cr: cr, caseId: cs ? +cs : null, tk: tk }); }
             };
         });
     }
-    function refresh() { if (!S.authed) return; if (S.tab === 'dash') socket.emit('admStats'); if (S.tab === 'log') socket.emit('admLog'); if (S.tab === 'promo') socket.emit('admPromos'); clearInterval(iv); if (S.tab === 'dash') iv = setInterval(function () { if (root.classList.contains('on')) socket.emit('admStats'); }, 5000); }
+    function refresh() { if (!S.authed) return; if (S.tab === 'an') socket.emit('admAnalytics'); if (S.tab === 'dash') socket.emit('admStats'); if (S.tab === 'log') socket.emit('admLog'); if (S.tab === 'promo') socket.emit('admPromos'); clearInterval(iv); if (S.tab === 'dash') iv = setInterval(function () { if (root.classList.contains('on')) socket.emit('admStats'); }, 5000); }
     socket.on('admAuth', function (d) {
         if (!d) return; if (!d.ok) { var m = $('#ad-m'); if (m) { m.textContent = d.msg || 'Доступ заборонено'; m.className = 'msg bad'; } var g = $('#ad-go'); if (g) g.disabled = false; return; }
         S.authed = true; S.stats = d.stats; S.cases = d.cases || []; S.modes = d.modes || []; render(); refresh();
     });
     socket.on('admStats', function (d) { S.stats = d; if (S.tab === 'dash') body(); });
+    socket.on('admAnalytics', function (d) { S.an = d; if (S.tab === 'an') body(); });
     socket.on('admFind', function (d) { S.list = (d && d.list) || []; users(); });
     socket.on('admLog', function (d) { S.log = d || []; if (S.tab === 'log') body(); });
     socket.on('admPromos', function (d) { S.promos = d || []; if (S.tab === 'promo') body(); });

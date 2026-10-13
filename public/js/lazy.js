@@ -26,8 +26,8 @@
           cards: [{ id: 'mm-ranked', icon: '🏆', title: 'РЕЙТИНГОВИЙ РЕЖИМ', sub: 'Ранги · ліги · сезони', color: 'pink', bg: '⚔️' }] },
         // «Фортуна»: вантажиться й за першою подією (виклик на дуель від друга має з'явитись, навіть якщо розділ ще не відкривали)
         { id: 'stakes', src: 'js/stakes.js', re: /^stk/, auto: true,
-          ev: ['stkState', 'stkMe', 'stkMsg', 'stkDuInv', 'stkDuGo', 'stkDuRes', 'stkDuGone', 'stkDuFail'],
-          cards: [{ id: 'mm-stakes', icon: '🎰', title: 'ФОРТУНА', sub: 'Батли кейсів · дуелі · колесо', color: 'rose', bg: '💰' }] },
+          ev: ['stkState', 'stkMe', 'stkMsg', 'stkDuInv', 'stkDuGo', 'stkDuRes', 'stkDuGone', 'stkDuFail', 'stkWhRes', 'stkFeed'],
+          cards: [{ id: 'mm-stakes', icon: '🎰', title: 'ФОРТУНА', sub: 'Колесо за квиток · дуелі', color: 'rose', bg: '💰' }] },
         { id: 'referral', src: 'js/referral.js', re: /^ref/,
           ev: ['refInfo', 'refError', 'refNotify'],
           cards: [{ id: 'mm-referral', icon: '🤝', title: 'ЗАПРОСИ ДРУГА', sub: 'Креди та кейси за друзів', color: 'teal', bg: '🎁' }] }

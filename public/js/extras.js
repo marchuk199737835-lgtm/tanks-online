@@ -117,8 +117,8 @@
         clear: function () { bubbles = {}; for (var id in nodes) nodes[id].el.remove(); nodes = {}; }
     };
     // ================= КІЛКАМ (звичайні сесії) =================
-    var WN = { normal: 'Гармата', explosive: 'Вибуховий снаряд', fast: 'Кулемет', minigun: 'Мінігун', piercing: 'Бронебійний снаряд', homing: 'Самонавідна ракета', shotgun: 'Дробовик', incendiary: 'Запальний снаряд', samurai: 'Клинок самурая', melee: 'Таран', mine: 'Міна', laser: 'Автолазер', hunter_gun: 'Рушниця мисливця', acid: 'Кислота', boss_proj: 'Снаряд боса' };
-    var WI = { normal: '💥', explosive: '🧨', fast: '🔫', minigun: '🔫', piercing: '🗡️', homing: '🚀', shotgun: '💢', incendiary: '🔥', samurai: '⚔️', melee: '💥', mine: '💣', laser: '⚡', hunter_gun: '🎯' };
+    var WN = { normal: 'Гармата', explosive: 'Вибуховий снаряд', fast: 'Кулемет', minigun: 'Мінігун', piercing: 'Бронебійний снаряд', homing: 'Самонавідна ракета', shotgun: 'Дробовик', incendiary: 'Запальний снаряд', samurai: 'Клинок самурая', melee: 'Таран', ram: 'Таран', mine: 'Міна', laser: 'Автолазер', hunter_gun: 'Рушниця мисливця', acid: 'Кислота', boss_proj: 'Снаряд боса' };
+    var WI = { normal: '💥', explosive: '🧨', fast: '🔫', minigun: '🔫', piercing: '🗡️', homing: '🚀', shotgun: '💢', incendiary: '🔥', samurai: '⚔️', melee: '💥', ram: '💨', mine: '💣', laser: '⚡', hunter_gun: '🎯' };
     var kc = { on: false }, kcEl = null, kcT = null, kcIv = null;
     function kcHide() { kc.on = false; clearTimeout(kcT); clearInterval(kcIv); if (kcEl) kcEl.classList.remove('on'); }
     socket.on('playerDied', function (d) {

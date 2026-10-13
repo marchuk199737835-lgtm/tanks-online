@@ -349,7 +349,17 @@
             else act = '<button type="button" class="pg-btn pg-ghost" data-reroll="' + q.i + '"' + (S.rerolled ? ' disabled title="Заміна вже використана"' : '') + '>⟳ Замінити</button>';
             h += '<div class="pg-q' + (q.done ? ' done' : '') + (q.claimed ? ' claimed' : '') + '" style="--c:' + c + '"><div class="pg-qi">' + esc(q.ico) + '</div><div class="pg-qm"><div class="pg-qc">' + esc(QCAT_N[q.cat] || '') + '</div><div class="pg-qt">' + esc(q.text) + '</div><div class="pg-bar"><i style="width:' + pct + '%"></i></div><div class="pg-bn">' + q.p + ' / ' + q.goal + '</div></div><div class="pg-qr"><div class="pg-chip">' + cr(16) + '<b>+' + q.reward + '</b></div>' + act + '</div></div>';
         });
+        h += ticketHtml();
         return h + '</div><p class="pg-note" style="margin:16px auto 0">Прогрес рахується автоматично під час гри. Нагороду потрібно забрати до півночі за Києвом.</p>';
+    }
+    // «Квиток дня»: усі щоденні завдання виконано → квиток на оберт колеса фортуни (розділ «Фортуна»)
+    function ticketHtml() {
+        var T = S.ticket; if (!T) return '';
+        var p = Math.min(T.goal, S.quests.filter(function (q) { return q.done; }).length), done = p >= T.goal, act;
+        if (T.claimed) act = '<span class="pg-tag">✓ ОТРИМАНО</span><button type="button" class="pg-btn pg-ghost" data-wheel="1">🎡 До колеса</button>';
+        else if (done) act = '<button type="button" class="pg-btn pg-sm gr go" data-claim-t="1">ЗАБРАТИ</button>';
+        else act = '<span class="pg-tag" style="color:#94a3b8">' + p + ' / ' + T.goal + '</span>';
+        return '<div class="pg-q pg-tk' + (done ? ' done' : '') + (T.claimed ? ' claimed' : '') + '" style="--c:250,204,21"><div class="pg-qi">🎟</div><div class="pg-qm"><div class="pg-qc">Квиток дня</div><div class="pg-qt">Виконай усі щоденні завдання — отримай квиток на колесо фортуни</div><div class="pg-bar"><i style="width:' + Math.round(p / T.goal * 100) + '%"></i></div><div class="pg-bn">' + p + ' / ' + T.goal + ' · у запасі квитків: ' + (T.have | 0) + '</div></div><div class="pg-qr"><div class="pg-chip">🎟 <b>+1</b></div>' + act + '</div></div>';
     }
     function achHtml() {
         var list = S.ach, tot = list.length, dn = list.filter(function (a) { return a.done; }).length, h = '';
@@ -390,6 +400,8 @@
         var k = t.getAttribute('data-k'); if (k) return setTab(k, false);
         if (t.id === 'pg-claim-d') { if (isBusy('d')) return; setBusy('d', 1); t.classList.add('busy'); return emit('claimDaily'); }
         var q = t.getAttribute('data-claim-q'); if (q != null) { if (isBusy('q' + q)) return; setBusy('q' + q, 1); t.classList.add('busy'); lastBtn = t; return emit('claimQuest', +q); }
+        if (t.getAttribute('data-claim-t')) { if (isBusy('t')) return; setBusy('t', 1); t.classList.add('busy'); lastBtn = t; return emit('claimTicket'); }
+        if (t.getAttribute('data-wheel')) { close(); if (window.Stakes && Stakes.open) Stakes.open('wh'); else if (window.Lazy) { Lazy.load('stakes'); var n = 0, iv = setInterval(function () { if (window.Stakes) { clearInterval(iv); Stakes.open('wh'); } else if (++n > 40) clearInterval(iv); }, 150); } return; }
         var rr = t.getAttribute('data-reroll'); if (rr != null) { if (isBusy('r')) return; setBusy('r', 1); return emit('rerollQuest', +rr); }
         var a = t.getAttribute('data-claim-a'); if (a) { if (isBusy('a' + a)) return; setBusy('a' + a, 1); t.classList.add('busy'); lastBtn = t; return emit('claimAch', a); }
         var f = t.getAttribute('data-f'); if (f) { var p = f.split(':'); if (p[0] === 't') fTier = p[1]; else fSt = p[1]; render(false); }
@@ -413,6 +425,7 @@
         socket.on('questClaimed', function (d) { snd('ui_buy', 'ui_buy'); if (lastBtn && document.body.contains(lastBtn)) { burst(lastBtn, 14); pop(lastBtn, '+' + d.reward); } else toast({ ico: '💰', title: 'Нагорода: +' + d.reward, c: '250,204,21', mini: true }); });
         socket.on('achClaimed', function (d) { snd('ui_buy', 'ui_buy'); if (lastBtn && document.body.contains(lastBtn)) { burst(lastBtn, d.caseId ? 26 : 16); pop(lastBtn, '+' + d.credits); } });
         socket.on('questRerolled', function () { snd('ui_confirm', 'ui_click'); });
+        socket.on('ticketClaimed', function () { snd('ui_buy', 'ui_buy'); if (lastBtn && document.body.contains(lastBtn)) burst(lastBtn, 18); toast({ ico: '🎟', title: 'Квиток на колесо фортуни: +1', c: '250,204,21', mini: true }); });
         socket.on('questProgress', function (d) {
             if (!d || !S || !S.quests || !S.quests[d.i]) return;
             var q = S.quests[d.i]; q.p = d.p; q.done = !!d.done; if (S.badge && d.done) S.badge.quests = (S.badge.quests | 0) + 1;

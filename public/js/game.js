@@ -361,11 +361,11 @@ function updatePhys(now, dt) {
         for (let oid in opponents) {
             if (_ally) break;
             let op = opponents[oid];
-            if (op.hp > 0 && op.buff !== 'shield') {
+            if (op.hp > 0 && op.buff !== 'shield' && !(b.type === 'piercing' && b.pierced && b.pierced.indexOf(oid) >= 0)) {      // бронебійний б'є кожну ціль один раз (раніше — щокадру, шкода залежала від FPS)
                 let oR = op.buff === 'boss' ? 75 : 24, hD = b.type === 'samurai' ? oR + 30 : oR + 4;
                 const _dx = b.x - op.x, _dy = b.y - op.y;
                 if (op.isDisguised && currentRoomData.mode === 'prophunt' ? phHit(op, b.x, b.y, 4) : _dx * _dx + _dy * _dy < hD * hD) {
-                    hP = true;
+                    hP = true; if (b.type === 'piercing' && b.pierced) b.pierced.push(oid);
                     if (b.owner === myId) {
                         if (isTeamM(currentRoomData.mode) && myLocalTank.team === op.team) continue;
                         // Відправляємо обчислений урон
@@ -398,7 +398,7 @@ function updatePhys(now, dt) {
                 if (_dx * _dx + _dy * _dy < zD * zD) {
                     hZ = true;
                     if (b.owner === myId) {
-                        socket.emit('zombieHit', { roomId: currentRoomId, zid: zid, dmg: actualDmg, type: b.type });
+                        socket.emit('zombieHit', { roomId: currentRoomId, zid: zid, dmg: actualDmg, type: b.type, bid: b.bid });
                         createExplosion(b.x, b.y, 5, zType(z.type).color);
                     }
                     break;
