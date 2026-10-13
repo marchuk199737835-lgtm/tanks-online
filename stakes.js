@@ -1,5 +1,4 @@
-/* stakes.js — «Арена ставок» (сервер): батл кейсів, койнфліп, джекпот, краш, колесо, мінне поле, контракт обміну,
- * лотерея сезону та дуелі з друзями на кредити. Правила й числа — public/js/stakesinfo.js (спільні з клієнтом).
+/* stakes.js — «Фортуна» (сервер): батл кейсів, койнфліп, джекпот, колесо фортуни та дуелі з друзями на кредити. Правила й числа — public/js/stakesinfo.js (спільні з клієнтом).
  *
  * Лише ігрова валюта: кредити й модулі не мають грошової вартості, вивести їх неможливо.
  *
@@ -50,8 +49,8 @@ module.exports = function (ctx) {
     function hist(l, k, d, x) { const s = S(l); if (!s) return; s.hist.push({ k, d: d | 0, x: String(x || '').slice(0, 80), t: now() }); if (s.hist.length > 40) s.hist.splice(0, s.hist.length - 40); }
     function canBet(l) {
         const u = dbUsers[l]; if (!u) return 'Спершу увійдіть в акаунт';
-        if (lvl(l) < SI.MIN_LEVEL) return 'Арена ставок відкривається з ' + SI.MIN_LEVEL + ' рівня';
-        const s = S(l); if (!s.acc) return 'Спершу прийміть правила Арени ставок';
+        if (lvl(l) < SI.MIN_LEVEL) return 'Фортуна відкривається з ' + SI.MIN_LEVEL + ' рівня';
+        const s = S(l); if (!s.acc) return 'Спершу прийміть правила Фортуни';
         if (s.n >= SI.DAILY) return 'Ліміт ставок на сьогодні вичерпано (' + SI.DAILY + '). Повертайтесь завтра!';
         return null;
     }
@@ -96,7 +95,7 @@ module.exports = function (ctx) {
     }
     function meView(l) {
         const s = S(l), u = dbUsers[l];
-        return { n: s.n, max: SI.DAILY, acc: !!s.acc, lvl: lvl(l), prize: s.prize.slice(), hist: s.hist.slice(-25).reverse(), news: s.news.splice(0), lot: lotMe(l), mine: mineView(l), bucks: u.bucks };
+        return { n: s.n, max: SI.DAILY, acc: !!s.acc, lvl: lvl(l), prize: s.prize.slice(), hist: s.hist.slice(-25).reverse(), news: s.news.splice(0), bucks: u.bucks };
     }
     function sendMe(l) { if (!dbUsers[l] || !sockOf(l).length) return; const v = meView(l); toLogin(l, 'stkMe', v); }      // офлайн — новини лишаються до входу
 
@@ -111,9 +110,7 @@ module.exports = function (ctx) {
         if (k === 'cb') return { list: [...CB.values()].map(cbView), now: now() };
         if (k === 'cf') return { list: [...CF.values()].map(cfView), now: now() };
         if (k === 'jp') return jpView();
-        if (k === 'cr') return crView();
         if (k === 'wh') return whView();
-        if (k === 'lt') return ltView();
         return null;
     }
 
@@ -322,52 +319,6 @@ module.exports = function (ctx) {
         setTimeout(() => { if (JP === J) jpNew(); }, 2500);
     }
 
-    // ================= КРАШ =================
-    let CR = null; const CR_HIST = [];
-    function crNew() { const ss = newSeed(); CR = { id: gid('cr'), ss, hash: sha(ss), st: 'bet', betEnd: now() + SI.CR.BET_MS, bets: new Map() }; ACTIVE.add(CR.id); mark('cr'); }
-    function crView() {
-        return { id: CR.id, st: CR.st, hash: CR.hash, betEnd: CR.betEnd, t0: CR.t0 || 0, point: CR.st === 'crash' ? CR.point : null, ss: CR.st === 'crash' ? CR.ss : null, now: now(),
-            bets: [...CR.bets.values()].map(b => ({ l: b.l, nick: b.nick, amt: b.amt, auto: b.auto || 0, out: b.out || 0 })), hist: CR_HIST.slice(0, 14) };
-    }
-    function crBet(l, d) {
-        if (CR.st !== 'bet') return 'Ставки приймаються до старту раунду';
-        if (CR.bets.has(l)) return 'Ви вже зробили ставку в цьому раунді';
-        const a = int(d && d.amt); if (!betOk(a)) return 'Ставка від ' + SI.MIN_BET + ' до ' + SI.MAX_BET;
-        let auto = Math.floor((+d.auto || 0) * 100) / 100; if (!(auto >= 1.01)) auto = 0; if (auto > SI.CR.MAX) auto = SI.CR.MAX;
-        const e = canBet(l); if (e) return e;
-        if (!takeCr(l, a, CR.id)) return 'Недостатньо кредитів';
-        countBet(l); CR.bets.set(l, { l, nick: nick(l), amt: a, auto, out: 0 });
-        flushEco(l); mark('cr'); return null;
-    }
-    function crCash(l, at) {
-        const b = CR.bets.get(l); if (!b || b.out || CR.st !== 'run') return false;
-        b.out = at; giveCr(l, Math.floor(b.amt * at)); release(l, CR.id); hist(l, 'cr', Math.floor(b.amt * at) - b.amt, '×' + at.toFixed(2)); flushEco(l); mark('cr'); return true;
-    }
-    function crOut(l) {
-        if (CR.st !== 'run') return 'Раунд ще не почався або вже закінчився';
-        const t = now(); if (t >= CR.crashT) return 'Запізно — вже вибухнуло!';
-        const m = SI.crashAt(t - CR.t0); if (!crCash(l, Math.min(m, CR.point))) return 'Немає активної ставки';
-        return null;
-    }
-    function crTick() {
-        const t = now();
-        if (CR.st === 'bet' && t >= CR.betEnd) {
-            CR.cs = CR.id; CR.point = SI.crashPoint(fl(CR.ss, CR.cs, 'crash'));
-            CR.st = 'run'; CR.t0 = t; CR.crashT = t + SI.crashTime(CR.point); mark('cr');
-        }
-        if (CR.st === 'run') {
-            const m = SI.crashAt(t - CR.t0);
-            CR.bets.forEach(b => { if (!b.out && b.auto && b.auto <= CR.point && m >= b.auto) crCash(b.l, b.auto); });
-            if (t >= CR.crashT) {
-                CR.st = 'crash';
-                CR.bets.forEach(b => { if (!b.out) { release(b.l, CR.id); hist(b.l, 'cr', -b.amt, 'Вибух ×' + CR.point.toFixed(2)); flushEco(b.l); } });
-                CR_HIST.unshift({ id: CR.id, p: CR.point, hash: CR.hash, ss: CR.ss }); if (CR_HIST.length > 30) CR_HIST.length = 30;
-                ACTIVE.delete(CR.id); mark('cr');
-                setTimeout(crNew, SI.CR.PAUSE_MS);
-            }
-        }
-    }
-
     // ================= КОЛЕСО =================
     let WH = null; const WH_HIST = [];
     function whNew() { const ss = newSeed(), t = now(); WH = { id: gid('wh'), ss, hash: sha(ss), st: 'bet', start: t, spinAt: t + SI.WH.CYCLE - SI.WH.SPIN, bets: new Map() }; ACTIVE.add(WH.id); mark('wh'); }
@@ -401,104 +352,6 @@ module.exports = function (ctx) {
             ACTIVE.delete(WH.id); mark('wh');
             setTimeout(whNew, 1500);
         }
-    }
-
-    // ================= МІННЕ ПОЛЕ =================
-    const MN = new Map();      // login → гра
-    function mineView(l) {
-        const g = MN.get(l); if (!g) return null;
-        return { id: g.id, m: g.m, amt: g.amt, open: [...g.open], st: g.st, hash: g.hash, mines: g.st !== 'play' ? g.mines : null, boom: g.st === 'boom' ? g.boom : null, ss: g.st !== 'play' ? g.ss : null, cs: g.cs, mult: SI.minesMult(g.m, g.open.size), next: SI.minesMult(g.m, g.open.size + 1) };
-    }
-    function mnNew(l, d) {
-        const old = MN.get(l); if (old && old.st === 'play') return 'Спершу завершіть поточну гру';
-        const a = int(d && d.amt), m = int(d && d.m); if (!betOk(a)) return 'Ставка від ' + SI.MIN_BET + ' до ' + SI.MAX_BET;
-        if (SI.MN.MINES.indexOf(m) < 0) return 'Оберіть кількість мін';
-        const e = canBet(l); if (e) return e;
-        const id = gid('mn'); if (!takeCr(l, a, id)) return 'Недостатньо кредитів';
-        countBet(l); ACTIVE.add(id);
-        const ss = newSeed(), cs = id + ':' + l, r = rngOf(ss, cs, 'm'), cells = []; for (let i = 0; i < SI.MN.N; i++) cells.push(i);
-        for (let i = cells.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); const x = cells[i]; cells[i] = cells[j]; cells[j] = x; }
-        MN.set(l, { id, l, amt: a, m, ss, cs, hash: sha(ss), mines: cells.slice(0, m).sort((x, y) => x - y), open: new Set(), st: 'play' });
-        flushEco(l); return null;
-    }
-    function mnPick(l, d) {
-        const g = MN.get(l); if (!g || g.st !== 'play') return 'Немає активної гри';
-        const i = int(d && d.i); if (!(i >= 0 && i < SI.MN.N) || g.open.has(i)) return null;
-        if (g.mines.indexOf(i) >= 0) { g.st = 'boom'; g.boom = i; release(l, g.id); ACTIVE.delete(g.id); hist(l, 'mn', -g.amt, 'Міна · ' + g.m); flushEco(l); return null; }
-        g.open.add(i);
-        if (g.open.size >= SI.MN.N - g.m) return mnCash(l);
-        sendMe(l); return null;
-    }
-    function mnCash(l) {
-        const g = MN.get(l); if (!g || g.st !== 'play') return 'Немає активної гри'; if (!g.open.size) return 'Відкрийте хоча б одну клітинку';
-        const mult = SI.minesMult(g.m, g.open.size), win = Math.floor(g.amt * mult);
-        g.st = 'cash'; giveCr(l, win); release(l, g.id); ACTIVE.delete(g.id); hist(l, 'mn', win - g.amt, '×' + mult.toFixed(2)); flushEco(l); return null;
-    }
-
-    // ================= КОНТРАКТ =================
-    function ctDo(l, d, sock) {
-        const ids = Array.isArray(d && d.items) ? d.items : null; if (!ids || ids.length !== SI.CT.NEED || !ids.every(id => typeof id === 'string' && MODULES[id])) return 'Потрібно рівно ' + SI.CT.NEED + ' предметів';
-        const rar = MODULES[ids[0]].rarity; if (!ids.every(id => MODULES[id].rarity === rar)) return 'Усі предмети мають бути однієї рідкості';
-        const ri = GameData.RARITY_ORDER.indexOf(rar); if (ri < 0 || ri >= GameData.RARITY_ORDER.length - 1) return 'Міфічні предмети не обмінюються';
-        const u = dbUsers[l], inv = u.inventory.slice(); for (const id of ids) { const i = inv.indexOf(id); if (i < 0) return 'Цих предметів уже немає в інвентарі'; inv.splice(i, 1); }
-        const next = GameData.RARITY_ORDER[ri + 1], pool = Object.keys(MODULES).filter(id => MODULES[id].rarity === next);
-        const out = pool[crypto.randomInt(pool.length)];
-        u.inventory = inv; u.inventory.push(out); hist(l, 'ct', priceOf(out) - valOf(ids), MODULES[out].name);
-        flushEco(l); sock.emit('stkCtRes', { mod: out, from: rar }); return null;
-    }
-
-    // ================= ЛОТЕРЕЯ =================
-    let LT = { done: [], last: null, loaded: false };
-    function metaCol() { const db = ctx.getDb && ctx.getDb(); return db ? db.collection('meta') : null; }
-    function ltLoad() { if (LT.loaded) return; const c = metaCol(); if (!c) return; LT.loaded = true; c.findOne({ _id: 'lottery' }).then(d => { if (d) { LT.done = Array.isArray(d.done) ? d.done : []; LT.last = d.last || null; } mark('lt'); }).catch(() => { LT.loaded = false; }); }
-    function ltSave() { const c = metaCol(); if (c) c.replaceOne({ _id: 'lottery' }, { _id: 'lottery', done: LT.done.slice(-30), last: LT.last }, { upsert: true }).catch(e => console.error('❌ lottery save', e.message)); }
-    let ltCache = null, ltAt = 0;
-    function ltPool() {
-        const t = now(); if (ltCache && t - ltAt < 5000) return ltCache;
-        const d = SI.drawId(t); let n = 0, p = 0; for (const l in dbUsers) { const x = dbUsers[l].stk && dbUsers[l].stk.lot; if (x && x.d === d && x.n > 0) { n += x.n; p++; } }
-        ltCache = { d, n, p, pool: n * SI.LT.PRICE }; ltAt = t; return ltCache;
-    }
-    function ltView() { const P = ltPool(); return { d: P.d, at: SI.nextDraw(now()), tickets: P.n, players: P.p, pool: P.pool, last: LT.last, now: now() }; }
-    function lotMe(l) { const s = S(l), x = s.lot, d = SI.drawId(now()); return { n: x && x.d === d ? x.n | 0 : 0 }; }
-    function ltBuy(l, d) {
-        const n = int(d && d.n); if (!(n >= 1 && n <= SI.LT.MAX)) return 'Від 1 до ' + SI.LT.MAX + ' квитків';
-        const u = dbUsers[l]; if (!u) return 'Помилка'; if (lvl(l) < SI.MIN_LEVEL) return 'Лотерея відкривається з ' + SI.MIN_LEVEL + ' рівня';
-        const s = S(l); if (!s.acc) return 'Спершу прийміть правила Арени ставок';
-        const dd = SI.drawId(now()); if (!s.lot || s.lot.d !== dd) s.lot = { d: dd, n: 0 };
-        if (s.lot.n + n > SI.LT.MAX) return 'Не більше ' + SI.LT.MAX + ' квитків на один розіграш';
-        const cost = n * SI.LT.PRICE; if (u.bucks < cost) return 'Недостатньо кредитів';
-        u.bucks -= cost; s.lot.n += n; hist(l, 'lt', -cost, n + ' квит.');
-        ltCache = null; flushEco(l); mark('lt'); return null;
-    }
-    function ltDraw(d) {
-        if (LT.done.indexOf(d) >= 0) return;
-        const rows = []; for (const l in dbUsers) { const x = dbUsers[l].stk && dbUsers[l].stk.lot; if (x && x.d === d && x.n > 0) rows.push({ l, n: x.n | 0 }); }
-        rows.sort((a, b) => a.l < b.l ? -1 : 1);
-        const T = rows.reduce((s, r) => s + r.n, 0), pool = T * SI.LT.PRICE, ss = newSeed(), cs = 'lot:' + d, winners = [];
-        let left = rows.slice();
-        for (let k = 0; k < SI.LT.SHARES.length && left.length; k++) {
-            const tot = left.reduce((s, r) => s + r.n, 0); let x = fl(ss, cs, 'w' + k) * tot, w = left[left.length - 1];
-            for (const r of left) { x -= r.n; if (x < 0) { w = r; break; } }
-            left = left.filter(r => r !== w);
-            const cr = Math.floor(pool * SI.LT.SHARES[k]); let mod = null;
-            if (k === 0) { const myth = Object.keys(MODULES).filter(id => MODULES[id].rarity === 'mythic'); mod = myth[Math.floor(fl(ss, cs, 'mod') * myth.length)]; }
-            giveCr(w.l, cr); if (mod) giveIt(w.l, [mod], true);
-            const s = S(w.l); s.news.push({ t: now(), x: '🎟 Лотерея ' + d + ': ви посіли ' + (k + 1) + ' місце! +' + cr + ' кредитів' + (mod ? ' і ' + MODULES[mod].name : '') });
-            hist(w.l, 'lt', cr, (k + 1) + ' місце');
-            saveUser(w.l); sockOf(w.l).forEach(sid => ctx.sendEconomy(sid, w.l)); sendMe(w.l);
-            winners.push({ place: k + 1, nick: nick(w.l), cr, mod, n: w.n });
-        }
-        LT.done.push(d); LT.last = { d, T, pool, winners, hash: sha(ss), ss, cs, players: rows.length };
-        ltSave(); ltCache = null; mark('lt');
-        if (winners.length) io.to('stk').emit('stkMsgAll', { t: '🎟 Розіграш лотереї: переможець — ' + winners[0].nick + '!' });
-    }
-    let ltCur = SI.drawId(now());
-    function ltTick() {
-        ltLoad();
-        const d = SI.drawId(now());
-        if (d !== ltCur) { const prev = ltCur; ltCur = d; if (!metaCol() || LT.loaded) ltDraw(prev); }
-        // пропущені розіграші (сервер не працював у момент розіграшу) — перевіряємо раз на хвилину
-        if ((!metaCol() || LT.loaded) && now() - (ltTick.at || 0) > 60000) { ltTick.at = now(); const pend = new Set(); for (const l in dbUsers) { const x = dbUsers[l].stk && dbUsers[l].stk.lot; if (x && x.d && x.d < d && LT.done.indexOf(x.d) < 0 && x.n > 0) pend.add(x.d); } [...pend].sort().forEach(ltDraw); }
     }
 
     // ================= ДУЕЛІ =================
@@ -612,31 +465,29 @@ module.exports = function (ctx) {
     }
 
     // ================= ТАЙМЕРИ =================
-    jpNew(); crNew(); whNew();
+    jpNew(); whNew();
     const tm = setInterval(() => {
-        try { crTick(); } catch (e) { console.error('❌ crash tick', e && e.message); }
         try { whTick(); } catch (e) { console.error('❌ wheel tick', e && e.message); }
         try { jpTick(); } catch (e) { console.error('❌ jackpot tick', e && e.message); }
     }, 100); if (tm.unref) tm.unref();
-    const tm2 = setInterval(() => { try { cbTick(); cfTick(); ltTick(); } catch (e) { console.error('❌ stakes tick', e && e.message); } }, 1000); if (tm2.unref) tm2.unref();
+    const tm2 = setInterval(() => { try { cbTick(); cfTick(); } catch (e) { console.error('❌ stakes tick', e && e.message); } }, 1000); if (tm2.unref) tm2.unref();
 
     // ================= СОКЕТ =================
     Events.on('login', e => { try { if (e && dbUsers[e.name]) settleOrphans(e.name); } catch (er) {} });
     const H = {
         stkCbNew: cbCreate, stkCbJoin: cbJoin, stkCbLeave: cbLeave,
         stkCfNew: cfCreate, stkCfJoin: cfJoin, stkCfCancel: cfCancel,
-        stkJpBet: jpBet, stkCrBet: crBet, stkCrOut: l => crOut(l), stkWhBet: whBet,
-        stkMnNew: mnNew, stkMnPick: mnPick, stkMnOut: l => mnCash(l),
-        stkCt: ctDo, stkLtBuy: ltBuy, stkDuInv: duInvite, stkDuAns: duAnswer, stkPrize: prizeAct
+        stkJpBet: jpBet, stkWhBet: whBet,
+        stkDuInv: duInvite, stkDuAns: duAnswer, stkPrize: prizeAct
     };
-    const GAP = { stkCrOut: 60, stkMnPick: 120, stkWhBet: 150 };
+    const GAP = { stkWhBet: 150 };
     ctx.onConnection(socket => {
         ipOf.set(socket.id, ctx.ipHashOf(socket));
         const last = {};
         const me = () => { const n = ctx.globalPlayers[socket.id]; return n && dbUsers[n] ? n : null; };
         socket.on('stkHello', () => {
             const l = me(); if (!l) return; socket.join('stk'); settleOrphans(l);
-            socket.emit('stkState', { me: meView(l), cb: view('cb'), cf: view('cf'), jp: view('jp'), cr: view('cr'), wh: view('wh'), lt: view('lt'), cbHist: CB_HIST.slice(0, 10), cfHist: CF_HIST.slice(0, 10), now: now() });
+            socket.emit('stkState', { me: meView(l), cb: view('cb'), cf: view('cf'), jp: view('jp'), wh: view('wh'), cbHist: CB_HIST.slice(0, 10), cfHist: CF_HIST.slice(0, 10), now: now() });
         });
         socket.on('stkBye', () => socket.leave('stk'));
         socket.on('stkRules', () => { const l = me(); if (!l) return; const s = S(l); if (!s.acc) { s.acc = now(); saveUser(l); } sendMe(l); });
@@ -645,7 +496,6 @@ module.exports = function (ctx) {
             let err = null; try { err = H[ev](l, d || {}, socket); } catch (e) { console.error('❌ stakes', ev, e && e.stack || e); err = 'Помилка сервера, спробуйте ще раз'; }
             if (err) socket.emit('stkMsg', { t: err, bad: true, ev });
             else socket.emit('stkOk', { ev });
-            if (ev === 'stkMnPick' || ev === 'stkMnNew' || ev === 'stkMnOut') sendMe(l);
         }));
         socket.on('stkDuLeave', () => {
             for (const id in rooms) { const r = rooms[id]; if (r.duel && r.players[socket.id]) { socket.leave(id); ctx.removePlayer(id, socket.id); } }
@@ -653,5 +503,5 @@ module.exports = function (ctx) {
         socket.on('disconnect', () => { ipOf.delete(socket.id); });
     });
 
-    ctx.Stakes = { CB, CF, get JP() { return JP; }, get CR() { return CR; }, get WH() { return WH; }, MN, INV, ltDraw, settleOrphans, S, _cbTick: cbTick, _ip: ipOf, _pairs: pairs };
+    ctx.Stakes = { CB, CF, get JP() { return JP; }, get WH() { return WH; }, INV, settleOrphans, S, _cbTick: cbTick, _ip: ipOf, _pairs: pairs };
 };

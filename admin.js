@@ -10,7 +10,8 @@
  *  7. Відповіді «Доступ заборонено» однакові для всіх причин (не видно, чи акаунт — адмін). Усі дії пишуться в журнал (пам'ять + консоль сервера).
  *
  * Можливості: статистика онлайну/сервера/БД · пошук гравця · бан (з причиною й терміном) / розбан · вигнати з гри · видати кредити або кейс ·
- *             подія (множник кредитів/досвіду для всіх або одного режиму, з таймером) · оголошення всім гравцям · журнал дій.
+ *             подія (множник кредитів/досвіду для всіх або одного режиму, з таймером) · оголошення всім гравцям · журнал дій ·
+ *             промокоди (список з лічильниками активацій, створення, редагування, вимкнення, видалення; зберігаються в meta/promos).
  * Подія зберігається в MongoDB (meta/event) лише при зміні — 1 запис. */
 'use strict';
 const crypto = require('crypto');
@@ -61,6 +62,29 @@ module.exports = function (ctx) {
     Events.on('login', e => { const p = evPublic(); if (p) setTimeout(() => io.to(e.socketId).emit('gameEvent', p), 1200); });
     // бонус події: server.js (applyEventBonus) питає активну подію для режиму й нараховує ×креди / ×досвід ДО показу вікна результату
     ctx.hooks.eventBonus = mode => { const E = evActive(); return E && (!E.mode || E.mode === mode) ? E : null; };
+
+    // ---------- промокоди ----------
+    // Вбудовані коди — у server.js (PROMO_CODES). Створені / змінені в адмінці зберігаються в MongoDB (meta/promos) і накладаються поверх
+    // при старті сервера. Вбудований код видалити не можна — лише вимкнути. Лічильник активацій — promo_uses (server.js).
+    const PROMOS = ctx.PROMO_CODES || {}, BUILTIN = new Set(Object.keys(PROMOS)), OVR = {};      // OVR — усе, що змінено в адмінці (код → опис або null = видалено)
+    const CODE_RE = /^[A-Z0-9_-]{3,24}$/, DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+    function cleanPromo(p) { return { credits: Math.max(1, Math.min(100000, Math.floor(+p.credits || 0))), maxUses: Math.max(0, Math.min(1e6, Math.floor(+p.maxUses || 0))), expires: DATE_RE.test(p.expires || '') ? p.expires : null, once: p.once !== false, off: !!p.off, note: String(p.note || '').replace(/[<>]/g, '').slice(0, 80), by: p.by || '', at: +p.at || 0 }; }
+    function applyOvr(code, p) { if (p) PROMOS[code] = cleanPromo(p); else if (!BUILTIN.has(code)) delete PROMOS[code]; }
+    function promoSave() { const db = ctx.getDb && ctx.getDb(); if (db) db.collection('meta').replaceOne({ _id: 'promos' }, { _id: 'promos', codes: OVR }, { upsert: true }).catch(e => console.error('❌ promos save', e.message)); }
+    let prLoaded = false;
+    function promoLoad() {
+        if (prLoaded) return; const db = ctx.getDb && ctx.getDb(); if (!db) return; prLoaded = true;
+        db.collection('meta').findOne({ _id: 'promos' }).then(d => {
+            const c = d && d.codes && typeof d.codes === 'object' ? d.codes : {};
+            Object.keys(c).forEach(k => { if (CODE_RE.test(k) && !Object.prototype.hasOwnProperty.call(OVR, k)) { OVR[k] = c[k]; applyOvr(k, c[k]); } });      // зміни, зроблені до завантаження, не перетираємо
+            if (Object.keys(c).length) console.log('🎟️  Промокоди з адмінки: ' + Object.keys(c).length);
+        }).catch(() => { prLoaded = false; });
+    }
+    const pl = setInterval(() => { promoLoad(); if (prLoaded) clearInterval(pl); }, 4000); if (pl.unref) pl.unref();
+    function promoList() {
+        const uses = ctx.promoUses || {};
+        return Object.keys(PROMOS).sort().map(k => { const p = PROMOS[k]; return { code: k, credits: p.credits | 0, maxUses: p.maxUses | 0, uses: uses[k] | 0, expires: p.expires || null, once: p.once !== false, off: !!p.off, note: p.note || '', builtin: BUILTIN.has(k), expired: !!(p.expires && Date.now() > Date.parse(p.expires + 'T23:59:59.999Z')) }; });
+    }
 
     // ---------- статистика ----------
     let opsWin = [];
@@ -148,6 +172,30 @@ module.exports = function (ctx) {
         A('admAnnounce', (by, d) => {
             const text = String(d.text || '').replace(/[<>]/g, '').trim().slice(0, 200); if (!text) return;
             io.emit('announce', { text, at: Date.now() }); log(by, 'announce', '', { text }); ok('Оголошення надіслано ' + new Set(Object.values(ctx.globalPlayers)).size + ' гравцям');
+        });
+        A('admPromos', () => socket.emit('admPromos', promoList()));
+        A('admPromoSave', (by, d) => {
+            const code = String(d.code || '').trim().toUpperCase();
+            if (!CODE_RE.test(code)) return socket.emit('admErr', { msg: 'Код: 3–24 символи, лише латиниця, цифри, _ та -' });
+            if (!(+d.credits >= 1)) return socket.emit('admErr', { msg: 'Вкажіть кількість кредитів (від 1)' });
+            if (d.expires && !DATE_RE.test(d.expires)) return socket.emit('admErr', { msg: 'Дата дії: РРРР-ММ-ДД або порожньо' });
+            const isNew = !PROMOS[code];
+            if (isNew && d.edit) return socket.emit('admErr', { msg: 'Такого коду вже немає' });
+            if (!isNew && !d.edit) return socket.emit('admErr', { msg: 'Код ' + code + ' уже існує — відредагуйте його в списку' });
+            const p = cleanPromo(Object.assign({}, d, { by, at: Date.now() }));
+            OVR[code] = p; applyOvr(code, p); promoSave();
+            log(by, isNew ? 'promo-add' : 'promo-edit', code, p); ok((isNew ? 'Промокод створено: ' : 'Промокод оновлено: ') + code, { promos: promoList() });
+        });
+        A('admPromoToggle', (by, d) => {
+            const code = String(d.code || '').toUpperCase(), p = PROMOS[code]; if (!p) return socket.emit('admErr', { msg: 'Код не знайдено' });
+            const np = cleanPromo(Object.assign({}, p, { off: !p.off, by, at: Date.now() })); OVR[code] = np; applyOvr(code, np); promoSave();
+            log(by, np.off ? 'promo-off' : 'promo-on', code); ok(code + (np.off ? ' вимкнено' : ' увімкнено'), { promos: promoList() });
+        });
+        A('admPromoDel', (by, d) => {
+            const code = String(d.code || '').toUpperCase(); if (!PROMOS[code]) return socket.emit('admErr', { msg: 'Код не знайдено' });
+            if (BUILTIN.has(code)) return socket.emit('admErr', { msg: 'Вбудований код видалити не можна — вимкніть його' });
+            OVR[code] = null; applyOvr(code, null); promoSave();
+            log(by, 'promo-del', code); ok('Промокод ' + code + ' видалено', { promos: promoList() });
         });
         A('admFlush', (by) => { if (ctx.flushUsers) ctx.flushUsers(); log(by, 'db-flush'); ok('Запис у БД запущено'); });
         A('admLogout', () => { sess.delete(socket.id); ok('Вихід з адмінки'); });

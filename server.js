@@ -184,6 +184,7 @@ function redeemPromoCode(name, rawCode, now) {
     if (!code) return { ok: false, msg: 'Введіть промокод' };
     if (code.length > 40 || !Object.prototype.hasOwnProperty.call(PROMO_CODES, code)) return fail('Невірний промокод');
     const p = PROMO_CODES[code];
+    if (p.off) return fail('Невірний промокод');      // вимкнений в адмінці
     if (p.expires && now > Date.parse(p.expires + 'T23:59:59.999Z')) return fail('Термін дії промокоду минув');
     if (!Array.isArray(u.usedPromos)) u.usedPromos = [];
     if (p.once !== false && u.usedPromos.some(x => String(x).toUpperCase() === code)) return fail('Цей промокод уже використано');
@@ -2038,7 +2039,7 @@ setInterval(() => {
         hooks, displayName: nickOf, onConnection: f => connHooks.push(f), getDb: () => dbRef, onlineSocketsOf, isOnline: name => _sockByName.has(name),
         get BANS() { return BANS; }, get TICK_RATE() { return TICK_RATE; }, get SYNCS() { return SYNCS; }, startRoomGame, collectTokenFor, emitMatchEnd, teamsOf, isTeamPvp, powerupsOn, pickMap, clampInt, BUFF_DURATION, VALID_COLORS, TDM_TEAMS,
         newPlayerEntry, joinRoomFor, ipHashOf, getRandomModuleFromCase, matchTally: () => matchTally,
-        banInfo, dbStat, dirtyCount: () => dirtyUsers.size, flushUsers, PROMO_CODES
+        banInfo, dbStat, dirtyCount: () => dirtyUsers.size, flushUsers, PROMO_CODES, promoUses
     };
     ['handles', 'progress', 'profile', 'social', 'clans', 'chat', 'playercard', 'bots', 'ranked', 'referral', 'stakes', 'tutorial', 'emotes', 'notify', 'admin'].forEach(f => {
         if (!fs.existsSync(path.join(__dirname, f + '.js'))) return;
