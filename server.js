@@ -370,7 +370,7 @@ const globalPlayers = new Proxy({}, {
         return true;
     }
 });
-const hooks = { clanTag: () => '', extraRooms: () => [], preJoin: () => false, botNames: null, inRankedQueue: null, leaveRankedQueue: null, rankedLeave: null, eventBonus: null };   // модулі підміняють (clans.js → hooks.clanTag; bots.js → extraRooms/preJoin/botNames)
+const hooks = { clanTag: () => '', extraRooms: () => [], preJoin: () => false, botNames: null, inRankedQueue: null, leaveRankedQueue: null, rankedLeave: null, duelLeave: null, eventBonus: null };   // модулі підміняють (clans.js → hooks.clanTag; bots.js → extraRooms/preJoin/botNames)
 const nickOf = n => (dbUsers[n] && dbUsers[n].nick) || n;
 const connHooks = [];   // обробники підключення від додаткових модулів (ctx.onConnection)
 
@@ -407,7 +407,7 @@ const ROOMS_GAP = 1800; let _roomsAt = 0;
 function pushRooms() { if (_roomsTimer) return; _roomsTimer = setTimeout(() => { _roomsTimer = null; const lst = getActiveRooms(), js = JSON.stringify(lst); if (js === _roomsLast) return; _roomsLast = js; _roomsAt = Date.now(); io.to('rb').emit('roomsList', lst); }, Math.max(150, _roomsAt + ROOMS_GAP - Date.now())); }
 function getActiveRooms() {
     let extra = []; try { extra = hooks.extraRooms() || []; } catch (e) { extra = []; }   // «віртуальні» сесії (bots.js)
-    return Object.values(rooms).filter(r => !r.ranked).map(r => ({ id: r.id, hostName: r.hostName, hostNick: nickOf(r.hostName), mode: r.mode, map: r.map, playersCount: Object.keys(r.players).length, maxPlayers: r.maxPlayers, status: r.status })).concat(extra);
+    return Object.values(rooms).filter(r => !r.ranked && !r.duel).map(r => ({ id: r.id, hostName: r.hostName, hostNick: nickOf(r.hostName), mode: r.mode, map: r.map, playersCount: Object.keys(r.players).length, maxPlayers: r.maxPlayers, status: r.status })).concat(extra);
 }
 
 function getMaxHp(equipped) {
@@ -618,6 +618,7 @@ function removePlayer(rId, sockId) {
     const left = r.players[sockId];
     delete r.players[sockId];
     if (r.ranked && hooks.rankedLeave) { try { hooks.rankedLeave(r, left); } catch (e) { console.error('❌ rankedLeave', e && e.message); } }   // рейтинг: дезертирство = поразка, місце займає бот
+    if (r.duel && hooks.duelLeave) { try { hooks.duelLeave(r, left); } catch (e) { console.error('❌ duelLeave', e && e.message); } }         // дуель на ставку: утікач програє, банк — суперникові
     const ids = Object.keys(r.players);
     if (ids.length === 0) { delete rooms[rId]; matchTally.delete(rId); if (typeof SYNCS !== "undefined") SYNCS.delete(rId); BANS.delete(rId); Modes.cleanup(rId); return; }
     if (r.hostSocket === sockId) { r.hostSocket = ids[0]; r.hostName = r.players[ids[0]].name; }
@@ -683,7 +684,7 @@ function startRoomGame(roomId, notify) {
                 aT.forEach(t => r.teamScores[t] = 0);
                 if (r.mode === 'team_deathmatch') r.timeEndTime = Date.now() + 4000 + (r.tdmTime * 1000);
                 let tS = {};
-                aT.forEach((t, i) => tS[t] = sPts[i % sPts.length]);
+                aT.forEach((t, i) => tS[t] = (r._spawnFix && r._spawnFix[t]) || sPts[i % sPts.length]);      // _spawnFix — задані бази команд (дуель на ставку: далеко одна від одної)
                 r.teamSpawns = {}; aT.forEach(t => r.teamSpawns[t] = { x: tS[t].x, y: tS[t].y });
                 pK.forEach(id => {
                     let p = r.players[id];
@@ -893,7 +894,7 @@ function joinRoomFor(socket, roomId, quiet) {
     if (typeof roomId !== 'string') return fail('Кімната не знайдена');
     try { if (hooks.preJoin(socket, roomId, n)) return null; } catch (e) { console.error('❌ preJoin', e && e.message); }   // bots.js: віртуальні сесії, бот звільняє місце
     const r = rooms[roomId];
-    if (!r || r.ranked) return fail('Кімната не знайдена');
+    if (!r || r.ranked || r.duel) return fail('Кімната не знайдена');
     if (r.players[socket.id]) { socket.emit('joinedRoom', { roomId: roomId, roomData: r }); return r; } // вже тут
     if (BANS.has(roomId) && BANS.get(roomId).has(n)) return fail('Лідер заблокував вас у цій сесії');
     for (const rid in rooms) for (const pid in rooms[rid].players) if (rooms[rid].players[pid].name === n) return fail('Цей акаунт уже перебуває в сесії!');
@@ -1177,9 +1178,10 @@ io.on('connection', (socket) => {
         let name = globalPlayers[socket.id];
         if (!name || !dbUsers[name]) return;
         let u = dbUsers[name];
-        if (Array.isArray(newInv) && newInv.length === u.inventory.length) {
-            u.inventory = newInv;
-            saveUser(name);
+        // лише перестановка тих самих предметів (раніше клієнт міг підмінити інвентар довільним списком)
+        if (Array.isArray(newInv) && newInv.length === u.inventory.length && newInv.every(x => typeof x === 'string')) {
+            const a = u.inventory.slice().sort(), b = newInv.slice().sort();
+            if (a.every((x, i) => x === b[i])) { u.inventory = newInv.slice(); saveUser(name); }
         }
     });
 
@@ -2038,7 +2040,7 @@ setInterval(() => {
         newPlayerEntry, joinRoomFor, ipHashOf, getRandomModuleFromCase, matchTally: () => matchTally,
         banInfo, dbStat, dirtyCount: () => dirtyUsers.size, flushUsers, PROMO_CODES
     };
-    ['handles', 'progress', 'profile', 'social', 'clans', 'chat', 'playercard', 'bots', 'ranked', 'referral', 'tutorial', 'emotes', 'notify', 'admin'].forEach(f => {
+    ['handles', 'progress', 'profile', 'social', 'clans', 'chat', 'playercard', 'bots', 'ranked', 'referral', 'stakes', 'tutorial', 'emotes', 'notify', 'admin'].forEach(f => {
         if (!fs.existsSync(path.join(__dirname, f + '.js'))) return;
         try { require('./' + f + '.js')(ctx); console.log('✅ Модуль', f); } catch (e) { console.error('❌ Модуль', f, e && e.stack || e); }
     });

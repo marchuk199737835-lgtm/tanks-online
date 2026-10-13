@@ -104,8 +104,10 @@ module.exports = function createModes(D) {
             const out = o.outcomes[p.id] || 'loss', base = ModeInfo.reward(r.mode, r, out, Object.assign({ n: n0 }, o.ctx ? o.ctx(p) : {}));
             let amt = contribMul ? Math.max(1, Math.round(base * contribMul(r, p))) : base;      // кооп: хто майже нічого не зробив (AFK) — отримує менше
             if (EF) amt = EF(p, amt);
+            if (r.du) amt = 0;      // дуель на ставку (stakes.js): виграш — лише банк ставки, без звичайних кредитів, досвіду й предметів
             rw[p.id] = amt; oc[p.id] = out; if (o.per) per[p.id] = o.per(p);
-            if (dbUsers[p.name]) {
+            if (dbUsers[p.name] && r.du) crd[p.id] = 0;
+            else if (dbUsers[p.name]) {
                 const u = dbUsers[p.name]; u.bucks += amt; u.stats.earned += amt; u.stats.matches++; crd[p.id] = amt;
                 xpm[p.id] = grantXp(p.name, out); const dr = rollDrop(p.name); drp[p.id] = dr; saveUser(p.name);
                 io.to(p.id).emit('economyUpdate', ecoPayload(p.name)); if (dr) io.to(p.id).emit('dropReceived', dr);
