@@ -374,7 +374,8 @@ const ROOMS_GAP = 1800; let _roomsAt = 0;
 function pushRooms() { if (_roomsTimer) return; _roomsTimer = setTimeout(() => { _roomsTimer = null; const lst = getActiveRooms(), js = JSON.stringify(lst); if (js === _roomsLast) return; _roomsLast = js; _roomsAt = Date.now(); io.to('rb').emit('roomsList', lst); }, Math.max(150, _roomsAt + ROOMS_GAP - Date.now())); }
 function getActiveRooms() {
     let extra = []; try { extra = hooks.extraRooms() || []; } catch (e) { extra = []; }   // «віртуальні» сесії (bots.js)
-    return Object.values(rooms).filter(r => !r.ranked && !r.duel).map(r => ({ id: r.id, hostName: r.hostName, hostNick: nickOf(r.hostName), mode: r.mode, map: r.map, playersCount: Object.keys(r.players).length, maxPlayers: r.maxPlayers, status: r.status })).concat(extra);
+    // приховані кімнати «Гладіаторів» (арени, дуелі) у списку не показуємо; у Форумі рахуємо всіх учасників, де б вони зараз не були
+    return Object.values(rooms).filter(r => !r.ranked && !r.duel && !r.glc).map(r => ({ id: r.id, hostName: r.hostName, hostNick: nickOf(r.hostName), mode: r.mode, map: r.map, playersCount: Glad.count(r) != null ? Glad.count(r) : Object.keys(r.players).length, maxPlayers: r.maxPlayers, status: r.status })).concat(extra);
 }
 
 function getMaxHp(equipped) {
@@ -469,6 +470,7 @@ function processPlayerDeath(r, victimId, killerId, meta) {
         io.to(r.id).emit('leaderDown', { by: nickOf(atk.name), tg: nickOf(v.name), byId: atk.id });
         if (!atk.isBot) Ev.emit('leaderDown', { roomId: r.id, mode: r.mode, killerName: atk.name });
     }
+    if (Glad.owns(r)) { Glad.onDeath(r, v, killerId); return; }      // «Гладіатори»: арена (життя, відродження) / дуель (ставки)
     if (Modes.has(r.mode)) { Modes.onDeath(r, v, killerId); return; }
     if (r.mode === 'survival') {   // життя: відродження через 6 с біля живого союзника; останнє — гравець вибуває
         v.lives = (v.lives || 1) - 1; io.to(v.id).emit('clsLives', { n: Math.max(0, v.lives) });
@@ -553,9 +555,13 @@ const Modes = require('./modes.js')({ io, rooms, dbUsers, MAP_DATA, MapObj, Nav,
     grantXp, rollDrop, saveUser, ecoPayload, pushRooms, zombieTick, processPlayerDeath, emitMatchEnd, applyEventBonus, effCtx, finalMul, finalSpawn, objReset, ZOMBIE_CAP, ZOMBIE_SPAWN_BASE, ZOMBIE_SPAWN_STEP });
 const Classes = require('./classes_srv.js')({ io, rooms, getMaxHp, GameData, Modes, checkCollisionServer, onZDeath: (r, z, o) => onZDeath(r, z, o) });   // класи танків у кооперативі
 Modes.setElite((r, ids, wave, d, n) => eliteMix(r, ids, wave, d, n), (r, z, o) => onZDeath(r, z, o));   // еліт-зомбі в нових кооп-режимах
+// «Гладіатори»: Форум + приховані дочірні кімнати (арени, дуель) — gladiators.js
+const Glad = require('./gladiators.js')({ io, rooms, dbUsers, MAP_DATA, Z_TYPES, getValidSpawn, getValidEdgeSpawn, checkCollisionServer, getMaxHp, zombieTick, grantXp, rollDrop,
+    saveUser, ecoPayload, pushRooms, emitMatchEnd, hiddenSet, applyEventBonus, nickOf: n => nickOf(n), SYNCS: () => SYNCS });
+connHooks.push(s => Glad.bind(s));
 const teamsOf = r => r.mode === 'rounds' || r.ranked ? 2 : r.mode === 'capture_points' ? Math.max(2, Math.min(4, r.cpTeams || 2)) : Math.max(2, Math.min(4, r.tdmTeams || 2));
 const isTeamPvp = m => m === 'team_deathmatch' || m === 'capture_points' || m === 'rounds';
-const powerupsOn = m => m !== 'prophunt' && m !== 'team_deathmatch' && m !== 'rounds';
+const powerupsOn = m => m !== 'prophunt' && m !== 'team_deathmatch' && m !== 'rounds' && m !== 'gladiators' && m !== 'gl_arena' && m !== 'gl_duel';
 // мапа для режиму: бажана, якщо вона дозволена в цьому режимі (поле modes з редактора), інакше перша дозволена
 function pickMap(want, mode) {
     if (MAP_DATA[want] && MapObj.mapAllows(MAP_DATA[want], mode)) return want;
@@ -588,6 +594,11 @@ function removePlayer(rId, sockId) {
     if (r.status === 'playing' && !left.isBot) Ev.emit('matchQuit', { roomId: rId, mode: r.mode, name: left.name, ranked: !!r.ranked, duel: !!r.duel });      // аналітика: де кидають бій
     if (r.ranked && hooks.rankedLeave) { try { hooks.rankedLeave(r, left); } catch (e) { console.error('❌ rankedLeave', e && e.message); } }   // рейтинг: дезертирство = поразка, місце займає бот
     if (r.duel && hooks.duelLeave) { try { hooks.duelLeave(r, left); } catch (e) { console.error('❌ duelLeave', e && e.message); } }         // дуель на ставку: утікач програє, банк — суперникові
+    if (Glad.owns(r)) {      // «Гладіатори»: вибуття, нагорода, дуель / арена — у gladiators.js; Форум живе, поки в грі є хоч один учасник
+        const res = Glad.onLeave(r, left);
+        if (res === 'empty' && rooms[rId] === r && !r.glc && !Object.keys(r.players).length) { delete rooms[rId]; matchTally.delete(rId); SYNCS.delete(rId); BANS.delete(rId); }
+        return;
+    }
     const ids = Object.keys(r.players);
     if (ids.length === 0) { delete rooms[rId]; matchTally.delete(rId); if (typeof SYNCS !== "undefined") SYNCS.delete(rId); BANS.delete(rId); Modes.cleanup(rId); return; }
     if (r.hostSocket === sockId) { r.hostSocket = ids[0]; r.hostName = r.players[ids[0]].name; }
@@ -696,6 +707,7 @@ function startRoomGame(roomId, notify) {
             mapEvInit(r, Date.now()); hiddenSet(r, '_leader', null); hiddenSet(r, '_ldAt', 0);   // події на мапі, ціль-лідер
             hiddenSet(r, '_obj', null);      // руйнівні об'єкти — знову цілі
             hiddenSet(r, '_fin', null); r.dmEnd = r.mode === 'deathmatch' ? Date.now() + 4000 + (r.dmTime || 480) * 1000 : 0;      // фінальна хвилина, ліміт часу детматчу
+            if (Glad.isHub(r)) Glad.start(r, pK, Date.now());      // «Гладіатори»: базова екіпіровка, 3 життя, таймер Форуму
             io.to(roomId).emit('gameStarting', r);
             pushRooms();
             return true;
@@ -832,6 +844,7 @@ function ramFor(socket, d) {
     if (isTeamPvp(r.mode) && p.team && p.team === v.team) return;
     if (Math.hypot(p.x - v.x, p.y - v.y) > 140) return;
     hiddenSet(p, '_ramOf', du);
+    if (Glad.noDmg(r)) { hiddenSet(p, '_ramOf', du); io.to(socket.id).emit('dmgN', { x: Math.round(v.x), y: Math.round(v.y), v: RAM_DMG, k: 1 }); io.to(r.id).emit('ramFx', { x: Math.round((p.x + v.x) / 2), y: Math.round((p.y + v.y) / 2), by: socket.id, tid: v.id, ms: 0 }); return; }      // Форум «Гладіаторів»: лише цифри
     const hp0 = v.hp; v.hp = Math.max(0, v.hp - RAM_DMG);
     if (r.ranked) r.ranked.dmg[socket.id] = (r.ranked.dmg[socket.id] || 0) + Math.min(hp0, RAM_DMG);
     hiddenSet(v, 'stunUntil', now + RAM_STUN);
@@ -1264,7 +1277,7 @@ io.on('connection', (socket) => {
             players: {}, powerups: {}, tokens: {}, zombies: {}, mines: {},
             wave: 1, nextWaveTime: 0, lastPowerupSpawn: Date.now()
         };
-        { const nr = rooms[rId]; nr.mpPref = nr.maxPlayers; Modes.readSettings(nr, c); if (ModeInfo.isSolo(nr.mode)) nr.maxPlayers = 1; }   // соло-режими: у сесії лише один гравець
+        { const nr = rooms[rId]; nr.mpPref = nr.maxPlayers; Modes.readSettings(nr, c); if (ModeInfo.isSolo(nr.mode)) nr.maxPlayers = 1; if (Glad.isHub(nr)) nr.map = Glad.HUB; }   // соло-режими: у сесії лише один гравець; «Гладіатори» — завжди Форум
         socket.emit('roomCreated', rId);
         pushRooms();
     });
@@ -1324,6 +1337,7 @@ io.on('connection', (socket) => {
                 r.map = pickMap(r.map, r.mode);                     // якщо мапа не підходить режиму — перемикаємо на дозволену
             }
             if (d.map) r.map = pickMap(d.map, r.mode);
+            if (Glad.isHub(r)) r.map = Glad.HUB;      // «Гладіатори»: мапи фіксовані
             if (d.maxPlayers) { r.mpPref = Math.max(2, Math.min(10, parseInt(d.maxPlayers) || 6)); if (!ModeInfo.isSolo(r.mode)) r.maxPlayers = r.mpPref; }
             if (d.winScore) r.winScore = clampInt(d.winScore, 5, DM_MAX_SCORE, 50);
             if (d.hunterCount) {
@@ -1523,7 +1537,9 @@ io.on('connection', (socket) => {
         }
         // кут броні: прямий снаряд (не уламки вибуху) у борт / корму б'є сильніше
         const side = (r.mode === 'prophunt' || data.sp) ? 0 : armorSide(v, +data.a); fD *= ARM_MUL[side];
-        
+        // Форум «Гладіаторів»: шкоди немає, але цифри показуємо — видно, скільки «зносить» танк
+        if (Glad.noDmg(r)) { io.to(socket.id).emit('hitConfirmed'); io.to(socket.id).emit('dmgN', { x: Math.round(v.x), y: Math.round(v.y), v: Math.round(fD), k: 0, s: side }); return; }
+
         if (sh.type === 'incendiary') v.onFire = { end: Date.now() + 5000, nextTick: Date.now() + 1000, owner: socket.id };
         
         // добивання: у ворога < 15% HP і він поруч (≤ 170 px) — постріл знищує миттєво, нападник отримує +50 HP
@@ -1669,7 +1685,7 @@ function zombieTick(r, rId, now, dt, aP, X) {
         aP.forEach(pl => { let d = Math.hypot(pl.x - z.x, pl.y - z.y); if (pl.buff === 'invisible') d *= 3; const w = pl._cs ? Classes.weight(pl, d, now) : d; if (w < bw) { bw = w; mD = d; t = pl; } });
         if (X && X.targets) for (const T of X.targets) { const d = Math.hypot(T.x - z.x, T.y - z.y) - T.r; if (d < bw) { bw = d; mD = d; t = T; st = T; } }
         if (t) {
-            let dx = t.x - z.x, dy = t.y - z.y, l = Math.max(Math.hypot(dx, dy), 0.001), sp = ZT.speed, cdM = 1;
+            let dx = t.x - z.x, dy = t.y - z.y, l = Math.max(Math.hypot(dx, dy), 0.001), sp = ZT.speed * (z.spdMul || 1), cdM = 1;      // spdMul — посилення затягнутої хвилі («Гладіатори»)
             if (X && X.enrage && ZT.isBoss && z.hp < z.maxHp * 0.5) { sp *= 1.3; cdM = 0.7; }
             // шлях в обхід перешкод (барикади, стіни, вода): зомбі йде до наступної точки маршруту, а не тупо в гравця
             const wp = Nav.steer(MAP_DATA[r.map] || MAP_DATA['epic_map'], r, t.id, t.x, t.y, z.x, z.y, ZT.radius, now), wdx = wp.x - z.x, wdy = wp.y - z.y, wl = Math.max(Math.hypot(wdx, wdy), 0.001);
@@ -1732,6 +1748,7 @@ function eliteMix(r, ids, wave, d, n) {
 function onZDeath(r, z, ownerId) {
     const now = Date.now(), ZT = Z_TYPES[z.type]; if (!ZT) return;
     { const kp = ownerId && r.players[ownerId]; if (kp && !kp.isBot) Ev.emit('zkill', { roomId: r.id, mode: r.mode, name: kp.name, boss: !!ZT.isBoss }); }      // досягнення «Санітар», «Гроза босів»
+    if (r.glc) Glad.onZombieKill(r, ownerId, z);      // «Гладіатори»: поінти за зомбі на арені
     if (z.type === 'splitter') {
         const hm = z.maxHp / ZT.hp;
         for (let i = 0; i < 3; i++) {
@@ -1985,6 +2002,7 @@ setInterval(() => {
 
         mapEvTick(r, now); leaderTick(r, now);      // події на мапі, ціль-лідер
         Classes.tick(r, now, dt);      // кооп: здібності класів (лікування, турелі, артобстріл), ремонт інженером
+        if (Glad.owns(r)) { if (Glad.tick(r, now, dt) || rooms[rId] !== r) continue; }      // «Гладіатори»: таймери Форуму, арени, дуель
         if (Modes.has(r.mode)) { if (Modes.tick(r, now, dt)) continue; }
 
         if (r.mode === 'survival') {
@@ -2044,7 +2062,8 @@ setInterval(() => {
         hooks, displayName: nickOf, onConnection: f => connHooks.push(f), getDb: () => dbRef, onlineSocketsOf, isOnline: name => _sockByName.has(name),
         get BANS() { return BANS; }, get TICK_RATE() { return TICK_RATE; }, get SYNCS() { return SYNCS; }, startRoomGame, collectTokenFor, emitMatchEnd, teamsOf, isTeamPvp, powerupsOn, pickMap, clampInt, BUFF_DURATION, VALID_COLORS, TDM_TEAMS,
         newPlayerEntry, joinRoomFor, ipHashOf, getRandomModuleFromCase, matchTally: () => matchTally,
-        banInfo, dbStat, dirtyCount: () => dirtyUsers.size, flushUsers, PROMO_CODES, promoUses
+        banInfo, dbStat, dirtyCount: () => dirtyUsers.size, flushUsers, PROMO_CODES, promoUses,
+        roomMembers: r => Glad.members(r)      // «Гладіатори»: учасники гри в усіх її кімнатах (чат)
     };
     ['handles', 'progress', 'profile', 'social', 'clans', 'chat', 'playercard', 'bots', 'ranked', 'referral', 'stakes', 'tutorial', 'emotes', 'notify', 'analytics', 'admin'].forEach(f => {
         if (!fs.existsSync(path.join(__dirname, f + '.js'))) return;

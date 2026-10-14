@@ -44,9 +44,10 @@ module.exports = function (ctx) {
     const cid = login => { try { return ctx.Clans ? ctx.Clans.clanOf(login) : ''; } catch (e) { return ''; } };
     const areFriends = (a, b) => { try { return !!(ctx.Social && ctx.Social.areFriends(a, b)); } catch (e) { return false; } };
     function roomOf(sid) {
-        for (const id in rooms) { const r = rooms[id]; if (r && r.players && r.players[sid]) return r; }
+        for (const id in rooms) { const r = rooms[id]; if (r && r.players && r.players[sid]) return r.glc && rooms[r.glc] ? rooms[r.glc] : r; }      // «Гладіатори»: арена / дуель → спільний чат Форуму
         return null;
     }
+    const membersOf = r => (ctx.roomMembers && ctx.roomMembers(r)) || Object.keys(r.players);      // усі учасники гри, навіть якщо зараз в іншій кімнаті
     const isTeamRoom = r => { try { return !!ctx.isTeamPvp(r.mode); } catch (e) { return false; } };
 
     // ---------- історія ----------
@@ -112,10 +113,11 @@ module.exports = function (ctx) {
             store('clan', id, m); sendList(new Set(mem), m);
         } else if (ch === 'room' || ch === 'team') {
             const r = roomOf(socket.id); if (!r) return socket.emit('chatErr', { msg: 'Ви не в кімнаті' });
-            const me = r.players[socket.id];
+            const me = r.players[socket.id] || {};
             if (ch === 'team' && (!isTeamRoom(r) || !me.team)) return socket.emit('chatErr', { msg: 'Командний чат доступний лише в командних режимах' });
             store(ch, ch === 'room' ? r.id : teamKey(r, me), m);
-            for (const sid in r.players) { const p = r.players[sid]; if (p.isBot) continue; if (ch === 'team' && p.team !== me.team) continue; to(sid, 'chatMsg', m); }
+            if (ch === 'room') { membersOf(r).forEach(sid => { const p = r.players[sid]; if (p && p.isBot) return; to(sid, 'chatMsg', m); }); }
+            else for (const sid in r.players) { const p = r.players[sid]; if (p.isBot) continue; if (p.team !== me.team) continue; to(sid, 'chatMsg', m); }
         } else {   // dm
             const th = typeof d.to === 'string' ? d.to.slice(0, 24) : '';
             const bot = ctx.Handles.botOf(th);
@@ -186,7 +188,7 @@ module.exports = function (ctx) {
             else if (ch === 'clan') { const id = cid(login); if (id) msgs = getHist('clan', id); }
             else if (ch === 'room' || ch === 'team') {
                 const r = roomOf(socket.id);
-                if (r) { const me = r.players[socket.id]; msgs = ch === 'room' ? getHist('room', r.id) : (isTeamRoom(r) && me.team ? getHist('team', teamKey(r, me)) : []); }
+                if (r) { const me = r.players[socket.id] || {}; msgs = ch === 'room' ? getHist('room', r.id) : (isTeamRoom(r) && me.team ? getHist('team', teamKey(r, me)) : []); }
             } else {
                 const o = ctx.Handles.loginOf(typeof d.to === 'string' ? d.to.slice(0, 24) : '');
                 if (o && user(o) && o !== login) msgs = getHist('dm', dmKey(login, o));

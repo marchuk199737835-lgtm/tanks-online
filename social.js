@@ -65,7 +65,7 @@ module.exports = function (ctx) {
         if (!f) return { t: 'menu' };
         const r = f.r, cnt = Object.keys(r.players).length;
         if (r.status === 'lobby') return { t: 'lobby', roomId: f.rid, mode: r.mode, map: r.map, n: cnt, max: r.maxPlayers, free: cnt < r.maxPlayers };
-        return { t: 'battle', mode: r.mode, map: r.map };
+        return { t: 'battle', mode: r.glc ? 'gladiators' : r.mode, map: r.map };      // арена / дуель «Гладіаторів» — у друзів видно сам режим
     }
     function entry(n) {
         const u = user(n); if (!u) return null;
