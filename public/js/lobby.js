@@ -108,7 +108,7 @@
             case 'capture_points': h += rule('🚩', 'Команд', v('cpTeams')) + rule('📍', 'Точок', v('cpPoints')) + rule('🏁', 'Очки', v('cpScore')) + rule('⏱', 'Час', tm('cpTime')) + rule('🎲', 'Події', yn('mapEvents')); break;
             case 'bounty': h += rule('🏁', 'Очки', v('bnScore')) + rule('⏱', 'Час', tm('bnTime')) + rule('🎯', 'Зміна цілі', v('bnInterval') + 'с') + rule('🎲', 'Події', yn('mapEvents')); break;
             case 'rounds': h += rule('🔁', 'Раундів', v('rdRounds')) + rule('⏱', 'Раунд', v('rdTime') + 'с') + rule('🤝', 'Нічия', yn('rdDraw')); break;
-            case 'gladiators': h += rule('❤️', 'Життів', '3') + rule('🔁', 'Раундів', '∞') + rule('⚔️', 'Дуелі', 'з 3-го') + rule('🎁', 'Модуль', 'кожен 2-й') + rule('🛒', 'Лавка', 'бафи · кейси'); break;
+            case 'gladiators': h += rule('❤️', 'Життів', '3') + rule('🔁', 'Раундів', '∞') + rule('⚔️', 'Дуелі', 'кожен 3-й') + rule('🎁', 'Модуль', 'кожен 2-й') + rule('🛒', 'Лавка', 'бафи · кейси'); break;
         }
         const rr = MI.rewardRange(r.mode, r);
         h += rule(creditIcon(20), r.mode === 'survival' ? 'Нагорода (5–20 хвиль)' : 'Нагорода', rr.loss + '–' + rr.win) + (rr.draw != null ? rule('🤝', 'Нічия', creditAmount(rr.draw, 14)) : '') + (MI.effKind ? (MI.effKind(r.mode) === 1 ? rule('📊', 'Ефективність', '+0…4') : MI.effKind(r.mode) === 2 ? rule('💀', 'Штраф за смерті', '0…−3') : '') : '');
