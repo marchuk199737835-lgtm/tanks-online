@@ -2350,7 +2350,7 @@ I18N.add("tr", {
  "Ставки закрито": "Bahisler kapandı",
  "Сума": "Miktar",
  "Усе": "Hepsi",
- "Переможець дуелі забирає банк, поставлений на нього (щонайменше 200 поінтів), той, хто програв, — 5% свого банку. Хто ставив на переможця, повертає ставку й ділить 95% банку суперника пропорційно ставкам.": "Düelloyu kazanan, kendisine yatırılan kasayı alır (en az 200 puan), kaybeden kendi kasasının %5’ini alır. Kazanana bahis yapanlar bahislerini geri alır ve rakibin kasasının %95’ini bahisleri oranında paylaşır.",
+ "Банк кожного дуелянта — щонайменше 200 поінтів, навіть якщо на нього не ставили. Переможець дуелі забирає свій банк, той, хто програв, — 5% свого. Хто ставив на переможця, повертає ставку й ділить 95% банку суперника пропорційно ставкам.": "Her düellocunun kasası, kimse bahis yapmasa bile en az 200 puandır. Düelloyu kazanan kendi kasasını, kaybeden kendi kasasının %5’ini alır. Kazanana bahis yapanlar bahislerini geri alır ve rakibin kasasının %95’ini bahisleri oranında paylaşır.",
  "Інвентар доступний лише на Форумі": "Envanter yalnızca Forum’da kullanılabilir",
  "базовий": "temel",
  "Дуло": "Namlu",

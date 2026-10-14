@@ -2350,7 +2350,7 @@ I18N.add("fr", {
  "Ставки закрито": "Les paris sont fermés",
  "Сума": "Montant",
  "Усе": "Tout",
- "Переможець дуелі забирає банк, поставлений на нього (щонайменше 200 поінтів), той, хто програв, — 5% свого банку. Хто ставив на переможця, повертає ставку й ділить 95% банку суперника пропорційно ставкам.": "Le vainqueur du duel remporte la cagnotte misée sur lui (au moins 200 points), le perdant touche 5 % de la sienne. Ceux qui ont parié sur le vainqueur récupèrent leur mise et se partagent 95 % de la cagnotte adverse au prorata des mises.",
+ "Банк кожного дуелянта — щонайменше 200 поінтів, навіть якщо на нього не ставили. Переможець дуелі забирає свій банк, той, хто програв, — 5% свого. Хто ставив на переможця, повертає ставку й ділить 95% банку суперника пропорційно ставкам.": "La cagnotte de chaque duelliste est d’au moins 200 points, même si personne n’a parié sur lui. Le vainqueur du duel remporte sa cagnotte, le perdant touche 5 % de la sienne. Ceux qui ont parié sur le vainqueur récupèrent leur mise et se partagent 95 % de la cagnotte adverse au prorata des mises.",
  "Інвентар доступний лише на Форумі": "L’inventaire n’est disponible qu’au Forum",
  "базовий": "de base",
  "Дуло": "Canon",

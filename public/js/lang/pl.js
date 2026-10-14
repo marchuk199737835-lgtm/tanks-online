@@ -2350,7 +2350,7 @@ I18N.add("pl", {
  "Ставки закрито": "Zakłady zamknięte",
  "Сума": "Kwota",
  "Усе": "Wszystko",
- "Переможець дуелі забирає банк, поставлений на нього (щонайменше 200 поінтів), той, хто програв, — 5% свого банку. Хто ставив на переможця, повертає ставку й ділить 95% банку суперника пропорційно ставкам.": "Zwycięzca pojedynku zgarnia pulę postawioną na niego (co najmniej 200 punktów), przegrany — 5% swojej puli. Kto postawił na zwycięzcę, odzyskuje stawkę i dzieli 95% puli rywala proporcjonalnie do zakładów.",
+ "Банк кожного дуелянта — щонайменше 200 поінтів, навіть якщо на нього не ставили. Переможець дуелі забирає свій банк, той, хто програв, — 5% свого. Хто ставив на переможця, повертає ставку й ділить 95% банку суперника пропорційно ставкам.": "Pula każdego uczestnika pojedynku to co najmniej 200 punktów, nawet jeśli nikt na niego nie postawił. Zwycięzca zgarnia swoją pulę, przegrany — 5% swojej. Kto postawił na zwycięzcę, odzyskuje stawkę i dzieli 95% puli rywala proporcjonalnie do zakładów.",
  "Інвентар доступний лише на Форумі": "Ekwipunek jest dostępny tylko na Forum",
  "базовий": "podstawowy",
  "Дуло": "Lufa",

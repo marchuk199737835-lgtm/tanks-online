@@ -173,7 +173,7 @@
         let h = head('🎲', 'СТАВКИ НА ДУЕЛЬ', can ? 'Закриються через ' + mmss(closeIn) : isDuelist() ? 'Ви дуелянт — ставити не можна' : 'Ставки закрито') +
             '<div class="gl-bets">' + side(A, 'a', d.bankA) + '<div class="gl-vs">VS</div>' + side(B, 'b', d.bankB) + '</div>' +
             '<div class="gl-amt"><span>Сума</span><button type="button" data-d="-50">−50</button><input id="gl-bet-in" type="number" min="50" step="50" value="' + betAmt + '"><button type="button" data-d="50">+50</button><button type="button" data-d="500">+500</button><button type="button" data-max>Усе</button></div>' +
-            '<p class="gl-note">Переможець дуелі забирає банк, поставлений на нього (щонайменше 200 поінтів), той, хто програв, — 5% свого банку. Хто ставив на переможця, повертає ставку й ділить 95% банку суперника пропорційно ставкам.</p>';
+            '<p class="gl-note">Банк кожного дуелянта — щонайменше 200 поінтів, навіть якщо на нього не ставили. Переможець дуелі забирає свій банк, той, хто програв, — 5% свого. Хто ставив на переможця, повертає ставку й ділить 95% банку суперника пропорційно ставкам.</p>';
         const box = panel('bets', h), inp = box.querySelector('#gl-bet-in');
         const fix = v => { betAmt = Math.max(50, Math.min(Math.floor(+v || 0), Math.max(50, (S.me && S.me.pts) | 0))); inp.value = betAmt; };
         box.querySelectorAll('[data-d]').forEach(b => b.onclick = () => { snd('ui_click'); fix(betAmt + (+b.dataset.d)); });

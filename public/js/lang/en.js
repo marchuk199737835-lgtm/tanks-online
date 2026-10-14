@@ -2461,7 +2461,7 @@ I18N.add("en", {
  "Ставки закрито": "Bets are closed",
  "Сума": "Amount",
  "Усе": "All",
- "Переможець дуелі забирає банк, поставлений на нього (щонайменше 200 поінтів), той, хто програв, — 5% свого банку. Хто ставив на переможця, повертає ставку й ділить 95% банку суперника пропорційно ставкам.": "The duel winner takes the bank bet on them (at least 200 points), the loser gets 5% of their bank. Those who bet on the winner get their stake back and share 95% of the opponent’s bank in proportion to their bets.",
+ "Банк кожного дуелянта — щонайменше 200 поінтів, навіть якщо на нього не ставили. Переможець дуелі забирає свій банк, той, хто програв, — 5% свого. Хто ставив на переможця, повертає ставку й ділить 95% банку суперника пропорційно ставкам.": "Each duelist’s bank is at least 200 points, even if nobody bet on them. The duel winner takes their bank, the loser gets 5% of theirs. Those who bet on the winner get their stake back and share 95% of the opponent’s bank in proportion to their bets.",
  "Інвентар доступний лише на Форумі": "The inventory is available only on the Forum",
  "базовий": "basic",
  "Дуло": "Barrel",

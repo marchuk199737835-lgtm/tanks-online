@@ -2350,7 +2350,7 @@ I18N.add("pt", {
  "Ставки закрито": "Apostas encerradas",
  "Сума": "Valor",
  "Усе": "Tudo",
- "Переможець дуелі забирає банк, поставлений на нього (щонайменше 200 поінтів), той, хто програв, — 5% свого банку. Хто ставив на переможця, повертає ставку й ділить 95% банку суперника пропорційно ставкам.": "O vencedor do duelo leva a banca apostada nele (pelo menos 200 pontos) e o perdedor, 5% da sua. Quem apostou no vencedor recebe a aposta de volta e divide 95% da banca do adversário proporcionalmente às apostas.",
+ "Банк кожного дуелянта — щонайменше 200 поінтів, навіть якщо на нього не ставили. Переможець дуелі забирає свій банк, той, хто програв, — 5% свого. Хто ставив на переможця, повертає ставку й ділить 95% банку суперника пропорційно ставкам.": "A banca de cada duelista é de pelo menos 200 pontos, mesmo que ninguém tenha apostado nele. O vencedor do duelo leva a sua banca e o perdedor, 5% da dele. Quem apostou no vencedor recebe a aposta de volta e divide 95% da banca do adversário proporcionalmente às apostas.",
  "Інвентар доступний лише на Форумі": "O inventário só está disponível no Fórum",
  "базовий": "básico",
  "Дуло": "Cano",

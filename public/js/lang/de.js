@@ -2350,7 +2350,7 @@ I18N.add("de", {
  "Ставки закрито": "Wetten sind geschlossen",
  "Сума": "Betrag",
  "Усе": "Alles",
- "Переможець дуелі забирає банк, поставлений на нього (щонайменше 200 поінтів), той, хто програв, — 5% свого банку. Хто ставив на переможця, повертає ставку й ділить 95% банку суперника пропорційно ставкам.": "Der Duellsieger erhält den auf ihn gesetzten Pot (mindestens 200 Punkte), der Verlierer 5 % seines Pots. Wer auf den Sieger gesetzt hat, bekommt seinen Einsatz zurück und teilt sich 95 % des gegnerischen Pots im Verhältnis der Einsätze.",
+ "Банк кожного дуелянта — щонайменше 200 поінтів, навіть якщо на нього не ставили. Переможець дуелі забирає свій банк, той, хто програв, — 5% свого. Хто ставив на переможця, повертає ставку й ділить 95% банку суперника пропорційно ставкам.": "Der Pot jedes Duellanten beträgt mindestens 200 Punkte, auch wenn niemand auf ihn gesetzt hat. Der Duellsieger erhält seinen Pot, der Verlierer 5 % seines Pots. Wer auf den Sieger gesetzt hat, bekommt seinen Einsatz zurück und teilt sich 95 % des gegnerischen Pots im Verhältnis der Einsätze.",
  "Інвентар доступний лише на Форумі": "Das Inventar ist nur auf dem Forum verfügbar",
  "базовий": "Basis",
  "Дуло": "Rohr",
