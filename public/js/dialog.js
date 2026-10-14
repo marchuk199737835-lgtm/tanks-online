@@ -78,8 +78,12 @@
     function inMatch() { return typeof currentRoomData !== 'undefined' && currentRoomData && currentRoomData.status === 'playing' && typeof currentRoomId !== 'undefined' && currentRoomId; }
     function leaveMatch() {
         if (!inMatch()) return;
-        const ranked = !!currentRoomData.rk, duel = !!currentRoomData.du;
-        uiDialog.confirm(duel ? {
+        const ranked = !!currentRoomData.rk, duel = !!currentRoomData.du, gl = !!(window.GladUI && GladUI.active());
+        uiDialog.confirm(gl ? {
+            kind: 'danger', icon: '🏛️', title: 'Покинути «Гладіаторів»?',
+            text: GladUI.isOut() ? 'Ви вже вибули, нагороду нараховано. Можна й далі спостерігати за боєм.' : 'Вихід зараховується як вибуття: ви отримаєте нагороду лише за прожиті раунди, а поінти, бафи й модулі цієї гри зникнуть.',
+            cancelText: GladUI.isOut() ? 'Спостерігати' : 'Залишитись', okText: 'Вийти в лобі', danger: !GladUI.isOut()
+        } : duel ? {
             kind: 'danger', icon: '🚪', title: 'Покинути дуель?',
             text: 'Вихід із дуелі зараховується як поразка: ваша ставка дістанеться суперникові.',
             rows: [['Ставка', '— ' + currentRoomData.du, 'bad']],
@@ -105,6 +109,7 @@
             if (duel) { showScreen('main-menu-screen'); return; }
             if (ranked) { showScreen('main-menu-screen'); if (window.RankedUI) RankedUI.open(); if (window.uiToast) uiToast('Ви покинули рейтинговий бій: зараховано поразку', true); return; }
             showScreen('room-browser-screen');
+            if (gl) { if (window.GladUI) GladUI.reset(); return; }
             if (window.uiToast) uiToast('Ви вийшли з матчу без нагороди', true);
         });
     }

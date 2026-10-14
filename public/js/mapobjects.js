@@ -892,7 +892,7 @@ var MapObj = (function () {
     // ---------- ПЕРЕВІРКА МАПИ (сервер) ----------
     const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
     const num = (v, lo, hi, d) => { v = Number(v); if (!isFinite(v)) return d; return Math.max(lo, Math.min(hi, v)); };
-    const MODES = ['deathmatch', 'team_deathmatch', 'survival', 'prophunt', 'base_defense', 'boss_raid', 'convoy', 'solo_arena', 'boss_duel', 'battle_royale', 'capture_points', 'bounty', 'rounds'];
+    const MODES = ['deathmatch', 'team_deathmatch', 'survival', 'prophunt', 'base_defense', 'boss_raid', 'convoy', 'solo_arena', 'boss_duel', 'battle_royale', 'capture_points', 'bounty', 'rounds', 'gladiators'];
     // чи дозволена мапа в режимі (без поля modes — доступна в усіх)
     // нові режими успадковують дозвіл базових: кооп/соло — як «Виживання», королівський бій і полювання — як «Детматч», захоплення точок — як «Командний»
     const MODE_ALIAS = { base_defense: 'survival', boss_raid: 'survival', convoy: 'survival', solo_arena: 'survival', boss_duel: 'survival', battle_royale: 'deathmatch', bounty: 'deathmatch', capture_points: 'team_deathmatch', rounds: 'team_deathmatch' };

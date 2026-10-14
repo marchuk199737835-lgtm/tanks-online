@@ -174,7 +174,10 @@ function statMult(equipped, stat) {
     if (mod && mod.stats && mod.stats[stat]) m *= mod.stats[stat];
   });
   const lim = STAT_LIMITS[stat];
-  return lim ? Math.max(lim[0], Math.min(lim[1], m)) : m;
+  let v = lim ? Math.max(lim[0], Math.min(lim[1], m)) : m;
+  // bm — бафи, куплені в межах гри («Гладіатори»: +2% за покупку), діють понад ліміти модулів
+  if (equipped && equipped.bm && equipped.bm[stat] > 0) v *= equipped.bm[stat];
+  return v;
 }
 // Шанс апгрейду (%): справедливий шанс (вхід+креди)/ціна цілі зі «зборами казино»: -15% (на міфічні -25%) і стеля 75% (на міфічні 50%).
 // Ланцюжок дрібних апгрейдів тому не безпечний: кожен крок множить очікувану цінність на 0.85.

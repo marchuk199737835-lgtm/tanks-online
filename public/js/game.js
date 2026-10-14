@@ -1257,6 +1257,7 @@ function draw(now) {
 
     const _pv = _PV; _pv.x0 = VX0; _pv.x1 = VX1; _pv.y0 = VY0; _pv.y1 = VY1;   // один об'єкт на всі виклики (без виділень на кадр)
     if (window.ModesFX && ModesFX.ground) ModesFX.ground(ctx, now, _pv);   // аірдроп (королівський бій): нижній шар
+    if (window.GladFX) GladFX.ground(ctx, now, _pv, _low);                  // «Гладіатори»: зони Лавки й Табло ставок на Форумі
     for (let pid in powerups) {
         let p = powerups[pid];
         if (p.mod) { if (window.ModesFX) ModesFX.lootDraw(ctx, p, now, _pv); continue; }

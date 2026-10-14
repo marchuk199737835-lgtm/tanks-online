@@ -15,7 +15,8 @@
         { id: 'emote', n: 'Меню емоцій', d: ['KeyQ', ''] },
         { id: 'map', n: 'Велика міні-мапа', d: ['KeyM', ''] },
         { id: 'target', n: 'Зміна цілі (самонавідка)', d: ['Tab', ''] },
-        { id: 'chat', n: 'Чат у бою', d: ['Enter', 'NumpadEnter'] }
+        { id: 'chat', n: 'Чат у бою', d: ['Enter', 'NumpadEnter'] },
+        { id: 'inventory', n: 'Інвентар («Гладіатори»)', d: ['KeyX', ''] }
     ];
     // клавіші, які не можна призначити (системні / зайняті іншим)
     var RESERVED = { Escape: 1, Digit1: 1, Digit2: 1, Digit3: 1, Digit4: 1, Digit5: 1, Digit6: 1, Numpad1: 1, Numpad2: 1, Numpad3: 1, Numpad4: 1, Numpad5: 1, Numpad6: 1, MetaLeft: 1, MetaRight: 1, ContextMenu: 1, F5: 1, F11: 1, F12: 1 };

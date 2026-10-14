@@ -18,12 +18,16 @@
         battle_royale:   { e: '🔥', n: 'КОРОЛІВСЬКИЙ БІЙ', sn: 'Королів. бій', s: 'Останній танк виграє', kind: 'pvp', c: '132,204,22', d: 'Кожен сам за себе на звужуваній мапі. Усі стартують без модулів — їх треба знаходити на мапі: що довше триває бій, то кращі модулі (епічні → легендарні). Аірдропи скидають міфічні та легендарні модулі, а у фіналі міфічні лежать у центрі зони. Безпечна зона стискається — хто вийшов за її межі, отримує шкоду. Переможе останній танк. Відроджень немає.' },
         capture_points:  { e: '🚩', n: 'ЗАХОПЛЕННЯ ТОЧОК', sn: 'Точки', s: 'Контролюй точки', kind: 'pvp', c: '20,184,166', d: 'Команди борються за контрольні точки. Станьте на точку, щоб захопити її: що більше точок утримуєте, то швидше йдуть очки. Вбивства теж додають очки команді.' },
         bounty:          { e: '🎯', n: 'ПОЛЮВАННЯ ЗА ГОЛОВОЮ', sn: 'Ціль', s: 'Знищ ціль — візьми приз', kind: 'pvp', c: '202,138,4', d: 'Кожен сам за себе. Періодично одного з гравців (частіше лідера) позначають як ціль — усі бачать його на мапі. Знищіть ціль — отримаєте нагороду; проживіть ціллю до кінця таймера — заробите ви.' },
-        rounds:          { e: '⏱️', n: 'РАУНДИ', sn: 'Раунди', s: 'Без відродження до кінця раунду', kind: 'pvp', c: '244,114,182', d: 'Команда проти команди по раундах. Знищений танк не відроджується до кінця раунду — раунд виграє команда, яка знищила всіх суперників (або має більше живих, коли вийде час). Перед кожним раундом — 4 секунди підготовки. Перемагає команда з більшою кількістю виграних раундів; за рівного рахунку — додаткові раунди або нічия (якщо її дозволено).' }
+        rounds:          { e: '⏱️', n: 'РАУНДИ', sn: 'Раунди', s: 'Без відродження до кінця раунду', kind: 'pvp', c: '244,114,182', d: 'Команда проти команди по раундах. Знищений танк не відроджується до кінця раунду — раунд виграє команда, яка знищила всіх суперників (або має більше живих, коли вийде час). Перед кожним раундом — 4 секунди підготовки. Перемагає команда з більшою кількістю виграних раундів; за рівного рахунку — додаткові раунди або нічия (якщо її дозволено).' },
+        // «Гладіатори» (gladiators.js): Форум між раундами, кожен — у своєму Колізеї проти зомбі, з 3-го раунду дуелі зі ставками
+        gladiators:      { e: '🏛️', n: 'ГЛАДІАТОРИ', sn: 'Гладіатори', s: 'Зомбі, дуелі й ставки', kind: 'pvp', c: '234,179,8', isNew: true, players: '2–10',
+            d: 'У кожного 3 життя. Між раундами всі збираються на Форумі: там магазин бафів (швидкість, шкода, здоров’я) і кейси з модулями. Кожен раунд ви б’єтеся сам у своєму Колізеї проти хвилі зомбі й заробляєте поінти. Кожен 2-й раунд — вибір 1 з 3 модулів. З 3-го раунду випадкова пара б’ється в дуелі, а інші ставлять поінти на переможця. Раундів скільки завгодно — грає до останнього вцілілого.',
+            fixedMaps: [{ n: 'Forum', t: 'Форум', d: 'Спільна мапа між раундами: магазин, табло ставок, очікування.' }, { n: 'Colosseum', t: 'Колізей', d: 'У кожного гравця своя арена проти хвилі зомбі.' }, { n: 'Duelist Pit', t: 'Яма дуелянтів', d: 'Дуель 1 на 1 до першого знищення, з 3-го раунду.' }] }
     };
-    const ORDER = ['survival', 'base_defense', 'boss_raid', 'convoy', 'solo_arena', 'boss_duel', 'deathmatch', 'team_deathmatch', 'prophunt', 'battle_royale', 'capture_points', 'bounty', 'rounds'];
+    const ORDER = ['survival', 'base_defense', 'boss_raid', 'convoy', 'solo_arena', 'boss_duel', 'gladiators', 'deathmatch', 'team_deathmatch', 'prophunt', 'battle_royale', 'capture_points', 'bounty', 'rounds'];
     const NEW = ['base_defense', 'boss_raid', 'convoy', 'solo_arena', 'boss_duel', 'battle_royale', 'capture_points', 'bounty', 'rounds'];
     const GROUPS = [{ k: 'coop', n: '🤝 Кооператив' }, { k: 'solo', n: '🎯 Соло (1 гравець)' }, { k: 'pvp', n: '⚔️ Проти гравців' }];
-    const PVE = ['survival', 'base_defense', 'boss_raid', 'convoy', 'solo_arena', 'boss_duel'];
+    const PVE = ['survival', 'base_defense', 'boss_raid', 'convoy', 'solo_arena', 'boss_duel', 'gl_arena'];      // gl_arena — службова арена «Гладіаторів» (у списку режимів її немає)
     const SOLO = ['solo_arena', 'boss_duel'];
     const TEAMS = ['team_deathmatch', 'capture_points', 'rounds'];           // командні PvP (команда = колір)
     const NO_COLOR = ['prophunt', 'team_deathmatch', 'capture_points', 'rounds'];   // режими, де замість камуфляжу обирають команду
@@ -153,6 +157,8 @@
             // раунди: R — кількість раундів (довший матч → більша нагорода); rw — виграні раунди вашої команди (втіха за поразку), kills — до +8
             //   R=6: перемога 31, нічия 15.5, поразка 8.5 + 1.5 за кожен виграний раунд;  R=12: 46 / 23 / 13+
             case 'rounds': { const R = v('rdRounds'); a = outcome === 'win' ? 16 + 2.5 * R : outcome === 'draw' ? 8 + 1.25 * R : 4 + 0.75 * R + 1.5 * Math.min(R, c.rw || 0); a += Math.min(8, kills); break; }
+            // гладіатори: 4 за кожен прожитий раунд; переможцю +12 і +3 за кожного суперника, другому місцю +6
+            case 'gladiators': a = 4 * Math.max(0, c.rounds || 0) + (outcome === 'win' ? 12 + 3 * n : (c.place === 2 ? 6 : 0)); break;
             default: a = 0;
         }
         return Math.max(1, Math.round(a));
@@ -179,6 +185,7 @@
     function rewardRange(mode, r) {
         const np = r && r.players ? Object.keys(r.players).length : 0, n = np || 2;
         if (mode === 'survival') return { loss: reward(mode, r, 'loss', { waves: 5, n }), win: reward(mode, r, 'loss', { waves: 20, n }), draw: null };
+        if (mode === 'gladiators') return { loss: reward(mode, r, 'loss', { rounds: 2, n, place: n }), win: reward(mode, r, 'win', { rounds: 8, n }), draw: null };
         const lo = reward(mode, r, 'loss', { waves: 3, frac: 0.3, killed: 1, n, place: n, kills: 0, caps: 0 }), hi = reward(mode, r, 'win', { frac: 1, n, place: 1, kills: 0, caps: 0 });
         const hasDraw = mode === 'battle_royale' || mode === 'capture_points' || mode === 'bounty' || (mode === 'rounds' && r && r.rdDraw);
         return { loss: lo, win: hi, draw: hasDraw ? reward(mode, r, 'draw', { n, kills: 0 }) : null };
