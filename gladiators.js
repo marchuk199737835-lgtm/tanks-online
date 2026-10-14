@@ -1,7 +1,7 @@
 /* gladiators.js — режим «Гладіатори» (від 2 до 10 гравців, у кожного 3 життя).
  * Устрій: сама сесія — це «Форум» (мапа Forum, режим 'gladiators'): тут чекають між раундами, купують бафи й кейси, ставлять на дуелі.
  * Кожен раунд гравця переносить у ВЛАСНУ приховану кімнату-арену ('gl_arena', мапа Colosseum) проти однієї хвилі зомбі;
- * з 3-го раунду випадкова пара йде в кімнату-дуель ('gl_duel', мапа Duelist Pit) до першого знищення, інші — на арени.
+ * кожен 3-й раунд випадкова пара йде в кімнату-дуель ('gl_duel', мапа Duelist Pit) до першого знищення, інші — на арени.
  * Дочірні кімнати — звичайні кімнати rooms[] з полем glc = id Форуму: уся логіка руху, зіткнень, зомбі й синхронізації працює як завжди,
  * а гравець «перестрибує» між кімнатами (подія 'glHop' + звичайний 'gameStarting' без відліку). Глядач — гравець із out = true, hp = 0:
  * клієнт сам переходить у режим спостереження за живими в кімнаті.
@@ -23,7 +23,8 @@ module.exports = function createGladiators(D) {
     const HUB_FIRST = FAST ? 20000 : 25000, HUB_WAIT = FAST ? 15000 : 60000, BET_CLOSE = 5000;          // перше очікування / між раундами / ставки закриваються за 5 с до старту
     const ARENA_SOFT = 240000, ENRAGE_EVERY = 15000, ENRAGE_STEP = 0.10;   // після 4 хв кожні 15 с зомбі +10% до HP, шкоди й швидкості
     const ARENA_HARD = 480000;      // 8 хв — запобіжник від завислого / згорнутого клієнта (шкоду від зомбі рахує клієнт): −1 життя, арена закривається
-    const DUEL_MAX = 180000;                                               // дуель довше 3 хв — перемагає той, у кого більша частка HP
+    const DUEL_EVERY = 3;                                                  // дуель — кожен 3-й раунд; вибір модуля — кожен парний
+    const DUEL_MAX = 180000;                                              // дуель довше 3 хв — перемагає той, у кого більша частка HP
     const RESPAWN_MS = 3000;
     const ZONES = { shop: { x: 1790, y: 640, r: 150 }, bets: { x: 610, y: 640, r: 150 } };
     const BUY = { speed: 1, dmg: 1, hp: 1 }, BUY_BASE = 200, BUY_STEP = 75, BUY_MAX = 20, BUY_PCT = 0.02;
@@ -129,9 +130,9 @@ module.exports = function createGladiators(D) {
         if (al.length <= 1 && G.round > 0) return finish(G);
         // кожен 2-й раунд — вибір 1 з 3 модулів (кожна наступна роздача щедріша)
         if (G.round > 0 && G.round % 2 === 0) { const odds = pickOdds(G.offerN++); al.forEach(rec => { rec.offer = [rollMod(roll(odds)), rollMod(roll(odds)), rollMod(roll(odds))]; }); }
-        // дуель наступного раунду (з 3-го): випадкова пара; двоє живих — дуель без ставок
+        // дуель — кожен 3-й раунд (3, 6, 9…): випадкова пара; решта раундів — лише зомбі (прокачка). Двоє живих — дуель без ставок
         G.duel = null;
-        if (G.round + 1 >= 3 && al.length >= 2) {
+        if ((G.round + 1) % DUEL_EVERY === 0 && al.length >= 2) {
             const sh = al.slice().sort(() => Math.random() - 0.5), a = sh[0], b = sh[1];
             G.duel = { a: a.id, b: b.id, bets: {}, open: al.length > 2 || recs(G).length > 2, room: null, t0: 0 };
         }
@@ -167,13 +168,14 @@ module.exports = function createGladiators(D) {
     }
 
     // ---------- хвиля зомбі арени: одна хвиля, з кожним раундом більша й різноманітніша ----------
+    const EASE = 0.75;      // хвилі на 25% легші: здоров’я й шкода зомбі ×0.75 (кількість і поінти за вбивство — без змін)
     function waveSpec(R) {
         const n = Math.min(30, 5 + 2 * (R - 1)), pool = [['normal', 10]];
         if (R >= 2) pool.push(['spitter', 3], ['tanker', 3]);
         if (R >= 3) pool.push(['bomber', 2], ['ghost', 2]);
         if (R >= 5) pool[0][1] = 6;
         const elites = R >= 4 ? Math.min(Math.floor(n / 3), R - 3) : 0, el = R >= 6 ? ['shielder', 'puller'] : ['shielder'];
-        return { n, pool, elites, el, hp: 1 + 0.12 * (R - 1), dmg: 1 + 0.08 * (R - 1) };
+        return { n, pool, elites, el, hp: EASE * (1 + 0.12 * (R - 1)), dmg: EASE * (1 + 0.08 * (R - 1)) };
     }
     function pickW(pool) { let t = 0; pool.forEach(x => t += x[1]); let v = Math.random() * t; for (const x of pool) { v -= x[1]; if (v < 0) return x[0]; } return pool[0][0]; }
     function spawnWave(G, r, now) {
