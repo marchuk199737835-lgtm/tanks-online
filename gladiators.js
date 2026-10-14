@@ -32,7 +32,7 @@ module.exports = function createGladiators(D) {
     const PICK_ODDS = { common: 60, rare: 15, epic: 10, legendary: 10, mythic: 5 };     // перша роздача; кожна наступна: +1% кожній рідкості, крім звичайної
     const BET_MIN = 50, WIN_MIN = 200, LOSER_PCT = 0.05, POOL_PCT = 0.95;
     // поінти за зомбі (не більше 50); «швидких» зомбі (бігун, малий) і босів у режимі немає
-    const PTS = { normal: 15, ghost: 20, spitter: 25, tanker: 25, bomber: 30, shielder: 50, puller: 50 };
+    const PTS = { normal: 15, ghost: 20, spitter: 25, tanker: 25, bomber: 30, puller: 50 };
 
     const SLOTS = ['cannon', 'turret', 'hull', 'tracks'], RORD = GD.RARITY_ORDER;
     const MOD_IDX = {}; SLOTS.forEach(s => { MOD_IDX[s] = {}; RORD.forEach(q => { MOD_IDX[s][q] = []; }); });
@@ -174,7 +174,7 @@ module.exports = function createGladiators(D) {
         if (R >= 2) pool.push(['spitter', 3], ['tanker', 3]);
         if (R >= 3) pool.push(['bomber', 2], ['ghost', 2]);
         if (R >= 5) pool[0][1] = 6;
-        const elites = R >= 4 ? Math.min(Math.floor(n / 3), R - 3) : 0, el = R >= 6 ? ['shielder', 'puller'] : ['shielder'];
+        const elites = R >= 4 ? Math.min(Math.floor(n / 3), R - 3) : 0, el = ['puller'];      // еліт — лише тягуни (щитоносців у режимі немає)
         return { n, pool, elites, el, hp: EASE * (1 + 0.12 * (R - 1)), dmg: EASE * (1 + 0.08 * (R - 1)) };
     }
     function pickW(pool) { let t = 0; pool.forEach(x => t += x[1]); let v = Math.random() * t; for (const x of pool) { v -= x[1]; if (v < 0) return x[0]; } return pool[0][0]; }
@@ -284,12 +284,14 @@ module.exports = function createGladiators(D) {
         const d = G.duel; if (!d || d.over) return; d.over = true;
         const W = G.ps[winId], L = G.ps[loseId], bets = Object.values(d.bets);
         const bankW = bets.filter(b => b.on === winId).reduce((a, b) => a + b.amt, 0), bankL = bets.filter(b => b.on === loseId).reduce((a, b) => a + b.amt, 0);
+        // банк кожного дуелянта — щонайменше 200 (WIN_MIN), навіть якщо на нього ніхто не ставив: тоді переможці ставок усе одно мають прибуток
+        const effW = Math.max(WIN_MIN, bankW), effL = Math.max(WIN_MIN, bankL);
         const pay = { win: 0, lose: 0, bettors: {} };
-        if (W && !W.left) { pay.win = Math.max(WIN_MIN, bankW); W.pts += pay.win; W.kills++; }
-        if (L && !L.left) { pay.lose = Math.round(bankL * LOSER_PCT); L.pts += pay.lose; }
+        if (W && !W.left) { pay.win = effW; W.pts += pay.win; W.kills++; }
+        if (L && !L.left) { pay.lose = Math.round(effL * LOSER_PCT); L.pts += pay.lose; }
         bets.forEach(b => {
             if (b.on !== winId) return; const q = G.ps[b.id]; if (!q || q.left) return;
-            const got = b.amt + (bankW > 0 ? Math.round(b.amt / bankW * bankL * POOL_PCT) : 0); q.pts += got; pay.bettors[b.id] = got;
+            const got = b.amt + Math.round(b.amt / effW * effL * POOL_PCT); q.pts += got; pay.bettors[b.id] = got;
         });
         io.to(chan(G)).emit('glDuelEnd', { win: winId, lose: loseId, winName: W ? nickOf(W.name) : '', loseName: L ? nickOf(L.name) : '', bankW, bankL, prize: pay.win, consol: pay.lose, why, bettors: pay.bettors });
         if (L && !L.left) { L.lives = Math.max(0, L.lives - 1); if (L.lives <= 0) eliminate(G, L); }
