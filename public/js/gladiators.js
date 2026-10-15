@@ -81,7 +81,11 @@
         set('gl-ph', ph);
         set('gl-timer', st.ph === 'hub' ? mmss(L) : arenaClock());
         $('gl-timer').classList.toggle('warn', st.ph === 'hub' && L <= 10000);
-        const lv = Math.max(0, me.lives == null ? 3 : me.lives); let h = ''; for (let i = 0; i < 3; i++) h += '<i class="' + (i < lv ? 'on' : '') + '">❤</i>'; setH('gl-lives', h);
+        // серця: червоні — звичайні життя (+1 куплене), чорні — прокляття (−10% до всього за кожне)
+        const lv = Math.max(0, me.lives == null ? 3 : me.lives), cu = me.curse | 0; let h = '';
+        for (let i = 0; i < Math.max(3, lv); i++) h += '<i class="' + (i < lv ? 'on' : '') + '">❤</i>';
+        for (let i = 0; i < cu; i++) h += '<i class="cur" title="Прокляття −' + (cu * 10) + '%">🖤</i>';
+        setH('gl-lives', h);
         const pts = me.pts | 0; if (lastPts != null && pts !== lastPts) popPts(pts - lastPts); lastPts = pts; set('gl-pts', String(pts));
         // кнопки дій
         const hubNow = k === 'hub', duel = st.duel;
@@ -152,6 +156,9 @@
                 '<button type="button" data-buy="' + k + '"' + (can ? '' : ' disabled') + '>' + (max ? 'МАКС' : '' + PT + ' ' + pr) + '</button></div>';
         });
         const odds = [['common', 75], ['rare', 15], ['epic', 7], ['legendary', 2], ['mythic', 1]];
+        // додаткове життя — лише одне за гру
+        h += '<div class="gl-buy gl-life"><div class="gl-bi">❤️</div><div class="gl-bt"><b>Додаткове життя</b><small>' + (me.lifeBought ? 'Уже куплено в цій грі' : '+1 серце · лише одне за гру') + '</small></div>' +
+            '<button type="button" data-buy="life"' + (!me.lifeBought && me.pts >= me.price.life ? '' : ' disabled') + '>' + (me.lifeBought ? '✓' : PT + ' ' + me.price.life) + '</button></div>';
         h += '<div class="gl-case"><div class="gl-cimg">🎁</div><div class="gl-bt"><b>Кейс із модулем</b><small>Випадковий модуль у тимчасовий інвентар</small><div class="gl-odds">' + odds.map(o => '<span style="--rc:' + RCOL(o[0]) + '">' + o[1] + '%</span>').join('') + '</div></div>' +
             '<button type="button" data-buy="case"' + (me.pts >= me.price.case ? '' : ' disabled') + '>' + PT + ' ' + me.price.case + '</button></div></div>';
         const box = panel('shop', h);
@@ -167,7 +174,7 @@
         betAmt = Math.max(50, Math.min(betAmt, Math.max(50, me.pts | 0)));
         const side = (r, key, bank) => {
             const on = mine && mine.on === r.id, dis = !can || (mine && !on) || (me.pts | 0) < 50;
-            return '<div class="gl-bs ' + key + (on ? ' on' : '') + '"><b>' + esc(r.n) + '</b><small>' + '❤'.repeat(Math.max(0, r.l)) + '</small><div class="gl-bank">Банк <b>' + PT + ' ' + bank + '</b></div>' +
+            return '<div class="gl-bs ' + key + (on ? ' on' : '') + '"><b>' + esc(r.n) + '</b><small>' + '❤'.repeat(Math.max(0, r.l)) + '🖤'.repeat(r.c | 0) + '</small><div class="gl-bank">Банк <b>' + PT + ' ' + bank + '</b></div>' +
                 (on ? '<div class="gl-my">Ваша ставка: ' + PT + ' ' + mine.amt + '</div>' : '') + '<button type="button" data-on="' + key + '"' + (dis ? ' disabled' : '') + '>Поставити</button></div>';
         };
         let h = head('🎲', 'СТАВКИ НА ДУЕЛЬ', can ? 'Закриються через ' + mmss(closeIn) : isDuelist() ? 'Ви дуелянт — ставити не можна' : 'Ставки закрито') +
@@ -193,6 +200,7 @@
         let h = head('🎒', 'ІНВЕНТАР ГРИ', 'Модулі й бафи діють лише в цій грі') +
             '<div class="gl-inv"><div class="gl-col"><div class="gl-sec">Встановлено</div><div class="gl-slots">' + ['cannon', 'turret', 'hull', 'tracks'].map(slot).join('') + '</div>' +
             '<div class="gl-sec">Характеристики</div><div class="gl-stats">' + st.map(([ic, n, k, b]) => { let p = k === 'cd' ? Math.round((1 / GameData.statMult(eq, 'cd') - 1) * 100) : statPct(eq, k); return '<div><i>' + ic + '</i><span>' + n + '</span><b class="' + (p > 0 ? 'up' : p < 0 ? 'dn' : '') + '">' + (p > 0 ? '+' : '') + p + '%</b>' + (b != null ? '<em>куплено +' + b * pc + '%</em>' : '') + '</div>'; }).join('') + '</div>' +
+            (me.curse ? '<div class="gl-curse"><i>🖤</i><span>Прокляття: ' + me.curse + ' · −' + me.cursePct + '% до всіх характеристик</span></div>' : '') +
             '<div class="gl-sum"><span>❤ Життів <b>' + me.lives + '</b></span><span>' + PT + ' Баланс <b>' + me.pts + '</b></span><span>💀 Зомбі <b>' + me.kills + '</b></span></div></div>' +
             '<div class="gl-col"><div class="gl-sec">Тимчасовий інвентар · ' + me.inv.length + '</div><div class="gl-list">' +
             (me.inv.length ? me.inv.map((id, i) => { const m = MOD(id); if (!m) return ''; return '<button type="button" class="gl-it" data-mod="' + esc(id) + '" style="--rc:' + RCOL(m.rarity) + '"><div class="gl-mi">' + (typeof modIcon === 'function' ? modIcon(m) : '') + '</div><div class="gl-itt"><b>' + esc(m.name) + '</b><small>' + RNAME(m.rarity) + ' · ' + SLOTN[m.type] + '</small><div class="gl-ms">' + (typeof modStatsHtml === 'function' ? modStatsHtml(m, ' · ') : '') + '</div></div><span class="gl-eq">Встановити</span></button>'; }).join('') : '<div class="gl-none">Порожньо. Модулі дають кейси в Лавці й вибір кожного 2-го раунду.</div>') +
@@ -214,7 +222,7 @@
         const st = S.st; if (!st) return;
         const list = st.roster.filter(q => !q.o && !q.x && (q.w === 'arena' || q.w === 'duel'));
         let h = head('👁', 'СПОСТЕРЕЖЕННЯ', 'Оберіть, за ким дивитись') + '<div class="gl-watch">' +
-            (list.length ? list.map(q => '<button type="button" data-w="' + esc(q.id) + '"><i>' + (q.w === 'duel' ? '⚔️' : '🧟') + '</i><b>' + esc(q.n) + '</b><small>' + (q.w === 'duel' ? 'дуель' : 'арена') + ' · ' + '❤'.repeat(Math.max(0, q.l)) + '</small></button>').join('') : '<div class="gl-none">Зараз ніхто не бʼється</div>') +
+            (list.length ? list.map(q => '<button type="button" data-w="' + esc(q.id) + '"><i>' + (q.w === 'duel' ? '⚔️' : '🧟') + '</i><b>' + esc(q.n) + '</b><small>' + (q.w === 'duel' ? 'дуель' : 'арена') + ' · ' + '❤'.repeat(Math.max(0, q.l)) + '🖤'.repeat(q.c | 0) + '</small></button>').join('') : '<div class="gl-none">Зараз ніхто не бʼється</div>') +
             '<button type="button" data-w="hub"><i>🏛️</i><b>Форум</b><small>повернутись на площу</small></button></div>';
         const box = panel('watch', h);
         box.querySelectorAll('[data-w]').forEach(b => b.onclick = () => { snd('ui_click'); socket.emit('glWatch', { roomId: rid(), id: b.dataset.w }); closePanel(); });
@@ -319,7 +327,7 @@
     });
     socket.on('glDuelEnd', d => {
         const me = typeof myId !== 'undefined' ? myId : null, my = d.bettors && d.bettors[me];
-        const sub = d.win === me ? 'Приз: ' + PT + ' ' + d.prize : d.lose === me ? 'Втіха: ' + PT + ' ' + d.consol + ' · −1 життя' : my ? 'Ваш виграш: ' + PT + ' ' + my : 'Банк: ' + PT + ' ' + d.bankW + ' / ' + d.bankL;
+        const sub = d.win === me ? 'Приз: ' + PT + ' ' + d.prize : d.lose === me ? 'Втіха: ' + PT + ' ' + d.consol + (d.curse ? ' · 🖤 прокляття −' + d.pct + '%' : d.out ? '' : ' · −1 життя') : my ? 'Ваш виграш: ' + PT + ' ' + my : 'Банк: ' + PT + ' ' + d.bankW + ' / ' + d.bankL;
         banner(d.win === me ? '🏆' : d.lose === me ? '💔' : '⚔️', esc(d.winName) + ' перемагає в дуелі' + (d.why === 'time' ? ' (за часом)' : d.why === 'left' ? ' (суперник вийшов)' : ''), sub, d.win === me || my ? 'green' : d.lose === me ? 'red' : 'gold', 4200);
     });
     socket.on('glOver', d => { setTimeout(() => overWin(d), d.win ? 400 : 1600); });
