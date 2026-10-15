@@ -31,6 +31,10 @@ module.exports = function createGladiators(D) {
     const CASE_BASE = 350, CASE_STEP = 75, CASE_ODDS = { common: 75, rare: 15, epic: 7, legendary: 2, mythic: 1 };
     const PICK_ODDS = { common: 60, rare: 15, epic: 10, legendary: 10, mythic: 5 };     // перша роздача; кожна наступна: +1% кожній рідкості, крім звичайної
     const BET_MIN = 50, WIN_MIN = 200, LOSER_PCT = 0.05, POOL_PCT = 0.95;
+    // прокляття: поразка в дуелі на ОСТАННЬОМУ житті не вбиває, а дає чорне серце (−10% до всіх характеристик за кожне);
+    // 4-та така поразка — вибуття. Смерть на арені з останнім (звичайним чи проклятим) серцем — вибуття одразу.
+    const CURSE_MAX = 3, CURSE_PCT = 0.10;
+    const LIFE_PRICE = 1000;      // додаткове життя в Лавці — лише одне за гру
     // поінти за зомбі (не більше 50); «швидких» зомбі (бігун, малий) і босів у режимі немає
     const PTS = { normal: 15, ghost: 20, spitter: 25, tanker: 25, bomber: 30, puller: 50 };
 
@@ -55,13 +59,15 @@ module.exports = function createGladiators(D) {
     // ---------- екіпіровка в межах гри: модулі зі слотів + бафи (поле bm читає GameData.statMult) ----------
     function applyEq(G, rec) {
         const p = findP(G, rec.id); const e = Object.assign(BASE_EQ(), rec.eq);
-        e.bm = { speed: +(1 + BUY_PCT * rec.buys.speed).toFixed(2), dmg: +(1 + BUY_PCT * rec.buys.dmg).toFixed(2), hp: +(1 + BUY_PCT * rec.buys.hp).toFixed(2) };
+        const k = 1 - CURSE_PCT * (rec.curse || 0);      // прокляття: −10% до кожної характеристики (скорострільність — довша перезарядка)
+        e.bm = { speed: +((1 + BUY_PCT * rec.buys.speed) * k).toFixed(3), dmg: +((1 + BUY_PCT * rec.buys.dmg) * k).toFixed(3), hp: +((1 + BUY_PCT * rec.buys.hp) * k).toFixed(3) };
+        if (k < 1) { e.bm.range = +k.toFixed(3); e.bm.rotSpeed = +k.toFixed(3); e.bm.cd = +(1 / k).toFixed(3); }
         if (p) { const full = p.hp >= getMaxHp(p.equipped) - 0.5; p.equipped = e; if (full || p.hp > getMaxHp(e)) p.hp = getMaxHp(e); }
         return e;
     }
 
     // ---------- стан гри ----------
-    function newRec(p) { return { id: p.id, name: p.name, lives: LIVES, pts: FAST ? 1000 : 0, out: false, left: false, done: false, buys: { speed: 0, dmg: 0, hp: 0 }, cases: 0, inv: [], eq: BASE_EQ(), offer: null, lived: 0, kills: 0, place: 0, paid: false, bet: null, room: null }; }
+    function newRec(p) { return { id: p.id, name: p.name, lives: LIVES, curse: 0, lifeBought: false, pts: FAST ? 1000 : 0, out: false, left: false, done: false, buys: { speed: 0, dmg: 0, hp: 0 }, cases: 0, inv: [], eq: BASE_EQ(), offer: null, lived: 0, kills: 0, place: 0, paid: false, bet: null, room: null }; }
     function findP(G, id) { const rec = G.ps[id]; if (!rec || !rec.room || !rooms[rec.room]) return null; return rooms[rec.room].players[id] || null; }
     const recs = G => Object.values(G.ps).filter(q => !q.left);
     const alive = G => recs(G).filter(q => !q.out);
@@ -293,8 +299,16 @@ module.exports = function createGladiators(D) {
             if (b.on !== winId) return; const q = G.ps[b.id]; if (!q || q.left) return;
             const got = b.amt + Math.round(b.amt / effW * effL * POOL_PCT); q.pts += got; pay.bettors[b.id] = got;
         });
-        io.to(chan(G)).emit('glDuelEnd', { win: winId, lose: loseId, winName: W ? nickOf(W.name) : '', loseName: L ? nickOf(L.name) : '', bankW, bankL, prize: pay.win, consol: pay.lose, why, bettors: pay.bettors });
-        if (L && !L.left) { L.lives = Math.max(0, L.lives - 1); if (L.lives <= 0) eliminate(G, L); }
+        // той, хто програв: −1 звичайне серце; на останньому — чорне серце прокляття (−10%), понад 3 — вибуття
+        let cursed = 0, outNow = false;
+        if (L && !L.left) {
+            if (L.lives > 1) L.lives--;
+            else if ((L.curse || 0) < CURSE_MAX) { L.curse = (L.curse || 0) + 1; cursed = L.curse; applyEq(G, L); }
+            else { L.lives = 0; outNow = true; }
+            const pl = findP(G, L.id); if (pl) pl.lives = L.lives;
+        }
+        io.to(chan(G)).emit('glDuelEnd', { win: winId, lose: loseId, winName: W ? nickOf(W.name) : '', loseName: L ? nickOf(L.name) : '', bankW, bankL, prize: pay.win, consol: pay.lose, why, bettors: pay.bettors, curse: cursed, pct: Math.round(cursed * CURSE_PCT * 100), out: outNow });
+        if (outNow) eliminate(G, L);
         if (W && !W.left) W.lived = Math.max(W.lived, G.round);
         const room = rooms[d.room];
         setTimeout(() => {      // 2 с — подивитись на вибух, далі всіх із дуелі розвести
@@ -385,6 +399,11 @@ module.exports = function createGladiators(D) {
             const pr = priceCase(rec.cases); if (rec.pts < pr) return socket.emit('glMsg', { t: 'Не вистачає поінтів', err: 1 });
             rec.pts -= pr; rec.cases++; const rar = roll(CASE_ODDS), mod = rollMod(rar); rec.inv.push(mod);
             socket.emit('glCase', { mod, rar });
+        } else if (k === 'life') {      // +1 звичайне серце; лише одне за гру
+            if (rec.lifeBought) return socket.emit('glMsg', { t: 'Життя можна купити лише один раз за гру', err: 1 });
+            if (rec.pts < LIFE_PRICE) return socket.emit('glMsg', { t: 'Не вистачає поінтів', err: 1 });
+            rec.pts -= LIFE_PRICE; rec.lifeBought = true; rec.lives++; if (p) p.lives = rec.lives;
+            socket.emit('glBought', { k, n: rec.lives }); broadcast(G);
         } else return;
         sendMe(G, rec);
     }
@@ -428,7 +447,7 @@ module.exports = function createGladiators(D) {
         const now = now_(), D2 = G.duel;
         const st = {
             ph: G.ph, round: G.round, left: Math.max(0, G.t - now), hub: G.hub.id, betClose: BET_CLOSE,
-            roster: Object.values(G.ps).map(q => ({ id: q.id, n: nickOf(q.name), l: q.lives, o: q.out ? 1 : 0, x: q.left ? 1 : 0, w: q.room === G.hub.id ? 'hub' : q.room && rooms[q.room] ? (rooms[q.room].mode === 'gl_duel' ? 'duel' : 'arena') : '', d: q.done ? 1 : 0, p: q.place || 0, room: q.room })),
+            roster: Object.values(G.ps).map(q => ({ id: q.id, n: nickOf(q.name), l: q.lives, c: q.curse || 0, o: q.out ? 1 : 0, x: q.left ? 1 : 0, w: q.room === G.hub.id ? 'hub' : q.room && rooms[q.room] ? (rooms[q.room].mode === 'gl_duel' ? 'duel' : 'arena') : '', d: q.done ? 1 : 0, p: q.place || 0, room: q.room })),
             duel: D2 ? { a: D2.a, b: D2.b, open: !!D2.open, bankA: sumOn(D2, D2.a), bankB: sumOn(D2, D2.b), room: D2.room || null, live: !!D2.room } : null
         };
         io.to(chan(G)).emit('glState', st);
@@ -437,8 +456,8 @@ module.exports = function createGladiators(D) {
     function sendMe(G, rec) {
         if (!rec || rec.left) return;
         io.to(rec.id).emit('glMe', {
-            lives: rec.lives, pts: rec.pts, out: rec.out, done: rec.done, place: rec.place, buys: rec.buys, cases: rec.cases, inv: rec.inv, eq: rec.eq, offer: rec.offer, bet: rec.bet, kills: rec.kills,
-            price: { speed: priceBuy(rec.buys.speed), dmg: priceBuy(rec.buys.dmg), hp: priceBuy(rec.buys.hp), case: priceCase(rec.cases) }, max: BUY_MAX, pct: BUY_PCT
+            lives: rec.lives, curse: rec.curse || 0, cursePct: Math.round((rec.curse || 0) * CURSE_PCT * 100), lifeBought: rec.lifeBought, pts: rec.pts, out: rec.out, done: rec.done, place: rec.place, buys: rec.buys, cases: rec.cases, inv: rec.inv, eq: rec.eq, offer: rec.offer, bet: rec.bet, kills: rec.kills,
+            price: { speed: priceBuy(rec.buys.speed), dmg: priceBuy(rec.buys.dmg), hp: priceBuy(rec.buys.hp), case: priceCase(rec.cases), life: LIFE_PRICE }, max: BUY_MAX, pct: BUY_PCT
         });
     }
     function onZombieKill(r, sid, z) {
