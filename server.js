@@ -557,7 +557,8 @@ const Classes = require('./classes_srv.js')({ io, rooms, getMaxHp, GameData, Mod
 Modes.setElite((r, ids, wave, d, n) => eliteMix(r, ids, wave, d, n), (r, z, o) => onZDeath(r, z, o));   // еліт-зомбі в нових кооп-режимах
 // «Гладіатори»: Форум + приховані дочірні кімнати (арени, дуель) — gladiators.js
 const Glad = require('./gladiators.js')({ io, rooms, dbUsers, MAP_DATA, Z_TYPES, getValidSpawn, getValidEdgeSpawn, checkCollisionServer, getMaxHp, zombieTick, grantXp, rollDrop,
-    saveUser, ecoPayload, pushRooms, emitMatchEnd, hiddenSet, applyEventBonus, nickOf: n => nickOf(n), SYNCS: () => SYNCS });
+    saveUser, ecoPayload, pushRooms, emitMatchEnd, hiddenSet, applyEventBonus, nickOf: n => nickOf(n), SYNCS: () => SYNCS,
+    area: (r, x, y, rad, dmg, owner) => Classes.area(r, x, y, rad, dmg, owner), processPlayerDeath: (r, v, k, m) => processPlayerDeath(r, v, k, m) });      // вміння класів «Гладіаторів»
 connHooks.push(s => Glad.bind(s));
 const teamsOf = r => r.mode === 'rounds' || r.ranked ? 2 : r.mode === 'capture_points' ? Math.max(2, Math.min(4, r.cpTeams || 2)) : Math.max(2, Math.min(4, r.tdmTeams || 2));
 const isTeamPvp = m => m === 'team_deathmatch' || m === 'capture_points' || m === 'rounds';
@@ -792,6 +793,7 @@ function zombieHitFor(sid, d, flat) {
         if (aP && aP.hp > 0 && !ZTz.isBoss && (ZTz.elite || ZTz.hp >= 90) && zz.hp / Math.max(1, zz.maxHp) < 0.15 && Math.hypot(aP.x - zz.x, aP.y - zz.y) <= 170) { fD = Math.max(fD, zz.hp); fin = true; }
         const shown = Math.round(Math.min(Math.max(0, zz.hp), fD));
         zz.hp -= fD;
+        if (r.glc) Glad.dealt(r, sid, shown);      // «Гладіатори»: вампіризм
         io.to(sid).emit('dmgN', { x: Math.round(zz.x), y: Math.round(zz.y), v: shown, k: zz.hp <= 0 ? 2 : (fD >= 1.5 * norm ? 1 : 0) });   // цифри шкоди; 1 — крит (тінь, критичний удар арени)
         if (fin && zz.hp <= 0) {
             if (nowZ >= (aP._finAt || 0)) { aP.hp = Math.min(getMaxHp(aP.equipped), aP.hp + 50); hiddenSet(aP, '_finAt', nowZ + 2000); }
@@ -1546,7 +1548,9 @@ io.on('connection', (socket) => {
         let fin = false;
         if (r.mode !== 'prophunt' && atk.hp > 0 && v.hp > 0 && v.hp / Math.max(1, getMaxHp(v.equipped)) < 0.15 && Math.hypot(atk.x - v.x, atk.y - v.y) <= 170) { fD = Math.max(fD, v.hp); fin = true; }
         if (r.ranked) r.ranked.dmg[socket.id] = (r.ranked.dmg[socket.id] || 0) + Math.min(v.hp, fD);   // рейтинг: облік участі (AFK не отримує рейтинг за перемогу)
+        if (r.glc) fD = Glad.taken(r, v, fD);      // дуель «Гладіаторів»: броня / щит вміння
         const hp0 = v.hp; v.hp = Math.max(0, v.hp - fD);
+        if (r.glc) Glad.dealt(r, socket.id, Math.min(hp0, fD));      // вампіризм
         if (fin && v.hp === 0) { atk.hp = Math.min(getMaxHp(atk.equipped), atk.hp + 50); io.to(r.id).emit('finisher', { x: Math.round(v.x), y: Math.round(v.y), by: socket.id }); }
         io.to(socket.id).emit('hitConfirmed');
         // цифри шкоди (нападнику) і легка віддача (жертві); k: 1 — сильне влучання, 2 — вбивство
@@ -1573,7 +1577,7 @@ io.on('connection', (socket) => {
         if (!r || r.status !== 'playing' || !r.players[socket.id] || (d.attacker !== 'zombie' && d.attacker !== 'bomber')) return;
         let v = r.players[socket.id];
         if (v.buff === 'shield' || v.hp <= 0 || !ModeInfo.isPve(r.mode)) return;
-        v.hp = Math.max(0, v.hp - Classes.taken(r, v, Modes.dmgTaken(r, socket.id, Math.min(400, Math.max(0, +d.amt || 0)))));
+        v.hp = Math.max(0, v.hp - Glad.taken(r, v, Classes.taken(r, v, Modes.dmgTaken(r, socket.id, Math.min(400, Math.max(0, +d.amt || 0))))));      // Glad.taken — броня / щит вмінь «Гладіаторів»
         if (v.hp === 0) processPlayerDeath(r, socket.id, 'zombie');
     });
 

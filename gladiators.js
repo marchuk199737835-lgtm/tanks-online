@@ -10,6 +10,7 @@
 'use strict';
 const ModeInfo = require('./public/js/modeinfo.js');
 const GD = require('./public/js/gamedata.js');
+const GLC = require('./public/js/glclasses.js');      // 30 класів: базові характеристики й вміння
 
 module.exports = function createGladiators(D) {
     const { io, rooms, dbUsers, MAP_DATA, Z_TYPES, getValidSpawn, getValidEdgeSpawn, checkCollisionServer, getMaxHp, zombieTick, grantXp, rollDrop,
@@ -20,7 +21,8 @@ module.exports = function createGladiators(D) {
     const HUB = 'Forum', ARENA = 'Colosseum', PIT = 'Duelist Pit';
     const LIVES = 3;
     const FAST = process.env.GL_FAST === '1';                              // лише для локальних тестів: коротші таймери Форуму
-    const HUB_FIRST = FAST ? 20000 : 25000, HUB_WAIT = FAST ? 15000 : 60000, BET_CLOSE = 5000;          // перше очікування / між раундами / ставки закриваються за 5 с до старту
+    const PICK_MS = FAST ? 15000 : GLC.PICK_MS;                            // вибір класу на старті: 45 с, далі — автоматично
+    const HUB_FIRST = FAST ? 20000 : GLC.PICK_MS + 5000, HUB_WAIT = FAST ? 15000 : 60000, BET_CLOSE = 5000;          // перше очікування / між раундами / ставки закриваються за 5 с до старту
     const ARENA_SOFT = 240000, ENRAGE_EVERY = 15000, ENRAGE_STEP = 0.10;   // після 4 хв кожні 15 с зомбі +10% до HP, шкоди й швидкості
     const ARENA_HARD = 480000;      // 8 хв — запобіжник від завислого / згорнутого клієнта (шкоду від зомбі рахує клієнт): −1 життя, арена закривається
     const DUEL_EVERY = 3;                                                  // дуель — кожен 3-й раунд; вибір модуля — кожен парний
@@ -57,23 +59,27 @@ module.exports = function createGladiators(D) {
     function pickOdds(n) { const o = Object.assign({}, PICK_ODDS); RORD.forEach(k => { if (k !== 'common') o[k] += n; }); o.common = Math.max(0, o.common - 4 * n); return o; }
 
     // ---------- екіпіровка в межах гри: модулі зі слотів + бафи (поле bm читає GameData.statMult) ----------
+    // множники: клас (база) × куплені бафи × прокляття × активні вміння (fx)
+    const N3 = v => +v.toFixed(3);
+    function fxSum(rec, now) { const s = { spd: 0, dmg: 0, rate: 0, rng: 0, armor: 0, vamp: 0 }; (rec.fx || []).forEach(f => { if (f.until > now) for (const k in s) s[k] += f[k] || 0; }); return s; }
     function applyEq(G, rec) {
         const p = findP(G, rec.id); const e = Object.assign(BASE_EQ(), rec.eq);
         const k = 1 - CURSE_PCT * (rec.curse || 0);      // прокляття: −10% до кожної характеристики (скорострільність — довша перезарядка)
-        e.bm = { speed: +((1 + BUY_PCT * rec.buys.speed) * k).toFixed(3), dmg: +((1 + BUY_PCT * rec.buys.dmg) * k).toFixed(3), hp: +((1 + BUY_PCT * rec.buys.hp) * k).toFixed(3) };
-        if (k < 1) { e.bm.range = +k.toFixed(3); e.bm.rotSpeed = +k.toFixed(3); e.bm.cd = +(1 / k).toFixed(3); }
+        const C = rec.cls && GLC.BYID[rec.cls], st = C ? C.st : { hp: 1, dmg: 1, spd: 1, cd: 1, rng: 1, rot: 1 }, f = fxSum(rec, now_());
+        e.bm = { speed: N3((1 + BUY_PCT * rec.buys.speed) * k * st.spd * (1 + f.spd)), dmg: N3((1 + BUY_PCT * rec.buys.dmg) * k * st.dmg * (1 + f.dmg)), hp: N3((1 + BUY_PCT * rec.buys.hp) * k * st.hp),
+            range: N3(k * st.rng * (1 + f.rng)), rotSpeed: N3(k * st.rot), cd: N3(st.cd / k / (1 + f.rate)) };
         if (p) { const full = p.hp >= getMaxHp(p.equipped) - 0.5; p.equipped = e; if (full || p.hp > getMaxHp(e)) p.hp = getMaxHp(e); }
         return e;
     }
 
     // ---------- стан гри ----------
-    function newRec(p) { return { id: p.id, name: p.name, lives: LIVES, curse: 0, lifeBought: false, pts: FAST ? 1000 : 0, out: false, left: false, done: false, buys: { speed: 0, dmg: 0, hp: 0 }, cases: 0, inv: [], eq: BASE_EQ(), offer: null, lived: 0, kills: 0, place: 0, paid: false, bet: null, room: null }; }
+    function newRec(p) { return { id: p.id, name: p.name, lives: LIVES, curse: 0, lifeBought: false, cls: null, cdUntil: 0, fx: [], hot: [], barrier: null, pts: FAST ? 1000 : 0, out: false, left: false, done: false, buys: { speed: 0, dmg: 0, hp: 0 }, cases: 0, inv: [], eq: BASE_EQ(), offer: null, lived: 0, kills: 0, place: 0, paid: false, bet: null, room: null }; }
     function findP(G, id) { const rec = G.ps[id]; if (!rec || !rec.room || !rooms[rec.room]) return null; return rooms[rec.room].players[id] || null; }
     const recs = G => Object.values(G.ps).filter(q => !q.left);
     const alive = G => recs(G).filter(q => !q.out);
 
     function start(r, pK, now) {
-        const G = { hub: r, ps: {}, round: 0, ph: 'hub', t: now + 4000 + HUB_FIRST, duel: null, kids: {}, offerN: 0, n0: pK.length, t0: now, seq: 0 };
+        const G = { hub: r, ps: {}, round: 0, ph: 'hub', t: now + 4000 + HUB_FIRST, pickEnd: now + 4000 + PICK_MS, duel: null, kids: {}, offerN: 0, n0: pK.length, t0: now, seq: 0 };
         hiddenSet(r, '_gl', G); r.map = HUB;
         pK.forEach(id => {
             const p = r.players[id], rec = G.ps[id] = newRec(p); rec.room = r.id; rec.p = p;
@@ -130,7 +136,11 @@ module.exports = function createGladiators(D) {
     function startHub(G) {
         const now = now_(); G.ph = 'hub';
         // усіх повертаємо на Форум (глядачі теж стоять там), дочірні кімнати прибираємо
-        recs(G).forEach(rec => { if (rec.room !== G.hub.id) toHub(G, rec); else { const p = findP(G, rec.id); if (p) { p.out = rec.out; p.hp = rec.out ? 0 : getMaxHp(p.equipped); } } rec.done = false; rec.bet = null; });
+        recs(G).forEach(rec => {
+            rec.fx = []; rec.hot = []; rec.barrier = null; applyEq(G, rec);      // ефекти вмінь закінчуються разом із раундом
+            if (rec.room !== G.hub.id) toHub(G, rec); else { const p = findP(G, rec.id); if (p) { p.out = rec.out; p.hp = rec.out ? 0 : getMaxHp(p.equipped); p.buff = null; } }
+            rec.done = false; rec.bet = null;
+        });
         Object.keys(G.kids).forEach(k => killRoom(G, k));
         const al = alive(G);
         if (al.length <= 1 && G.round > 0) return finish(G);
@@ -146,8 +156,9 @@ module.exports = function createGladiators(D) {
         recs(G).forEach(q => sendMe(G, q)); broadcast(G);
     }
     function startRound(G) {
-        const now = now_(); G.round++; G.ph = 'fight';
+        const now = now_(); if (!G.picked) autoPick(G); G.round++; G.ph = 'fight';
         if (G.duel) G.duel.open = false;
+        recs(G).forEach(rec => { rec.cdUntil = now + 3000; });      // вміння доступне з початком бою
         // невибрані модулі — випадковий з трьох
         recs(G).forEach(rec => { if (rec.offer) { rec.inv.push(rec.offer[Math.floor(Math.random() * 3)]); rec.offer = null; } });
         const al = alive(G), duel = G.duel && G.ps[G.duel.a] && G.ps[G.duel.b] && !G.ps[G.duel.a].out && !G.ps[G.duel.b].out ? G.duel : null;
@@ -200,7 +211,9 @@ module.exports = function createGladiators(D) {
         const G = G_of(r); if (!G) return false;
         if (isHub(r)) {
             if (r.status !== 'playing') return true;
+            fxTick(G, now);
             if (G.ph === 'hub') {
+                if (!G.picked && now >= G.pickEnd) autoPick(G);
                 if (G.duel && G.duel.open && now >= G.t - BET_CLOSE) { G.duel.open = false; broadcast(G); }
                 if (now >= G.t) startRound(G);
             } else if (G.ph === 'fight' && !Object.keys(G.kids).length) { endRound(G); }
@@ -441,13 +454,110 @@ module.exports = function createGladiators(D) {
         if (d.id === 'hub') toHub(G, rec); else if (room) toWatch(G, rec, room);
     }
 
+    // ---------- КЛАСИ ----------
+    function pickClass(socket, d) {
+        const r = d && rooms[d.roomId], G = G_of(r), rec = G && G.ps[socket.id]; if (!rec || rec.left || G.picked || G.ph !== 'hub' || G.round > 0) return;
+        if (!d.id || !GLC.BYID[d.id]) return;
+        rec.cls = d.id; applyEq(G, rec); const p = findP(G, rec.id); if (p) p.hp = getMaxHp(p.equipped);
+        sendMe(G, rec); broadcast(G);
+        if (recs(G).every(q => q.cls)) { G.picked = true; G.t = Math.min(G.t, now_() + 10000); broadcast(G); }      // усі обрали — раунд за 10 с
+    }
+    function autoPick(G) {
+        G.picked = true;
+        recs(G).forEach(rec => {
+            if (rec.cls) return; const L = GLC.LIST; rec.cls = L[Math.floor(Math.random() * L.length)].id; applyEq(G, rec);
+            const p = findP(G, rec.id); if (p) p.hp = getMaxHp(p.equipped); io.to(rec.id).emit('glMsg', { t: 'Клас обрано автоматично: ' + GLC.BYID[rec.cls].n }); sendMe(G, rec);
+        });
+        broadcast(G);
+    }
+    // тимчасові ефекти вмінь: закінчення (перерахунок характеристик) і лікування з часом — щотіку
+    function fxTick(G, now) {
+        recs(G).forEach(rec => {
+            if (rec.fx.length && rec.fx.some(f => f.until <= now)) { rec.fx = rec.fx.filter(f => f.until > now); applyEq(G, rec); sendMe(G, rec); }
+            if (rec.barrier && rec.barrier.until <= now) rec.barrier = null;
+            if (rec.hot.length) {
+                const p = findP(G, rec.id);
+                rec.hot = rec.hot.filter(h => h.until > now - 50);
+                rec.hot.forEach(h => { if (now >= h.next) { h.next += 1000; if (p && p.hp > 0 && !p.out) p.hp = Math.min(getMaxHp(p.equipped), p.hp + h.v); } });
+            }
+        });
+    }
+    // шкода по гравцю з урахуванням броні (armor) і щита (barrier) — викликає server.js (зомбі, постріли в дуелі) і самі вміння
+    function taken(r, v, amt) {
+        const G = G_of(r), rec = G && v && G.ps[v.id]; if (!rec || !(amt > 0)) return amt;
+        const now = now_(), f = fxSum(rec, now); let a = amt * (1 - Math.max(-0.5, Math.min(0.8, f.armor)));
+        const B = rec.barrier; if (B && B.until > now && B.v > 0) { const ab = Math.min(B.v, a); B.v -= ab; a -= ab; if (B.v <= 0) rec.barrier = null; }
+        return a;
+    }
+    // завдана шкода → вампіризм
+    function dealt(r, sid, amt) {
+        const G = G_of(r), rec = G && G.ps[sid]; if (!rec || !(amt > 0)) return;
+        const f = fxSum(rec, now_()); if (!(f.vamp > 0)) return;
+        const p = r.players[sid]; if (p && p.hp > 0 && !p.out) p.hp = Math.min(getMaxHp(p.equipped), p.hp + amt * f.vamp);
+    }
+    function hitPlayer(r, atkId, v, dmg) {      // удар вмінням по суперникові в дуелі
+        if (!v || v.hp <= 0 || v.out) return;
+        const a = taken(r, v, dmg), hp0 = v.hp; v.hp = Math.max(0, v.hp - a);
+        io.to(atkId).emit('dmgN', { x: Math.round(v.x), y: Math.round(v.y), v: Math.round(Math.min(hp0, a)), k: v.hp === 0 ? 2 : 1 }); dealt(r, atkId, Math.min(hp0, a));
+        if (v.hp === 0) D.processPlayerDeath(r, v.id, atkId, { weapon: 'ability' });
+    }
+    function useAbility(socket, d) {
+        const r = d && rooms[d.roomId], G = G_of(r), rec = G && G.ps[socket.id], now = now_();
+        if (!rec || rec.left || rec.out || !r.glc || G.ph !== 'fight' || !rec.cls) return;
+        const p = r.players[socket.id]; if (!p || p.hp <= 0 || p.out) return;
+        if (now < rec.cdUntil || now < r._k.t0 - 500) return socket.emit('glCd', { ms: Math.max(0, rec.cdUntil - now) });
+        const C = GLC.BYID[rec.cls]; let fx = C.ab.fx;
+        if (fx.any) fx = fx.any[Math.floor(Math.random() * fx.any.length)];
+        rec.cdUntil = now + C.ab.cd * 1000;
+        const mx = () => getMaxHp(p.equipped), pw = GD.statMult(p.equipped, 'dmg'), duel = r.mode === 'gl_duel';
+        const foe = duel ? Object.values(r.players).find(q => q.id !== p.id && q.hp > 0 && !q.out) : null, inR = (o, rad) => Math.hypot(o.x - p.x, o.y - p.y) <= rad;
+        const out = { id: p.id, cls: C.id, x: Math.round(p.x), y: Math.round(p.y) };
+        if (fx.cost) p.hp = Math.max(1, Math.round(p.hp * (1 - fx.cost)));
+        if (fx.heal) p.hp = Math.min(mx(), p.hp + fx.heal);
+        if (fx.healPct) p.hp = Math.min(mx(), p.hp + mx() * fx.healPct);
+        if (fx.healMiss) p.hp = Math.min(mx(), p.hp + (mx() - p.hp) * fx.healMiss);
+        if (fx.hot) rec.hot.push({ v: fx.hot[0], until: now + fx.hot[1] * 1000, next: now + 1000 });
+        if (fx.t && (fx.spd || fx.dmg || fx.rate || fx.armor || fx.vamp || fx.rng)) { rec.fx.push({ until: now + fx.t * 1000, spd: fx.spd || 0, dmg: fx.dmg || 0, rate: fx.rate || 0, armor: fx.armor || 0, vamp: fx.vamp || 0, rng: fx.rng || 0 }); applyEq(G, rec); out.t = fx.t; }
+        if (fx.barrier) { rec.barrier = { v: fx.barrier, until: now + (fx.t || 8) * 1000 }; out.t = fx.t || 8; }
+        if (fx.invis) { p.buff = 'invisible'; p.buffEndTime = now + fx.invis * 1000; }
+        if (fx.weapon) { p.buff = fx.weapon[0]; p.buffEndTime = now + fx.weapon[1] * 1000; }
+        if (fx.blink) {
+            const a = Number.isFinite(p.turretAngle) ? p.turretAngle : 0, dir = Math.sign(fx.blink), L = Math.abs(fx.blink), size = (MAP_DATA[r.map] || {}).size || 2400;
+            for (let s = L; s >= 20; s -= 20) {
+                const x = p.x + Math.cos(a) * s * dir, y = p.y + Math.sin(a) * s * dir;
+                if (x > 40 && y > 40 && x < size - 40 && y < size - 40 && !checkCollisionServer(r.map, x, y, 26, [], r)) { out.to = { x: Math.round(x), y: Math.round(y) }; p.x = x; p.y = y; p.stuckIn = []; socket.emit('posFix', { x: Math.round(x), y: Math.round(y) }); break; }
+            }
+        }
+        if (fx.pull && !duel) {      // стягнути зомбі до себе
+            const [rad, dm] = fx.pull; out.r = rad;
+            for (const id in r.zombies) { const z = r.zombies[id]; if (!inR(z, rad)) continue; const ang = Math.atan2(z.y - p.y, z.x - p.x), nx = p.x + Math.cos(ang) * 75, ny = p.y + Math.sin(ang) * 75; if (!checkCollisionServer(r.map, nx, ny, 15, [], r)) { z.x = nx; z.y = ny; } }
+            D.area(r, p.x, p.y, 120, dm * pw, p.id);
+        } else if (fx.pull && foe && inR(foe, fx.pull[0])) { out.r = fx.pull[0]; hitPlayer(r, p.id, foe, fx.pull[1] * pw); }
+        if (fx.nova) {
+            const [rad, dm, sec] = fx.nova; out.r = rad;
+            if (sec) for (const id in r.zombies) { const z = r.zombies[id]; if (inR(z, rad)) z.stunUntil = now + sec * 1000; }
+            if (dm) D.area(r, p.x, p.y, rad, dm * pw, p.id);
+            if (foe && inR(foe, rad)) { if (sec) hiddenSet(foe, 'stunUntil', now + sec * 1000); if (dm) hitPlayer(r, p.id, foe, dm * pw); }
+        }
+        if (fx.stun) {
+            const [rad, sec] = fx.stun; out.r = rad;
+            for (const id in r.zombies) { const z = r.zombies[id]; if (inR(z, rad)) z.stunUntil = now + sec * 1000; }
+            if (foe && inR(foe, rad)) hiddenSet(foe, 'stunUntil', now + sec * 1000);
+        }
+        if (fx.mines) { for (let i = 0; i < fx.mines; i++) { const a = i / fx.mines * Math.PI * 2, x = p.x + Math.cos(a) * 90, y = p.y + Math.sin(a) * 90; if (checkCollisionServer(r.map, x, y, 12, [], r)) continue; const id = 'glm_' + now + '_' + i; r.mines[id] = { id, x: Math.round(x), y: Math.round(y), owner: p.id, time: now }; } }
+        out.k = Object.keys(fx).filter(k => k !== 't').join(',');
+        io.to(r.id).emit('glAbil', out);
+        socket.emit('glCd', { ms: C.ab.cd * 1000 });
+        sendMe(G, rec);
+    }
+
     // ---------- стан для клієнта ----------
     function broadcast(G) {
         if (!G || G.ph === 'end' && !G.hub) return;
         const now = now_(), D2 = G.duel;
         const st = {
-            ph: G.ph, round: G.round, left: Math.max(0, G.t - now), hub: G.hub.id, betClose: BET_CLOSE,
-            roster: Object.values(G.ps).map(q => ({ id: q.id, n: nickOf(q.name), l: q.lives, c: q.curse || 0, o: q.out ? 1 : 0, x: q.left ? 1 : 0, w: q.room === G.hub.id ? 'hub' : q.room && rooms[q.room] ? (rooms[q.room].mode === 'gl_duel' ? 'duel' : 'arena') : '', d: q.done ? 1 : 0, p: q.place || 0, room: q.room })),
+            ph: G.ph, round: G.round, left: Math.max(0, G.t - now), hub: G.hub.id, betClose: BET_CLOSE, pick: G.picked ? 0 : Math.max(0, G.pickEnd - now),
+            roster: Object.values(G.ps).map(q => ({ id: q.id, n: nickOf(q.name), l: q.lives, c: q.curse || 0, k: q.cls || null, o: q.out ? 1 : 0, x: q.left ? 1 : 0, w: q.room === G.hub.id ? 'hub' : q.room && rooms[q.room] ? (rooms[q.room].mode === 'gl_duel' ? 'duel' : 'arena') : '', d: q.done ? 1 : 0, p: q.place || 0, room: q.room })),
             duel: D2 ? { a: D2.a, b: D2.b, open: !!D2.open, bankA: sumOn(D2, D2.a), bankB: sumOn(D2, D2.b), room: D2.room || null, live: !!D2.room } : null
         };
         io.to(chan(G)).emit('glState', st);
@@ -456,6 +566,8 @@ module.exports = function createGladiators(D) {
     function sendMe(G, rec) {
         if (!rec || rec.left) return;
         io.to(rec.id).emit('glMe', {
+            cls: rec.cls, cd: Math.max(0, rec.cdUntil - now_()), pickLeft: G.picked ? 0 : Math.max(0, G.pickEnd - now_()),
+            fxLeft: Math.max(0, ...(rec.fx || []).map(f => f.until - now_()), rec.barrier ? rec.barrier.until - now_() : 0), barrier: rec.barrier ? Math.round(rec.barrier.v) : 0,
             lives: rec.lives, curse: rec.curse || 0, cursePct: Math.round((rec.curse || 0) * CURSE_PCT * 100), lifeBought: rec.lifeBought, pts: rec.pts, out: rec.out, done: rec.done, place: rec.place, buys: rec.buys, cases: rec.cases, inv: rec.inv, eq: rec.eq, offer: rec.offer, bet: rec.bet, kills: rec.kills,
             price: { speed: priceBuy(rec.buys.speed), dmg: priceBuy(rec.buys.dmg), hp: priceBuy(rec.buys.hp), case: priceCase(rec.cases), life: LIFE_PRICE }, max: BUY_MAX, pct: BUY_PCT
         });
@@ -474,6 +586,8 @@ module.exports = function createGladiators(D) {
         socket.on('glEquip', d => equip(socket, d));
         socket.on('glBet', d => bet(socket, d));
         socket.on('glWatch', d => watch(socket, d));
+        socket.on('glClass', d => pickClass(socket, d));
+        socket.on('glAbility', d => useAbility(socket, d));
         socket.on('glSync', d => { const r = d && rooms[d.roomId], G = G_of(r), rec = G && G.ps[socket.id]; if (rec && !rec.left) { sendMe(G, rec); broadcast(G); } });
     }
     // скільки людей у сесії (для списку сесій): учасники, які ще не вийшли
@@ -483,5 +597,5 @@ module.exports = function createGladiators(D) {
     const noDmg = r => isHub(r) && !!r._gl;      // Форум: шкоди немає (цифри показуються)
     const noPowerups = m => m === 'gladiators' || m === 'gl_arena' || m === 'gl_duel';
 
-    return { start, tick, onDeath, onLeave, onZombieKill, bind, owns, isHub, count, members, noDmg, noPowerups, HUB, ZONES, G_of };
+    return { start, tick, onDeath, onLeave, onZombieKill, bind, owns, isHub, count, members, noDmg, noPowerups, taken, dealt, HUB, ZONES, G_of };
 };
