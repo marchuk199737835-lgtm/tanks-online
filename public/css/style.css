@@ -1397,3 +1397,51 @@ html.gfx-low .gl-coin { box-shadow: none; }
 .gl-life .gl-bi { background: rgba(239,68,68,.16); }
 .gl-curse { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 8px 10px; border-radius: 11px; background: rgba(88,28,135,.25); border: 1px solid rgba(168,85,247,.5); font-size: 12px; font-weight: 800; color: #e9d5ff; }
 .gl-curse i { font-style: normal; font-size: 16px; }
+
+/* ===== «ГЛАДІАТОРИ»: класи (вибір, кнопка вміння) ===== */
+.glc-ic { width: 100%; height: 100%; display: block; }
+.glc-roles { display: flex; gap: 6px; overflow-x: auto; padding: 0 14px 10px; scrollbar-width: none; }
+.glc-roles::-webkit-scrollbar { display: none; }
+.glc-roles button { flex: 0 0 auto; height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(var(--rc, 234,179,8), .45); background: rgba(var(--rc, 234,179,8), .08); color: #fef3c7; font-size: 12px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+.glc-roles button.on { background: rgba(var(--rc, 234,179,8), .3); box-shadow: 0 0 12px rgba(var(--rc, 234,179,8), .35); }
+.glc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 9px; padding: 0 14px 12px; }
+.glc-card { position: relative; display: flex; flex-direction: column; gap: 7px; padding: 10px; border-radius: 14px; text-align: left; color: #fef3c7; cursor: pointer; border: 1px solid rgba(var(--cc), .35);
+  background: radial-gradient(120% 90% at 0% 0%, rgba(var(--cc), .2), rgba(12,10,9,.9) 60%); transition: transform .14s, border-color .14s, box-shadow .14s; opacity: 0; animation: glIn .3s ease forwards; }
+.glc-card:hover { border-color: rgb(var(--cc)); transform: translateY(-2px); }
+.glc-card.sel { border-color: rgb(var(--cc)); box-shadow: 0 0 0 2px rgb(var(--cc)), 0 0 24px rgba(var(--cc), .45); }
+.glc-top { display: flex; align-items: center; gap: 10px; }
+.glc-icw { width: 46px; height: 46px; flex: 0 0 auto; filter: drop-shadow(0 4px 10px rgba(var(--cc), .45)); }
+.glc-top b { display: block; font-family: 'Russo One', sans-serif; font-weight: 400; font-size: 15px; }
+.glc-top em { display: inline-block; margin-top: 2px; font-style: normal; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: 2px 7px; border-radius: 6px; color: rgb(var(--rc)); background: rgba(var(--rc), .14); }
+.glc-stats { display: flex; flex-wrap: wrap; gap: 4px; }
+.glc-stats span { font-size: 10.5px; font-weight: 800; padding: 2px 6px; border-radius: 6px; background: rgba(255,255,255,.06); color: #d6d3d1; }
+.glc-stats span.up { color: #86efac; background: rgba(34,197,94,.12); } .glc-stats span.dn { color: #fca5a5; background: rgba(239,68,68,.12); }
+.glc-ab { padding: 7px 8px; border-radius: 10px; background: rgba(0,0,0,.3); border: 1px solid rgba(var(--cc), .25); }
+.glc-ab b { display: flex; justify-content: space-between; gap: 6px; font-size: 12.5px; font-weight: 800; color: rgb(var(--cc)); filter: brightness(1.35); }
+.glc-ab b i { font-style: normal; color: #d6d3d1; font-size: 11px; white-space: nowrap; filter: none; }
+.glc-ab small { display: block; margin-top: 3px; font-size: 11px; line-height: 1.4; font-weight: 600; color: #d6d3d1; }
+.glc-foot { position: sticky; bottom: -14px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 14px 12px; background: linear-gradient(180deg, rgba(12,10,9,0), #0c0a09 40%); }
+.glc-foot button { min-width: 220px; height: 44px; border: 0; border-radius: 13px; font-family: 'Russo One', sans-serif; font-size: 14px; color: #1c1917; background: linear-gradient(180deg, #fde68a, #f59e0b); box-shadow: 0 8px 20px rgba(245,158,11,.4); cursor: pointer; }
+.glc-foot button[disabled] { filter: grayscale(1); opacity: .5; cursor: default; box-shadow: none; }
+.glc-foot small { font-size: 11px; font-weight: 700; color: #a8a29e; }
+.gl-pt { font-size: 15px; }
+.glc-mine { display: flex; gap: 12px; align-items: center; margin: 0 14px 10px; padding: 10px 12px; border-radius: 14px; border: 1px solid rgba(var(--cc), .45); background: radial-gradient(120% 120% at 0% 0%, rgba(var(--cc), .22), rgba(0,0,0,.25) 70%); }
+.glc-mine .glc-icw { width: 54px; height: 54px; }
+.glc-mine small { display: block; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #d6b46a; }
+.glc-mine b { display: block; font-family: 'Russo One', sans-serif; font-weight: 400; font-size: 17px; }
+.glc-mine span { display: block; font-size: 11.5px; font-weight: 600; color: #d6d3d1; margin-top: 2px; line-height: 1.4; }
+.gl-ab { position: fixed; right: calc(env(safe-area-inset-right, 0px) + 16px); top: 46%; z-index: 46; width: 74px; height: 74px; padding: 6px; border-radius: 22px; border: 2px solid rgba(var(--cc), .8); background: rgba(12,10,9,.85); cursor: pointer; box-shadow: 0 0 18px rgba(var(--cc), .45); transition: transform .12s; }
+.gl-ab:active { transform: scale(.94); }
+.gl-abi { width: 100%; height: 100%; }
+.gl-abcd { position: absolute; inset: 0; border-radius: 20px; pointer-events: none; }
+.gl-abt { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: 'Russo One', sans-serif; font-size: 22px; color: #fff; text-shadow: 0 2px 6px #000; pointer-events: none; }
+.gl-ab kbd { position: absolute; left: -6px; top: -6px; font-family: 'Russo One', sans-serif; font-size: 10px; padding: 2px 6px; border-radius: 6px; background: #1c1917; border: 1px solid rgba(var(--cc), .8); color: #fef3c7; }
+.gl-ab.off { filter: grayscale(.85); opacity: .6; box-shadow: none; }
+.gl-ab.cd { box-shadow: none; }
+.gl-ab.act { animation: glAbAct 1s ease-in-out infinite; }
+@keyframes glAbAct { 50% { box-shadow: 0 0 30px rgba(var(--cc), .9); } }
+@media (hover: none) { .gl-ab kbd { display: none; } }
+@media (max-width: 640px), (orientation: landscape) and (max-height: 460px) {
+  .glc-grid { grid-template-columns: 1fr; } .gl-ab { width: 62px; height: 62px; top: 40%; } .glc-foot button { min-width: 0; width: 100%; }
+}
+html.gfx-low .glc-card { animation: none; opacity: 1; } html.gfx-low .glc-icw { filter: none; } html.gfx-low .gl-ab.act { animation: none; }

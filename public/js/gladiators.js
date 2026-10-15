@@ -141,7 +141,7 @@
     }
     function closePanel(only) { const p = $('gl-panel'); if (!p || (only && panelKind !== only)) return; if (panelKind === 'shop' || panelKind === 'bets') S.dismiss[panelKind] = true; p.classList.add('hidden'); panelKind = null; }
     const head = (ic, t, sub) => '<div class="gl-ph"><i>' + ic + '</i><div><b>' + t + '</b><small>' + (sub || '') + '</small></div><span class="gl-bal">' + PT + ' <b>' + ((S.me && S.me.pts) | 0) + '</b></span><button type="button" class="gl-x" data-x aria-label="Закрити">✕</button></div>';
-    function refreshPanel() { if (!panelKind) return; if (panelKind === 'shop') openShop(true); else if (panelKind === 'bets') openBets(true); else if (panelKind === 'inv') openInv(true); else if (panelKind === 'watch') openWatch(true); }
+    function refreshPanel() { if (!panelKind) return; if (panelKind === 'shop') openShop(true); else if (panelKind === 'bets') openBets(true); else if (panelKind === 'inv') openInv(true); else if (panelKind === 'watch') openWatch(true); else if (panelKind === 'pick') openPick(true); }
 
     // --- Лавка ---
     const BUYS = [['speed', '💨', 'Швидкість', 'швидкість руху'], ['dmg', '🔥', 'Шкода', 'шкода снарядів'], ['hp', '🛡️', 'Здоровʼя', 'максимум HP']];
@@ -197,7 +197,9 @@
         const pc = Math.round(me.pct * 100), eq = Object.assign({}, me.eq, { bm: { speed: 1 + me.pct * me.buys.speed, dmg: 1 + me.pct * me.buys.dmg, hp: 1 + me.pct * me.buys.hp } });
         const slot = s => { const m = MOD(me.eq[s]); return '<button type="button" class="gl-slot' + (m ? ' full' : '') + '" data-slot="' + s + '" style="--rc:' + (m ? RCOL(m.rarity) : '#334155') + '">' + (m ? '<div class="gl-mi">' + (typeof modIcon === 'function' ? modIcon(m) : '') + '</div><b>' + esc(m.name) + '</b><small>' + RNAME(m.rarity) + '</small>' : '<div class="gl-mi gl-empty">＋</div><b>' + SLOTN[s] + '</b><small>базовий</small>') + '</button>'; };
         const st = [['💨', 'Швидкість', 'speed', me.buys.speed], ['🔥', 'Шкода', 'dmg', me.buys.dmg], ['🛡️', 'Здоровʼя', 'hp', me.buys.hp], ['⏱', 'Скорострільність', 'cd', null], ['🎯', 'Дальність', 'range', null]];
+        const mc = window.GlClasses && GlClasses.BYID[me.cls];
         let h = head('🎒', 'ІНВЕНТАР ГРИ', 'Модулі й бафи діють лише в цій грі') +
+            (mc ? '<div class="glc-mine" style="--cc:' + mc.c + '"><div class="glc-icw">' + GlClasses.icon(mc.id) + '</div><div><small>' + GlClasses.ROLES[mc.r].n + '</small><b>' + esc(mc.n) + '</b><span>✨ ' + esc(mc.ab.n) + ' · ⏱ ' + mc.ab.cd + ' с — ' + esc(mc.ab.d) + '</span></div></div>' : '') +
             '<div class="gl-inv"><div class="gl-col"><div class="gl-sec">Встановлено</div><div class="gl-slots">' + ['cannon', 'turret', 'hull', 'tracks'].map(slot).join('') + '</div>' +
             '<div class="gl-sec">Характеристики</div><div class="gl-stats">' + st.map(([ic, n, k, b]) => { let p = k === 'cd' ? Math.round((1 / GameData.statMult(eq, 'cd') - 1) * 100) : statPct(eq, k); return '<div><i>' + ic + '</i><span>' + n + '</span><b class="' + (p > 0 ? 'up' : p < 0 ? 'dn' : '') + '">' + (p > 0 ? '+' : '') + p + '%</b>' + (b != null ? '<em>куплено +' + b * pc + '%</em>' : '') + '</div>'; }).join('') + '</div>' +
             (me.curse ? '<div class="gl-curse"><i>🖤</i><span>Прокляття: ' + me.curse + ' · −' + me.cursePct + '% до всіх характеристик</span></div>' : '') +
@@ -268,9 +270,84 @@
         }
     }
 
+    // ---------- КЛАСИ: вибір на старті (45 с), кнопка вміння, ефекти ----------
+    const GC = window.GlClasses, CL = id => GC && GC.BYID[id];
+    const STATN = [['hp', '❤', 'Здоровʼя'], ['dmg', '🔥', 'Шкода'], ['spd', '💨', 'Швидкість'], ['cd', '⏱', 'Скорострільність'], ['rng', '🎯', 'Дальність']];
+    // множник → відсоток (перезарядка: менша = краще, тому показуємо як скорострільність)
+    const pctOf = (k, v) => Math.round(((k === 'cd' ? 1 / v : v) - 1) * 100);
+    function statChips(c) {
+        return STATN.map(([k, ic, n]) => { const p = pctOf(k, c.st[k]); if (!p) return ''; return '<span class="' + (p > 0 ? 'up' : 'dn') + '" title="' + n + '">' + ic + ' ' + (p > 0 ? '+' : '') + p + '%</span>'; }).join('') || '<span>⚖ збалансований</span>';
+    }
+    let pickSel = null, pickRole = 'all';
+    const pickLeft = () => S.st ? Math.max(0, (S.st.pick || 0) - (performance.now() - S.stAt)) : 0;
+    function openPick(re) {
+        if (!GC || !S.st || !S.me || S.me.cls || S.st.round > 0 || !(S.st.pick > 0)) return;
+        const roles = Object.keys(GC.ROLES), picked = S.st.roster.filter(q => q.k && !q.x).length, tot = S.st.roster.filter(q => !q.x).length;
+        const list = GC.LIST.filter(c => pickRole === 'all' || c.r === pickRole);
+        let h = '<div class="gl-ph"><i>🛡️</i><div><b>ОБЕРІТЬ КЛАС</b><small>Клас дає базові характеристики й вміння на всю гру · обрали ' + picked + ' / ' + tot + '</small></div><span class="gl-bal gl-pt" id="gl-pick-t">' + mmss(pickLeft()) + '</span></div>' +
+            '<div class="glc-roles"><button type="button" data-role="all" class="' + (pickRole === 'all' ? 'on' : '') + '">Усі · ' + GC.LIST.length + '</button>' + roles.map(r => '<button type="button" data-role="' + r + '" class="' + (pickRole === r ? 'on' : '') + '" style="--rc:' + GC.ROLES[r].c + '">' + GC.ROLES[r].n + '</button>').join('') + '</div>' +
+            '<div class="glc-grid">' + list.map((c, i) => '<button type="button" class="glc-card' + (pickSel === c.id ? ' sel' : '') + '" data-c="' + c.id + '" style="--cc:' + c.c + ';--rc:' + GC.ROLES[c.r].c + ';animation-delay:' + Math.min(i, 20) * 18 + 'ms">' +
+                '<div class="glc-top"><div class="glc-icw">' + GC.icon(c.id) + '</div><div><b>' + esc(c.n) + '</b><em>' + GC.ROLES[c.r].n + '</em></div></div>' +
+                '<div class="glc-stats">' + statChips(c) + '</div>' +
+                '<div class="glc-ab"><b>✨ ' + esc(c.ab.n) + '<i>⏱ ' + c.ab.cd + ' с</i></b><small>' + esc(c.ab.d) + '</small></div></button>').join('') + '</div>' +
+            '<div class="glc-foot"><button type="button" id="glc-ok"' + (pickSel ? '' : ' disabled') + '>' + (pickSel ? 'ОБРАТИ: ' + esc(CL(pickSel).n) : 'Оберіть клас') + '</button><small>Якщо не встигнете — клас буде обрано автоматично</small></div>';
+        const pb = $('gl-panel') && $('gl-panel').firstChild, sc = re && pb ? pb.scrollTop : 0;      // перемальовування не скидає прокрутку
+        const box = panel('pick', h); box.scrollTop = sc;
+        box.querySelectorAll('[data-role]').forEach(b => b.onclick = () => { snd('ui_click'); pickRole = b.dataset.role; openPick(true); });
+        box.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { snd('ui_click'); pickSel = b.dataset.c; box.querySelectorAll('.glc-card').forEach(x => x.classList.toggle('sel', x === b)); const ok = $('glc-ok'); ok.disabled = false; ok.textContent = (window.I18N ? I18N.t('ОБРАТИ:') : 'ОБРАТИ:') + ' ' + CL(pickSel).n; });
+        box.querySelectorAll('[data-c]').forEach(b => b.ondblclick = () => { pickSel = b.dataset.c; confirmPick(); });
+        $('glc-ok').onclick = confirmPick;
+    }
+    function confirmPick() { if (!pickSel) return; snd('ui_buy'); socket.emit('glClass', { roomId: rid(), id: pickSel }); }
+    // кнопка вміння: іконка класу + перезарядка; E (або своя клавіша) на ПК, дотик — на телефоні
+    let cdEnd = 0, fxEnd = 0;
+    function abBtn() {
+        build(); let b = $('gl-ab');
+        if (!b) { b = document.createElement('button'); b.type = 'button'; b.id = 'gl-ab'; b.className = 'gl-ab hidden'; b.innerHTML = '<div class="gl-abi"></div><div class="gl-abcd"></div><span class="gl-abt"></span><kbd></kbd>'; $('gl-root').appendChild(b); b.addEventListener('click', useAb); }
+        const c = S.me && CL(S.me.cls), k = kindNow(), on = active() && !!c && !(S.me && S.me.out);
+        b.classList.toggle('hidden', !on); if (!on) return;
+        const ic = b.querySelector('.gl-abi'); if (ic.__c !== c.id) { ic.__c = c.id; ic.innerHTML = GC.icon(c.id); b.style.setProperty('--cc', c.c); b.title = c.ab.n + ' — ' + c.ab.d; }
+        const left = Math.max(0, cdEnd - performance.now()), fight = (k === 'arena' || k === 'duel') && myHp() > 0, frac = left / (c.ab.cd * 1000);
+        b.classList.toggle('off', !fight); b.classList.toggle('cd', left > 0); b.classList.toggle('act', fxEnd > performance.now());
+        b.querySelector('.gl-abcd').style.background = left > 0 ? 'conic-gradient(rgba(2,6,23,.78) ' + Math.round(Math.min(1, frac) * 360) + 'deg, transparent 0)' : 'none';
+        b.querySelector('.gl-abt').textContent = left > 0 ? Math.ceil(left / 1000) : (fight ? '' : '⛔');
+        b.querySelector('kbd').textContent = window.KB ? KB.label('ability') : 'E';
+    }
+    function useAb() {
+        const k = kindNow(); if (k !== 'arena' && k !== 'duel') { toast('Вміння працює лише в бою: на арені та в дуелі', true); return; }
+        if (performance.now() < cdEnd || myHp() <= 0) return;
+        socket.emit('glAbility', { roomId: rid() });
+    }
+    const fxs = [];      // спалахи вмінь на мапі
+    socket.on('glAbil', d => {
+        const c = CL(d.cls); if (!c) return;
+        fxs.push({ x: d.x, y: d.y, r: d.r || 110, to: d.to, c: c.c, n: c.ab.n, t0: performance.now(), id: d.id });
+        if (fxs.length > 12) fxs.shift();
+        if (d.id === (typeof myId !== 'undefined' ? myId : null)) { snd('powerup'); fxEnd = d.t ? performance.now() + d.t * 1000 : 0; if (d.to && typeof myLocalTank !== 'undefined') { myLocalTank.x = d.to.x; myLocalTank.y = d.to.y; } }
+    });
+    socket.on('glCd', d => { cdEnd = performance.now() + (d.ms | 0); abBtn(); });
+    function drawFx(ctx, now, lowG) {
+        const t = performance.now();
+        for (let i = fxs.length - 1; i >= 0; i--) {
+            const f = fxs[i], age = (t - f.t0) / 900; if (age >= 1.4) { fxs.splice(i, 1); continue; }
+            ctx.save();
+            if (age < 1) {
+                const R = f.r * (0.25 + 0.75 * age);
+                ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, Math.PI * 2); ctx.lineWidth = 8 * (1 - age) + 2; ctx.strokeStyle = 'rgba(' + f.c + ',' + (0.85 * (1 - age)) + ')'; ctx.stroke();
+                if (!lowG) { ctx.fillStyle = 'rgba(' + f.c + ',' + (0.14 * (1 - age)) + ')'; ctx.fill(); }
+                if (f.to) { ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(f.to.x, f.to.y); ctx.setLineDash([10, 10]); ctx.lineWidth = 4; ctx.stroke(); ctx.setLineDash([]); ctx.beginPath(); ctx.arc(f.to.x, f.to.y, 60 * (0.4 + 0.6 * age), 0, Math.PI * 2); ctx.stroke(); }
+            }
+            const a = Math.max(0, 1 - Math.max(0, age - 0.6) / 0.8), y = (f.to ? f.to.y : f.y) - 70 - age * 24;
+            ctx.globalAlpha = a; ctx.font = '700 22px "Russo One", sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(2,6,23,.85)';
+            const tx = window.I18N ? I18N.t(f.n) : f.n; ctx.strokeText(tx, f.to ? f.to.x : f.x, y); ctx.fillStyle = 'rgb(' + f.c + ')'; ctx.fillText(tx, f.to ? f.to.x : f.x, y);
+            ctx.restore();
+        }
+    }
+
     // ---------- малювання на мапі: світні кола зон ----------
     window.GladFX = {
         ground(ctx, now, pv, lowG) {
+            if (fxs.length) drawFx(ctx, now, lowG);
             if (kindNow() !== 'hub' || !S.st) return;
             [['shop', 'ЛАВКА', '251,191,36'], ['bets', 'СТАВКИ', '168,85,247']].forEach(([k, t, c]) => {
                 const z = ZONES[k]; if (z.x + z.r < pv.x0 || z.x - z.r > pv.x1 || z.y + z.r < pv.y0 || z.y - z.r > pv.y1) return;
@@ -295,7 +372,9 @@
         hud(); refreshPanel();
     });
     socket.on('glMe', d => {
-        const had = S.me && S.me.offer; S.me = d; hud();
+        const had = S.me && S.me.offer, hadCls = S.me && S.me.cls; S.me = d; hud();
+        if (d.cd > 0 && performance.now() + d.cd > cdEnd + 400) cdEnd = performance.now() + d.cd;      // перезарядка після переходу між кімнатами
+        if (d.cls && !hadCls) { const c = CL(d.cls); if (panelKind === 'pick') closePanel(); if (c) banner('🛡️', 'Ваш клас: ' + c.n, '✨ ' + esc(c.ab.n) + ' — ' + esc(c.ab.d), 'gold', 4500); }
         if (panelKind === 'offer' && !d.offer) closePanel();
         if (d.offer && !had) setTimeout(openOffer, 600); else if (panelKind && panelKind !== 'offer' && panelKind !== 'over' && panelKind !== 'end' && panelKind !== 'case') refreshPanel();
     });
@@ -334,6 +413,12 @@
     socket.on('glEnd', d => { S.endData = { hub: S.st && S.st.hub }; if (S.st) S.st.ph = 'end'; setTimeout(() => endWin(d), 900); hud(); });
     socket.on('clsLives', d => { if (S.me && d && d.n != null && kindNow()) { S.me.lives = d.n; hud(); } });
 
+    // ---------- клавіша вміння (та сама, що для здібностей класів у кооперативі: E) ----------
+    window.addEventListener('keydown', e => {
+        if (!active() || !window.KB || !KB.is(e, 'ability') || e.repeat) return;
+        const t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+        e.preventDefault(); useAb();
+    });
     // ---------- клавіша інвентарю ----------
     window.addEventListener('keydown', e => {
         if (!active() || !window.KB || !KB.is(e, 'inventory')) return;
@@ -346,7 +431,8 @@
     setInterval(() => {
         if (!S.st) return;
         if (!active()) { if ($('gl-hud') && !$('gl-hud').classList.contains('hidden')) hud(); return; }
-        hud(); zones();
+        hud(); zones(); abBtn();
+        if (S.me && !S.me.cls && S.st.round === 0 && S.st.pick > 0) { if (panelKind !== 'pick' && panelKind !== 'end') openPick(); else if (panelKind === 'pick') { const t = $('gl-pick-t'); if (t) t.textContent = mmss(pickLeft()); } }
         if (panelKind === 'bets' || panelKind === 'watch') refreshPanel();
         if (S.me && S.me.offer && !panelKind && kindNow() === 'hub') openOffer();
         // глядач: якщо ціль зникла — наступний живий
@@ -356,5 +442,5 @@
 
     function reset() { const dm = $('deathmatch-score-hud'); if (dm) dm.style.display = ''; S.st = null; S.me = null; S.zone = null; S.dismiss = {}; S.over = false; lastPts = null; closePanel(); const h = $('gl-hud'); if (h) { h.classList.add('hidden'); $('gl-acts').classList.add('hidden'); $('gl-duelbar').classList.add('hidden'); $('gl-big').classList.add('hidden'); } }
     socket.on('kicked', reset);
-    window.GladUI = { active, isOut: () => !!(S.me && S.me.out), reset, inv: openInv, shop: openShop, bets: openBets, watch: openWatch };
+    window.GladUI = { active, isOut: () => !!(S.me && S.me.out), reset, inv: openInv, shop: openShop, bets: openBets, watch: openWatch, pick: openPick, ability: useAb };
 })();
